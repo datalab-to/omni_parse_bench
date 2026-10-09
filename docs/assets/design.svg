@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="496" viewBox="0 0 760 496" font-size="15" role="img" aria-label="The headline averages families; tags only select tests">
+<style><![CDATA[@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap');
+/* Datalab design system -- tokens from svelte/src/styles/datalab-system.css, converted from
+   oklch to hex so the figures render identically outside a browser. The system is light-only;
+   this guard stops a viewer's auto dark mode inverting them on its own. */
+:root{color-scheme:only light}
+text{font-family:Geist,ui-sans-serif,system-ui,sans-serif;fill:#0f1217}
+.h2{font-weight:500;font-size:18px;letter-spacing:-.09px;font-feature-settings:"ss01" 1}
+.nm{font-weight:500;font-size:14px;text-anchor:middle}
+.ln{font-size:12.5px;fill:#595e66;text-anchor:middle}
+.mono{font-family:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;fill:#595e66;text-anchor:middle}
+.ft{font-size:12.5px;fill:#595e66;text-anchor:middle}
+.box{fill:#ffffff;stroke:#ced1d6;stroke-width:1}
+.wire{fill:none;stroke:#9a9fa7;stroke-width:1.25}
+]]></style>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9a9fa7"/></marker></defs>
+<rect width="760" height="496" fill="#f9fafd"/>
+<text class="h2" x="24" y="38">The headline averages families; tags only select tests</text>
+<g>
+  <path class="wire" d="M380 116V134"/>
+  <path class="wire" d="M156 134H604"/>
+  <path class="wire" d="M156 134V154" marker-end="url(#arrow)"/>
+  <path class="wire" d="M380 134V154" marker-end="url(#arrow)"/>
+  <path class="wire" d="M604 134V154" marker-end="url(#arrow)"/>
+  <path class="wire" d="M156 226V252H604"/>
+  <path class="wire" d="M380 226V252"/>
+  <path class="wire" d="M604 226V252"/>
+  <path class="wire" d="M380 252V276" marker-end="url(#arrow)"/>
+  <path class="wire" d="M380 332V348H260V364" marker-end="url(#arrow)"/>
+  <path class="wire" d="M400 392H440" marker-end="url(#arrow)"/>
+</g>
+<rect class="box" x="230" y="60" width="300" height="56" rx="8"/>
+<text class="nm" x="380" y="84">Headline</text>
+<text class="ln" x="380" y="102">mean of the families' scores</text>
+<rect class="box" x="56" y="154" width="200" height="72" rx="8"/>
+<text class="nm" x="156" y="178">Text</text>
+<text class="mono" x="156" y="198">present, order,</text>
+<text class="mono" x="156" y="214">repeat</text>
+<rect class="box" x="280" y="154" width="200" height="72" rx="8"/>
+<text class="nm" x="380" y="178">Tables</text>
+<text class="mono" x="380" y="198">table_cell</text>
+<rect class="box" x="504" y="154" width="200" height="72" rx="8"/>
+<text class="nm" x="604" y="178">Layout</text>
+<text class="mono" x="604" y="198">layout_kind</text>
+<rect class="box" x="200" y="276" width="360" height="56" rx="8"/>
+<text class="nm" x="380" y="300">Test</text>
+<text class="ln" x="380" y="318">one yes/no claim about one page</text>
+<rect class="box" x="120" y="364" width="280" height="56" rx="8"/>
+<text class="nm" x="260" y="388">Arg</text>
+<text class="ln" x="260" y="406">content at one place on the page</text>
+<rect x="440" y="364" width="280" height="56" rx="8" fill="#e4f2ff" stroke="#001dbe" stroke-width="1.5"/>
+<text class="nm" x="580" y="388">Tags</text>
+<text class="ln" x="580" y="406" style="fill:#0f1217">table, math, language, etc.</text>
+<text class="ft" x="380" y="456">A test's tags are the union of its args' tags.</text>
+<text class="ft" x="380" y="474">Tags select tests for any query; they never weigh the headline.</text>
+</svg>
