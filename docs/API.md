@@ -526,7 +526,7 @@ and cost:
 {"headline": {"...": "..."}, "html": {"...": "..."}, "blocks": {"...": "..."},
  "per_suite": {"...": "..."}, "per_derivation": {"...": "..."},
  "gold": "857550728dd99df40d2139946d99f711568ed529",
- "scorer": "0.0.1+a09ce5ecf32a", "pages": 2937, "pages_pending": 0, "usd": 13.668,
+ "scorer": "0.1.0+a09ce5ecf32a", "pages": 2937, "pages_pending": 0, "usd": 13.668,
  "credits": 0}
 ```
 
@@ -558,7 +558,7 @@ One line per test, in manifest order: its verdict, what the test is, and the sta
  "suite": "olmo_arxiv_math", "document": "olmo_arxiv_math:2502.15977",
  "test_id": "2502.15977_pg21_math_003", "test_type": "present", "output_type": "html",
  "derivation": "upstream_olmocr", "tags": ["math"], "result": "pass", "why": "",
- "record": "5f0c...", "gold": "857550728dd99df40d2139946d99f711568ed529", "scorer": "0.0.1+a09ce5ecf32a"}
+ "record": "5f0c...", "gold": "857550728dd99df40d2139946d99f711568ed529", "scorer": "0.1.0+a09ce5ecf32a"}
 ```
 
 - `run` and `provider` name the run (its folder) and its provider; `settings.json` has the rest;
