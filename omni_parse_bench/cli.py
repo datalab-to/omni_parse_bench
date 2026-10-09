@@ -10,18 +10,26 @@
 Everything goes to stdout as JSON except `benchmark`'s progress, and `benchmark` shows its plan
 and waits for a yes unless given `-y`; nothing in the library ever reads stdin. `benchmark` exits 2
 when a test's grading failed in our code, so a scorer bug can't pass as a vendor's score.
+
+`score` needs only the core install; every other command needs an extra (EXTRAS), and on an
+install without it says which to add instead of failing on the first missing import.
 """
 from __future__ import annotations
 
 import argparse
 import dataclasses
 import json
+import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 from omni_parse_bench import benchmark
+
+# command -> the extra it needs; `score` needs none.
+EXTRAS = {"predict": "harness", "providers": "harness", "reparse": "harness", "benchmark": "benchmark",
+          "tests": "benchmark"}
 
 
 
@@ -260,8 +268,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     pl.add_argument("provider", nargs="?")
 
     a = ap.parse_args(argv)
-    return {"score": cmd_score, "predict": cmd_predict, "benchmark": cmd_benchmark, "tests": cmd_tests,
-            "providers": cmd_providers, "reparse": cmd_reparse}[a.cmd](a)
+    cmd = {"score": cmd_score, "predict": cmd_predict, "benchmark": cmd_benchmark, "tests": cmd_tests,
+           "providers": cmd_providers, "reparse": cmd_reparse}[a.cmd]
+    try:
+        return cmd(a)
+    except ImportError as exc:
+        # Note: only a third-party module is fixed by installing an extra; a broken import of our own
+        # must surface as itself. The harness's own error (`MissingDependency`) names its module only
+        # in its message.
+        missing = exc.name or (m[1] if (m := re.search(r"No module named '([^']+)'", str(exc))) else None)
+        if a.cmd not in EXTRAS or not missing or missing.startswith("omni_parse_bench"): raise
+        extra = EXTRAS[a.cmd]
+        print(f"opb {a.cmd} needs {missing.split('.')[0]}, which comes with the {extra} extra:\n"
+              f"    pip install 'omni-parse-bench[{extra}]'", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
