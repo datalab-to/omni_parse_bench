@@ -9,12 +9,6 @@
 A document-parsing benchmark. Every test is a yes/no question about one page: is this text in the
 output, in this order, in a table cell under these headings, in a layout block of this kind?
 
-The pages are PubMed Central tables, arXiv math, old scans, multi-column and tiny text, real
-business documents, filled forms (US federal, French, handwritten), handwritten manuscripts,
-engineering drawings, pages in many languages, and rotated, skewed and rebuilt copies. Each test's
-answer comes from a source we can check: the publisher's XML, the PDF's text layer, a form we
-filled, an archive's transcription, or a model panel, with a person deciding its splits.
-
 This repository runs the benchmark on [our dataset](https://huggingface.co/datasets/datalab-to/omni_parse_bench)
 or yours, and exposes its two primitives, `predict` and `score`, for your pipelines.
 
