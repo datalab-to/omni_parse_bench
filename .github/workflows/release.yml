@@ -1,0 +1,110 @@
+# Publishing to PyPI. Triggered by pushing a version tag, whose version must be the one
+# `pyproject.toml` already declares -- the job refuses the two if they disagree, because a
+# wheel named after the wrong version cannot be taken back off PyPI.
+#
+# No API token: PyPI is configured to trust this repository and this workflow file, and the
+# `id-token` permission below is what lets the action prove it is them.
+name: release
+
+# Tag push only. A `release: published` trigger alongside this one would fire a second time
+# for the usual "push the tag, then write the release notes" sequence, and that second upload
+# fails on a filename PyPI already has -- a red run for a release that actually succeeded.
+# `workflow_dispatch` is a DRY RUN: it builds, tests and checks the artifacts but does not
+# publish (see the `if` on the publish job). Use it to see a release go green before the tag
+# exists, because a tag that fails halfway can leave a version burned on PyPI.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+
+      # Read the declared version from pyproject itself rather than `uv version --short`:
+      # that subcommand reports the PROJECT version only on uv >= 0.7, and on older uv the
+      # same command prints uv's OWN version instead -- so a drifting toolchain would quietly
+      # compare the tag against the wrong number.
+      - name: Check the tag against the declared version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          declared=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
+          tag=${GITHUB_REF_NAME#v}
+          echo "tag=$tag declared=$declared"
+          if [ "$declared" != "$tag" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match version $declared in pyproject.toml. Bump the version, or move the tag." >&2
+            exit 1
+          fi
+
+      # The scorer decides published numbers, so a release that cannot pass its own checks is
+      # not one to ship. The same checks as test.yml: `dev` brings every extra (the harness and
+      # the dataset access) with pytest and ruff, and none of the tests needs network or
+      # credentials. `--frozen` installs what uv.lock pins, so a release is tested on the
+      # versions it was developed on.
+      - name: Install and test
+        run: |
+          uv sync --frozen --extra dev
+          uv run ruff check omni_parse_bench tests
+          uv run pytest -q
+
+      - run: uv build
+
+      # A source distribution that swept in a dataset or a run is the failure this guards
+      # against: PyPI takes nothing over 100 MB, and finding that out mid-upload leaves the
+      # wheel published and the sdist not.
+      - name: Check the artifacts
+        run: |
+          uvx twine check dist/*
+          if [ -n "$(find dist -size +50M)" ]; then
+            echo "::error::an artifact is over 50 MB; check what the sdist swept in" >&2
+            ls -lh dist
+            exit 1
+          fi
+
+      # The tag matched what pyproject declared; this checks the files that actually built
+      # carry that version too, which is what PyPI indexes and nobody can rename afterwards.
+      - name: Check the built version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag=${GITHUB_REF_NAME#v}
+          ls -l dist
+          for f in dist/*; do
+            case "$(basename "$f")" in
+              *-"$tag"-*.whl|*-"$tag".tar.gz) ;;
+              *) echo "::error::$(basename "$f") is not version $tag" >&2; exit 1 ;;
+            esac
+          done
+
+      # The distributions only. `uv build` leaves a `.gitignore` in dist/, and while the
+      # upload action skips hidden files by default, naming what to carry means the publish
+      # job cannot be handed anything that is not a distribution.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # Only a tag publishes. A manual run stops after `build`, so `workflow_dispatch` is a
+    # dry run rather than a way to put whatever is on main onto PyPI without a version check.
+    if: startsWith(github.ref, 'refs/tags/')
+    # PyPI's trusted-publisher entry may name an environment. If it does, this must be that
+    # name; if it leaves the field blank, any environment is accepted and this is free.
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
