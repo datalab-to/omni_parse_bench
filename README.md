@@ -12,6 +12,7 @@ output, in this order, in a table cell under these headings, in a layout block o
 This repository runs the benchmark on [our dataset](https://huggingface.co/datasets/datalab-to/omni_parse_bench)
 or yours, and exposes its two primitives, `predict` and `score`, for your pipelines.
 
+- [The design](#the-design)
 - [Install](#install)
 - [Run the benchmark](#run-the-benchmark)
 - [Score](#score)
@@ -19,6 +20,34 @@ or yours, and exposes its two primitives, `predict` and `score`, for your pipeli
 - [Documentation](#documentation)
 - [License](#license)
 - [Citation](#citation)
+
+## The design
+
+![The benchmark's design: headline, families, tests, args and tags](./docs/assets/design.svg)
+
+The headline is the mean of three family scores: text, tables and layout. A family is a group of test
+types:
+
+| test type | checks | family |
+|---|---|---|
+| `present` | this text, number or equation appears | text |
+| `order` | text A comes before text B | text |
+| `repeat` | this line appears exactly N times | text |
+| `table_cell` | this cell sits under these headings and beside these neighbors | tables |
+| `layout_kind` | the block holding this line is a heading, text or table | layout |
+
+A test checks one or more args, each of which is the content at one place on the page. Each arg is
+tagged:
+
+- structure: `table`, `math`, `form` and `multi_column`;
+- rendering: `handwriting`, `tiny`, `rotated` and `degraded`;
+- role: `heading`, `caption`, `footnote`, `list`, `code`, `figure` and `header_footer`;
+- script: ISO 15924 codes (`Latn`, `Hani`, `Deva`, ...); and
+- language: ISO 639-3 codes (`eng`, `fra`, `tha`, ...).
+
+A test's tags are the union of its args' tags. Tags never decide whether a test passes or what the
+headline is; they select tests, so any slice of the benchmark can be scored. A test with several tags
+counts in each, so per-tag scores overlap and don't average to the headline.
 
 ## Install
 
