@@ -1,0 +1,12 @@
+RealDoc-Bench and RealDoc-Bench-Layout — documents under their owners' terms
+
+Source: https://huggingface.co/datasets/Extend-AI/RealDoc-Bench
+        https://huggingface.co/datasets/Extend-AI/RealDoc-Bench-Layout
+Collected by: Extend AI.
+Suites: realdoc_pdfs (RealDoc-Bench), realdoc_pages (RealDoc-Bench-Layout), the rotated copies of
+realdoc_pdfs pages in rotation_skew, and the synth_copies pages rebuilt from either.
+
+Upstream licenses its annotations under CC BY 4.0; those annotations are not used here, and this
+benchmark's tests were made for it. The documents and page images are not covered by that license:
+they keep their owners' rights. They are publicly available documents, credited here to the
+collection they come from.

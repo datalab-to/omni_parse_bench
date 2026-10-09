@@ -1,0 +1,50 @@
+HTR-United datasets — Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Suite: handwriting_samples (10 pages).
+
+Pages are cropped and rendered as images, and the datasets' transcriptions are used as test answers.
+The datasets' license covers their transcriptions; where each page's image comes from, and its
+rights, are given below.
+
+CREMMA-AN Testament De Poilus (3 pages)
+
+- Repository: https://github.com/HTR-United/CREMMA-AN-TestamentDePoilus
+- Authors: Emmanuelle de Champs, Florence Clavaud, Pauline Charbonnier, Christine Nougaret, Alix Chagué, Thibault Clérice, Falcoz Elsa, Marie-Françoise Limon-Bonnet, Elise Wojszvzyk, Sylvie Dechavanne, ALemoine, ASJPeronneau, Alcofrybas, BeaLct, CLbt, Chloelsa, DMichel, Desauthieux, EPerrin, GBMireille, GPINET, Genea78, JMGoux, Jideuxhemme, LBIsabelle, Lamotte, MFGarreau, MIna, Maniet, MarionJo, PGambette, PPocard, PROMBAUT, PaulineTest, SCayeux, SL., SLespinasse, Silver08, TPellé, Valérie, alp, jmorvan, lelia, majubama, mickael.lefevr, sgauthier, EdChamps, Danièle Allezard, Françoise Auriau, Sophie Blanchard, Laure Cadars, Paul Cazin-Bernier, Rosine Cleyet-Michaud, Sophie Delinge, Christiane Demeulenaere-Douyère, Mathilde Deuve, Tristan Girard, Wilfried Gourdon, Emilie Laffitte-Louisou, Valérie Lemée, Jean-Claude Lescure, Mélisa Locatelli, Aurélie Massie, Thomas Olivier, Françoise Pinchard, Tiffanie Pitot, Anais Pontoparia, Michel Renard, Thierry Rihouey, Christian Rodriguez, Konstantinos Sifakis, Marie-Thérèse Solignat, Lucie Vieillon, SL
+- Citation: Chagué A., Clérice T., Mazoue A., Van Kote E. CREMMA-AN-TestamentDePoilus. https://github.com/HTR-United/CREMMA-AN-TestamentDePoilus
+- Images: wills held by the Archives nationales (AN 0065, AN 0281) and the Archives départementales
+  des Yvelines (AD78 0088), from the Testament de Poilus project led by the Archives nationales. The
+  wills were written in 1914–18 by soldiers who died in the war, and are out of copyright.
+
+Moonshines (3 pages)
+
+- Repository: https://github.com/alix-tz/moonshines
+- Authors: Alix Chagué
+- Citation: Chagué A. (2023). moonshines (version 2.0.0). https://github.com/alix-tz/moonshines
+- Images: the author's own handwriting, copying poems by Guillaume Apollinaire (died 1918), which
+  are out of copyright.
+
+Copiste d'un jour (3 pages)
+
+- Repository: https://github.com/banq-dcn/Copiste-d-un-jour
+- Authors: Adèle Aubin, Pascale Montmartin
+- Citation: see the repository
+- Text: volunteers copied French Wikipedia summaries by hand. That text is Wikipedia's contributors',
+  under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/legalcode), and the tests on
+  these pages, which quote it, are under CC BY-SA 4.0 too.
+- Consent: each form carries BAnQ's consent text, in which the writer agrees that the page "pourra
+  aussi être publié et partagé sous licence CC-BY pour être utilisé librement à des fins non
+  commerciales" (may be published and shared under CC BY, to be used freely for non-commercial
+  purposes). The dataset itself is published under CC BY 4.0, which has no non-commercial term. We
+  use the pages in a benchmark that Datalab, a company, publishes. A hand copy of someone else's text
+  carries little copyright of its own, so we believe this use is fair; we say so here rather than
+  leave the consent text unmentioned.
+
+Cremma Medieval (1 page)
+
+- Repository: https://github.com/HTR-United/cremma-medieval
+- Authors: Pinche Ariane, Camps Jean-Baptiste, Mariotti Viola, Nolibois Alice, Carnaille Camille, Deleville Prunelle, Lecomte Sophie, Meylan Aminoel, Ventura Simone, Dugaz Lucien
+- Citation: Pinche A. (2022). Cremma Medieval (version Bicerin 1.1.0). DOI: 10.5281/zenodo.5235185. https://github.com/HTR-United/cremma-medieval
+- Image: University of Pennsylvania, Ms. Codex 660, "free of known copyright restrictions and in the
+  public domain" (OPenn, https://openn.library.upenn.edu/Data/0002/html/mscodex660.html).
+
+Full license text: https://creativecommons.org/licenses/by/4.0/legalcode

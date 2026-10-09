@@ -1,0 +1,15 @@
+PubMed Central open-access articles — CC BY, CC0 or public domain, per article
+
+Source: https://www.ncbi.nlm.nih.gov/pmc/tools/openftlist/ (the PMC Open Access Subset)
+Suites: tables_derived, and its rotated copies in rotation_skew.
+
+Each page is a page of one article, under that article's own license: CC BY 2.0, 2.5, 3.0 or 4.0
+(476 articles), CC BY with no version stated (2, whose text names only the "Creative Commons
+Attribution License"), CC0 1.0 (2) or the public domain (1). Pages are cut from the article's PDF,
+and rotation_skew's copies are rotated and skewed; nothing else is changed. Each article's credit (authors, year, title,
+journal, DOI, PMC id and license) and the pages cut from it are a row of pmc_articles.csv, beside
+this file. An article is used only when its own license element is CC BY, CC0 or public domain and
+names no non-commercial or no-derivatives term.
+
+Full license texts: https://creativecommons.org/licenses/by/4.0/legalcode (and the earlier versions
+at https://creativecommons.org/licenses/), https://creativecommons.org/publicdomain/zero/1.0/legalcode

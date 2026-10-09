@@ -1,0 +1,15 @@
+Ohio Department of Transportation drawings — ODOT's terms
+
+Source: Ohio Department of Transportation (https://www.transportation.ohio.gov/).
+Suites: large_format (sample plans) and tiny_plans (standard construction drawings).
+
+ODOT says many of its products are public records "open for non-commercial reuse or duplication",
+that reuse for commercial purposes "is generally prohibited", and that educational and non-profit
+requests are decided case by case; it asks to be credited.
+
+Datalab, a company, publishes this benchmark and compares its own parser with others' on it. We
+include the drawings because they are used to test document parsing, not for their engineering
+content, and engineering drawings are largely factual; we believe this is fair use. The drawings
+are unmodified apart from scan-like copies of some. If ODOT objects, we will remove them.
+
+Source: Ohio Department of Transportation.

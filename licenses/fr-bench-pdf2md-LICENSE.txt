@@ -1,0 +1,17 @@
+fr-bench-pdf2md — MIT License
+
+Source: https://huggingface.co/datasets/pulsia/fr-bench-pdf2md
+Revision used by this benchmark: 7f1f8e7
+Copyright: pulsia and the fr-bench-pdf2md contributors.
+Suite: frbench_handwriting.
+
+The forms category only: French administration forms its authors filled by hand and scanned, and its
+tests, converted to this benchmark's test format; some were removed. The blank forms are French public
+bodies' forms: CERFA forms under the Licence Ouverte 2.0 (see cerfa-LICENSE.txt), and an Agence de
+l'eau form, reusable as public information under the Code des relations entre le public et
+l'administration (art. L321-1).
+
+Please cite: Benchmarking Vision-Language Models for French PDF-to-Markdown Conversion.
+arXiv:2602.11960.
+
+Full license text: https://opensource.org/license/mit

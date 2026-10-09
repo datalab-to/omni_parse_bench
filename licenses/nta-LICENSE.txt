@@ -1,0 +1,8 @@
+国税庁 (National Tax Agency, Japan) form — Public Data License 1.0 (公共データ利用規約 第1.0版)
+
+Source: https://www.nta.go.jp/ (terms: https://www.nta.go.jp/chuijiko/copy.htm, checked 2026-10-08)
+Suite: multilingual (one form).
+
+「国税庁の様式」（国税庁）（https://www.nta.go.jp/）を加工して作成
+Made by filling in a form from the National Tax Agency's website.
+

@@ -1,0 +1,13 @@
+Omni Parse Bench
+Copyright 2026 Datalab
+
+This product includes software developed by others:
+
+- KaTeX 0.16.22 (omni_parse_bench/katex/katex.js), Copyright (c) 2013-2020 Khan Academy and other
+  contributors, under the MIT License (omni_parse_bench/katex/LICENSE).
+- omni_parse_bench/tables.py is a rewrite of the HTML table parser of olmOCR-bench (olmOCR,
+  https://github.com/allenai/olmocr), Copyright Allen Institute for AI, under the Apache License,
+  Version 2.0. The test types present, order and table_cell, and comparing equations by their KaTeX
+  rendering, follow olmOCR-bench.
+
+Each of the dataset's sources, its license and the credit it requires are in licenses/.

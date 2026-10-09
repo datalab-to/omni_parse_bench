@@ -1,0 +1,37 @@
+DocumentCloud forms — documents published by DocumentCloud's users
+
+Source: the DocumentCloud collection on the Internet Archive (archive.org).
+Suite: forms_documentcloud.
+
+DocumentCloud is where journalists and requesters publish the documents they report on or obtain,
+many through the Freedom of Information Act and state public-records laws. The items carry no rights
+statement, and no one has granted a license for them. Their status depends on who made each one:
+
+- US federal forms, in the public domain (17 U.S.C. § 105), with what their filers entered: FERC
+  Form 1 pages filed by DTE Electric, Ameren Missouri (Union Electric) and Ameren Illinois (financial
+  figures), and a Chicago Police Department application on the Justice Department's COPS portal;
+- state and local government documents, from Pennsylvania, Texas and a city police department's
+  grant application: public records, though a state or city may hold copyright in its own works;
+- forms made by private organizations: the National Association of Broadcasters' political
+  broadcast agreement, the NFL Player Disability & Neurocognitive Benefit Plan's application, and
+  the Australian Broadcasting Corporation's Trailblazers application; and
+- a mock IRS-style form ("Form OBMA"), whose maker isn't recorded.
+
+The documents were published on DocumentCloud by the newsrooms and groups whose reporting obtained
+them, credited here:
+
+- MuckRock: the Pennsylvania Right-to-Know requests and the Chicago Police Department's COPS
+  application;
+- Campaign for Accountability (Julia Long): the Texas Health and Human Services forms and emails;
+- Energy and Policy Institute (Matt Kasper): the FERC Form 1 pages;
+- ProPublica (Jeremy Merrill): the NAB political broadcast agreement;
+- The Marshall Project (Manuel Villa): the police department's grant application;
+- Advocacy for Fairness in Sports (Sheilla Dingus): the NFL players' plan application;
+- the Australian Broadcasting Corporation, ABC News: its own Trailblazers application; and
+- the Washington Examiner (Emily Babay): the mock "Form OBMA".
+
+Datalab, a company, publishes this benchmark. We use these pages to test how documents are parsed,
+not for what they say, and most are blank or factual; we believe this is fair use. Some pages show
+the names and work contact details of officials, staff and requesters, as they were published on
+DocumentCloud. If you made one of these documents, or appear in one, and want it removed, open an
+issue at https://github.com/datalab-to/omni_parse_bench/issues.

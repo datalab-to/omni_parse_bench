@@ -1,0 +1,8 @@
+US federal forms — public domain
+
+Source: the issuing agencies (IRS, USCIS, FAA, NTSB and others).
+Suites: forms_filled (its US pages) and forms_federal.
+
+Works of the US federal government are in the public domain (17 U.S.C. § 105). The forms were filled
+by us; forms_federal's fills use handwriting-style fonts (OFL-1.1, Apache-2.0) and simulated wear
+(Augraphy, MIT).

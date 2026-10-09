@@ -1,0 +1,17 @@
+olmOCR-bench — Open Data Commons Attribution License v1.0 (ODC-BY 1.0)
+
+Source: https://huggingface.co/datasets/allenai/olmOCR-bench
+Copyright: Allen Institute for AI (Ai2).
+Suites: olmo_arxiv_math, olmo_long_tiny_text, olmo_multi_column, olmo_old_scans,
+olmo_old_scans_math and olmo_table_tests, and the synth_copies pages rebuilt from olmo_old_scans
+pages.
+
+The pages and their tests are olmOCR-bench's, converted to this benchmark's test format; some tests
+were corrected or removed. olmOCR-bench's pages come from arXiv, the Internet Archive, the Library of
+Congress and Ai2's own collections. Upstream says it is intended for research and educational use in
+accordance with Ai2's Responsible Use Guidelines (https://allenai.org/responsible-use).
+
+Please cite: Poznanski J. et al. (2025). olmOCR: Unlocking Trillions of Tokens in PDFs with Vision
+Language Models. arXiv:2502.18443.
+
+Full license text: https://opendatacommons.org/licenses/by/1-0/

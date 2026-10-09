@@ -1,0 +1,12 @@
+DocParsingBench — Open Data Commons Attribution License v1.0 (ODC-BY 1.0)
+
+Source: https://huggingface.co/datasets/SoMarkAI/DocParsingBench
+Copyright: SoMark.
+Suites: docparsing_images, and the synth_copies pages rebuilt from it.
+
+Page images are used as shipped upstream; their annotations are not used, and this benchmark's tests
+were made for it. Upstream describes the documents as drawn from real business workflows.
+
+Please cite: SoMark (2026). DocParsingBench. Hugging Face and ModelScope.
+
+Full license text: https://opendatacommons.org/licenses/by/1-0/

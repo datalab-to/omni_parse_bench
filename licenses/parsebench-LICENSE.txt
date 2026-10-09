@@ -1,0 +1,14 @@
+ParseBench — Apache License 2.0
+
+Source: https://huggingface.co/datasets/llamaindex/ParseBench
+Copyright: LlamaIndex.
+Suites: parsebench_docs, its rotated copies in rotation_skew, and the synth_copies pages rebuilt
+from it.
+
+Pages are cut from upstream's documents; their annotations are not used, and this benchmark's tests
+were made for it. Upstream describes the documents as sourced from public online channels.
+
+Please cite: Zhang B. et al. (2026). ParseBench: A Document Parsing Benchmark for AI Agents.
+arXiv:2604.08538.
+
+Full license text: https://www.apache.org/licenses/LICENSE-2.0

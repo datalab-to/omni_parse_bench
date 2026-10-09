@@ -1,0 +1,24 @@
+{"tests": [
+  {"id": "fx_table_relations", "test_type": "table_cell", "output_type": "html", "derivation": "authored",
+   "tags": ["table"], "args": {"cell": {"text": "1,240", "max_diffs": 0}, "left": {"text": "2024", "max_diffs": 0},
+                               "right": {"text": "12%", "max_diffs": 0}, "up": {"text": "1,105", "max_diffs": 0},
+                               "down": {"text": "1,388", "max_diffs": 0},
+                               "top_heading": {"text": "Total", "max_diffs": 0},
+                               "left_heading": {"text": "Year", "max_diffs": 0}}, "settings": {}},
+  {"id": "fx_table_structure", "test_type": "table_cell", "output_type": "html", "derivation": "authored",
+   "tags": ["table", "multi_column"], "args": {
+     "cell": {"text": "0.120", "max_diffs": 0},
+     "headings": [{"text": "Univariable", "max_diffs": 0}, {"text": "P", "max_diffs": 0}],
+     "section": {"text": "A. Overall", "max_diffs": 0},
+     "row_groups": [{"text": "Board", "max_diffs": 0}, {"text": "Risk", "max_diffs": 0}]}, "settings": {}},
+  {"id": "fx_table_everything", "test_type": "table_cell", "output_type": "html", "derivation": "authored",
+   "tags": ["table"], "args": {
+     "cell": {"text": "32 (40.0)", "max_diffs": 1},
+     "headings": [{"text": "Cases", "max_diffs": 1}, {"text": "No. (%)", "max_diffs": 1}],
+     "section": {"text": "Sex", "max_diffs": 1},
+     "row_groups": [{"text": "Female", "max_diffs": 1}],
+     "up": {"text": "48 (60.0)", "max_diffs": 1}, "left": {"text": "<30 y", "max_diffs": 1},
+     "top_heading": {"text": "No. (%)", "max_diffs": 1}}, "settings": {}},
+  {"id": "fx_table_bare", "test_type": "table_cell", "output_type": "html", "derivation": "authored",
+   "tags": ["table"], "args": {"cell": {"text": "$x_1$", "max_diffs": 0}}, "settings": {}}
+]}

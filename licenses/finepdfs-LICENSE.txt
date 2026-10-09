@@ -1,0 +1,12 @@
+FinePDFs — documents under their owners' terms
+
+Source: https://huggingface.co/datasets/HuggingFaceFW/finepdfs
+Collected by: Hugging Face.
+Suites: multiling_finepdfs, and the synth_copies pages rebuilt from it.
+
+FinePDFs (ODC-BY 1.0, its use also subject to Common Crawl's Terms of Use) lists publicly available
+PDFs and their extracted text. Each PDF here was fetched from the URL FinePDFs recorded for it, and
+keeps its owner's rights. FinePDFs' own docling extraction is one of the two extractions whose
+agreement makes a test.
+
+Full license text (FinePDFs): https://opendatacommons.org/licenses/by/1-0/

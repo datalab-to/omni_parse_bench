@@ -1,0 +1,14 @@
+French administration forms (CERFA) — Licence Ouverte 2.0 (etalab-2.0)
+
+Source: https://www.service-public.gouv.fr/ ("Sauf mention contraire, tous les contenus de ce site
+sont sous licence etalab-2.0", from its legal notice, checked 2026-10-08)
+Producer: République française.
+Suites: forms_filled (its CERFA pages), multilingual (its CERFA pages), and the blank forms of
+frbench_handwriting.
+
+The forms were filled by us, or by fr-bench-pdf2md's authors, and some scanned. Each form's number
+and version are printed on it (cerfa n° …*NN), which dates it as the license's credit asks. French
+public bodies' information is also reusable by law, with its source credited (Code des relations
+entre le public et l'administration, art. L321-1 and L322-1).
+
+Full license text: https://www.etalab.gouv.fr/licence-ouverte-open-licence/
