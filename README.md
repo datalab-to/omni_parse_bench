@@ -52,9 +52,9 @@ counts in each, so per-tag scores overlap and don't average to the headline.
 ## Install
 
 ```bash
-uv pip install 'omni-parse-bench @ git+https://github.com/datalab-to/omni_parse_bench'               # score(): no network, no API keys
-uv pip install 'omni-parse-bench[harness] @ git+https://github.com/datalab-to/omni_parse_bench'      # + vendor adapters, to predict
-uv pip install 'omni-parse-bench[benchmark] @ git+https://github.com/datalab-to/omni_parse_bench'    # + dataset access, to run the benchmark
+uv pip install omni-parse-bench                 # score(): no network, no API keys
+uv pip install 'omni-parse-bench[harness]'      # + vendor adapters, to predict
+uv pip install 'omni-parse-bench[benchmark]'    # + dataset access, to run the benchmark
 ```
 
 ## Run the benchmark

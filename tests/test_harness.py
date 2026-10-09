@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import sys
 import types
 
 import pytest
@@ -104,6 +105,20 @@ def test_opb_providers_lists_an_adapters_options(capsys):
 
     assert cli.main(["providers", "datalab"]) == 0
     assert "datalab" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("argv, module, extra", [
+    (["providers"], "rich", "harness"),
+    (["tests", "--dataset", "hf://datasets/x/y"], "huggingface_hub", "benchmark"),
+])
+def test_opb_names_the_extra_a_core_install_lacks(monkeypatch, capsys, argv, module, extra):
+    """On an install without the command's extra, opb says which extra to add, not a traceback."""
+    from omni_parse_bench import cli
+
+    monkeypatch.setitem(sys.modules, module, None)   # importing it now raises ImportError
+    assert cli.main(argv) == 1
+    err = capsys.readouterr().err
+    assert f"opb {argv[0]} needs {module}" in err and f"pip install 'omni-parse-bench[{extra}]'" in err
 
 
 def test_tesseract_writes_its_text_as_escaped_html():
