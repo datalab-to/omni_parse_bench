@@ -9,8 +9,8 @@
 A document-parsing benchmark. Every test is a yes/no question about one page: is this text in the
 output, in this order, in a table cell under these headings, in a layout block of this kind?
 
-This repository runs the benchmark on [our dataset](https://huggingface.co/datasets/datalab-to/omni_parse_bench)
-or yours, and exposes its two primitives, `predict` and `score`, for your pipelines.
+This repository contains a way to run our benchmark using our dataset on [HuggingFace](https://huggingface.co/datasets/datalab-to/omni_parse_bench) or your own dataset. It also provides lower-level primitives (score and predict) to run in your own pipelines however you like. The README is split up into the following table of contents.
+
 
 - [The design](#the-design)
 - [Install](#install)
