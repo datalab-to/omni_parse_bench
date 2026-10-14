@@ -10,7 +10,7 @@
 # two GPUs), and opb's `model` option names the same one. The weights download when it starts, into
 # HF_HOME; mount a cache there to keep them. Set OPB_ENDPOINT_KEY (docker run -e) to require it as a
 # bearer token, as opb sends it.
-FROM vllm/vllm-openai:v0.17.1
+FROM vllm/vllm-openai:v0.17.1@sha256:0dc46f74eb0e630675d83101dc66c6441c4475cceedcf9235ee42b87c3affd23
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 RUN ln -s "$(python3 -c 'import os, sys, vllm; print(os.path.realpath(sys.executable))')" /opt/vllm-python
@@ -20,7 +20,7 @@ RUN /opt/vllm-python -m pip install --no-cache-dir uv \
     && /opt/vllm-python -m uv pip install --python /opt/vllm-python --system --break-system-packages --no-cache \
         transformers==5.3.0 \
     && /opt/vllm-python -m uv venv /opt/infinity --python 3.12 \
-    && /opt/vllm-python -m uv pip install --python /opt/infinity/bin/python --no-cache httpx infinity_parser2==0.4.0
+    && /opt/vllm-python -m uv pip install --python /opt/infinity/bin/python --no-cache httpx==0.28.1 infinity_parser2==0.4.0
 
 ENV PORT=8001 MODEL=infly/Infinity-Parser2-Pro
 COPY server.py start.sh /srv/

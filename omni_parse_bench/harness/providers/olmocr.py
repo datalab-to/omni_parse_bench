@@ -40,11 +40,10 @@ OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
 from __future__ import annotations
 
 import dataclasses
-import os
 from pathlib import Path
 
 from ... import markdown
-from .. import budget, contract, errors, http
+from .. import contract, errors, http
 
 SUPPORTS = frozenset({"html"})
 WEIGHTS = "allenai/olmOCR-2-7B-1025-FP8"
@@ -69,9 +68,7 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
-    raw = http.post(f"{config.base_url.rstrip('/')}/parse",
-                    {**http.page(page), "settings": http.settings(config)}, budget.Budget(timeout),
-                    key=os.environ.get("OPB_ENDPOINT_KEY"))
+    raw = http.parse(config, page, timeout)
     return contract.Call(raw, cost=contract.Cost(tokens_in=raw.get("input_tokens"),
                                                  tokens_out=raw.get("output_tokens")))
 

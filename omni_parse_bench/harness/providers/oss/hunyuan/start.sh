@@ -8,7 +8,7 @@ W="${HF_HOME:-/root/.cache/huggingface}/hunyuan-47644ecc"
 if [ ! -f "$W/.ready" ]; then
     /venv/bin/hf download tencent/HunyuanOCR --revision 47644ecc4fc854efa4f505155158831f36773ee4 \
         --exclude 'v1.0/*' 'dflash/*' --local-dir "$W"
-    /venv/bin/hf download tencent/HunyuanOCR config.json --revision 3d3cbc9ebd --local-dir "$W.cfg"
+    /venv/bin/hf download tencent/HunyuanOCR config.json --revision 3d3cbc9ebde3bd08cfb70fa8b3c40466319e4b15 --local-dir "$W.cfg"
     cp "$W.cfg/config.json" "$W/config.json" && touch "$W/.ready"
 fi
 /venv/bin/vllm serve "$W" --served-model-name tencent/HunyuanOCR -tp 1 --limit-mm-per-prompt '{"image":4,"video":0}' \

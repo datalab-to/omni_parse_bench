@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git curl && rm 
 RUN ln -s "$(python3 -c 'import os, sys, vllm; print(os.path.realpath(sys.executable))')" /opt/vllm-python
 RUN /opt/vllm-python -m pip install --no-cache-dir uv \
     && /opt/vllm-python -m uv pip install --python /opt/vllm-python --system --break-system-packages --no-cache \
-        httpx requests pymupdf
+        httpx==0.28.1 requests==2.34.2 pymupdf==1.28.2
 RUN git clone -q https://github.com/baidu/Unlimited-OCR /opt/unlimited \
     && git -C /opt/unlimited checkout -q 92ad94b53a51950fea0416aced42331dfb4dd59e
 

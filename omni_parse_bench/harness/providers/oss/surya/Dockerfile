@@ -7,7 +7,7 @@
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set
 # OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb sends it.
-FROM vllm/vllm-openai:v0.20.1
+FROM vllm/vllm-openai:v0.20.1@sha256:9eff9734a30b6713a8566217d36f8277630fd2d31cec7f0a0292835901a23aa4
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
@@ -16,7 +16,7 @@ RUN ln -s "$(python3 -c 'import os, sys, vllm; print(os.path.realpath(sys.execut
 # package only prepares pages and reads replies.
 RUN /opt/vllm-python -m pip install --no-cache-dir uv && /opt/vllm-python -m uv venv /opt/surya --python 3.12 \
     && /opt/vllm-python -m uv pip install --python /opt/surya/bin/python --no-cache \
-        --index-url https://download.pytorch.org/whl/cpu 'torch>=2.7,<3' 'torchvision>=0.20,<1' \
+        --index-url https://download.pytorch.org/whl/cpu 'torch==2.14.1+cpu' 'torchvision==0.29.1+cpu' \
     && /opt/vllm-python -m uv pip install --python /opt/surya/bin/python --no-cache surya-ocr==0.22.1
 
 # Note: SURYA_FULLPAGE_REGEN is the package's setting "opt-in for benchmarking" (surya/settings.py): a

@@ -41,12 +41,11 @@ OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
 from __future__ import annotations
 
 import dataclasses
-import os
 import re
 from pathlib import Path
 
 from ... import markdown
-from .. import budget, contract, errors, http, layout
+from .. import contract, errors, http, layout
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -91,9 +90,7 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
-    raw = http.post(f"{config.base_url.rstrip('/')}/parse",
-                    {**http.page(page), "settings": http.settings(config)}, budget.Budget(timeout),
-                    key=os.environ.get("OPB_ENDPOINT_KEY"))
+    raw = http.parse(config, page, timeout)
     usage = raw.get("usage") or {}
     cost = contract.Cost(tokens_in=usage.get("prompt_tokens"), tokens_out=usage.get("completion_tokens"))
     # Note: a reply cut at the token limit on every attempt is kept and read, as the package reads it.
@@ -126,9 +123,7 @@ def picture(block: dict) -> str:
 def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
     """The page from the server's blocks, pictures as alt text; the blocks from the reply. A label
     LABELS lacks fails the blocks only."""
-    if (why := llm.finish(raw["completion"])) not in ("stop", "length"):
-        raise errors.VendorError(f"the reply didn't finish: {why}", status=200)
-    said = ((raw["completion"]["choices"][0].get("message")) or {}).get("content") or ""
+    said = llm.content(raw["completion"])
     outputs, errs = {}, {}
     if "html" in request.outputs:
         outputs["html"] = "".join(picture(b) if b["label"] in PICTURES else b["html"] for b in raw["blocks"]
@@ -137,5 +132,5 @@ def parse(raw: dict, request: contract.Request, config: Config | None = None) ->
         try:
             outputs["blocks"] = blocks(said)
         except errors.VendorError as exc:
-            errs["blocks"] = str(exc)
+            errs["blocks"] = errors.unread(exc)
     return outputs, errs

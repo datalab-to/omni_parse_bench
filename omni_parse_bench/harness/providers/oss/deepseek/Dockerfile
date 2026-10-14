@@ -7,16 +7,16 @@
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set
 # OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb sends it.
-FROM vllm/vllm-openai:v0.8.5
+FROM vllm/vllm-openai:v0.8.5@sha256:6cf9808ca8810fc6c3fd0451c2e7784fb224590d81f7db338e7eaf3c02a33d33
 
 RUN apt-get update && apt-get install -y --no-install-recommends git curl && rm -rf /var/lib/apt/lists/*
 # Note: the packages and flash-attention build the repository's README installs beside vLLM 0.8.5.
 RUN PIP_BREAK_SYSTEM_PACKAGES=1 /usr/bin/python3 -m pip install --no-cache-dir -q transformers==4.46.3 \
-        tokenizers==0.20.3 einops easydict addict PyMuPDF img2pdf \
+        tokenizers==0.20.3 einops==0.8.2 easydict==1.13 addict==2.4.0 PyMuPDF==1.28.2 img2pdf==0.6.3 \
     && PIP_BREAK_SYSTEM_PACKAGES=1 /usr/bin/python3 -m pip install --no-cache-dir -q \
         https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.3/flash_attn-2.7.3+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl
 RUN git clone -q https://github.com/deepseek-ai/DeepSeek-OCR-2 /opt/dsocr2 \
-    && git -C /opt/dsocr2 checkout -q 2f3699e
+    && git -C /opt/dsocr2 checkout -q 2f3699ebbb96fa8af32212e8c170f2cc28730fad
 # Note: config.py is where the repository says to set the model's path; it reads the weights start.sh
 # fetches at a pinned revision.
 RUN sed -i "s|^MODEL_PATH = .*|import os; MODEL_PATH = os.environ['DEEPSEEK_WEIGHTS']|" \

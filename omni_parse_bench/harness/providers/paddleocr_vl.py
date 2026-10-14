@@ -38,12 +38,11 @@ OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
 from __future__ import annotations
 
 import dataclasses
-import os
 import re
 from pathlib import Path
 
 from ... import markdown
-from .. import budget, contract, errors, http, layout
+from .. import contract, errors, http, layout
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "PaddlePaddle/PaddleOCR-VL-1.6@c5630abae1d940eafe0697512a0325494b02ab42"
@@ -82,10 +81,7 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
-    deadline = budget.Budget(timeout)
-    body = {**http.page(page), "settings": http.settings(config)}
-    return contract.Call(http.post(f"{config.base_url.rstrip('/')}/parse", body, deadline,
-                                   key=os.environ.get("OPB_ENDPOINT_KEY")))
+    return contract.Call(http.parse(config, page, timeout))
 
 
 def blocks(raw: dict) -> list[dict]:
@@ -109,5 +105,5 @@ def parse(raw: dict, request: contract.Request, config: Config | None = None) ->
         try:
             outputs["blocks"] = blocks(raw)
         except (errors.VendorError, KeyError, TypeError, ValueError) as exc:
-            errs["blocks"] = f"the adapter couldn't read the answer: {type(exc).__name__}: {exc}"[:300]
+            errs["blocks"] = errors.unread(exc)
     return outputs, errs

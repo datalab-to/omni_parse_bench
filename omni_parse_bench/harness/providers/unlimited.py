@@ -38,12 +38,11 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
-import os
 import re
 from pathlib import Path
 
 from ... import markdown, views
-from .. import budget, contract, errors, http, layout
+from .. import contract, errors, http, layout
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -90,9 +89,7 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
-    raw = http.post(f"{config.base_url.rstrip('/')}/parse",
-                    {**http.page(page), "settings": http.settings(config)}, budget.Budget(timeout),
-                    key=os.environ.get("OPB_ENDPOINT_KEY"))
+    raw = http.parse(config, page, timeout)
     return contract.Call(raw, cost=llm.tokens([raw["completion"]]), job_id=raw["completion"].get("id"))
 
 
@@ -141,5 +138,5 @@ def parse(raw: dict, request: contract.Request, config: Config | None = None) ->
         try:
             outputs["blocks"] = blocks(text)
         except errors.VendorError as exc:
-            errs["blocks"] = str(exc)
+            errs["blocks"] = errors.unread(exc)
     return outputs, errs

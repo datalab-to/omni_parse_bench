@@ -43,12 +43,11 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
 import re
 from pathlib import Path
 
 from ... import markdown
-from .. import budget, contract, errors, http, layout
+from .. import contract, errors, http, layout
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "zai-org/GLM-OCR"
@@ -84,9 +83,7 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
-    body = http.page(page)
-    raw = http.post(f"{config.base_url.rstrip('/')}/parse", body, budget.Budget(timeout),
-                    key=os.environ.get("OPB_ENDPOINT_KEY"))
+    raw = http.parse(config, page, timeout, body=http.page(page))
     return contract.Call(raw, job_id=raw.get("id"))
 
 
@@ -117,5 +114,5 @@ def parse(raw: dict, request: contract.Request, config: Config | None = None) ->
         try:
             outputs["blocks"] = [_block(r) for r in _regions(raw) if r.get("bbox_2d")]
         except errors.VendorError as exc:
-            errs["blocks"] = f"the adapter couldn't read the answer: VendorError: {exc}"[:300]
+            errs["blocks"] = errors.unread(exc)
     return outputs, errs

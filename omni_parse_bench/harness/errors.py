@@ -17,6 +17,11 @@ from typing import Any
 TRANSIENT_STATUSES = frozenset({429, 500, 502, 503, 504, 520, 521, 522, 523, 524})
 
 
+def unread(exc: Exception) -> str:
+    """Why an answer that arrived couldn't be read into an output, worded the same for every adapter."""
+    return f"the adapter couldn't read the answer: {type(exc).__name__}: {exc}"[:300]
+
+
 class VendorError(RuntimeError):
     """The call was made and did not produce its outputs. `status` decides a retry."""
 

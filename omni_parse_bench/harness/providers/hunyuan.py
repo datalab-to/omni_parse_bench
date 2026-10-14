@@ -47,12 +47,11 @@ from __future__ import annotations
 import base64
 import dataclasses
 import json
-import os
 import re
 from pathlib import Path
 
 from ... import markdown
-from .. import budget, contract, errors, http, layout
+from .. import contract, errors, http, layout
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -93,8 +92,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0, confi
     # Note: the repository takes images only, so the page goes as opb's PNG, in the body every server takes.
     body = {"page": base64.b64encode(llm.image(page, config.long_edge)).decode("ascii"), "suffix": ".png",
             "settings": http.settings(config, "long_edge")}
-    return contract.Call(http.post(f"{config.base_url.rstrip('/')}/parse", body, budget.Budget(timeout),
-                                   key=os.environ.get("OPB_ENDPOINT_KEY")))
+    return contract.Call(http.parse(config, page, timeout, body=body))
 
 
 # The layout_parse categories onto views.LABELS: the names the vendor's own layout scorer canonicalises
@@ -173,7 +171,7 @@ def parse(raw: dict, request: contract.Request, config: Config | None = None) ->
         try:
             outputs["blocks"] = blocks(text)
         except errors.VendorError as exc:
-            errs["blocks"] = f"the adapter couldn't read the answer: VendorError: {exc}"[:300]
+            errs["blocks"] = errors.unread(exc)
     return outputs, errs
 
 

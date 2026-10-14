@@ -75,8 +75,7 @@ def _parse(api: contract.Adapter, got: contract.Call, request: contract.Request,
     try:
         return api.parse(got.raw, request, config)
     except (errors.VendorError, ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
-        why = f"the adapter couldn't read the answer: {type(exc).__name__}: {exc}"[:300]
-        return {}, dict.fromkeys(request.outputs, why)
+        return {}, dict.fromkeys(request.outputs, errors.unread(exc))
 
 
 def predict(provider: str, page: str | Path, wants: set[str] | frozenset[str] | None = None, *,

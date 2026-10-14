@@ -39,13 +39,12 @@ from __future__ import annotations
 
 import ast
 import dataclasses
-import os
 import re
 from pathlib import Path
 
 
 from ... import markdown
-from .. import budget, contract, errors, http, layout
+from .. import contract, errors, http, layout
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "deepseek-ai/DeepSeek-OCR-2"
@@ -92,10 +91,7 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
-    deadline = budget.Budget(timeout)
-    body = {**http.page(page), "settings": http.settings(config)}
-    raw = http.post(f"{config.base_url.rstrip('/')}/parse", body, deadline,
-                    key=os.environ.get("OPB_ENDPOINT_KEY"))
+    raw = http.parse(config, page, timeout)
     return contract.Call(raw, cost=contract.Cost(tokens_out=raw.get("tokens")))
 
 
@@ -139,5 +135,5 @@ def parse(raw: dict, request: contract.Request, config: Config | None = None) ->
         try:
             outputs["blocks"] = blocks(said)
         except errors.VendorError as exc:
-            errs["blocks"] = f"the adapter couldn't read the answer: VendorError: {exc}"[:300]
+            errs["blocks"] = errors.unread(exc)
     return outputs, errs

@@ -37,11 +37,10 @@ OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
 from __future__ import annotations
 
 import dataclasses
-import os
 import re
 from pathlib import Path
 
-from .. import budget, contract, errors, http, layout
+from .. import contract, errors, http, layout
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "datalab-to/surya-ocr-2"
@@ -77,9 +76,7 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
-    body = {**http.page(page), "settings": http.settings(config)}
-    return contract.Call(http.post(f"{config.base_url.rstrip('/')}/parse", body, budget.Budget(timeout),
-                                   key=os.environ.get("OPB_ENDPOINT_KEY")))
+    return contract.Call(http.parse(config, page, timeout))
 
 
 def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
@@ -95,5 +92,5 @@ def parse(raw: dict, request: contract.Request, config: Config | None = None) ->
                                               " ".join(_TAG.sub(" ", b.get("html") or "").split()))
                                  for b in blocks if b.get("label") != "BlankPage"]
         except errors.VendorError as exc:
-            errs["blocks"] = f"the adapter couldn't read the answer: VendorError: {exc}"[:300]
+            errs["blocks"] = errors.unread(exc)
     return outputs, errs

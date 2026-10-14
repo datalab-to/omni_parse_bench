@@ -1,12 +1,14 @@
 """A JSON POST within a call's time budget, its failures mapped to the harness's errors.
 
 For a server that answers one route with JSON: a vendor's pipeline or its own engine behind one
-endpoint. A chat endpoint is `providers.llm.chat`.
+endpoint, as every opb model server (providers/oss/) answers `/parse` (`parse`). A chat endpoint is
+`providers.llm.chat`.
 """
 from __future__ import annotations
 
 import base64
 import dataclasses
+import os
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +30,15 @@ def settings(config: Any, *local: str) -> dict:
     gets its own run name."""
     out = {f.name: getattr(config, f.name) for f in dataclasses.fields(config)}
     return {k: v for k, v in out.items() if k not in ("base_url", "model", *local)}
+
+
+def parse(config: Any, path: Path, timeout: float, body: dict | None = None) -> dict:
+    """An opb model server's answer for one page: `body` (by default the page file and the config's
+    `settings`) to its /parse route at `config.base_url`, within `timeout`, with OPB_ENDPOINT_KEY as its
+    bearer token when it is set."""
+    body = {**page(path), "settings": settings(config)} if body is None else body
+    return post(f"{config.base_url.rstrip('/')}/parse", body, budget.Budget(timeout),
+                key=os.environ.get("OPB_ENDPOINT_KEY"))
 
 
 def post(url: str, body: dict, deadline: budget.Budget, key: str | None = None) -> dict:

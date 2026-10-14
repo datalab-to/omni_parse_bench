@@ -145,5 +145,5 @@ def parse(raw: dict, request: contract.Request, config: Config | None = None) ->
         if o == "blocks" and raw.get("chunks"):
             try: outputs[o] = blocks(raw["chunks"])
             except (errors.VendorError, KeyError, TypeError, ValueError) as exc:
-                errs[o] = f"blocks: {type(exc).__name__}: {exc}"
+                errs[o] = errors.unread(exc)
     return outputs, errs

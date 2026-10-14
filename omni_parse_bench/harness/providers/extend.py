@@ -211,5 +211,5 @@ def parse(raw: dict, request: contract.Request, config: Config | None = None) ->
             turned = next((x.get("rotationApplied") or 0 for x in pages if x.get("number", 1) == 1), 0)
             try: outputs[o] = layout_blocks(blocks, turned)
             except (errors.VendorError, KeyError, TypeError, ValueError) as exc:
-                errs[o] = f"blocks: {type(exc).__name__}: {exc}"
+                errs[o] = errors.unread(exc)
     return outputs, errs

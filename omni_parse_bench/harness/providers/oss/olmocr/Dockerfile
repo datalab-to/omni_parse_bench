@@ -32,7 +32,7 @@ RUN ln -s "$(python3 -c 'import os, sys, vllm; print(os.path.realpath(sys.execut
 # Note: the pipeline's package runs in a Python of its own, without its GPU extras; img2pdf is the command
 # it calls to make an image file a PDF, which its package doesn't install.
 RUN /opt/vllm-python -m pip install --no-cache-dir uv && /opt/vllm-python -m uv venv /opt/olmocr --python 3.12 \
-    && /opt/vllm-python -m uv pip install --python /opt/olmocr/bin/python --no-cache aiohttp img2pdf==0.6.3 \
+    && /opt/vllm-python -m uv pip install --python /opt/olmocr/bin/python --no-cache aiohttp==3.14.5 img2pdf==0.6.3 \
         'olmocr @ git+https://github.com/allenai/olmocr@f7cfe4c22098b154c76b6ec950d1c0a464eecf8d'
 
 ENV PORT=8001 OLMOCR_COMMIT=f7cfe4c22098b154c76b6ec950d1c0a464eecf8d

@@ -44,11 +44,10 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
 from pathlib import Path
 
 from ... import markdown, views
-from .. import budget, contract, errors, http, layout
+from .. import contract, errors, http, layout
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -91,9 +90,7 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
-    raw = http.post(f"{config.base_url.rstrip('/')}/parse",
-                    {**http.page(page), "settings": http.settings(config)}, budget.Budget(timeout),
-                    key=os.environ.get("OPB_ENDPOINT_KEY"))
+    raw = http.parse(config, page, timeout)
     if raw.get("model") != config.model:
         raise errors.VendorError(f"the server serves {raw.get('model')!r}, not {config.model!r}: set the "
                                  f"`model` option to the model it serves", status=200)
@@ -115,8 +112,7 @@ def _items(text: str) -> list[dict] | None:
 
 def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
     """The SDK's reading, headers and footers kept; the elements as blocks."""
-    if (why := llm.finish(raw["completion"])) not in ("stop", "length"):
-        raise errors.VendorError(f"the reply didn't finish: {why}", status=200)
+    llm.content(raw["completion"])     # the reply finished, or was cut at its token limit
     if "json" not in raw:
         raise errors.VendorError("the reply is empty", status=200)
     outputs, errs = {}, {}
@@ -133,5 +129,5 @@ def parse(raw: dict, request: contract.Request, config: Config | None = None) ->
                                  " ".join(views.text(str(x.get("text") or "")).split()))
                     for x in items if isinstance(x.get("bbox"), list) and len(x["bbox"]) == 4]
             except errors.VendorError as exc:
-                errs["blocks"] = str(exc)
+                errs["blocks"] = errors.unread(exc)
     return outputs, errs
