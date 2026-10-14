@@ -271,7 +271,10 @@ that deploys it on any GPU host, and opb then benchmarks it from anywhere, point
 
 A folder holds:
 
-- `Dockerfile`: the vendor's environment, pinned (base image, packages, repository at a commit);
+- `Dockerfile`: the vendor's environment, pinned: the base image by digest, every Python package by
+  version, the vendor's repository at a full commit. apt packages aren't pinned: `poppler-utils` (LightOn,
+  olmOCR), `libcairo2` (dots.mocr) and olmOCR's fonts come from the base image's Ubuntu release when the
+  image is built, so a later build may get newer ones, which can change how a page is rendered;
 - `start.sh`: vLLM with the vendor's flags and the weights at a pinned revision, then server.py if
   there is one; one port out, 8001; and
 - `server.py`, for a model whose vendor's code takes part in reading a page (loading the file,
