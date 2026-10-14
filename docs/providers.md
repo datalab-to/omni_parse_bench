@@ -295,9 +295,7 @@ once than it reads at once, for the same reason.
 
 ## Open-weight models
 
-Each model runs with the defaults its vendor recommends, taken from the vendor's documentation and
-code, except that page headers and footers are kept, as for every vendor. Each default is an option of
-the adapter's `Config`; `opb providers <provider>` lists them.
+Each model runs with the defaults its vendor recommends; each adapter's docstring lists where it differs.
 
 | model | provider | oss/ | outputs |
 | --- | --- | --- | --- |
