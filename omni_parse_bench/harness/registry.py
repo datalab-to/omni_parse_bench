@@ -72,7 +72,7 @@ def out_name(provider: str, options: dict | None = None) -> str:
     Note: the digest covers every setting, not only those that differ from the defaults, so a
     directory holds exactly one configuration even after a default changes. What the digest
     stands for is written beside the answers as `settings.json` by `benchmark.predict_all`. A
-    `Config` field marked `metadata={"names_run": False}` is left out: where a server of ours answers
+    `Config` field marked `metadata={"names_run": False}` is left out: where an opb model server answers
     (a new address each time it starts) doesn't change what was run, so a resumed run keeps its name.
     """
     # Note: what each call sends is in the digest too (fixed request settings, a prompt's digest),

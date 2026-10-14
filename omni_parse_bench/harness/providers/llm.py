@@ -251,7 +251,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
 
 def key(base_url: str) -> str:
     """The key for an endpoint. Each key goes only to its own endpoint, so the OpenRouter key never
-    reaches a server of ours."""
+    reaches an opb model server (providers/oss/)."""
     if base_url != DEFAULT_BASE_URL:
         return os.environ.get("OPB_ENDPOINT_KEY", "EMPTY")
     if not (got := os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY")):

@@ -15,8 +15,7 @@ How a page is processed:
   3. Model inference      vLLM 0.21.0 with MinerU's logits processor (`MinerULogitsProcessor`, for the
                           client's no-repeat n-gram setting); the client's `two_step_extract`, layout
                           first, then each block's content from its crop, at its default prompts and
-                          sampling. Image analysis stays off (the model card's default), and the
-                          client's own retries are off.
+                          sampling. Image analysis stays off (the model card's default).
   4. Vendor output parsing  the client's blocks `{type, bbox, angle, content}`, boxes from 0 to 1, and
                           its `json2md` over them: truncated paragraphs merged, headers and footers kept,
                           images left out.
@@ -25,7 +24,6 @@ How a page is processed:
 
 Differences from the vendor:
 
-  - the client's retries are off: opb retries a failed page the same way for every system; and
   - each page has the benchmark's 900 s.
 
     docker build -t opb-mineru omni_parse_bench/harness/providers/oss/mineru

@@ -12,8 +12,8 @@ How a page is processed:
   2. Image preprocessing  the model's own image processor, in vLLM (up to about 4.2M pixels).
   3. Model inference      the vendor's validated setup: vLLM 0.18.1 on Python 3.10, the weights at
                           revision 47644ecc with the repository's previous config.json (revision
-                          3d3cbc9e; the current one, written for transformers 5, breaks vLLM's xdrope
-                          position encoding). An empty system message, then the page image and the
+                          3d3cbc9e; the current one targets transformers 5 and doesn't load correctly
+                          in vLLM 0.18.1). An empty system message, then the page image and the
                           task's prompt from inference/utils/tasks.py; temperature 0, top_p 1, top_k
                           -1, repetition_penalty 1.08, special tokens skipped, at most 32768 tokens;
                           streamed, with the client's tail-repetition early stop (`infer_stream`).
@@ -117,7 +117,7 @@ LABELS = {
     "table": "table",
     "figure": "figure", "chart": "figure", "image": "figure", "seal": "figure", "stamp": "figure",
     "signature": "figure",
-    # seen in the full run's answers
+    # also emitted by the model, though not in its scorer's list
     "none": "text", "partial_para": "text",
     "table_header_note": "caption", "table_both": "caption",
     "table_footer_note": "footnote",

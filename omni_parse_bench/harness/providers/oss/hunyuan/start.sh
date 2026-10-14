@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The weights at revision 47644ecc with the repository's previous config.json (revision 3d3cbc9e): the
-# current one, written for transformers 5, breaks vLLM's xdrope position encoding. vLLM serves them on
+# current one targets transformers 5 and doesn't load correctly in vLLM 0.18.1. vLLM serves them on
 # 8000 with the repository's flags; server.py answers on $PORT once vLLM is up. Either exiting stops the
 # container.
 set -euo pipefail

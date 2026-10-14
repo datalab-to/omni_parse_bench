@@ -3,9 +3,8 @@
 The SDK (github.com/zai-org/GLM-OCR, `glmocr[selfhosted,server]` 0.1.5) self-hosts as its README
 documents: `python -m glmocr.server` runs PP-DocLayoutV3 layout detection, recognises each region with
 the model (vLLM on localhost:8000, chosen by the GLMOCR_* environment), and formats the page. One SDK
-server shares one pipeline between concurrent requests, and concurrent requests to one server came back
-empty (60 pages: 10.1 at 64 in flight, 76.6 one at a time). So this starts GLM_SERVERS of them (12) on
-ports 5002, 5003, ..., and gives each one page at a time; pages still run in parallel.
+server reads one page at a time, so this starts GLM_SERVERS of them (12) on ports 5002, 5003, ...,
+and gives each one page at a time; pages still run in parallel.
 
 Every setting is the SDK's default config.yaml but its port, and, with GLM_SDK_CONFIG=keep (the
 default here), one more: the default abandons the regions it labels header, footer, number, footnote,

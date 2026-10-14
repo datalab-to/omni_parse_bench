@@ -27,7 +27,6 @@ How a page is processed:
 
 Differences from the vendor:
 
-  - a reply cut at the token limit is asked again too (the package's client can't see the cut);
   - headers and footers are kept (the package drops them by default; the benchmark scores the whole
     page for every system);
   - picture contents are alt text, as for every system; and

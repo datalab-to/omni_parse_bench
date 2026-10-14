@@ -13,7 +13,7 @@ FROM vllm/vllm-openai:v0.19.0-ubuntu2404
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 RUN ln -s "$(python3 -c 'import os, sys, vllm; print(os.path.realpath(sys.executable))')" /opt/vllm-python
-# Note: GLM-OCR's README needs transformers 5.3 or later beside vLLM; 5.19.0 was the latest at the run.
+# Note: GLM-OCR's README needs transformers 5.3 or later beside vLLM; pinned at 5.19.0.
 RUN /opt/vllm-python -m pip install --no-cache-dir uv \
     && /opt/vllm-python -m uv pip install --python /opt/vllm-python --system --break-system-packages --no-cache \
         transformers==5.19.0

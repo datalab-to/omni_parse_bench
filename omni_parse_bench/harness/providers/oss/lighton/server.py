@@ -46,10 +46,11 @@ COMMIT = (json.loads(importlib.metadata.distribution("lightonocr").read_text("di
 def render(pdf: bytes, dpi: int, max_pixels: int) -> Image.Image:
     """A PDF page as LightOn's benchmark renders it.
 
-    Copied, not imported: it lives in the repository's benchmarks/ (Apache-2.0), in a class tied to its
-    benchmark harness, not in the `lightonocr` package. benchmarks/ocr_bench/providers/loocr_grounding.py
-    at 36755d4, `_pdf_to_images_with_size`: poppler at `dpi`, lowered so the page fits `max_pixels` before
-    it is rasterized, then shrunk if poppler's rounding still overshoots."""
+    Copied and adapted, not imported: it lives in the repository's benchmarks/ (Apache-2.0), in a class
+    tied to its benchmark harness, not in the `lightonocr` package.
+    benchmarks/ocr_bench/providers/loocr_grounding.py at 36755d4, `_pdf_to_images_with_size`: poppler at
+    `dpi`, lowered so the page fits `max_pixels` before it is rasterized, then shrunk if poppler's
+    rounding still overshoots."""
     from pdf2image import convert_from_bytes
     from pypdf import PdfReader
 

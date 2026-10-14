@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# vLLM serves surya-ocr-2 on 8000 under the model id the package asks for, with the run's flags (MTP
-# speculation, 2 tokens); server.py answers on $PORT once vLLM is up. Either exiting stops the container.
+# vLLM serves surya-ocr-2 on 8000 under the model id the package asks for, with the flags the package's
+# launcher sets at VLLM_GPU_TYPE=h100 (MTP speculation, 2 tokens); server.py answers on $PORT once vLLM is up. Either exiting stops the container.
 set -euo pipefail
 # Note: the weights at a pinned revision, so a run's record names the weights that answered.
 /opt/vllm-python -m vllm.entrypoints.cli.main serve datalab-to/surya-ocr-2 \

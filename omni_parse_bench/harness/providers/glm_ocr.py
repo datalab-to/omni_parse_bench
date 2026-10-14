@@ -19,7 +19,7 @@ How a page is processed:
   4. Vendor output parsing  the SDK formats the page: its markdown (`markdown_result`) and its regions
                           (`json_result`: `{label, native_label, content, bbox_2d}`, boxes on a 0-1000
                           grid). A region the SDK failed to read, which it would leave out silently,
-                          fails the page instead, so it is asked again.
+                          fails the page instead.
   5. Mapping to opb outputs  html is that markdown, its image placeholders (`![Image 0-0](imgs/...)`,
                           files the server would write) dropped, as for Mistral, through
                           `markdown.to_html`; blocks are the regions, each `native_label` mapped by
@@ -30,8 +30,7 @@ Differences from the vendor:
   - the SDK's default config abandons the regions it labels header, footer, number, footnote,
     aside_text, reference and header/footer images; the server's `keep` config (its default) reads them,
     since the benchmark scores the whole page, headers and footers included, for every system; its
-    answer says which config read it (`sdk_config`);
-  - a page with a region the SDK failed to read is asked again rather than kept with text missing; and
+    answer says which config read it (`sdk_config`); and
   - each page has the benchmark's 900 s.
 
     docker build -t opb-glm_ocr omni_parse_bench/harness/providers/oss/glm_ocr

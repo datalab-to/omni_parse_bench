@@ -16,8 +16,8 @@ model id goes to `llm.py`.
 1. [The two outputs, and how an adapter produces them](#the-two-outputs-and-how-an-adapter-produces-them): html and blocks, and the format changes an adapter may make;
 2. [Block labels](#block-labels): each vendor's block types, mapped onto the labels;
 3. [The vendors](#the-vendors): each adapter's API, outputs, headers and keys;
-4. [Benching a model we serve](#benching-a-model-we-serve): each open model's folder (image, start script, server) and how opb reaches it;
-5. [Open-weight models](#open-weight-models): the fifteen open OCR models, how each is asked, and their labels;
+4. [Serving an open model](#serving-an-open-model): each open model's folder (image, start script, server) and how opb reaches it;
+5. [Open-weight models](#open-weight-models): the open OCR models, their providers and their labels;
 6. [What differs between vendors, by necessity](#what-differs-between-vendors-by-necessity): the page sizes, caches and prompts; and
 7. [Every adapter: fetch, then parse](#every-adapter-fetch-then-parse): why an answer is saved before it is read.
 
@@ -260,7 +260,7 @@ Per vendor:
   and it gives no layout blocks. Needs `brew install tesseract tesseract-lang` (or the
   distribution's tesseract and its script models).
 
-## Benching a model we serve
+## Serving an open model
 
 Serving and benchmarking are separate. Each open model has a folder, `omni_parse_bench/harness/providers/oss/<model>/`,
 that deploys it on any GPU host, and opb then benchmarks it from anywhere, pointed at its URL:
@@ -295,59 +295,27 @@ once than it reads at once, for the same reason.
 
 ## Open-weight models
 
-Fifteen open OCR models were run in October 2026, one run each. They get the rules every vendor gets:
+Each model runs with the defaults its vendor recommends, taken from the vendor's documentation and
+code, except that page headers and footers are kept, as for every vendor. Each default is an option of
+the adapter's `Config`; `opb providers <provider>` lists them.
 
-- each model runs as its vendor documents it: the vendor's serving image or package version, its
-  server flags, its prompt, sampling, token limit and retries. Where the vendor's client prepares the
-  page or reads the reply, its code runs on the model's server at a pinned commit, not copied;
-- the page goes as the API vendors get it, the original file, and the vendor's own code loads it:
-  where the model has a server of ours (providers/oss/), its server runs the vendor's own loader on
-  the file (its renderer, DPI, size caps; for a vendor with a benchmark setting, that one). A model
-  whose vendor documents image input only (HunyuanOCR, Nanonets-OCR2) gets the LLM
-  adapter's PNG, at most 2048 px on its long edge, as the general LLMs do. Each adapter's docstring
-  sets out, in five named steps, how a page is processed: input loading, image preprocessing, model
-  inference, vendor output parsing and mapping to opb outputs, then where it differs from the vendor;
-- html keeps page headers and footers. A vendor default that drops them is turned off (the GLM-OCR
-  SDK's abandon list, PaddleOCR-VL's ignored labels, the Infinity-Parser2 SDK's
-  `keep_header_footer`), as Datalab's `keep_pageheader_in_output` is;
-- a model's account of a picture (its description of an image, a chart's data, a diagram's mermaid)
-  becomes the image's alt text, as Extend's descriptions do. A model that leaves a picture's text
-  out (dots.mocr, Unlimited-OCR, MinerU and Surya, for example) gives no alt text;
-- the changes are format changes only. A reply in markdown goes through `markdown.to_html`, and a
-  label maps through the model's LABELS table; a label the table lacks fails `blocks` only;
-- a reply cut at the token limit is read as it is, as each vendor's own code reads it (a
-  vendor whose code asks again, as chandra's does, asks again first);
-- what a vendor's code takes per page is an option of the model's `Config`, the vendor's value by
-  default: sampling (temperature, top_p, max_tokens, and the repetition penalty where the vendor sets
-  one), the page's resolution (a PDF's DPI, a pixel cap, a long edge) and the vendor's guards against
-  looping (retries, an n-gram blocker's sizes, an early stop). The adapter sends them as `settings`;
-  the server holds none of its own and refuses a request without exactly its own. Another value is an
-  experiment, not the vendor's setting, and names a run of its own (`opb providers <provider>` lists
-  them). What is fixed when a server starts (vLLM's flags, an SDK's configuration) is not an option;
-  and
-- each call has the usual 900 s.
+| model | provider | oss/ | outputs |
+| --- | --- | --- | --- |
+| LightOnOCR-3 (4B, 0.8B) | `lightonocr` (`model`) | `lighton` | html, blocks |
+| dots.mocr | `dots-mocr` | `dots` | html, blocks |
+| Unlimited-OCR | `unlimited-ocr` | `unlimited` | html, blocks |
+| Infinity-Parser2 (Pro, Flash) | `infinity-parser2` (`model`) | `infinity` | html, blocks |
+| chandra-ocr-2 | `chandra-ocr` | `chandra` | html, blocks |
+| olmOCR-2 | `olmocr` | `olmocr` | html |
+| HunyuanOCR-1.5 | `hunyuan-ocr` | `hunyuan` | html, blocks |
+| DeepSeek-OCR-2 | `deepseek-ocr` | `deepseek` | html, blocks |
+| Surya OCR 2 | `surya-ocr` | `surya` | html, blocks |
+| MinerU2.5-Pro | `mineru` | `mineru` | html, blocks |
+| GLM-OCR | `glm-ocr` | `glm_ocr` | html, blocks |
+| PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr_vl` | html, blocks |
+| Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets` | html |
 
-| model | provider | oss/ | outputs | page loaded as | how it is asked |
-| --- | --- | --- | --- | --- | --- |
-| LightOnOCR-3 (4B, 0.8B) | `lightonocr` (`model`) | `lighton` | html, blocks | its benchmark: poppler, 400 DPI fit to 5M pixels | its client: `grounding`, temperature 0.1, top_p 1.0, 12288 tokens, once, `fix_escaped_dollars` |
-| dots.mocr | `dots-mocr` | `dots` | html, blocks | its parser: 200 DPI (72 past 4500 px) | its parser: `prompt_layout_all_en`, temperature 0.1, top_p 1.0, 32768 tokens, once, `post_process_output` |
-| Unlimited-OCR | `unlimited-ocr` | `unlimited` | html, blocks | its pipeline (infer.py): 300 DPI | its vLLM recipe: the prompt before the image, temperature 0, n-gram processor 35/128, 28000 tokens, once |
-| Infinity-Parser2 (Pro, Flash) | `infinity-parser2` (`model`) | `infinity` | html, blocks | its SDK: 300 DPI | its SDK: `doc2json`, temperature 0, top_p 1, 32768 tokens, thinking off, once; a cut reply keeps its complete elements |
-| chandra-ocr-2 | `chandra-ocr` | `chandra` | html, blocks | its benchmark script: 300 DPI, forms flattened; small images enlarged | the `chandra-ocr` package: `ocr_layout`, temperature 0, top_p 0.1, 12384 tokens, up to 6 retries on a repeat; `parse_html` per block |
-| olmOCR-2 | `olmocr` | `olmocr` | html | its pipeline: pdftoppm, 1288 px long edge | its pipeline's own `process_page`: the v4 prompt, 8000 tokens, up to 8 attempts at its temperatures, rotation corrected, its PageResponse check |
-| HunyuanOCR-1.5 | `hunyuan-ocr` | `hunyuan` | html, blocks | opb's 2048 px PNG (images only) | its client: the `layout_parse` task, temperature 0, repetition penalty 1.08, streamed with its early stop, its repeat cleanup |
-| DeepSeek-OCR-2 | `deepseek-ocr` | `deepseek` | html, blocks | its scripts: PyMuPDF at 144 DPI | its vLLM 0.8.5 engine: the grounding prompt, crop mode, n-gram processor 40/90, 8192 tokens |
-| Surya OCR 2 | `surya-ocr` | `surya` | html, blocks | its command: 192 DPI | the `surya-ocr` package's full-page recognition, at its own settings, regenerating a looping page, with its fallback |
-| MinerU2.5-Pro | `mineru` | `mineru` | html, blocks | its docvortex: 200 DPI, at most 3500 px | `mineru-vl-utils`' `two_step_extract`: layout, then each block; its `json2md` |
-| GLM-OCR | `glm-ocr` | `glm_ocr` | html, blocks | its SDK: 200 DPI, at most 3500 px | its SDK servers: PP-DocLayoutV3, then each region; the abandon list emptied; a page with a dropped region asked again |
-| PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr_vl` | html, blocks | its pipeline: 144 DPI | its `PaddleOCRVL` pipeline, every block kept |
-| Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets` | html | opb's 2048 px PNG (images only) | its model card: its prompt, temperature 0, repetition penalty 1.0, 15000 tokens |
-
-olmOCR-2 and Nanonets-OCR2 draw no layout, so they have no blocks and no headline. Each module's
-docstring gives the server command, the versions and the reason for each setting.
-
-A finished run is read again with `opb reparse` and graded again with `--score-only --rescore`,
-anywhere: no adapter needs its vendor's code, and no model is called.
+olmOCR-2 and Nanonets-OCR2 return no layout, so they have no blocks.
 
 Their labels (LightOn's table is above):
 

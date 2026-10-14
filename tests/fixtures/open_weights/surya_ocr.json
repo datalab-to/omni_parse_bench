@@ -6,12 +6,7 @@
  "outputs": [
   "html"
  ],
- "sent": {
-  "weights": "datalab-to/surya-ocr-2",
-  "package": "surya-ocr==0.22.1",
-  "mode": "RecognitionPredictor(full_page=True)",
-  "image": "llm png"
- },
+ "sent": null,
  "raw": {
   "blocks": [
    {

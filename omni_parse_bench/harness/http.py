@@ -16,7 +16,7 @@ from . import budget, errors
 
 
 def page(path: Path) -> dict:
-    """The page file as a server of ours takes it (providers/oss/): its bytes and its suffix, for the
+    """The page file as an opb model server takes it (providers/oss/): its bytes and its suffix, for the
     vendor's own code to load as it loads a PDF or an image."""
     return {"page": base64.b64encode(path.read_bytes()).decode("ascii"), "suffix": path.suffix.lower()}
 
@@ -24,7 +24,8 @@ def page(path: Path) -> dict:
 def settings(config: Any, *local: str) -> dict:
     """An open model's `Config` as its server takes it: every field but where the server is (`base_url`),
     the model it serves (`model`, checked against its answer) and those the adapter applies itself
-    (`local`). Each defaults to the vendor's value; another is an experiment, and names a run of its own."""
+    (`local`). Each defaults to the vendor's value; any other value is a non-default configuration and
+    gets its own run name."""
     out = {f.name: getattr(config, f.name) for f in dataclasses.fields(config)}
     return {k: v for k, v in out.items() if k not in ("base_url", "model", *local)}
 

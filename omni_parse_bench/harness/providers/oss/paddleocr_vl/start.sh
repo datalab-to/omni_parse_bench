@@ -13,7 +13,7 @@ until curl -sf http://127.0.0.1:8000/v1/models > /dev/null; do
     kill -0 "$VLLM" 2>/dev/null || { echo "vllm exited" >&2; exit 1; }
     sleep 5
 done
-# Note: one pipeline per worker, each reading one page at a time; 4 workers is the setting the run used.
+# Note: 4 workers, one pipeline each, each reading one page at a time.
 /opt/paddle/bin/uvicorn server:app --app-dir /srv --host 0.0.0.0 --port "${PORT:-8001}" --workers 4 &
 SERVER=$!
 wait -n "$VLLM" "$SERVER"
