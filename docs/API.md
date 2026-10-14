@@ -638,7 +638,7 @@ One line per test, in manifest order: its verdict, what the test is, and the sta
  "suite": "olmo_arxiv_math", "document": "olmo_arxiv_math:2502.15977",
  "test_id": "2502.15977_pg21_math_003", "test_type": "present", "output_type": "html",
  "derivation": "upstream_olmocr", "tags": ["math"], "result": "pass", "why": "",
- "prediction": "5f0c...", "gold": "fb8cb369b9538d1a", "scorer": "0.1.2+f5c5ce802b77"}
+ "prediction": "5f0c...", "gold": "fb8cb369b9538d1a", "scorer": "0.2.0+f5c5ce802b77"}
 ```
 
 - `run` and `provider` name the run (its folder) and its provider; `settings.json` has the rest;
