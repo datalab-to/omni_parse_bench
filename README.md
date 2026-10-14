@@ -6,10 +6,9 @@
 [![Data: per source](https://img.shields.io/badge/data-per%20source-lightgrey)](./licenses)
 [![Dataset on Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20dataset-omni__parse__bench-yellow)](https://huggingface.co/datasets/datalab-to/omni_parse_bench)
 
-A document-parsing benchmark. Every test is a yes/no question about one page: is this text in the
-output, in this order, in a table cell under these headings, in a layout block of this kind?
 
-This repository contains a way to run our benchmark using our dataset on [HuggingFace](https://huggingface.co/datasets/datalab-to/omni_parse_bench) or your own dataset. It also provides lower-level primitives (score and predict) to run in your own pipelines however you like. The README is split up into the following table of contents.
+This repository contains a way to run our document-parsing benchmark using our dataset on [HuggingFace](https://huggingface.co/datasets/datalab-to/omni_parse_bench) or your own dataset. It also provides lower-level primitives (score and predict) to run in your own pipelines however you like. Every test is a yes/no question about one page: is this text in the output, in this order, in a table cell under these headings, etc. The README is split up into the following table of contents.
+
 
 
 - [The design](#the-design)
@@ -46,8 +45,7 @@ tagged:
 - language: ISO 639-3 codes (`eng`, `fra`, `tha`, ...).
 
 A test's tags are the union of its args' tags. Tags never decide whether a test passes or what the
-headline is; they select tests, so any slice of the benchmark can be scored. A test with several tags
-counts in each, so per-tag scores overlap and don't average to the headline.
+headline is. It is only used to query tests and rerank. 
 
 ## Install
 
@@ -65,12 +63,7 @@ With `[benchmark]` installed, run vendors on the dataset (5 pages here):
 opb benchmark --out runs/ --limit 5 --providers datalab openai/gpt-5.6-sol
 ```
 
-It shows the plan and asks before calling any vendor, since calls cost money. Each vendor needs its
-API key in the environment: `DATALAB_API_KEY` for Datalab, `OPENROUTER_API_KEY` for any model by
-its OpenRouter id; [`docs/providers.md`](./docs/providers.md) lists the rest. A run is resumable: stop it, and run the same command again to carry
-on.
-
-Each setting of a provider is its own run; here, two:
+It shows the plan and asks before calling any vendor. A run is resumable. Each setting of a provider is its own run. For example here we have two:
 
 ```bash
 opb benchmark --out runs/ --limit 5 --providers datalab \
@@ -79,14 +72,12 @@ opb benchmark --out runs/ --limit 5 --providers datalab \
 
 `--dataset` picks the dataset: a folder, or `hf://datasets/<repo>[@revision]` (ours by default).
 `--suites`, `--sample` and `--pages` choose pages. [`docs/API.md`](./docs/API.md#benchmark) has
-every option, how resuming works and what a run writes. Each run's `scores.jsonl` has one line per
-test; [Asking a question](./docs/API.md#asking-a-question) shows how to compare runs by tag, suite or
-test type.
+every option.
 
 ## Score
 
-Here is one page with three tests, written inline with `gold.parse` so the gold
-file's shape is visible (`gold.read("gold/<page_id>.json")` reads a file):
+Here is one page with three tests. It is written inline with `gold.parse` so the gold
+file's shape is visible:
 
 ```python
 from omni_parse_bench import gold, score, summarize
@@ -152,20 +143,20 @@ verdicts = score(outputs, tests)
 (0.6666666666666666, {'present': 1.0, 'order': 1.0, 'table_cell': 0.0}, {'score': 0.0, 'tests': 1, 'pages': 1})
 ```
 
-A verdict is `pass`, `fail`, `unsupported` (the provider can't produce that output) or `error`
-(grading raised: a bug in the scorer, not the provider's fault), with `why` saying what went wrong.
-`unsupported` and `error` verdicts are left out of every score.
+A verdict is `pass`, `fail`, `unsupported` or `error` with `why` saying what went wrong. `unsupported` and `error` verdicts are left out of every score.
 
-From the command line, with the outputs in a JSON file:
+From the command line:
 
 ```bash
 opb score --pred outputs.json --gold gold/<page_id>.json
 ```
 
-It prints the verdicts. A score is a number over many pages: `summarize` in your code, or
-`summary.json` from `opb benchmark`. To grade your own model on the whole dataset, write its outputs to
-`predictions/<page_id>.json` and run `opb grade` on the folder (see [Grading your own
-predictions](./docs/API.md#grading-your-own-predictions)).
+It prints the verdicts. 
+
+A score is a number over many pages: `summarize` in your code, or
+`summary.json` from `opb benchmark`. 
+
+To grade predictions your brought on the benchmark see [Grading your own predictions](./docs/API.md#grading-your-own-predictions).
 
 ## Predict
 
@@ -189,9 +180,7 @@ opb predict --provider openai/gpt-5.6-sol --page pages/<page_id>.pdf --wants htm
 opb providers        # every provider, and its options
 ```
 
-Every provider gets the same timeout per call and its most accurate settings by default. An output a vendor
-can't produce is recorded as unsupported, and its tests are left out of that vendor's scores rather
-than failed.
+Every provider gets the same timeout per call and its most accurate settings by default. 
 
 ## Documentation
 
