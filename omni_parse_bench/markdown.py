@@ -86,3 +86,12 @@ def _renderer():
     from markdown_it import MarkdownIt
 
     return MarkdownIt("commonmark", {"html": True}).enable(["table", "strikethrough"]).disable("reference")
+
+
+def alt(content: str) -> str:
+    """A model's account of a picture (a description, a chart's data) as an image's alt text: where every
+    provider's picture descriptions go (docs/providers.md), so the scorer treats them alike."""
+    import html as _html
+
+    said = " ".join(views.text(content).split())
+    return f'<img alt="{_html.escape(said, quote=True)}">' if said else "<img>"

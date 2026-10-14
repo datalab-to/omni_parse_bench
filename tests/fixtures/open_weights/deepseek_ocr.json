@@ -1,0 +1,33 @@
+{
+ "model": "DeepSeek-OCR-2",
+ "page": "docparsing_images-images_00e18000_images_education_english_00083-p1",
+ "provider": "deepseek-ocr",
+ "options": {},
+ "outputs": [
+  "blocks",
+  "html"
+ ],
+ "sent": {
+  "weights": "deepseek-ai/DeepSeek-OCR-2",
+  "prompt": "<image>\n<|grounding|>Convert the document to markdown.",
+  "vllm": "0.8.5 (V0 engine)",
+  "temperature": 0.0,
+  "max_tokens": 8192,
+  "skip_special_tokens": false,
+  "crop_mode": true,
+  "ngram": {
+   "ngram_size": 40,
+   "window_size": 90,
+   "whitelist_token_ids": [
+    128821,
+    128822
+   ]
+  }
+ },
+ "raw": {
+  "raw": "<|ref|>text<|/ref|><|det|>[[170, 92, 913, 155]]<|/det|>\nStudents are put into pairs. Each member of the pair receives a picture which is slightly different from his partner's. Students hide the pictures from one another and then, by a process of describing, questioning and answering, discover what the differences are.\n\n<|ref|>text<|/ref|><|det|>[[170, 164, 915, 250]]<|/det|>\nDescribable and draw Students are put into pairs. One student has a picture, the other a blank piece of paper and a pencil. The student with the picture must tell his/her partner what to draw so that the drawing ends up the same as the original picture. The student must not show the picture until the drawing is completed.\n\n<|ref|>text<|/ref|><|det|>[[145, 260, 915, 363]]<|/det|>\nPlay a game Students are shown a picture or a tray with many objects on it, or a series of different flash cards or magazine pictures. They have two minutes to memorise as many of the objects as they can. The cards, pictures or tray are then taken away and the students have to say what they saw, or write down everything they can remember seeing, then compare with the rest of the class.\n\n<|ref|>text<|/ref|><|det|>[[170, 368, 664, 395]]<|/det|>\nUse word series Students construct the series following an example.\n\n<|ref|>text<|/ref|><|det|>[[270, 410, 570, 430]]<|/det|>\nExample: Cultery: knife, fork, spoon\n\n<|ref|>text<|/ref|><|det|>[[270, 432, 362, 450]]<|/det|>\nTransport:\n\n<|ref|>text<|/ref|><|det|>[[270, 452, 360, 469]]<|/det|>\nVehicles:\n\n<|ref|>text<|/ref|><|det|>[[270, 472, 360, 489]]<|/det|>\nFurniture:\n\n<|ref|>text<|/ref|><|det|>[[270, 491, 362, 510]]<|/det|>\nBuildings:\n\n<|ref|>text<|/ref|><|det|>[[145, 523, 915, 650]]<|/det|>\nWord bingo The teacher thinks of an area of language (e.g. shopping) that the students have recently been studying. Students draw 9 squares (3 × 3) on a piece of paper and put 9 words connected with shopping in the squares. The teacher then calls out, one at a time, words connected with shopping. If the students have the word in the squares, they cross it out. The first student to cross out all the words in the squares is the winner. The game can be played for more than one round.\n\n<|ref|>table<|/ref|><|det|>[[299, 660, 560, 850]]<|/det|>\n<table><tr><td></td><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td><td></td></tr></table>\n\n<|ref|>text<|/ref|><|det|>[[145, 866, 915, 930]]<|/det|>\nWord association The teacher says a key word, e.g. travelling. The students then have to write down all the words they can think of connected with travelling. They have a time limit, e.g. two minutes. When time is up, the person with the highest number of acceptable words is the winner.",
+  "tokens": 675,
+  "finish_reason": "stop",
+  "prompt": "<image>\n<|grounding|>Convert the document to markdown."
+ }
+}

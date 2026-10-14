@@ -16,7 +16,9 @@ import re
 from typing import Any
 
 from . import contract
-from .providers import azure, datalab, extend, llamaparse, llm, mistral, reducto, tesseract
+from .providers import (azure, chandra_ocr, datalab, deepseek_ocr, dots, extend, glm_ocr, hunyuan, infinity,
+                        lighton, llamaparse, llm, mineru, mistral, nanonets, olmocr, paddleocr_vl, reducto,
+                        surya_ocr, tesseract, unlimited)
 
 DEFAULT_TIMEOUT = 900.0
 MODEL_SEPARATOR = "/"
@@ -29,6 +31,21 @@ ADAPTERS = {
     "azure": azure,
     "mistral": mistral,
     "tesseract": tesseract,
+    # Open models, each served from its folder in providers/oss/: the vendor's own code on a server of
+    # ours, or vLLM alone where the vendor offers only the model.
+    "chandra-ocr": chandra_ocr,
+    "deepseek-ocr": deepseek_ocr,
+    "dots-mocr": dots,
+    "glm-ocr": glm_ocr,
+    "hunyuan-ocr": hunyuan,
+    "infinity-parser2": infinity,
+    "lightonocr": lighton,
+    "mineru": mineru,
+    "nanonets-ocr": nanonets,
+    "olmocr": olmocr,
+    "paddleocr-vl": paddleocr_vl,
+    "surya-ocr": surya_ocr,
+    "unlimited-ocr": unlimited,
 }
 PROVIDERS = sorted(ADAPTERS)
 
@@ -54,13 +71,17 @@ def out_name(provider: str, options: dict | None = None) -> str:
 
     Note: the digest covers every setting, not only those that differ from the defaults, so a
     directory holds exactly one configuration even after a default changes. What the digest
-    stands for is written beside the answers as `settings.json` by `benchmark.predict_all`.
+    stands for is written beside the answers as `settings.json` by `benchmark.predict_all`. A
+    `Config` field marked `metadata={"names_run": False}` is left out: where a server of ours answers
+    (a new address each time it starts) doesn't change what was run, so a resumed run keeps its name.
     """
     # Note: what each call sends is in the digest too (fixed request settings, a prompt's digest),
     # so a code change that alters a request names a new run instead of joining the old one.
     api, config = adapter(provider), config_for(provider, options)
     sent = [[sorted(r.outputs), r.sent] for r in api.requests(api.SUPPORTS, config)]
-    settings = {"provider": provider, **settings_for(provider, options), "requests": sent}
+    named = {f.name for f in dataclasses.fields(config) if f.metadata.get("names_run", True)}
+    kept = {k: v for k, v in settings_for(provider, options).items() if k in named}
+    settings = {"provider": provider, **kept, "requests": sent}
     spelled = json.dumps(settings, sort_keys=True, default=str)
     digest = hashlib.sha256(spelled.encode()).hexdigest()[:8]
     name = re.sub(r"[^A-Za-z0-9._-]+", "_", provider.replace(MODEL_SEPARATOR, "__"))

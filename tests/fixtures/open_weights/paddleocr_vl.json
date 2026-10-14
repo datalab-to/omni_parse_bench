@@ -1,0 +1,229 @@
+{
+ "model": "PaddleOCR-VL-1.6",
+ "page": "forms_federal-filled_faa_8710_1-p1",
+ "provider": "paddleocr-vl",
+ "options": {},
+ "outputs": [
+  "html"
+ ],
+ "sent": {
+  "weights": "PaddlePaddle/PaddleOCR-VL-1.6@c5630abae1d940eafe0697512a0325494b02ab42",
+  "pipeline": "PaddleOCRVL v1.6 (paddleocr 3.7.0)",
+  "layout": "PP-DocLayoutV3",
+  "vl_rec_backend": "vllm-server",
+  "markdown_ignore_labels": [],
+  "image": "llm png"
+ },
+ "raw": {
+  "input_path": null,
+  "page_index": null,
+  "page_count": null,
+  "width": 1583,
+  "height": 2048,
+  "model_settings": {
+   "use_doc_preprocessor": false,
+   "use_layout_detection": true,
+   "use_chart_recognition": false,
+   "use_seal_recognition": false,
+   "use_ocr_for_image_block": false,
+   "format_block_content": false,
+   "merge_layout_blocks": true,
+   "markdown_ignore_labels": [],
+   "return_layout_polygon_points": true
+  },
+  "parsing_res_list": [
+   {
+    "block_label": "header",
+    "block_content": "TYPE OR PRINT ALL ENTRIES IN INK",
+    "block_bbox": [
+     99,
+     65,
+     417,
+     86
+    ],
+    "block_id": 0,
+    "block_order": null,
+    "group_id": 0,
+    "block_polygon_points": [
+     [
+      99.0,
+      65.0
+     ],
+     [
+      416.0,
+      65.0
+     ],
+     [
+      416.0,
+      85.0
+     ],
+     [
+      99.0,
+      85.0
+     ]
+    ]
+   },
+   {
+    "block_label": "header",
+    "block_content": "OMB Control Number: 2120-0021\nExpiration Date: 12/31/2028",
+    "block_bbox": [
+     1181,
+     42,
+     1483,
+     90
+    ],
+    "block_id": 1,
+    "block_order": null,
+    "group_id": 1,
+    "block_polygon_points": [
+     [
+      1181.0,
+      42.0
+     ],
+     [
+      1483.0,
+      42.0
+     ],
+     [
+      1483.0,
+      90.0
+     ],
+     [
+      1181.0,
+      90.0
+     ]
+    ]
+   },
+   {
+    "block_label": "figure_title",
+    "block_content": "Airman Certificate and/or Rating Application",
+    "block_bbox": [
+     475,
+     133,
+     1136,
+     169
+    ],
+    "block_id": 2,
+    "block_order": null,
+    "group_id": 2,
+    "block_polygon_points": [
+     [
+      475.0,
+      133.0
+     ],
+     [
+      1136.0,
+      133.0
+     ],
+     [
+      1136.0,
+      169.0
+     ],
+     [
+      475.0,
+      169.0
+     ]
+    ]
+   },
+   {
+    "block_label": "table",
+    "block_content": "<table><tr><td colspan=\"2\">I. APPLICATION INFORMATION (Mark &#x27;X&#x27; in all the blocks applicable to the certificate or rating for which you are applying or for the information you submit to validate certain certification requirements):</td></tr></table>",
+    "block_bbox": [
+     96,
+     160,
+     1485,
+     1954
+    ],
+    "block_id": 3,
+    "block_order": null,
+    "group_id": 3,
+    "block_polygon_points": [
+     [
+      96.0,
+      160.0
+     ],
+     [
+      1485.0,
+      160.0
+     ],
+     [
+      1485.0,
+      1954.0
+     ],
+     [
+      96.0,
+      1954.0
+     ]
+    ]
+   },
+   {
+    "block_label": "footer",
+    "block_content": "FAA 8710-1 (03/26) Supersedes Previous Edition",
+    "block_bbox": [
+     97,
+     1958,
+     516,
+     1982
+    ],
+    "block_id": 4,
+    "block_order": null,
+    "group_id": 4,
+    "block_polygon_points": [
+     [
+      97.0,
+      1958.0
+     ],
+     [
+      516.0,
+      1958.0
+     ],
+     [
+      516.0,
+      1982.0
+     ],
+     [
+      97.0,
+      1982.0
+     ]
+    ]
+   },
+   {
+    "block_label": "number",
+    "block_content": "Page 1 of 2",
+    "block_bbox": [
+     1382,
+     1959,
+     1481,
+     1983
+    ],
+    "block_id": 5,
+    "block_order": 1,
+    "group_id": 5,
+    "block_polygon_points": [
+     [
+      1382.0,
+      1959.0
+     ],
+     [
+      1480.0,
+      1959.0
+     ],
+     [
+      1480.0,
+      1982.0
+     ],
+     [
+      1382.0,
+      1982.0
+     ]
+    ]
+   }
+  ],
+  "markdown": "TYPE OR PRINT ALL ENTRIES IN INK\n\nOMB Control Number: 2120-0021\nExpiration Date: 12/31/2028\n\n<div style=\"text-align: center;\">Airman Certificate and/or Rating Application</div>\n\n\n\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td colspan=\"2\">I. APPLICATION INFORMATION (Mark &#x27;X&#x27; in all the blocks applicable to the certificate or rating for which you are applying or for the information you submit to validate certain certification requirements):</td></tr></table>\n\nFAA 8710-1 (03/26) Supersedes Previous Edition\n\nPage 1 of 2",
+  "vendor": {
+   "paddleocr": "3.7.0",
+   "paddlex": "3.7.2",
+   "paddlepaddle": "3.3.1"
+  }
+ }
+}

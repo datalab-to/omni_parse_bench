@@ -15,8 +15,12 @@ No sampling setting is sent: each model runs at its own default temperature and 
 vendor runs at its own settings (Google, for one, advises against lowering Gemini 3's temperature,
 which can make it loop). The page image is sent at high detail, so no endpoint downscales it.
 
-Auth: OPENROUTER_API_KEY, or OPENAI_API_KEY. Another endpoint is selected with the `base_url`
-option, so the record says which endpoint answered.
+Another endpoint is selected with the `base_url` option, so the record says which endpoint
+answered. Auth: OPENROUTER_API_KEY (or OPENAI_API_KEY) for OpenRouter; for any other endpoint
+OPB_ENDPOINT_KEY if set, else none.
+
+The open OCR models are providers of their own (providers/oss/); `chat`, `answer` and the small
+helpers below are what they share with this adapter.
 
     opb predict --provider openai/gpt-5.6-sol --page page.pdf
 
@@ -33,6 +37,7 @@ import os
 import random
 import re
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 import openai
@@ -98,15 +103,15 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
             for o in sorted(wants)]
 
 
-def image(page: Path) -> bytes:
-    """The page as a PNG, its long edge at most LONG_EDGE pixels."""
+def image(page: Path, long_edge: int = LONG_EDGE) -> bytes:
+    """The page as a PNG, its long edge at most `long_edge` pixels."""
     from PIL import Image
 
     if page.suffix.lower() == ".pdf":
-        img = raster.render(page, lambda size: LONG_EDGE / max(size))
+        img = raster.render(page, lambda size: long_edge / max(size))
     else:
         img = Image.open(page)
-        img.thumbnail((LONG_EDGE, LONG_EDGE))
+        img.thumbnail((long_edge, long_edge))
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG")
     return buf.getvalue()
@@ -214,12 +219,8 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
     not retried here, and the SDK's retries are off: `predict`'s retry decides, so the loops can't
     multiply.
     """
-    key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY")
-    if not key:
-        raise errors.MissingCredential("OPENROUTER_API_KEY (or OPENAI_API_KEY) must be set")
     deadline = budget.Budget(timeout)
-    # Note: the SDK's own retries are off; `predict` retries every vendor the same way.
-    client = openai.OpenAI(base_url=config.base_url, api_key=key, max_retries=0)
+    usage = {"extra_body": {"usage": {"include": True}}} if config.base_url == DEFAULT_BASE_URL else {}
     b64 = base64.b64encode(image(page)).decode("ascii")
     (output,) = request.outputs
     messages = [{"role": "user", "content": [
@@ -230,17 +231,8 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         if attempt:
             time.sleep(min((2 ** attempt) + random.uniform(0, 1), deadline.remaining()))
         deadline.check(f"after {attempt} attempt(s) that produced no usable answer")
-        try:
-            resp = client.chat.completions.create(
-                model=config.model, messages=messages, max_tokens=config.max_output_tokens,
-                timeout=deadline.remaining(), extra_body={"usage": {"include": True}})
-        except openai.APIStatusError as exc:
-            raise errors.VendorError(f"HTTP {exc.status_code}: {str(exc)[:300]}", status=exc.status_code,
-                                     body=str(exc.body), cost=contract.total(spent)) from None
-        except openai.APIConnectionError as exc:
-            raise errors.VendorUnreachable(f"connection failed: {exc}"[:300],
-                                           cost=contract.total(spent)) from None
-        body = last = resp.model_dump()
+        ask = {"model": config.model, "messages": messages, "max_tokens": config.max_output_tokens, **usage}
+        body = last = chat(config.base_url, ask, deadline, spent)
         spent.append(_cost(body.get("usage") or {}))
         finish = ((body.get("choices") or [{}])[0]).get("finish_reason")
         if finish == "length":
@@ -255,6 +247,61 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
     raise errors.VendorError(f"no usable {output} after {config.attempts} attempts"
                              + (" (a reply was cut off by an error)" if cut else ""),
                              status=200, raw=last, cost=contract.total(spent))
+
+
+def key(base_url: str) -> str:
+    """The key for an endpoint. Each key goes only to its own endpoint, so the OpenRouter key never
+    reaches a server of ours."""
+    if base_url != DEFAULT_BASE_URL:
+        return os.environ.get("OPB_ENDPOINT_KEY", "EMPTY")
+    if not (got := os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY")):
+        raise errors.MissingCredential("OPENROUTER_API_KEY (or OPENAI_API_KEY) must be set")
+    return got
+
+
+def chat(base_url: str, body: dict, deadline: budget.Budget, spent: Sequence[contract.Cost] = ()) -> dict:
+    """One chat completion's answer, as JSON: every chat call of every provider goes through here, so
+    their failures map alike. `body` is `chat.completions.create`'s arguments; `spent` is what earlier
+    attempts cost, kept on a failure. The SDK's own retries are off: `predict` retries every vendor the
+    same way, so the loops can't multiply."""
+    client = openai.OpenAI(base_url=base_url, api_key=key(base_url), max_retries=0)
+    try:
+        return client.chat.completions.create(**body, timeout=max(1.0, deadline.remaining())).model_dump()
+    except openai.APITimeoutError:
+        raise errors.VendorTimeout(f"no answer within {deadline.total:.0f} s",
+                                   cost=contract.total(list(spent))) from None
+    except openai.APIStatusError as exc:
+        raise errors.VendorError(f"HTTP {exc.status_code}: {str(exc)[:300]}", status=exc.status_code,
+                                 body=str(exc.body), cost=contract.total(list(spent))) from None
+    except openai.APIConnectionError as exc:
+        raise errors.VendorUnreachable(f"connection failed: {exc}"[:300],
+                                       cost=contract.total(list(spent))) from None
+
+
+def image_part(png: bytes) -> dict:
+    """A PNG as a chat message's image part."""
+    url = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+    return {"type": "image_url", "image_url": {"url": url}}
+
+
+def finish(body: dict) -> str | None:
+    """Why a chat completion stopped: `stop`, `length`, ..."""
+    return ((body.get("choices") or [{}])[0]).get("finish_reason")
+
+
+def content(body: dict) -> str:
+    """A chat completion's text, finished or cut at its token limit (read as it is, as a vendor's own
+    client reads it); empty for a page the model read as blank."""
+    if finish(body) not in ("stop", "length"):
+        raise errors.VendorError(f"the reply didn't finish: {finish(body)}", status=200)
+    return ((body["choices"][0].get("message")) or {}).get("content") or ""
+
+
+def tokens(bodies: list[dict]) -> contract.Cost:
+    """The tokens of several chat completions, summed where any states them."""
+    usages = [b.get("usage") or {} for b in bodies]
+    return contract.total([contract.Cost(tokens_in=u.get("prompt_tokens"),
+                                         tokens_out=u.get("completion_tokens")) for u in usages])
 
 
 def _usable(body: dict, output: str) -> bool:

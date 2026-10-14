@@ -1,0 +1,135 @@
+{
+  "model": "dots.mocr",
+  "page": "docparsing_images-images_2990125f_images_legal_legal_provision_00080-p1",
+  "provider": "dots-mocr",
+  "options": {
+    "base_url": "http://127.0.0.1:8001"
+  },
+  "outputs": [
+    "html"
+  ],
+  "sent": null,
+  "raw": {
+    "cells": [
+      {
+        "bbox": [
+          45,
+          4,
+          111,
+          35
+        ],
+        "category": "Page-header",
+        "text": "AUTHENTICATED\nU.S. GOVERNMENT\nINFORMATION\nGPO"
+      },
+      {
+        "bbox": [
+          246,
+          142,
+          316,
+          212
+        ],
+        "category": "Picture"
+      },
+      {
+        "bbox": [
+          329,
+          159,
+          465,
+          195
+        ],
+        "category": "Text",
+        "text": "CODE OF FEDERAL REGULATIONS"
+      },
+      {
+        "bbox": [
+          248,
+          271,
+          453,
+          310
+        ],
+        "category": "Title",
+        "text": "Title 31\nMoney and Finance: Treasury"
+      },
+      {
+        "bbox": [
+          248,
+          322,
+          334,
+          337
+        ],
+        "category": "Text",
+        "text": "Parts 0 to 199"
+      },
+      {
+        "bbox": [
+          248,
+          365,
+          384,
+          378
+        ],
+        "category": "Text",
+        "text": "Revised as of July 1, 2016"
+      },
+      {
+        "bbox": [
+          248,
+          422,
+          419,
+          447
+        ],
+        "category": "Text",
+        "text": "Containing a codification of documents of general applicability and future effect"
+      },
+      {
+        "bbox": [
+          248,
+          468,
+          328,
+          479
+        ],
+        "category": "Text",
+        "text": "As of July 1, 2016"
+      },
+      {
+        "bbox": [
+          248,
+          499,
+          453,
+          539
+        ],
+        "category": "Text",
+        "text": "Published by the Office of the Federal Register National Archives and Records Administration as a Special Edition of the Federal Register"
+      }
+    ],
+    "markdown": "AUTHENTICATED\nU.S. GOVERNMENT\nINFORMATION\nGPO\n\nCODE OF FEDERAL REGULATIONS\n\nTitle 31\nMoney and Finance: Treasury\n\nParts 0 to 199\n\nRevised as of July 1, 2016\n\nContaining a codification of documents of general applicability and future effect\n\nAs of July 1, 2016\n\nPublished by the Office of the Federal Register National Archives and Records Administration as a Special Edition of the Federal Register",
+    "image_size": [
+      616,
+      784
+    ],
+    "completion": {
+      "id": "chatcmpl-94ba2c79b1f4f569",
+      "object": "chat.completion",
+      "created": 1791674647,
+      "model": "model",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "[{\"bbox\": [45, 4, 111, 35], \"category\": \"Page-header\", \"text\": \"AUTHENTICATED\\nU.S. GOVERNMENT\\nINFORMATION\\nGPO\"}, {\"bbox\": [246, 142, 316, 212], \"category\": \"Picture\"}, {\"bbox\": [329, 159, 465, 195], \"category\": \"Text\", \"text\": \"CODE OF FEDERAL REGULATIONS\"}, {\"bbox\": [248, 271, 453, 310], \"category\": \"Title\", \"text\": \"Title 31\\nMoney and Finance: Treasury\"}, {\"bbox\": [248, 322, 334, 337], \"category\": \"Text\", \"text\": \"Parts 0 to 199\"}, {\"bbox\": [248, 365, 384, 378], \"category\": \"Text\", \"text\": \"Revised as of July 1, 2016\"}, {\"bbox\": [248, 422, 419, 447], \"category\": \"Text\", \"text\": \"Containing a codification of documents of general applicability and future effect\"}, {\"bbox\": [248, 468, 328, 479], \"category\": \"Text\", \"text\": \"As of July 1, 2016\"}, {\"bbox\": [248, 499, 453, 539], \"category\": \"Text\", \"text\": \"Published by the Office of the Federal Register National Archives and Records Administration as a Special Edition of the Federal Register\"}]"
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 832,
+        "total_tokens": 1233,
+        "completion_tokens": 401,
+        "prompt_tokens_details": null
+      }
+    },
+    "vendor": {
+      "dots.ocr": "23f3e5612fb8066d4034d5ecfc8f33a9243533eb"
+    }
+  }
+}

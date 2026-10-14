@@ -10,13 +10,16 @@ with five names (`contract.Adapter`):
   received, with its cost; and
 - `parse(raw, request, config)`: read the outputs from an answer.
 
-`registry.ADAPTERS` lists the vendors; any model id goes to `llm.py`.
+`registry.ADAPTERS` lists the vendors and the open-weight models with adapters of their own; any
+model id goes to `llm.py`.
 
 1. [The two outputs, and how an adapter produces them](#the-two-outputs-and-how-an-adapter-produces-them): html and blocks, and the format changes an adapter may make;
 2. [Block labels](#block-labels): each vendor's block types, mapped onto the labels;
 3. [The vendors](#the-vendors): each adapter's API, outputs, headers and keys;
-4. [What differs between vendors, by necessity](#what-differs-between-vendors-by-necessity): the page sizes, caches and prompts; and
-5. [Every adapter: fetch, then parse](#every-adapter-fetch-then-parse): why an answer is saved before it is read.
+4. [Benching a model we serve](#benching-a-model-we-serve): each open model's folder (image, start script, server) and how opb reaches it;
+5. [Open-weight models](#open-weight-models): the fifteen open OCR models, how each is asked, and their labels;
+6. [What differs between vendors, by necessity](#what-differs-between-vendors-by-necessity): the page sizes, caches and prompts; and
+7. [Every adapter: fetch, then parse](#every-adapter-fetch-then-parse): why an answer is saved before it is read.
 
 ## The two outputs, and how an adapter produces them
 
@@ -173,6 +176,22 @@ figures are their own blocks):
 | table | table |
 | figure | figure |
 
+LightOn (the labels of its model card, and those its own ParseBench parser also reads; a label
+ending in `+` continues the block before it and is read without the `+`):
+
+| LightOn label | label |
+| --- | --- |
+| text, paragraph, aside_text | text |
+| title | heading |
+| header, footer, page_number, page_header, page_footer | page_furniture |
+| list | list |
+| caption, figure_title | caption |
+| footnote, page_footnote | footnote |
+| formula | equation |
+| code | code |
+| table | table |
+| image, figure, chart, header_image, footer_image | figure |
+
 ## The vendors
 
 | provider | API | outputs | headers | auth |
@@ -184,6 +203,7 @@ figures are their own blocks):
 | `llamaparse` | /api/v2/parse/upload, poll, expand=markdown,items,usage | html, blocks | header and footer fields beside the markdown, put back | LLAMA_CLOUD_API_KEY |
 | `azure` | Content Understanding, prebuilt-layout | html, blocks | comments in its markdown, unwrapped | AZURE_CU_KEY, and the `endpoint` option |
 | `mistral` | /v1/ocr (mistral-ocr-4-1) | html, blocks | header and footer fields beside the markdown, put back | MISTRAL_API_KEY |
+| a served open-weight model (see Open-weight models) | its oss/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2: html) | kept: vendor defaults that leave them out turned off | OPB_ENDPOINT_KEY, when the server has one |
 | `tesseract` | the local `tesseract` binary, no model of the page | html | kept: it has no notion of them | none |
 
 A vendor's tiers are runs of their own: `--options '{"datalab": [{"mode": "balanced"}, {"mode":
@@ -239,6 +259,246 @@ Per vendor:
   for, so it is told nothing about the page. Its text is written as html inside `<pre>`, escaped,
   and it gives no layout blocks. Needs `brew install tesseract tesseract-lang` (or the
   distribution's tesseract and its script models).
+
+## Benching a model we serve
+
+Serving and benchmarking are separate. Each open model has a folder, `omni_parse_bench/harness/providers/oss/<model>/`,
+that deploys it on any GPU host, and opb then benchmarks it from anywhere, pointed at its URL:
+
+    docker build -t opb-dots omni_parse_bench/harness/providers/oss/dots
+    docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-dots
+    opb benchmark --providers dots-mocr --options '{"dots-mocr": {"base_url": "http://<host>:8001"}}'
+
+A folder holds:
+
+- `Dockerfile`: the vendor's environment, pinned (base image, packages, repository at a commit);
+- `start.sh`: vLLM with the vendor's flags and the weights at a pinned revision, then server.py if
+  there is one; one port out, 8001; and
+- `server.py`, for a model whose vendor's code takes part in reading a page (loading the file,
+  preparing the image, asking, retrying, its pipeline or post-processing): that code, per page,
+  behind one route, taking the page file and answering with the vendor's output and the model's raw
+  reply.
+
+A server.py stands alone: it imports its vendor's code and what that needs, never omni_parse_bench,
+and nothing in omni_parse_bench imports it. So the vendor's code (and its license) stays in its image,
+and the adapter that reads the answer needs none of it: a saved answer is read again anywhere.
+
+A model whose vendor offers only the model, with no code of its own around it (Nanonets-OCR2), has no
+server.py: its port is vLLM's `/v1`, and its adapter asks it directly, through `llm.chat`.
+
+OPB_ENDPOINT_KEY, when the server has it, is required as the bearer token, and opb sends it to any
+endpoint but OpenRouter's. A page can take minutes (a vendor's retries, a looping reply), so a server
+must hold a request open as long as the call's 900 s, with no proxy in front that cuts requests sooner.
+Run opb beside the server, on the same host or network: every page file is sent to it, and many pages
+at once over a slow link wait on time the 900 s counts against the model. Send a server no more pages at
+once than it reads at once, for the same reason.
+
+## Open-weight models
+
+Fifteen open OCR models were run in October 2026, one run each. They get the rules every vendor gets:
+
+- each model runs as its vendor documents it: the vendor's serving image or package version, its
+  server flags, its prompt, sampling, token limit and retries. Where the vendor's client prepares the
+  page or reads the reply, its code runs on the model's server at a pinned commit, not copied;
+- the page goes as the API vendors get it, the original file, and the vendor's own code loads it:
+  where the model has a server of ours (providers/oss/), its server runs the vendor's own loader on
+  the file (its renderer, DPI, size caps; for a vendor with a benchmark setting, that one). A model
+  whose vendor documents image input only (HunyuanOCR, Nanonets-OCR2) gets the LLM
+  adapter's PNG, at most 2048 px on its long edge, as the general LLMs do. Each adapter's docstring
+  sets out, in five named steps, how a page is processed: input loading, image preprocessing, model
+  inference, vendor output parsing and mapping to opb outputs, then where it differs from the vendor;
+- html keeps page headers and footers. A vendor default that drops them is turned off (the GLM-OCR
+  SDK's abandon list, PaddleOCR-VL's ignored labels, the Infinity-Parser2 SDK's
+  `keep_header_footer`), as Datalab's `keep_pageheader_in_output` is;
+- a model's account of a picture (its description of an image, a chart's data, a diagram's mermaid)
+  becomes the image's alt text, as Extend's descriptions do. A model that leaves a picture's text
+  out (dots.mocr, Unlimited-OCR, MinerU and Surya, for example) gives no alt text;
+- the changes are format changes only. A reply in markdown goes through `markdown.to_html`, and a
+  label maps through the model's LABELS table; a label the table lacks fails `blocks` only;
+- a reply cut at the token limit is read as it is, as each vendor's own code reads it (a
+  vendor whose code asks again, as chandra's does, asks again first);
+- what a vendor's code takes per page is an option of the model's `Config`, the vendor's value by
+  default: sampling (temperature, top_p, max_tokens, and the repetition penalty where the vendor sets
+  one), the page's resolution (a PDF's DPI, a pixel cap, a long edge) and the vendor's guards against
+  looping (retries, an n-gram blocker's sizes, an early stop). The adapter sends them as `settings`;
+  the server holds none of its own and refuses a request without exactly its own. Another value is an
+  experiment, not the vendor's setting, and names a run of its own (`opb providers <provider>` lists
+  them). What is fixed when a server starts (vLLM's flags, an SDK's configuration) is not an option;
+  and
+- each call has the usual 900 s.
+
+| model | provider | oss/ | outputs | page loaded as | how it is asked |
+| --- | --- | --- | --- | --- | --- |
+| LightOnOCR-3 (4B, 0.8B) | `lightonocr` (`model`) | `lighton` | html, blocks | its benchmark: poppler, 400 DPI fit to 5M pixels | its client: `grounding`, temperature 0.1, top_p 1.0, 12288 tokens, once, `fix_escaped_dollars` |
+| dots.mocr | `dots-mocr` | `dots` | html, blocks | its parser: 200 DPI (72 past 4500 px) | its parser: `prompt_layout_all_en`, temperature 0.1, top_p 1.0, 32768 tokens, once, `post_process_output` |
+| Unlimited-OCR | `unlimited-ocr` | `unlimited` | html, blocks | its pipeline (infer.py): 300 DPI | its vLLM recipe: the prompt before the image, temperature 0, n-gram processor 35/128, 28000 tokens, once |
+| Infinity-Parser2 (Pro, Flash) | `infinity-parser2` (`model`) | `infinity` | html, blocks | its SDK: 300 DPI | its SDK: `doc2json`, temperature 0, top_p 1, 32768 tokens, thinking off, once; a cut reply keeps its complete elements |
+| chandra-ocr-2 | `chandra-ocr` | `chandra` | html, blocks | its benchmark script: 300 DPI, forms flattened; small images enlarged | the `chandra-ocr` package: `ocr_layout`, temperature 0, top_p 0.1, 12384 tokens, up to 6 retries on a repeat; `parse_html` per block |
+| olmOCR-2 | `olmocr` | `olmocr` | html | its pipeline: pdftoppm, 1288 px long edge | its pipeline's own `process_page`: the v4 prompt, 8000 tokens, up to 8 attempts at its temperatures, rotation corrected, its PageResponse check |
+| HunyuanOCR-1.5 | `hunyuan-ocr` | `hunyuan` | html, blocks | opb's 2048 px PNG (images only) | its client: the `layout_parse` task, temperature 0, repetition penalty 1.08, streamed with its early stop, its repeat cleanup |
+| DeepSeek-OCR-2 | `deepseek-ocr` | `deepseek` | html, blocks | its scripts: PyMuPDF at 144 DPI | its vLLM 0.8.5 engine: the grounding prompt, crop mode, n-gram processor 40/90, 8192 tokens |
+| Surya OCR 2 | `surya-ocr` | `surya` | html, blocks | its command: 192 DPI | the `surya-ocr` package's full-page recognition, at its own settings, regenerating a looping page, with its fallback |
+| MinerU2.5-Pro | `mineru` | `mineru` | html, blocks | its docvortex: 200 DPI, at most 3500 px | `mineru-vl-utils`' `two_step_extract`: layout, then each block; its `json2md` |
+| GLM-OCR | `glm-ocr` | `glm_ocr` | html, blocks | its SDK: 200 DPI, at most 3500 px | its SDK servers: PP-DocLayoutV3, then each region; the abandon list emptied; a page with a dropped region asked again |
+| PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr_vl` | html, blocks | its pipeline: 144 DPI | its `PaddleOCRVL` pipeline, every block kept |
+| Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets` | html | opb's 2048 px PNG (images only) | its model card: its prompt, temperature 0, repetition penalty 1.0, 15000 tokens |
+
+olmOCR-2 and Nanonets-OCR2 draw no layout, so they have no blocks and no headline. Each module's
+docstring gives the server command, the versions and the reason for each setting.
+
+A finished run is read again with `opb reparse` and graded again with `--score-only --rescore`,
+anywhere: no adapter needs its vendor's code, and no model is called.
+
+Their labels (LightOn's table is above):
+
+chandra-ocr-2 (`providers/chandra_ocr.py`):
+
+| chandra-ocr-2 label | label |
+| --- | --- |
+| Text, Table-Of-Contents, Bibliography | text |
+| Section-Header | heading |
+| Page-Header, Page-Footer | page_furniture |
+| List-Group | list |
+| Caption | caption |
+| Footnote | footnote |
+| Equation-Block | equation |
+| Code-Block | code |
+| Table | table |
+| Form | form |
+| Image, Figure, Picture, Diagram, Chemical-Block, Complex-Block | figure |
+
+dots.mocr (`providers/dots.py`):
+
+| dots.mocr label | label |
+| --- | --- |
+| Text | text |
+| Title, Section-header | heading |
+| Page-header, Page-footer | page_furniture |
+| List-item | list |
+| Caption | caption |
+| Footnote | footnote |
+| Formula | equation |
+| Table | table |
+| Picture | figure |
+
+Unlimited-OCR (`providers/unlimited.py`):
+
+| Unlimited-OCR label | label |
+| --- | --- |
+| text, aside_text, ref_text | text |
+| title, sub_title | heading |
+| header, footer, page_number | page_furniture |
+| list | list |
+| image_caption, table_caption, caption | caption |
+| footnote, table_footnote, image_footnote, page_footnote | footnote |
+| equation | equation |
+| code, algorithm | code |
+| table | table |
+| image, chart | figure |
+
+Infinity-Parser2 (`providers/infinity.py`):
+
+| Infinity-Parser2 label | label |
+| --- | --- |
+| text | text |
+| title | heading |
+| header, footer | page_furniture |
+| figure_caption, table_caption, formula_caption, table_text | caption |
+| figure_footnote, table_footnote, page_footnote | footnote |
+| formula | equation |
+| table | table |
+| form, label | form |
+| figure, signature | figure |
+
+MinerU2.5-Pro (`providers/mineru.py`):
+
+| MinerU2.5-Pro label | label |
+| --- | --- |
+| text, aside_text, ref_text, index, phonetic, unknown | text |
+| title, doc_title, paragraph_title | heading |
+| header, footer, page_number | page_furniture |
+| list, list_item | list |
+| caption, table_caption, image_caption, code_caption | caption |
+| footnote, table_footnote, image_footnote, page_footnote | footnote |
+| equation, equation_block, formula_number | equation |
+| code, algorithm | code |
+| table | table |
+| image, chart, image_block | figure |
+
+GLM-OCR (`providers/glm_ocr.py`):
+
+| GLM-OCR label | label |
+| --- | --- |
+| text, abstract, content, reference_content, reference, vertical_text, aside_text | text |
+| doc_title, paragraph_title | heading |
+| header, footer, number | page_furniture |
+| figure_title | caption |
+| footnote, vision_footnote | footnote |
+| display_formula, inline_formula, formula_number | equation |
+| algorithm | code |
+| table | table |
+| image, chart, seal, header_image, footer_image | figure |
+
+PaddleOCR-VL-1.6 (`providers/paddleocr_vl.py`):
+
+| PaddleOCR-VL-1.6 label | label |
+| --- | --- |
+| text, abstract, content, reference, reference_content, aside_text, vertical_text | text |
+| paragraph_title, doc_title | heading |
+| header, footer, number | page_furniture |
+| figure_title | caption |
+| footnote, vision_footnote | footnote |
+| display_formula, inline_formula, formula_number | equation |
+| algorithm | code |
+| table | table |
+| image, chart, seal, header_image, footer_image | figure |
+
+DeepSeek-OCR-2 (`providers/deepseek_ocr.py`):
+
+| DeepSeek-OCR-2 label | label |
+| --- | --- |
+| text, aside_text, ref_text | text |
+| title, sub_title | heading |
+| header, footer, page_number | page_furniture |
+| list | list |
+| image_caption, table_caption, caption, figure_title | caption |
+| footnote, table_footnote, image_footnote, page_footnote | footnote |
+| equation, formula_number | equation |
+| code, algorithm | code |
+| table | table |
+| image, chart | figure |
+
+HunyuanOCR (`providers/hunyuan.py`):
+
+| HunyuanOCR label | label |
+| --- | --- |
+| paragraph, paragraph_span, para, text, abstract, reference, aside_text, table_of_contents, content, none, partial_para | text |
+| doc_title, title, para_title, section_title, sub_title, heading | heading |
+| header, footer, page, page_number, page_header, page_footer, watermark | page_furniture |
+| list, list_item | list |
+| figure_title, table_title, chart_title, caption, figure_caption, table_caption, table_header_note, table_both | caption |
+| footnote, table_footnote, page_footnote, figure_footnote, table_footer_note | footnote |
+| formula, equation, formula_number | equation |
+| code, algorithm | code |
+| table | table |
+| checkbox, check, box, radio_button, radio_button_span, form | form |
+| figure, chart, image, seal, stamp, signature, algorithm_chart | figure |
+
+Surya OCR 2 (`providers/surya_ocr.py`):
+
+| Surya OCR 2 label | label |
+| --- | --- |
+| Text, TableOfContents, Bibliography | text |
+| SectionHeader | heading |
+| PageHeader, PageFooter | page_furniture |
+| ListGroup | list |
+| Caption | caption |
+| Footnote | footnote |
+| Equation | equation |
+| Code | code |
+| Table | table |
+| Form | form |
+| Picture, Figure, Diagram, ChemicalBlock | figure |
 
 ## What differs between vendors, by necessity
 

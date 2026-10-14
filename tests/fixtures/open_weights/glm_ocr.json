@@ -1,0 +1,249 @@
+{
+ "model": "GLM-OCR",
+ "page": "handwriting_samples-fleming_p100989769",
+ "provider": "glm-ocr",
+ "options": {},
+ "outputs": [
+  "html"
+ ],
+ "sent": null,
+ "raw": {
+  "created": 1791807155,
+  "data_info": {
+   "pages": []
+  },
+  "id": "chatcmpl-e2825d8e421846988e595dd4385fc",
+  "json_result": [
+   [
+    {
+     "bbox_2d": [
+      48,
+      91,
+      640,
+      131
+     ],
+     "content": "v. Williammynehle Jeffords faur",
+     "index": 0,
+     "label": "text",
+     "native_label": "text",
+     "polygon": [
+      [
+       48,
+       101
+      ],
+      [
+       48,
+       116
+      ],
+      [
+       48,
+       130
+      ],
+      [
+       638,
+       130
+      ],
+      [
+       633,
+       91
+      ],
+      [
+       75,
+       91
+      ]
+     ]
+    },
+    {
+     "bbox_2d": [
+      43,
+      274,
+      645,
+      313
+     ],
+     "content": "There ladies and ladies how will see",
+     "index": 1,
+     "label": "text",
+     "native_label": "text",
+     "polygon": [
+      [
+       43,
+       274
+      ],
+      [
+       43,
+       308
+      ],
+      [
+       50,
+       312
+      ],
+      [
+       643,
+       308
+      ],
+      [
+       638,
+       279
+      ],
+      [
+       523,
+       274
+      ]
+     ]
+    },
+    {
+     "bbox_2d": [
+      38,
+      703,
+      910,
+      920
+     ],
+     "content": "every thing a truantful some other used others green white CS but the trees Which is our the most truantful for they are of the most pretty green Never behold in all my life",
+     "index": 2,
+     "label": "text",
+     "native_label": "text",
+     "polygon": [
+      [
+       38,
+       703
+      ],
+      [
+       38,
+       919
+      ],
+      [
+       898,
+       915
+      ],
+      [
+       908,
+       905
+      ],
+      [
+       908,
+       703
+      ]
+     ]
+    }
+   ]
+  ],
+  "layout_details": [
+   [
+    {
+     "bbox_2d": [
+      48,
+      91,
+      640,
+      131
+     ],
+     "content": "v. Williammynehle Jeffords faur",
+     "index": 0,
+     "label": "text",
+     "native_label": "text",
+     "polygon": [
+      [
+       48,
+       101
+      ],
+      [
+       48,
+       116
+      ],
+      [
+       48,
+       130
+      ],
+      [
+       638,
+       130
+      ],
+      [
+       633,
+       91
+      ],
+      [
+       75,
+       91
+      ]
+     ]
+    },
+    {
+     "bbox_2d": [
+      43,
+      274,
+      645,
+      313
+     ],
+     "content": "There ladies and ladies how will see",
+     "index": 1,
+     "label": "text",
+     "native_label": "text",
+     "polygon": [
+      [
+       43,
+       274
+      ],
+      [
+       43,
+       308
+      ],
+      [
+       50,
+       312
+      ],
+      [
+       643,
+       308
+      ],
+      [
+       638,
+       279
+      ],
+      [
+       523,
+       274
+      ]
+     ]
+    },
+    {
+     "bbox_2d": [
+      38,
+      703,
+      910,
+      920
+     ],
+     "content": "every thing a truantful some other used others green white CS but the trees Which is our the most truantful for they are of the most pretty green Never behold in all my life",
+     "index": 2,
+     "label": "text",
+     "native_label": "text",
+     "polygon": [
+      [
+       38,
+       703
+      ],
+      [
+       38,
+       919
+      ],
+      [
+       898,
+       915
+      ],
+      [
+       908,
+       905
+      ],
+      [
+       908,
+       703
+      ]
+     ]
+    }
+   ]
+  ],
+  "markdown_result": "v. Williammynehle Jeffords faur\n\nThere ladies and ladies how will see\n\nevery thing a truantful some other used others green white CS but the trees Which is our the most truantful for they are of the most pretty green Never behold in all my life",
+  "md_results": "v. Williammynehle Jeffords faur\n\nThere ladies and ladies how will see\n\nevery thing a truantful some other used others green white CS but the trees Which is our the most truantful for they are of the most pretty green Never behold in all my life",
+  "model": "glm-ocr",
+  "usage": {}
+ }
+}

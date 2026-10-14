@@ -1,0 +1,58 @@
+{
+ "model": "Surya OCR 2",
+ "page": "docparsing_images-images_353bcfd3_images_research_programming_book_00087-p1",
+ "provider": "surya-ocr",
+ "options": {},
+ "outputs": [
+  "html"
+ ],
+ "sent": {
+  "weights": "datalab-to/surya-ocr-2",
+  "package": "surya-ocr==0.22.1",
+  "mode": "RecognitionPredictor(full_page=True)",
+  "image": "llm png"
+ },
+ "raw": {
+  "blocks": [
+   {
+    "polygon": [
+     [
+      201.041,
+      178.176
+     ],
+     [
+      1380.376,
+      178.176
+     ],
+     [
+      1380.376,
+      1837.056
+     ],
+     [
+      201.041,
+      1837.056
+     ]
+    ],
+    "confidence": 0.997472248055896,
+    "label": "Text",
+    "raw_label": "Text",
+    "reading_order": 0,
+    "html": "<pre>\n1: import java.applet.*;\n2: import java.awt.*;\n3: import java.awt.event.*;\n4: import javax.swing.*;\n5: import java.net.*;\n6:\n7: public class LinkRotator extends JApplet\n8:     implements Runnable, ActionListener {\n9:\n10:     String[] pageTitle = new String[6];\n11:     URL[] pageLink = new URL[6];\n12:     Color butterscotch = new Color(255, 204, 158);\n13:     int current = 0;\n14:     Thread runner;\n15:\n16:     public void init() {\n17:         pageTitle = new String[] {\n18:             \"Sun's Java site\",\n19:             \"Cafe au Lait\",\n20:             \"JavaWorld\",\n21:             \"Java in 24 Hours\",\n22:             \"Sams Publishing\",\n23:             \"Workbench\"\n24:         };\n25:         pageLink[0] = getURL(\"http://java.sun.com\");\n26:         pageLink[1] = getURL(\"http://www.ibiblio.org/javafaq\");\n27:         pageLink[2] = getURL(\"http://www.javaworld.com\");\n28:         pageLink[3] = getURL(\"http://www.java24hours.com\");\n29:         pageLink[4] = getURL(\"http://www.samspublishing.com\");\n30:         pageLink[5] = getURL(\"http:// workbench.cadenhead.org\");\n31:         Button goButton = new Button(\"Go\");\n32:         goButton.addActionListener(this);\n33:         FlowLayout flow = new FlowLayout();\n34:         setLayout(flow);\n35:         add(goButton);\n36:     }\n37:\n38:     URL getURL(String urlText) {\n39:         URL pageURL = null;\n40:         try {\n41:             pageURL = new URL(getDocumentBase(), urlText);\n42:         } catch (MalformedURLException m) { }\n43:         return pageURL;\n44:     }\n45:\n46:     public void paint(Graphics screen) {\n47:         Graphics2D screen2D = (Graphics2D) screen;\n48:         screen2D.setColor(butterscotch);\n49:         screen2D.fillRect(0, 0, getSize().width, getSize().height);\n50:         screen2D.setColor(Color.black);\n51:         screen2D.drawString(pageTitle[current], 5, 60);\n52:         screen2D.drawString(\" + pageLink[current], 5, 80);\n53:     }\n54:\n55:     public void start() {\n56:         if (runner == null) {\n57:             runner = new Thread(this);\n58:             runner.start();\n59:         }\n60:     }\n61:\n62:     public void run() {\n63:         Thread thisThread = Thread.currentThread();\n64:         while (runner == thisThread) {\n65:             current++;\n66:             if (current &gt; 5) {\n67:                 current = 0;\n68:             }\n69:             repaint();\n70:             try {\n71:                 Thread.sleep(10000);\n72:             } catch (InterruptedException e) {\n73:                 // do nothing\n74:             }\n75:         }\n76:     }\n77:\n78:     public void stop() {\n79:         if (runner != null) {\n80:             runner = null;\n81:         }\n82:     }\n83:\n84:     public void actionPerformed(ActionEvent event) {\n85:         if (runner != null) {\n86:             runner = null;\n87:         }\n88:         AppletContext browser = getAppletContext();\n89:         if (pageLink[current] != null) {\n90:             browser.showDocument(pageLink[current]);\n91:         }\n92:     }\n93: }\n</pre>",
+    "skipped": false,
+    "error": false,
+    "bbox": [
+     201.041,
+     178.176,
+     1380.376,
+     1837.056
+    ]
+   }
+  ],
+  "image_bbox": [
+   0.0,
+   0.0,
+   1583.0,
+   2048.0
+  ]
+ }
+}

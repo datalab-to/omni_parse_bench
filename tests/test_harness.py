@@ -304,3 +304,41 @@ def test_a_llamaparse_page_that_failed_is_an_error_not_an_empty_page():
     raw = {"markdown": {"pages": [{"page_number": 1, "success": False, "error": "timeout"}]}}
     with pytest.raises(errors.VendorError, match="timeout"):
         llamaparse.parse(raw, contract.Request(frozenset({"html"}), {}))
+
+
+LIGHTON_REPLY = """![header](40,20,960,40)
+Annual report
+
+![title](80,70,920,140)
+# Company report 2025
+
+![text](80,175,920,225) Revenue rose **20%**.
+
+![text+](80,230,920,260)
+It held.
+
+![chart](540,285,920,545)
+<table><tr><th>Year</th><th>Revenue</th></tr><tr><td>2025</td><td>€12M</td></tr></table>
+"""
+
+
+def test_a_lighton_reply_is_read_as_its_blocks_and_their_markdown():
+    from omni_parse_bench.harness.providers import lighton
+
+    request = lighton.requests(frozenset({"html", "blocks"}), lighton.Config())[0]
+    completion = {"choices": [{"finish_reason": "stop", "message": {"content": LIGHTON_REPLY}}]}
+    out, errs = lighton.parse({"completion": completion, "text": LIGHTON_REPLY}, request)
+    assert errs == {}
+    assert [(b["label"], b["text"]) for b in out["blocks"]] == [
+        ("page_furniture", "Annual report"), ("heading", "Company report 2025"),
+        ("text", "Revenue rose 20%."), ("text", "It held."), ("figure", "Year Revenue 2025 €12M")]
+    assert out["blocks"][1]["bbox"] == [0.08, 0.07, 0.92, 0.14]
+    assert "<h1>Company report 2025</h1>" in out["html"] and "<table" not in out["html"]
+    assert '<img alt="Year Revenue 2025 €12M">' in out["html"]
+    assert "![" not in out["html"]
+
+
+def test_a_lighton_reply_without_placeholders_is_one_unlabelled_block():
+    from omni_parse_bench.harness.providers import lighton
+
+    assert lighton.split("# Just text") == [("", (), "# Just text")]

@@ -1,0 +1,134 @@
+{
+ "model": "MinerU2.5-Pro",
+ "page": "docparsing_images-images_2990125f_images_legal_legal_provision_00080-p1",
+ "provider": "mineru",
+ "options": {},
+ "outputs": [
+  "html"
+ ],
+ "sent": null,
+ "raw": {
+  "blocks": [
+   {
+    "type": "header",
+    "bbox": [
+     0.076,
+     0.005,
+     0.182,
+     0.045
+    ],
+    "angle": 0,
+    "content": "AUTHENTICATED\nUS GOVERNMENT\nINFORMATION\nGPO"
+   },
+   {
+    "type": "image",
+    "bbox": [
+     0.399,
+     0.181,
+     0.518,
+     0.272
+    ],
+    "angle": 0,
+    "content": null
+   },
+   {
+    "type": "title",
+    "bbox": [
+     0.532,
+     0.203,
+     0.757,
+     0.249
+    ],
+    "angle": 0,
+    "content": "CODE OF FEDERAL\nREGULATIONS"
+   },
+   {
+    "type": "title",
+    "bbox": [
+     0.401,
+     0.347,
+     0.518,
+     0.371
+    ],
+    "angle": 0,
+    "content": "Title 31"
+   },
+   {
+    "type": "text",
+    "bbox": [
+     0.401,
+     0.374,
+     0.739,
+     0.397
+    ],
+    "angle": 0,
+    "content": "Money and Finance: Treasury",
+    "merge_prev": false
+   },
+   {
+    "type": "text",
+    "bbox": [
+     0.402,
+     0.411,
+     0.545,
+     0.43
+    ],
+    "angle": 0,
+    "content": "Parts 0 to 199",
+    "merge_prev": false
+   },
+   {
+    "type": "text",
+    "bbox": [
+     0.401,
+     0.466,
+     0.627,
+     0.484
+    ],
+    "angle": 0,
+    "content": "Revised as of July 1, 2016",
+    "merge_prev": false
+   },
+   {
+    "type": "text",
+    "bbox": [
+     0.4,
+     0.539,
+     0.685,
+     0.573
+    ],
+    "angle": 0,
+    "content": "Containing a codification of documents of general applicability and future effect",
+    "merge_prev": false
+   },
+   {
+    "type": "text",
+    "bbox": [
+     0.401,
+     0.597,
+     0.537,
+     0.612
+    ],
+    "angle": 0,
+    "content": "As of July 1, 2016",
+    "merge_prev": false
+   },
+   {
+    "type": "text",
+    "bbox": [
+     0.4,
+     0.637,
+     0.739,
+     0.689
+    ],
+    "angle": 0,
+    "content": "Published by the Office of the Federal Register National Archives and Records Administration as a Special Edition of the Federal Register",
+    "merge_prev": false
+   }
+  ],
+  "markdown": "AUTHENTICATED\nUS GOVERNMENT\nINFORMATION\nGPO\n\nCODE OF FEDERAL\nREGULATIONS\n\nTitle 31\n\nMoney and Finance: Treasury\n\nParts 0 to 199\n\nRevised as of July 1, 2016\n\nContaining a codification of documents of general applicability and future effect\n\nAs of July 1, 2016\n\nPublished by the Office of the Federal Register National Archives and Records Administration as a Special Edition of the Federal Register",
+  "vendor": {
+   "mineru-vl-utils": "2.0.7"
+  }
+ }
+}

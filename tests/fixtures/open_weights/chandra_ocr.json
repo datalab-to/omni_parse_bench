@@ -1,0 +1,96 @@
+{
+ "model": "chandra-ocr-2",
+ "page": "docparsing_images-images_2990125f_images_legal_legal_provision_00080-p1",
+ "provider": "chandra-ocr",
+ "options": {},
+ "outputs": [
+  "html"
+ ],
+ "sent": null,
+ "raw": {
+  "completion": {
+   "id": "chatcmpl-abd0c2a71b917c19",
+   "object": "chat.completion",
+   "created": 1791674677,
+   "model": "chandra",
+   "choices": [
+    {
+     "index": 0,
+     "message": {
+      "role": "assistant",
+      "content": "<div data-bbox=\"75 0 178 45\" data-label=\"Page-Header\"><p>AUTHENTICATED<br/>ON GOVERNMENT<br/>INFORMATION<br/>SYSTEMS<br/>GPO</p><img alt=\"GPO logo\" data-bbox=\"135 0 178 45\"/></div><div data-bbox=\"399 180 512 271\" data-label=\"Image\"><img alt=\"Seal of the Federal Register, National Archives and Records Administration, established 1995.\"/>The seal of the National Archives and Records Administration (NARA) is circular. It features an eagle with wings spread, perched on a shield. The eagle holds an olive branch in its right talon and arrows in its left. The shield has vertical stripes. The words \"NATIONAL ARCHIVES AND RECORDS ADMINISTRATION\" are written around the top inner border, and \"1995\" is at the bottom.</div><div data-bbox=\"529 200 757 247\" data-label=\"Section-Header\"><h2>CODE OF FEDERAL<br/>REGULATIONS</h2></div><div data-bbox=\"401 344 518 370\" data-label=\"Section-Header\"><h3><b>Title 31</b></h3></div><div data-bbox=\"401 370 737 395\" data-label=\"Section-Header\"><h4><b>Money and Finance: Treasury</b></h4><hr/></div><div data-bbox=\"401 408 544 428\" data-label=\"Section-Header\"><h5><b>Parts 0 to 199</b></h5></div><div data-bbox=\"401 463 627 482\" data-label=\"Text\"><p>Revised as of July 1, 2016</p></div><div data-bbox=\"401 535 683 570\" data-label=\"Text\"><p>Containing a codification of documents<br/>of general applicability and future effect</p></div><div data-bbox=\"401 594 535 610\" data-label=\"Text\"><p>As of July 1, 2016</p></div><div data-bbox=\"401 634 737 686\" data-label=\"Text\"><p>Published by the Office of the Federal Register<br/>National Archives and Records Administration<br/>as a Special Edition of the Federal Register</p></div>"
+     },
+     "finish_reason": "stop"
+    }
+   ],
+   "usage": {
+    "prompt_tokens": 1050,
+    "total_tokens": 1647,
+    "completion_tokens": 597,
+    "prompt_tokens_details": null
+   }
+  },
+  "attempts": 1,
+  "usage": {
+   "prompt_tokens": 1050,
+   "total_tokens": 1647,
+   "completion_tokens": 597,
+   "prompt_tokens_details": null
+  },
+  "blocks": [
+   {
+    "label": "Page-Header",
+    "raw": "<p>AUTHENTICATED<br/>ON GOVERNMENT<br/>INFORMATION<br/>SYSTEMS<br/>GPO</p><img alt=\"GPO logo\" data-bbox=\"135 0 178 45\"/>",
+    "html": "<p>AUTHENTICATED<br/>ON GOVERNMENT<br/>INFORMATION<br/>SYSTEMS<br/>GPO</p>"
+   },
+   {
+    "label": "Image",
+    "raw": "<img alt=\"Seal of the Federal Register, National Archives and Records Administration, established 1995.\"/>The seal of the National Archives and Records Administration (NARA) is circular. It features an eagle with wings spread, perched on a shield. The eagle holds an olive branch in its right talon and arrows in its left. The shield has vertical stripes. The words \"NATIONAL ARCHIVES AND RECORDS ADMINISTRATION\" are written around the top inner border, and \"1995\" is at the bottom.",
+    "html": "<img alt=\"Seal of the Federal Register, National Archives and Records Administration, established 1995.\" src=\"6f2fc2a875f1c421b52e7b1d3c08aeef_1_img.webp\"/>The seal of the National Archives and Records Administration (NARA) is circular. It features an eagle with wings spread, perched on a shield. The eagle holds an olive branch in its right talon and arrows in its left. The shield has vertical stripes. The words \"NATIONAL ARCHIVES AND RECORDS ADMINISTRATION\" are written around the top inner border, and \"1995\" is at the bottom."
+   },
+   {
+    "label": "Section-Header",
+    "raw": "<h2>CODE OF FEDERAL<br/>REGULATIONS</h2>",
+    "html": "<h2>CODE OF FEDERAL<br/>REGULATIONS</h2>"
+   },
+   {
+    "label": "Section-Header",
+    "raw": "<h3><b>Title 31</b></h3>",
+    "html": "<h3><b>Title 31</b></h3>"
+   },
+   {
+    "label": "Section-Header",
+    "raw": "<h4><b>Money and Finance: Treasury</b></h4><hr/>",
+    "html": "<h4><b>Money and Finance: Treasury</b></h4><hr/>"
+   },
+   {
+    "label": "Section-Header",
+    "raw": "<h5><b>Parts 0 to 199</b></h5>",
+    "html": "<h5><b>Parts 0 to 199</b></h5>"
+   },
+   {
+    "label": "Text",
+    "raw": "<p>Revised as of July 1, 2016</p>",
+    "html": "<p>Revised as of July 1, 2016</p>"
+   },
+   {
+    "label": "Text",
+    "raw": "<p>Containing a codification of documents<br/>of general applicability and future effect</p>",
+    "html": "<p>Containing a codification of documents<br/>of general applicability and future effect</p>"
+   },
+   {
+    "label": "Text",
+    "raw": "<p>As of July 1, 2016</p>",
+    "html": "<p>As of July 1, 2016</p>"
+   },
+   {
+    "label": "Text",
+    "raw": "<p>Published by the Office of the Federal Register<br/>National Archives and Records Administration<br/>as a Special Edition of the Federal Register</p>",
+    "html": "<p>Published by the Office of the Federal Register<br/>National Archives and Records Administration<br/>as a Special Edition of the Federal Register</p>"
+   }
+  ],
+  "vendor": {
+   "chandra-ocr": "d4f7467435aa4137d9539f000ddf0b7ced3eb43f"
+  }
+ }
+}
