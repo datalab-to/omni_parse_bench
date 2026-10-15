@@ -13,7 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from omni_parse_bench import data, gold, scorer
+from omni_parse_bench import data
+from omni_parse_bench.scorers.unit_tests import tests as gold
+from omni_parse_bench.scorers import unit_tests as scorer
 
 ROOT = Path(os.environ.get("OPB_DATASET", "")).expanduser()
 pytestmark = pytest.mark.skipif(not (ROOT / data.MANIFEST).exists(),

@@ -2,7 +2,7 @@
 
     manifest.parquet       a row per page: page_id, document, suite, doc_path, gt_path, outputs
     pages/<page_id>.pdf    the page that gets sent: a one-page PDF, or a .png for an image page
-    gold/<page_id>.json    its tests: {"tests": [...]}, read by `scorer.gold` (`gold.py` says what a test is)
+    gold/<page_id>.json    its tests: {"tests": [...]}, read by the scorer (`scorers.unit_tests.gold`)
 
 A page is a manifest row (`Page`) whose paths are full local paths, so a page says where its file and
 its gold are without the dataset beside it. The functions over a dataset:
@@ -26,7 +26,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from omni_parse_bench import gold, vocab
+from omni_parse_bench import vocab
 
 HF_PREFIX = "hf://datasets/"
 DEFAULT_DATASET = "hf://datasets/datalab-to/omni_parse_bench"
@@ -46,6 +46,10 @@ OLD_DATASET = (
     "  - to keep this copy, use the omni-parse-bench made for it: pip install 'omni-parse-bench==0.1.1'")
 _DOC_PATH = re.compile(r"pages/(.+)\.(?:pdf|png)")
 
+
+
+class ManifestError(ValueError):
+    """A manifest, or a row of one, that breaks the dataset's rules; the message names it and the fix."""
 
 @dataclasses.dataclass(frozen=True)
 class Page:
@@ -132,11 +136,11 @@ def read_manifest(dataset: str | Path) -> tuple[Path, tuple[Page, ...]]:
     root = download_dataset(dataset).resolve()
     table = pq.read_table(root / MANIFEST)
     if "outputs" not in table.column_names:
-        raise gold.GoldError(OLD_DATASET.format(root=root))
-    rows = tuple(dataclasses.replace(p := page(r), doc_path=str(root / p.doc_path),
+        raise ManifestError(OLD_DATASET.format(root=root))
+    rows = tuple(dataclasses.replace(p := _page(r), doc_path=str(root / p.doc_path),
                                      gt_path=str(root / p.gt_path)) for r in table.to_pylist())
     if twice := [i for i, n in collections.Counter(p.page_id for p in rows).items() if n > 1]:
-        raise gold.GoldError(f"{len(twice)} page ids are in the manifest more than once, e.g. {twice[:3]}")
+        raise ManifestError(f"{len(twice)} page ids are in the manifest more than once, e.g. {twice[:3]}")
     return root, rows
 
 
@@ -168,21 +172,21 @@ def select(pages: Sequence[Page], suites: list[str] | None = None, limit: int = 
     return rows[:limit] if limit else rows
 
 
-def page(r: Mapping[str, Any]) -> Page:
+def _page(r: Mapping[str, Any]) -> Page:
     """One manifest row, checked."""
     where = f"page {r.get('page_id')!r}"
     if missing := [f for f in PAGE_FIELDS if f not in r]:
-        raise gold.GoldError(f"{where} lacks {missing}")
+        raise ManifestError(f"{where} lacks {missing}")
     if not all(isinstance(r[f], str) and r[f].strip() for f in NAMES):
-        raise gold.GoldError(f"{where}: {list(NAMES)} must be non-empty strings")
+        raise ManifestError(f"{where}: {list(NAMES)} must be non-empty strings")
     if not ((m := _DOC_PATH.fullmatch(r["doc_path"])) and m[1] == r["page_id"]):
-        raise gold.GoldError(f"{where}: doc_path must be pages/<page_id>.pdf or .png, not {r['doc_path']!r}")
+        raise ManifestError(f"{where}: doc_path must be pages/<page_id>.pdf or .png, not {r['doc_path']!r}")
     if r["gt_path"] != f"gold/{r['page_id']}.json":
-        raise gold.GoldError(f"{where}: gt_path must be gold/<page_id>.json, not {r['gt_path']!r}")
+        raise ManifestError(f"{where}: gt_path must be gold/<page_id>.json, not {r['gt_path']!r}")
     outputs = r["outputs"]
     if (not isinstance(outputs, list | tuple) or not outputs or not set(outputs) <= OUTPUTS
             or len(set(outputs)) != len(outputs)):
-        raise gold.GoldError(f"{where}: outputs must be a non-empty list of distinct output types from "
+        raise ManifestError(f"{where}: outputs must be a non-empty list of distinct output types from "
                              f"{sorted(OUTPUTS)}, not {outputs!r}")
     extra = {k: v for k, v in r.items() if k not in PAGE_FIELDS}
     return Page(r["page_id"], r["document"], r["suite"], r["doc_path"], r["gt_path"], tuple(sorted(outputs)),

@@ -1,13 +1,16 @@
-"""Scoring: `gold` reads a page's tests, `score` gives its verdicts, `summarize` a run's scores.
+"""The unit-test scorer: yes/no tests on single pages. `gold` reads a page's tests, `score` gives its
+verdicts, `lines` makes them score lines, and `summarize` gives many lines one summary.
 
-    page_tests = scorer.gold(page)                      # a page of `data.read_manifest`
-    verdicts = scorer.score(outputs, page_tests)        # outputs: {"html": "...", "blocks": [...]}
-    xs = scorer.lines(verdicts, page_tests)             # each verdict beside what its test is
-    summary = scorer.summarize(xs, pages)               # every page of a run at once
+    tests = unit_tests.gold(page)                      # a page of `data.read_manifest`
+    verdicts = unit_tests.score(pred, tests)           # pred: {"html": "...", "blocks": [...]}
+    xs = unit_tests.lines(verdicts, tests, page)       # each verdict beside its page and its test
+    summary = unit_tests.summarize(xs)                 # any number of pages at once
 
-A score line is one test's verdict beside what the test is: `page_id`, `test_id`, `test_type`,
-`output_type`, `derivation`, `tags`, `result` and `why`. It is what a run's scores.jsonl holds, so
-`summarize` reads a scores.jsonl, or any part of one (one tag, one suite), as it is.
+The gold is unit tests: what one is, and how a gold file of them is read and checked, is `tests.py`;
+how each test type is run is `runners.py`. A score line is one test's verdict beside what the page
+and the test are: `page_id`, `suite`, `document`, `test_id`, `test_type`, `output_type`,
+`derivation`, `tags`, `result` and `why`. It is what a run's scores.jsonl holds, so `summarize` reads
+a scores.jsonl, or any part of one (one tag, one suite), as it is.
 
 A verdict's result is one of four:
 
@@ -25,10 +28,9 @@ handwriting, a script, a language), with its test and page counts. A test counts
 has, so the tags overlap and their scores don't average to the score: a reader who wants a mix of
 tags (table and degraded) selects those tests and scores them, never combines rows.
 
-With the pages (`data.Page`, by page id), each score gets its `documents` count: how many source
-documents its tests are from. A document's tests pass or fail together (one misread table fails all
-its cells; a page's image copy is the same page), so a score over a few documents says less than its
-test count suggests.
+Each score gets its `documents` count: how many source documents its tests are from. A document's
+tests pass or fail together (one misread table fails all its cells; a page's image copy is the same
+page), so a score over a few documents says less than its test count suggests.
 """
 from __future__ import annotations
 
@@ -38,9 +40,13 @@ from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
-# Note: imported as `_gold`, since `gold` here is the function that reads a page's gold.
-from omni_parse_bench import gold as _gold
-from omni_parse_bench import runners, views, vocab
+from omni_parse_bench import views, vocab
+
+from . import runners
+from . import tests as _tests
+from .tests import GoldError, Test
+
+__all__ = ["GoldError", "Test", "Verdict", "check", "gold", "lines", "runners", "score", "summarize", "tests"]
 
 if TYPE_CHECKING:
     from omni_parse_bench import data
@@ -61,49 +67,49 @@ class Verdict(NamedTuple):
     why: str
 
 
-def gold(page: data.Page) -> tuple[_gold.Test, ...]:
+def gold(page: data.Page) -> tuple[_tests.Test, ...]:
     """The page's tests, from its gold file (`page.gt_path`) alone; refuses a page whose manifest `outputs`
     disagree with what its tests read."""
-    ts = _gold.read(page.gt_path)
-    if frozenset(page.outputs) != _gold.wants(ts):
-        raise _gold.GoldError(f"page {page.page_id!r}: the manifest says it is asked for "
-                              f"{list(page.outputs)}, but its tests read {sorted(_gold.wants(ts))}; the "
+    ts = _tests.read(page.gt_path)
+    if frozenset(page.outputs) != _tests.wants(ts):
+        raise _tests.GoldError(f"page {page.page_id!r}: the manifest says it is asked for "
+                              f"{list(page.outputs)}, but its tests read {sorted(_tests.wants(ts))}; the "
                               "manifest is out of step with the gold")
     return ts
 
 
-def check(pages: Sequence[data.Page]) -> tuple[_gold.Test, ...]:
+def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
     """Every test of `pages` (a dataset's, `data.read_manifest`), each page's checked (`gold`), and the
     dataset as a whole: a gold file with no page, a test id used twice, and a page with no tests are
     refused. What publishing a dataset checks, and `opb tests` writes; grading needs none of it."""
     named = {Path(p.gt_path).name for p in pages}
     folders = {Path(p.gt_path).parent for p in pages}
     if stray := sorted(f.name for d in folders for f in d.glob("*.json") if f.name not in named):
-        raise _gold.GoldError(f"{len(stray)} gold files have no manifest row, e.g. {stray[:3]}")
+        raise _tests.GoldError(f"{len(stray)} gold files have no manifest row, e.g. {stray[:3]}")
     every = tuple(t for p in pages for t in gold(p))
     if twice := [i for i, n in collections.Counter(t.id for t in every).items() if n > 1]:
-        raise _gold.GoldError(f"{len(twice)} test ids are used more than once, e.g. {twice[:3]}")
+        raise _tests.GoldError(f"{len(twice)} test ids are used more than once, e.g. {twice[:3]}")
     if empty := sorted({p.page_id for p in pages} - {t.page_id for t in every}):
-        raise _gold.GoldError(f"{len(empty)} pages have no tests, e.g. {empty[:3]}; remove them or give "
+        raise _tests.GoldError(f"{len(empty)} pages have no tests, e.g. {empty[:3]}; remove them or give "
                               "them tests")
     return every
 
 
-def score(outputs: Mapping[str, Any], tests: Sequence[_gold.Test],
+def score(pred: Mapping[str, Any], gold: Sequence[_tests.Test],
           unsupported: Collection[str] = ()) -> list[Verdict]:
-    """One verdict per test. `outputs` maps an output type to its value, or to None when it
-    errored; `unsupported` lists the output types the provider declares it can't produce."""
+    """One verdict per test of `gold`, the page's tests. `pred` maps an output type to its value, or to
+    None when it errored; `unsupported` lists the output types the provider declares it can't produce."""
     built: dict[str, Any] = {}   # output type -> its view, or the Verdict its tests all get
     out = []
-    for t in tests:
+    for t in gold:
         if t.output_type in unsupported:
             out.append(Verdict(t.id, "unsupported", f"the provider can't produce {t.output_type}"))
             continue
-        if outputs.get(t.output_type) is None:
+        if pred.get(t.output_type) is None:
             out.append(Verdict(t.id, "fail", f"no {t.output_type} output"))
             continue
         if t.output_type not in built:
-            built[t.output_type] = _view(t.output_type, outputs[t.output_type])
+            built[t.output_type] = _view(t.output_type, pred[t.output_type])
         if isinstance(v := built[t.output_type], Verdict):
             out.append(v._replace(id=t.id))
             continue
@@ -127,26 +133,25 @@ def _view(output_type: str, value: Any) -> Any:
         return Verdict("", "error", f"{type(e).__name__}: {e}")
 
 
-def lines(verdicts: Iterable[Verdict], tests: Iterable[_gold.Test]) -> list[dict[str, Any]]:
-    """Each verdict as a score line: beside what its test is, the test looked up by id in `tests`."""
+def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.Page) -> list[dict[str, Any]]:
+    """Each verdict of `page` as a score line: the page it's on, then what its test is (looked up by id in
+    `tests`), then the verdict."""
     by_id = {t.id: t for t in tests}
-    return [{"page_id": (t := by_id[v.id]).page_id, "test_id": t.id, "test_type": t.test_type,
-             "output_type": t.output_type, "derivation": t.derivation, "tags": list(t.tags),
-             "result": v.result, "why": v.why}
+    on = {"page_id": page.page_id, "suite": page.suite, "document": page.document}
+    return [on | {"test_id": (t := by_id[v.id]).id, "test_type": t.test_type, "output_type": t.output_type,
+                  "derivation": t.derivation, "tags": list(t.tags), "result": v.result, "why": v.why}
             for v in verdicts]
 
 
-def summarize(xs: Iterable[Line], pages: Iterable[data.Page] | None = None) -> dict[str, Any]:
-    """The score lines `xs` (from `lines`, or a scores.jsonl's) summarized: `headline` (see `headline`),
-    then per output type: `score`, the test counts (`tests` scored, `unsupported`, `errors`),
-    `per_test_type` and `per_tag` (each `{score, tests, pages}`), and, with `pages` (the tests' pages, as
-    `data.read_manifest` gives them), `documents` beside each score; then `per_suite` (with `pages`) and
-    `per_derivation`. Scores are fractions from 0 to 1. An output type with no scored
-    tests is left out."""
-    pages = None if pages is None else {p.page_id: p for p in pages}
+def summarize(xs: Iterable[Line]) -> dict[str, Any]:
+    """The score lines `xs` (from `lines`, or a scores.jsonl's) summarized: `headline`, the one number to
+    compare runs by (see `_families`), beside `families` and `documents`; then per output type: `score`,
+    the test counts (`tests` scored, `unsupported`, `errors`), `documents`, `per_test_type` and `per_tag`
+    (each `{score, tests, pages, documents}`); then `per_suite` and `per_derivation`. Scores are
+    fractions from 0 to 1. An output type with no scored tests is left out."""
     every = list(xs)
     scored = [(x, x["result"] == "pass") for x in every if x["result"] not in UNSCORED]
-    summary: dict[str, Any] = {"headline": headline(scored, every, pages)}
+    summary: dict[str, Any] = _families(scored, every)
     for output in vocab.OUTPUT_TYPES:
         ys = [(x, ok) for x, ok in scored if x["output_type"] == output]
         if not ys: continue
@@ -154,7 +159,7 @@ def summarize(xs: Iterable[Line], pages: Iterable[data.Page] | None = None) -> d
         for x, ok in ys:
             for g in x["tags"]: groups.setdefault(g, []).append((x, ok))
         per_tag = {g: {"score": _mean(ok for _, ok in zs), "tests": len(zs),
-                       "pages": len({x["page_id"] for x, _ in zs}), **_documents(zs, pages)}
+                       "pages": len({x["page_id"] for x, _ in zs}), "documents": _documents(zs)}
                    for g, zs in sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0]))}
         count = collections.Counter(x["result"] for x in every if x["output_type"] == output)
         summary[output] = {
@@ -162,37 +167,34 @@ def summarize(xs: Iterable[Line], pages: Iterable[data.Page] | None = None) -> d
             "tests": len(ys),
             "unsupported": count["unsupported"],
             "errors": count["error"],
-            **_documents(ys, pages),
+            "documents": _documents(ys),
             "per_test_type": _means(ys, lambda x: x["test_type"], order=list(runners.TYPES)),
             "per_tag": per_tag,
         }
-    if pages is not None:
-        summary["per_suite"] = _means(scored, lambda x: pages[x["page_id"]].suite)
+    summary["per_suite"] = _means(scored, lambda x: x["suite"])
     summary["per_derivation"] = _means(scored, lambda x: x["derivation"], order=list(vocab.DERIVATIONS))
     return summary
 
 
-def headline(scored: Sequence[tuple[Line, bool]], graded: Sequence[Line],
-             pages: Mapping[str, data.Page] | None = None) -> dict[str, Any]:
-    """The mean of the families' scores, each family's flat over its scored tests, over the families
-    the graded tests are in; with `pages`, the documents each family's tests are from. `score` is None
-    when a family has no scored test (every one unsupported or an error), since a mean over fewer
-    families isn't the same number; `families` says which."""
+def _families(scored: Sequence[tuple[Line, bool]], graded: Sequence[Line]) -> dict[str, Any]:
+    """`headline`, the mean of the families' scores, each family's flat over its scored tests, over the
+    families the graded tests are in; `families`, each one's score, tests and documents; and `documents`,
+    the source documents the scored tests are from. `headline` is None when a family has no scored test
+    (every one unsupported or an error), since a mean over fewer families isn't the same number."""
     sizes = collections.Counter(vocab.FAMILIES[x["test_type"]] for x in graded)
     by = collections.defaultdict(list)
     for x, ok in scored: by[vocab.FAMILIES[x["test_type"]]].append((x, ok))
     families = {f: {"score": _mean(ok for _, ok in by[f]) if by[f] else None, "tests": len(by[f]),
-                    **_documents(by[f], pages)}
+                    "documents": _documents(by[f])}
                 for f, _ in sorted(sizes.items(), key=lambda kv: -kv[1])}
     complete = bool(families) and all(x["score"] is not None for x in families.values())
-    out = {"score": _mean(x["score"] for x in families.values()) if complete else None,
-           "families": families}
-    return out | _documents(scored, pages)
+    return {"headline": _mean(x["score"] for x in families.values()) if complete else None,
+            "families": families, "documents": _documents(scored)}
 
 
-def _documents(xs: Sequence[tuple[Line, bool]], pages: Mapping[str, data.Page] | None) -> dict[str, int]:
-    """`{documents: n}`, the source documents the tests are from; {} without the pages."""
-    return {} if pages is None else {"documents": len({pages[x["page_id"]].document for x, _ in xs})}
+def _documents(xs: Sequence[tuple[Line, bool]]) -> int:
+    """The source documents the lines are from."""
+    return len({x["document"] for x, _ in xs})
 
 
 def _mean(xs: Iterable[bool | float]) -> float:

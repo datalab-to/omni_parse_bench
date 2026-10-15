@@ -19,7 +19,9 @@ pytest.importorskip("openai")
 
 import httpx  # noqa: E402
 
-from omni_parse_bench import benchmark, cli, data, gold, harness, scorer  # noqa: E402
+from omni_parse_bench import benchmark, cli, data, harness  # noqa: E402
+from omni_parse_bench.scorers.unit_tests import tests as gold  # noqa: E402
+from omni_parse_bench.scorers import unit_tests as scorer  # noqa: E402
 from omni_parse_bench.harness import budget, contract, errors, page, registry  # noqa: E402
 from omni_parse_bench.harness.providers import azure, extend, reducto  # noqa: E402
 
@@ -115,12 +117,12 @@ def test_runs_of_one_adapter_share_its_cap(tmp_path, monkeypatch):
 
 def test_workers_may_be_set_per_adapter(tmp_path, monkeypatch):
     """Per adapter, the vendor account the limit is: a model id is refused, naming its adapter."""
-    assert benchmark.per_adapter({"datalab": 20, "llm": 3}) == {"datalab": 20, "llm": 3}
+    assert benchmark._per_adapter({"datalab": 20, "llm": 3}) == {"datalab": 20, "llm": 3}
     assert benchmark.workers_for("reducto", {"datalab": 20}) == benchmark.WORKERS["reducto"]
     for bad, why in [({"nope": 2}, "the adapters are"), ({"openai/gpt-5.6-sol": 3}, 'write {"llm": 3}'),
                      ({"datalab": 0}, "1 or more"), ({"datalab": True}, "1 or more")]:
         with pytest.raises(ValueError, match=why):
-            benchmark.per_adapter(bad)
+            benchmark._per_adapter(bad)
     assert cli.read_workers("8") == 8 and cli.read_workers('{"datalab": 20}') == {"datalab": 20}
     with pytest.raises(argparse.ArgumentTypeError):
         cli.read_workers("abc")
@@ -174,8 +176,8 @@ def test_retry_failed_asks_again_only_what_may_go_otherwise(failure, error, agai
     rec = {"outputs": {"html": None}, "errors": {"html": error},
            "calls": [{"outputs": ["html"]} | ({"failure": failure} if failure else {})]}
     want = frozenset({"html"})
-    assert benchmark.missing(rec, want) == frozenset()
-    assert benchmark.missing(rec, want, retry_failed=True) == (want if again else frozenset())
+    assert benchmark._missing(rec, want) == frozenset()
+    assert benchmark._missing(rec, want, retry_failed=True) == (want if again else frozenset())
 
 
 # 4. A run's dataset, gold and timeout.
@@ -293,7 +295,7 @@ def test_a_dataset_from_before_outputs_says_how_to_get_the_current_one(tmp_path)
     ds = dataset(tmp_path / "data")
     table = pq.read_table(pathlib.Path(ds) / "manifest.parquet")
     pq.write_table(table.drop_columns(["outputs"]), pathlib.Path(ds) / "manifest.parquet")
-    with pytest.raises(gold.GoldError, match="from before omni-parse-bench 0.1.2") as e:
+    with pytest.raises(data.ManifestError, match="from before omni-parse-bench 0.1.2") as e:
         data.read_manifest(ds)[1]
     for fix in ("hf://datasets/datalab-to/omni_parse_bench", "hf download datalab-to/omni_parse_bench",
                 "pip install 'omni-parse-bench==0.1.1'"):
@@ -309,7 +311,7 @@ def test_outputs_out_of_step_with_the_gold_are_refused(tmp_path):
 @pytest.mark.parametrize("outputs", [[], ["html", "html"], ["html", "pdf"]])
 def test_outputs_must_be_distinct_known_output_types(tmp_path, outputs):
     ds = dataset(tmp_path / "data", outputs=outputs)
-    with pytest.raises(gold.GoldError, match="distinct output types"):
+    with pytest.raises(data.ManifestError, match="distinct output types"):
         data.read_manifest(ds)[1]
 
 
@@ -427,7 +429,7 @@ def test_extend_ends_on_every_terminal_status(tmp_path, monkeypatch, status, ok)
     rec = harness.predict("extend", pdf, {"html"})
     assert (rec["outputs"]["html"] is not None) == ok
     if not ok:
-        assert rec["calls"][0]["failure"]["status"] == 200 and not benchmark.retryable(rec, "html")
+        assert rec["calls"][0]["failure"]["status"] == 200 and not benchmark._retryable(rec, "html")
 
 
 @pytest.mark.parametrize("reason, retried", [("INTERNAL_ERROR", True), ("OCR_ERROR", True),
@@ -448,7 +450,7 @@ def test_an_extend_outage_is_retried_and_a_bad_file_is_not(tmp_path, monkeypatch
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
     rec = harness.predict("extend", pdf, {"html"})
     assert len(runs) == (page.TRANSIENT_ATTEMPTS if retried else 1)
-    assert benchmark.retryable(rec, "html") == retried and reason in rec["errors"]["html"]
+    assert benchmark._retryable(rec, "html") == retried and reason in rec["errors"]["html"]
 
 
 def test_extend_and_reducto_are_asked_at_their_top_settings():
@@ -607,18 +609,18 @@ def test_an_interrupted_grading_writes_nothing(tmp_path, monkeypatch):
     path = p.runs[0].out / "scores.jsonl"
     before = path.read_text()
     monkeypatch.setattr(benchmark, "SCORER", "next")
-    real, n = benchmark.grade_page, [0]
+    real, n = benchmark._grade_page, [0]
 
     def once(*a):
         n[0] += 1
         if n[0] == 2: raise KeyboardInterrupt
         return real(*a)
 
-    monkeypatch.setattr(benchmark, "grade_page", once)
+    monkeypatch.setattr(benchmark, "_grade_page", once)
     with pytest.raises(KeyboardInterrupt):
         benchmark.execute(p._replace(score_only=True), say=QUIET)
     assert path.read_text() == before
-    monkeypatch.setattr(benchmark, "grade_page", real)
+    monkeypatch.setattr(benchmark, "_grade_page", real)
     benchmark.execute(p._replace(score_only=True), say=QUIET)
     rows = [json.loads(x) for x in path.read_text().splitlines()]
     assert [r["page_id"] for r in rows] == ["a-p0", "a-p1", "a-p2"]
@@ -628,16 +630,15 @@ def test_an_interrupted_grading_writes_nothing(tmp_path, monkeypatch):
 
 
 def test_the_scorer_stamp_changes_with_the_scoring_code(tmp_path, monkeypatch):
-    from omni_parse_bench import scorer
-
     pkg = tmp_path / "omni_parse_bench"
     for name in benchmark.SCORING:
         (pkg / name).parent.mkdir(parents=True, exist_ok=True)
-        (pkg / name).write_bytes((pathlib.Path(scorer.__file__).parent / name).read_bytes())
-    monkeypatch.setattr(scorer, "__file__", str(pkg / "scorer.py"))
+        (pkg / name).write_bytes((benchmark.PACKAGE / name).read_bytes())
+    monkeypatch.setattr(benchmark, "PACKAGE", pkg)
     before = benchmark.scorer_version()
     assert before == benchmark.SCORER
-    (pkg / "runners.py").write_text((pkg / "runners.py").read_text() + "\n# a change\n")
+    runners = pkg / "scorers" / "unit_tests" / "runners.py"
+    runners.write_text(runners.read_text() + "\n# a change\n")
     assert benchmark.scorer_version() != before
 
 
@@ -655,23 +656,20 @@ def test_scores_are_one_line_per_test_with_what_the_test_is(tmp_path, monkeypatc
 
 def test_a_runs_scores_are_summarized_as_they_are_on_disk(tmp_path, monkeypatch):
     """summary.json is `summarize` over scores.jsonl's lines, so any part of the file summarizes alone."""
-    from omni_parse_bench import scorer
-
     use(monkeypatch, {"stub": stub()})
     ds = dataset(tmp_path / "data", 2)
     p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=ds)
     (s,) = benchmark.execute(p, say=QUIET).values()
     lines = [json.loads(x) for x in (p.runs[0].out / "scores.jsonl").read_text().splitlines()]
-    pages = data.read_manifest(ds)[1]
-    got = scorer.summarize(lines, pages)
+    got = scorer.summarize(lines)
     assert got == {k: v for k, v in s.items() if k in got}
-    assert scorer.summarize(lines[:1], pages)["html"]["tests"] == 1
+    assert scorer.summarize(lines[:1])["html"]["tests"] == 1
 
 
 def graded_pages(monkeypatch) -> list[str]:
     """The pages `grade_page` is called on, in order, from here on."""
-    graded, real = [], benchmark.grade_page
-    monkeypatch.setattr(benchmark, "grade_page", lambda *a: graded.append(a[2].page_id) or real(*a))
+    graded, real = [], benchmark._grade_page
+    monkeypatch.setattr(benchmark, "_grade_page", lambda *a: graded.append(a[2].page_id) or real(*a))
     return graded
 
 
@@ -723,7 +721,8 @@ def test_a_changed_prediction_is_graded_and_the_record_is_not_read(tmp_path, mon
 
 
 def test_a_folder_of_your_own_predictions_is_graded(tmp_path, capsys):
-    """No records, no provider: predictions/ and what the system can't produce are all it takes."""
+    """No records, no provider: predictions/ and what the system can't produce are all it takes. A page
+    left out of a folder of your own is one your system didn't answer, so it fails."""
     ds = dataset(tmp_path / "data", n=2, blocks=True)
     mine = tmp_path / "mine"
     (mine / "predictions").mkdir(parents=True)
@@ -731,9 +730,20 @@ def test_a_folder_of_your_own_predictions_is_graded(tmp_path, capsys):
     assert cli.main(["grade", str(mine), "--dataset", ds, "--unsupported", "blocks"]) == 0
     assert json.loads((mine / "settings.json").read_text())["unsupported"] == ["blocks"]
     lines = [json.loads(x) for x in (mine / "scores.jsonl").read_text().splitlines()]
-    assert [(x["test_id"], x["result"]) for x in lines] == [("t0", "pass"), ("k0", "unsupported")]
+    assert [(x["test_id"], x["result"]) for x in lines] == [("t0", "pass"), ("k0", "unsupported"),
+                                                         ("t1", "fail"), ("k1", "unsupported")]
     out = json.loads(capsys.readouterr().out)
-    assert out["html"] == 1.0 and out["pages"] == 1 and out["pages_pending"] == 1
+    assert out["html"] == 0.5 and out["pages"] == 2 and out["pages_pending"] == 0
+
+
+def test_a_page_a_run_never_attempted_is_pending(tmp_path, monkeypatch):
+    """In a run folder, which keeps records, a page with neither a prediction nor a record was never
+    attempted (`--limit`, a stopped run): it is pending, left out and counted, not failed."""
+    use(monkeypatch, {"stub": stub()})
+    ds = dataset(tmp_path / "data", 2)
+    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=ds, limit=1)
+    (s,) = benchmark.execute(p, say=QUIET).values()
+    assert (s["pages"], s["pages_pending"]) == (1, 1) and s["html"]["score"] == 1.0
 
 
 def test_an_output_left_out_fails_rather_than_being_unsupported(tmp_path):

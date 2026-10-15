@@ -26,7 +26,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from omni_parse_bench import benchmark, data, progress, scorer, vocab
+from omni_parse_bench import benchmark, data, progress, vocab
+from omni_parse_bench.scorers import unit_tests as scorer
 
 # command -> the extra it needs; `score` needs none.
 EXTRAS = {"predict": "harness", "providers": "harness", "reparse": "harness", "benchmark": "benchmark",
@@ -72,9 +73,7 @@ def read_options(value: str | None) -> dict:
 
 def cmd_score(a: argparse.Namespace) -> int:
     """What `score` returns: one verdict per test of the page."""
-    from omni_parse_bench import gold, score
-
-    vs = score(read_json(a.pred), gold.read(a.gold), unsupported=set(a.unsupported or ()))
+    vs = scorer.score(read_json(a.pred), scorer.tests.read(a.gold), unsupported=set(a.unsupported or ()))
     print(json.dumps([v._asdict() for v in vs], indent=2, ensure_ascii=False))
     return 0
 
@@ -191,7 +190,7 @@ def cmd_benchmark(a: argparse.Namespace) -> int:
     print(json.dumps({k: {**{o: v["score"] for o, v in s.items() if isinstance(v, dict) and "score" in v},
                           "pages": s["pages"], "pages_pending": s["pages_pending"]}
                       for k, s in summaries.items()}, indent=2))
-    if errored := {k: n for k, s in summaries.items() if (n := benchmark.errors_in(s))}:
+    if errored := {k: n for k, s in summaries.items() if (n := benchmark._errors_in(s))}:
         print(f"warning: grading failed in our code (not the vendor's) for {sum(errored.values())} tests: "
               + ", ".join(f"{k} {n}" for k, n in errored.items())
               + ". They are left out of the scores; report it with the run's scores.jsonl.", file=sys.stderr)
@@ -207,13 +206,13 @@ def cmd_grade(a: argparse.Namespace) -> int:
     path = out / "settings.json"
     if a.unsupported is not None:
         said = {"unsupported": sorted(set(a.unsupported))}
-        benchmark.write_json(path, (benchmark.read_json(path) or {}) | said)
-    run = benchmark.Run((benchmark.read_json(path) or {}).get("provider", out.name), {}, out)
+        benchmark._write_json(path, (benchmark._read_json(path) or {}) | said)
+    run = benchmark.Run((benchmark._read_json(path) or {}).get("provider", out.name), {}, out)
     _, pages = data.read_manifest(a.dataset)
     s = benchmark.grade(run, pages, say=lambda m: print(m, file=sys.stderr))
     print(json.dumps({**{o: v["score"] for o, v in s.items() if isinstance(v, dict) and "score" in v},
                       "pages": s["pages"], "pages_pending": s["pages_pending"]}, indent=2))
-    return 2 if benchmark.errors_in(s) else 0
+    return 2 if benchmark._errors_in(s) else 0
 
 
 def cmd_reparse(a: argparse.Namespace) -> int:
@@ -234,8 +233,8 @@ def cmd_reparse(a: argparse.Namespace) -> int:
             total += 1
             if new["outputs"] == record["outputs"] and new["errors"] == record["errors"]: continue
             changed += 1
-            benchmark.write_json(path, new)
-            benchmark.write_json(run / "predictions" / path.name, new["outputs"])
+            benchmark._write_json(path, new)
+            benchmark._write_json(run / "predictions" / path.name, new["outputs"])
         print(f"{run}: {changed} of {total} records changed", file=sys.stderr)
     return 0
 

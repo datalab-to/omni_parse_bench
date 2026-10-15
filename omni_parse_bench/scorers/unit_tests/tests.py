@@ -39,7 +39,9 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from omni_parse_bench import equations, normalize, runners, vocab
+from omni_parse_bench import equations, normalize, vocab
+
+from . import runners
 
 FIELDS = ("id", "test_type", "output_type", "derivation", "tags", "args", "settings")
 KINDS = {"text": ("text", "max_diffs"), "number": ("number",), "latex": ("latex",)}

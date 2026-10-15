@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from omni_parse_bench import runners as R
+from omni_parse_bench.scorers.unit_tests import runners as R
 from omni_parse_bench import views
 
 
