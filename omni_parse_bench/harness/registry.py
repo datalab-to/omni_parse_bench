@@ -1,7 +1,9 @@
 """Which adapter, at what settings, filed under what name.
 
 `ADAPTERS` maps a vendor name to its adapter module; any model id (it contains
-`MODEL_SEPARATOR`) routes to the single-shot LLM adapter, with the id as its `model` setting.
+`MODEL_SEPARATOR`) routes to the single-shot LLM adapter, with the id as its `model` setting. An
+adapter of your own is filed with `add_adapter(name, module)`, or declared by its package under the
+entry-point group `ENTRY_POINT_GROUP`, and loaded when first asked for.
 
 The adapter's `Config` is the declaration of its options: what `--options` may set, what
 `opb providers` lists, and what a run records. Nothing infers an option from a signature or an
@@ -13,6 +15,8 @@ import dataclasses
 import hashlib
 import json
 import re
+from importlib import metadata
+from types import ModuleType
 from typing import Any
 
 from . import contract
@@ -48,13 +52,52 @@ ADAPTERS = {
     "surya-ocr": surya_ocr,
     "unlimited-ocr": unlimited,
 }
-PROVIDERS = sorted(ADAPTERS)
+ENTRY_POINT_GROUP = "omni_parse_bench.adapters"
+CONTRACT = ("Config", "SUPPORTS", "requests", "call", "parse")   # what an adapter module defines
+
+
+def plugins() -> dict[str, metadata.EntryPoint]:
+    """The adapters installed packages declare under `ENTRY_POINT_GROUP`, by name."""
+    out = {}
+    # Note: walked per distribution because `metadata.entry_points` keeps one entry per name,
+    # silently dropping a second package that claims it.
+    for ep in (ep for d in metadata.distributions() for ep in d.entry_points):
+        if ep.group != ENTRY_POINT_GROUP: continue
+        if (ep.name in ADAPTERS or MODEL_SEPARATOR in ep.name
+                or (ep.name in out and out[ep.name].dist.name != ep.dist.name)):
+            raise ValueError(f"package {ep.dist.name!r} declares adapter {ep.name!r}, which is taken or "
+                             f"contains {MODEL_SEPARATOR!r}. Rename it in its pyproject.toml")
+        out[ep.name] = ep
+    return out
+
+
+PLUGINS = plugins()
+PROVIDERS = sorted({*ADAPTERS, *PLUGINS})
+
+
+def add_adapter(provider: str, module: ModuleType, *, replace: bool = False) -> None:
+    """File an adapter defined in code; a package declares one under `ENTRY_POINT_GROUP` instead."""
+    taken = provider in ADAPTERS or provider in PLUGINS
+    if MODEL_SEPARATOR in provider or (taken and not replace):
+        raise ValueError(f"adapter name {provider!r} is taken or contains {MODEL_SEPARATOR!r}. Pick another, "
+                         "or pass replace=True to replace a taken one")
+    if missing := [n for n in CONTRACT if not hasattr(module, n)]:
+        raise TypeError(f"adapter {provider!r} is missing {', '.join(missing)}; see harness/contract.py")
+    ADAPTERS[provider] = module
+    # Note: updated in place because callers hold the list itself (`from .registry import PROVIDERS`).
+    PROVIDERS[:] = sorted({*PROVIDERS, provider})
 
 
 def adapter(provider: str) -> contract.Adapter:
     """The module that talks to this vendor: its `Config`, `SUPPORTS`, `requests` and `call`."""
     if MODEL_SEPARATOR in provider:
         return llm
+    if provider not in ADAPTERS and (ep := PLUGINS.get(provider)):
+        try:
+            add_adapter(provider, ep.load(), replace=True)
+        except ImportError as exc:
+            exc.add_note(f"while loading adapter {provider!r} from package {ep.dist.name!r}")
+            raise
     if provider not in ADAPTERS:
         raise ValueError(f"unknown provider {provider!r}. Known vendors: "
                          f"{', '.join(PROVIDERS)}. Any OpenRouter model id also works, "

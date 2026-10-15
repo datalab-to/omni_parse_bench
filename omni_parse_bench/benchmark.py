@@ -517,6 +517,21 @@ def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = pri
     return summary
 
 
+def read_scores(run: Run) -> list[dict]:
+    """A run's score lines on disk (scores.jsonl), in file order; [] when it has none. A line that isn't
+    readable JSON is left out, and logged."""
+    path = run.out / "scores.jsonl"
+    if not path.exists(): return []
+    out = []
+    for n, x in enumerate(path.read_text().splitlines()):
+        if not x.strip(): continue
+        try:
+            out.append(json.loads(x))
+        except json.JSONDecodeError:
+            log.warning("%s: line %d isn't readable JSON; left out", path, n + 1)
+    return out
+
+
 def grade_all(p: Plan, say: Callable[[str], None] = print) -> dict[str, dict]:
     """`grade` each run of the plan; their summaries by run name."""
     _, every = data.read_manifest(p.dataset)

@@ -37,7 +37,7 @@ from .errors import AccountFailure, MissingCredential, MissingDependency, Vendor
 # naming it, not hours into a run.
 try:
     from .page import predict, reparse
-    from .registry import DEFAULT_TIMEOUT, PROVIDERS, adapter, out_name, resolve, settings_for
+    from .registry import DEFAULT_TIMEOUT, PROVIDERS, adapter, add_adapter, out_name, resolve, settings_for
 except ImportError as exc:
     # Only a missing or incompatible SDK is fixed by installing the extra; a broken import of
     # our own must surface as itself.
@@ -50,7 +50,7 @@ except ImportError as exc:
     ) from None
 
 __all__ = [
-    "predict", "reparse", "adapter", "Adapter", "Request", "Call", "Cost",
+    "predict", "reparse", "adapter", "add_adapter", "Adapter", "Request", "Call", "Cost",
     "VendorError", "VendorTimeout", "AccountFailure", "MissingCredential", "MissingDependency",
     "PROVIDERS", "DEFAULT_TIMEOUT", "settings_for", "resolve", "out_name",
 ]

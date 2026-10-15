@@ -777,3 +777,26 @@ def test_a_page_whose_prediction_is_lost_is_predicted_again_not_left_pending(tmp
     assert benchmark.owed(p, run) == (1, 1)
     (s,) = benchmark.execute(p, say=QUIET).values()
     assert len(calls) == 2 and s["pages"] == 1 and s["pages_pending"] == 0
+
+
+def test_an_adapter_of_your_own_is_filed_and_checked(monkeypatch):
+    """`add_adapter` files a module that has the contract's names; a taken name, or a module missing
+    one, is refused, naming what to do."""
+    monkeypatch.setattr(registry, "ADAPTERS", dict(registry.ADAPTERS))
+    monkeypatch.setattr(registry, "PROVIDERS", list(registry.PROVIDERS))
+    mine = stub("mine")
+    harness.add_adapter("mine", mine)
+    assert registry.adapter("mine") is mine and "mine" in registry.PROVIDERS
+    with pytest.raises(ValueError, match="taken"):
+        harness.add_adapter("mine", mine)
+    with pytest.raises(TypeError, match="missing"):
+        harness.add_adapter("half", types.ModuleType("half"))
+
+
+def test_a_runs_lines_are_read_back_as_written(tmp_path, monkeypatch):
+    use(monkeypatch, {"stub": stub()})
+    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data", 2))
+    benchmark.execute(p, say=QUIET)
+    (run,) = p.runs
+    assert [x["page_id"] for x in benchmark.read_scores(run)] == ["a-p0", "a-p1"]
+    assert benchmark.read_scores(benchmark.Run("x", {}, tmp_path / "nothing")) == []
