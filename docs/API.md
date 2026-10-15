@@ -214,7 +214,6 @@ p = benchmark.plan(
   timeout=0,              # seconds per vendor call; 0: the default, 900
   workers=0,              # calls at once per adapter, shared by its runs: one number, or per adapter
                           # ({"datalab": 20, "llm": 3}); 0, or an adapter left out: `benchmark.WORKERS`
-  rescore=False,          # grade every page again
   score_only=False,       # grade what's recorded; call no vendor
   retry_failed=False,     # predict again outputs whose failure may not recur
 )
@@ -291,22 +290,17 @@ It's resumable, and safe to run twice.
   and pages are pinned to a dataset commit and never edited in place. To predict again after a
   dataset's pages change, use a new `--out`;
 - a record that isn't readable JSON counts as not predicted, and is logged;
-- a page is graded again when its lines in `scores.jsonl` are missing or unreadable, or its
-  prediction, its gold or the scoring code has changed. Grading calls no provider, so a gold
-  correction or a new scorer reaches a run on its next grading, every page it touches, and a
-  finished grading's lines are one scorer's against one gold. A page's gold is a digest of what
-  grading reads (its id, document and suite, and its gold file), so a dataset commit that changes
-  nothing graded (its card, a results table, the derived `outputs`) changes no page's gold. The scorer
-  is the digest of the scoring code, so a release that changes no scoring file is the same scorer;
+- grading is fresh every time: every predicted page is graded again (no provider is called), and
+  `scores.jsonl` and `summary.json` are written whole when grading finishes. So a run's scores are
+  always one grading's, and a gold correction or a new scorer reaches a run on its next grading;
 - grading covers every page the run has a prediction for, so `--limit` and `--suites` narrow what is
   predicted, never what is scored; and
-- scores are written however grading ends, so an interrupt keeps what was graded.
+- an interrupted grading writes nothing: the last finished grading's files stand.
 
 A run folder holds one dataset: an invocation with another `--dataset` into it is refused. A dataset
 is downloaded at one commit, its pages and gold together.
 
-`--rescore` grades every page again, whether or not anything changed, and predicts nothing again;
-grading is local and cheap. `--score-only` predicts nothing. `--retry-failed` predicts again
+`--score-only` predicts nothing, and grades. `--retry-failed` predicts again
 the outputs whose failure may not recur: a timeout, an outage, a 429 or 5xx (Cloudflare's 520 to 524
 too), or a failure with no HTTP status. A 400, a vendor's failed job, or an LLM reply that was
 truncated, refused or unusable is an answer, and is not retried.
@@ -485,7 +479,7 @@ opb grade mine/ --unsupported blocks      # mine/predictions/<page_id>.json, one
 `unsupported` rather than failed, and it is kept in `mine/settings.json`. An output a page asks for
 that its prediction leaves out fails, so leaving out a hard page's output can't take it out of the
 score. A page with no prediction is pending. The folder gets `scores.jsonl` and `summary.json`, as a
-run's does, and is graded again as its predictions change.
+run's does.
 
 ### Exploring the tests
 
@@ -662,6 +656,4 @@ One line per test, in manifest order: its verdict, what the test is, and the sta
 - `run` and `provider` name the run (its folder) and its provider; `settings.json` has the rest;
 - `page_id` to `tags` say what the test is (`opb tests` writes the same, its id as `id`);
 - `result` is `pass`, `fail`, `unsupported` or `error`, and `why` says what went wrong; and
-- `prediction`, `gold` and `scorer` stamp what was graded and by what: a page whose prediction, gold
-  (`benchmark.gold_digest`) or scoring code changed is graded again on the next `opb benchmark` or
-  `opb grade`.
+- `prediction`, `gold` and `scorer` stamp what was graded and by what.

@@ -380,7 +380,9 @@ def test_the_plan_counts_what_will_be_predicted(tmp_path, monkeypatch):
     assert benchmark.owed(p, run) == (1, 1)
     benchmark.execute(p, say=QUIET)
     assert saved(run)["errors"]["blocks"] == "unsupported"
-    assert benchmark.owed(p, run) == (0, 0), "an unsupported output is settled"
+    # Note: an unsupported output is settled, so nothing is predicted; grading is fresh, so the page is
+    # graded.
+    assert benchmark.owed(p, run) == (0, 1)
     assert benchmark.owed(p._replace(retry_failed=True), run) == (1, 1)
     assert "predict" in benchmark.describe(p)
 
@@ -625,28 +627,27 @@ def test_an_unreadable_record_is_predicted_again_and_a_bad_score_line_graded_aga
     assert len(scores.read_text().splitlines()) == 2
 
 
-def test_a_release_that_changes_no_scoring_code_keeps_a_run(tmp_path, monkeypatch):
-    """The stamp's version is for the reader; only its digest of the scoring code grades a page again."""
+def test_every_grading_grades_every_predicted_page_fresh(tmp_path, monkeypatch):
+    """No line is reused: a grading's files are always that grading's, whatever was on disk before."""
     use(monkeypatch, {"stub": stub()})
-    ds = dataset(tmp_path / "data")
+    ds = dataset(tmp_path / "data", 2)
     p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=ds)
     benchmark.execute(p, say=QUIET)
     pages = data.read_manifest(ds)[1]
     graded = graded_pages(monkeypatch)
-    monkeypatch.setattr(benchmark, "SCORER", "9.9.9+" + benchmark.scoring(benchmark.SCORER))
     benchmark.grade(p.runs[0], pages, say=QUIET)
-    assert graded == []
-    monkeypatch.setattr(benchmark, "SCORER", "9.9.9+another")
     benchmark.grade(p.runs[0], pages, say=QUIET)
-    assert graded == ["a-p0"]
+    assert graded == ["a-p0", "a-p1", "a-p0", "a-p1"]
 
 
-def test_an_interrupted_regrading_never_mixes_scorers(tmp_path, monkeypatch):
-    """An interrupted --rescore keeps the pages it regraded and drops the rest, which the next grading
-    grades with the same scorer, so a finished grading's lines never come from two."""
+def test_an_interrupted_grading_writes_nothing(tmp_path, monkeypatch):
+    """An interrupted grading leaves the last finished grading's files as they were, so a run's scores
+    are always one whole grading's, never a mix of two."""
     use(monkeypatch, {"stub": stub()})
     p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data", 3))
     benchmark.execute(p, say=QUIET)
+    path = p.runs[0].out / "scores.jsonl"
+    before = path.read_text()
     monkeypatch.setattr(benchmark, "SCORER", "next")
     real, n = benchmark.grade_page, [0]
 
@@ -657,12 +658,11 @@ def test_an_interrupted_regrading_never_mixes_scorers(tmp_path, monkeypatch):
 
     monkeypatch.setattr(benchmark, "grade_page", once)
     with pytest.raises(KeyboardInterrupt):
-        benchmark.execute(p._replace(score_only=True, rescore=True), say=QUIET)
-    rows = [json.loads(x) for x in (p.runs[0].out / "scores.jsonl").read_text().splitlines()]
-    assert [(r["page_id"], r["scorer"]) for r in rows] == [("a-p0", "next")]
+        benchmark.execute(p._replace(score_only=True), say=QUIET)
+    assert path.read_text() == before
     monkeypatch.setattr(benchmark, "grade_page", real)
     benchmark.execute(p._replace(score_only=True), say=QUIET)
-    rows = [json.loads(x) for x in (p.runs[0].out / "scores.jsonl").read_text().splitlines()]
+    rows = [json.loads(x) for x in path.read_text().splitlines()]
     assert [r["page_id"] for r in rows] == ["a-p0", "a-p1", "a-p2"]
     assert {r["scorer"] for r in rows} == {"next"}
 
@@ -718,7 +718,7 @@ def graded_pages(monkeypatch) -> list[str]:
     return graded
 
 
-def test_a_page_of_several_tests_is_graded_again_whole_and_only_when_stale(tmp_path, monkeypatch):
+def test_a_lost_line_comes_back_on_the_next_grading(tmp_path, monkeypatch):
     use(monkeypatch, {"stub": stub(supports={"html", "blocks"})})
     p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data", 2, blocks=True))
     benchmark.execute(p, say=QUIET)
@@ -726,14 +726,8 @@ def test_a_page_of_several_tests_is_graded_again_whole_and_only_when_stale(tmp_p
     path = run.out / "scores.jsonl"
     lines = [json.loads(x) for x in path.read_text().splitlines()]
     assert [x["test_id"] for x in lines] == ["t0", "k0", "t1", "k1"]
-    graded = graded_pages(monkeypatch)
-    benchmark.execute(p._replace(score_only=True), say=QUIET)
-    assert graded == []
-    pred = run.predictions / "a-p0.json"     # a-p0: its prediction changed; a-p1: one line lost
-    pred.write_text(json.dumps(json.loads(pred.read_text()), indent=1))
     path.write_text("".join(json.dumps(x) + "\n" for x in lines[:3]))
     benchmark.execute(p._replace(score_only=True), say=QUIET)
-    assert graded == ["a-p0", "a-p1"]
     assert [json.loads(x)["test_id"] for x in path.read_text().splitlines()] == ["t0", "k0", "t1", "k1"]
 
 

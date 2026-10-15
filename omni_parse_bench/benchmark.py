@@ -22,9 +22,9 @@ A run directory holds:
                                  document, type, tags, ...), and the stamps of what graded it
     summary.json                 scorer.summarize over every graded page, plus cost and coverage
 
-Resumable: a page is predicted again only for the outputs its record lacks, and graded again only
-when its lines are missing, or its prediction, its gold or the scoring code changed (`current`), so a
-run's scores are always this opb's against this dataset's gold, never a mix. A folder of predictions/
+Resumable: a page is predicted again only for the outputs its record lacks. Grading is fresh every
+time: every predicted page is graded again, and scores.jsonl and summary.json are written whole, so a
+run's scores are always one grading's, by this opb against this dataset's gold. A folder of predictions/
 made by anything (your own model) is graded the same way, with what it can't produce said in its
 settings.json (`opb grade`). A run never mixes datasets. Concurrency is per adapter, not per run:
 every run of one adapter (two datalab modes, every OpenRouter model) shares one pool of `workers_for`
@@ -65,8 +65,8 @@ SCORING = ("gold.py", "vocab.py", "runners.py", "views.py", "normalize.py", "tab
 
 
 def scorer_version() -> str:
-    """The package's version and a digest of its scoring code, stamped on each score line so a line
-    graded by another scorer is known, and graded again (`current`, `scoring`).
+    """The package's version and a digest of its scoring code, stamped on each score line: which scorer
+    graded it.
 
     Note: the version alone is the same across every commit between releases, so it can't say the
     scoring changed; the digest of the files that decide a verdict can. The version is kept for the
@@ -82,12 +82,6 @@ def scorer_version() -> str:
 
 
 SCORER = scorer_version()
-
-
-def scoring(stamp: str | None) -> str | None:
-    """The scoring code a scorer stamp names: its digest, without the version, so a release that
-    changes no scoring file grades as the one before it did."""
-    return None if stamp is None else stamp.rpartition("+")[2]
 
 
 class Run(NamedTuple):
@@ -182,7 +176,6 @@ class Plan(NamedTuple):
     dataset: str
     timeout: float
     workers: int | Mapping[str, int]   # calls in flight: one number for every adapter, or per adapter
-    rescore: bool
     score_only: bool
     retry_failed: bool = False
 
@@ -230,7 +223,7 @@ def configurations(providers: list[str], options: dict | None = None) -> list[tu
 
 def plan(providers: list[str], *, out: str | Path = Path("runs"), dataset: str = data.DEFAULT_DATASET,
          suites: list[str] | None = None, limit: int = 0, sample: int = 0, options: dict | None = None,
-         timeout: float = 0, workers: int = 0, rescore: bool = False,
+         timeout: float = 0, workers: int = 0,
          score_only: bool = False, retry_failed: bool = False, only: frozenset[str] | None = None) -> Plan:
     """Every run this invocation makes, checked before any call: a bad option or provider fails here.
 
@@ -254,7 +247,7 @@ def plan(providers: list[str], *, out: str | Path = Path("runs"), dataset: str =
         if (was := (read_json(r.out / "settings.json") or {}).get("dataset", ident)) != ident:
             raise ValueError(f"{r.out} is a run on dataset {was}, not {ident}, and a run never mixes "
                              f"datasets; pass another --out, or --dataset {was}")
-    return Plan(runs, ps, str(dataset), timeout or harness.DEFAULT_TIMEOUT, workers, rescore, score_only,
+    return Plan(runs, ps, str(dataset), timeout or harness.DEFAULT_TIMEOUT, workers, score_only,
                 retry_failed)
 
 
@@ -288,13 +281,11 @@ def per_adapter(workers: Mapping[str, int]) -> dict[str, int]:
 def owed(p: Plan, r: Run) -> tuple[int, int]:
     """How many of the plan's pages this run will predict, and grade, by the rules `predict_all` and
     `grade_all` follow."""
-    rows = {} if p.rescore else read_scores(r.out / "scores.jsonl")
     predict = grade = 0
     for g in p.pages:
         coming = not p.score_only and bool(needs(r, g, p.retry_failed))
-        got = predicted(r, g.page_id)
         predict += coming
-        grade += coming or (got is not None and not current(rows.get(g.page_id), got[1], g, tests(g)))
+        grade += coming or predicted(r, g.page_id) is not None
     return predict, grade
 
 
@@ -360,25 +351,6 @@ def unsupported(run: Run) -> frozenset[str]:
         raise ValueError(f"{path}: unsupported must be a list of output types from "
                          f"{list(vocab.OUTPUT_TYPES)}, not {said!r}")
     return frozenset(said)
-
-
-def read_scores(path: Path) -> dict[str, list[dict]]:
-    """A run's scores, each page's lines by its id; a line that doesn't parse, or lacks a test's id,
-    result or why, is left out, so its page is graded again."""
-    if not path.exists(): return {}
-    out, bad = collections.defaultdict(list), 0
-    for line in path.read_text().splitlines():
-        if not line.strip(): continue
-        try:
-            row = json.loads(line)
-            if not (isinstance(row.get("test_id"), str) and "result" in row and "why" in row):
-                raise KeyError("test_id")
-            out[row["page_id"]].append(row)
-        except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
-            bad += 1
-    if bad: log.warning("%s: %d line(s) not read; their pages are graded again", path, bad)
-    return dict(out)
-
 
 
 def predict_all(p: Plan) -> None:
@@ -490,19 +462,8 @@ def merged(old: dict, new: dict) -> dict:
 
 
 def digest(text: str) -> str:
-    """A prediction's digest, kept on its page's score lines, so a changed prediction is graded again."""
+    """A prediction's digest, kept on its page's score lines: which prediction they grade."""
     return hashlib.sha256(text.encode()).hexdigest()[:16]
-
-
-def current(lines: Sequence[dict] | None, prediction: str, page: data.Page, ts: Sequence[gold.Test]) -> bool:
-    """Whether a page's score lines still stand: they grade the prediction whose digest is `prediction`,
-    against the page's gold as it is (`gold_digest`), with this scoring code (`scoring`), one line for each
-    of its tests `ts` (a line lost is graded again). A changed gold or scorer grades the page again, which
-    calls no provider."""
-    if not lines: return False
-    now = (prediction, gold_digest(page), scoring(SCORER))
-    return (all((x.get("prediction"), x.get("gold"), scoring(x.get("scorer"))) == now for x in lines)
-            and sorted(x["test_id"] for x in lines) == sorted(t.id for t in ts))
 
 
 def grade_page(r: Run, outputs: dict, prediction: str, page: data.Page, ts: Sequence[gold.Test],
@@ -531,8 +492,7 @@ def headline(name: str, summary: dict) -> str:
             f"{summary['pages_pending']} pending" + (f"; {errs} tests errored in our code" if errs else ""))
 
 
-def grade(run: Run, pages: Sequence[data.Page], rescore: bool = False, say: Callable[[str], None] = print
-          ) -> dict:
+def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = print) -> dict:
     """Grade every page of `pages` the run has a prediction for, and write its scores and summary; returns
     the summary. `pages` is usually the whole dataset (`data.read_manifest(dataset)`), as `grade_all`
     passes it.
@@ -540,39 +500,28 @@ def grade(run: Run, pages: Sequence[data.Page], rescore: bool = False, say: Call
     Grading reads predictions/ alone, the run's `unsupported` and each page's gold file (`gt_path`);
     records add only their cost to the summary, so a folder of predictions made by anything is graded the
     same way. Given the whole dataset, it covers every page the run has a prediction for, whatever
-    `--suites` and `--limit` chose to predict, so a smaller invocation never shrinks a run's scores; a page
-    with no prediction is pending, not failed.
-    A page's lines are graded again when they aren't `current`: its prediction, its gold or the scoring
-    code changed. `rescore` grades every page again. Each line says which prediction, gold and scorer
-    graded it, and summary.json which scorer.
-    Scores are written however grading ends, so an interrupt keeps what was graded. A run that was never
-    prepared is refused: its folder is most likely another one (another option, another --out)."""
+    `--suites` and `--limit` chose to predict; a page with no prediction is pending, not failed.
+
+    Every page is graded fresh, every time, and scores.jsonl and summary.json are written whole once it
+    finishes: they are always one grading's, of `pages`, never a mix. An interrupted grading writes
+    nothing, so the last finished one's files stand. Each line says which prediction, gold and scorer it
+    graded. A run that was never prepared is refused: its folder is most likely another one (another
+    option, another --out)."""
     if not run.predictions.is_dir():
         raise ValueError(f"no run at {run.out}: {run.provider} with settings {run.options or 'by default'} "
                          "was never prepared there (it has no predictions/). Check --out and --options, or "
                          "prepare it first")
     cannot = unsupported(run)
-    path = run.out / "scores.jsonl"
-    old = {} if rescore else read_scores(path)
-    lines_of, seen, calls = {}, set(), []
-    try:
-        for g in pages:
-            if (got := predicted(run, g.page_id)) is not None:
-                outputs, text = got
-                if (rec := recorded(run, g.page_id)) is not None: calls += rec["calls"]
-                had, ts = old.get(g.page_id), tests(g)
-                lines_of[g.page_id] = had if current(had, text, g, ts) else grade_page(
-                    run, outputs, text, g, ts, cannot)
-            seen.add(g.page_id)
-    finally:
-        # Note: a page not reached yet keeps its old lines, which their stamps let the next grading check.
-        kept = [lines_of.get(g.page_id) if g.page_id in seen else old.get(g.page_id) for g in pages]
-        lines = [x for xs in kept for x in xs or ()]
-        write_text(path, "".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines))
-    graded = [g for g in pages if g.page_id in lines_of]
-    summary = scorer.summarize([x for g in graded for x in lines_of[g.page_id]], pages)
-    summary |= {"scorer": SCORER, "pages": len(graded),
-                "pages_pending": len(pages) - len(graded),
+    lines, calls, graded = [], [], 0
+    for g in pages:
+        if (got := predicted(run, g.page_id)) is None: continue
+        outputs, text = got
+        if (rec := recorded(run, g.page_id)) is not None: calls += rec["calls"]
+        lines += grade_page(run, outputs, text, g, tests(g), cannot)
+        graded += 1
+    write_text(run.out / "scores.jsonl", "".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines))
+    summary = scorer.summarize(lines, pages)
+    summary |= {"scorer": SCORER, "pages": graded, "pages_pending": len(pages) - graded,
                 "usd": round(sum(c.get("usd") or 0 for c in calls), 4),
                 "credits": round(sum(c.get("credits") or 0 for c in calls), 4)}
     write_json(run.out / "summary.json", summary)
@@ -583,7 +532,7 @@ def grade(run: Run, pages: Sequence[data.Page], rescore: bool = False, say: Call
 def grade_all(p: Plan, say: Callable[[str], None] = print) -> dict[str, dict]:
     """`grade` each run of the plan; their summaries by run name."""
     _, every = data.read_manifest(p.dataset)
-    return {r.out.name: grade(r, every, p.rescore, say) for r in p.runs}
+    return {r.out.name: grade(r, every, say) for r in p.runs}
 
 
 def execute(p: Plan, say: Callable[[str], None] = print) -> dict[str, dict]:

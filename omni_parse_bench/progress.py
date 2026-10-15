@@ -426,7 +426,7 @@ def facts(p: benchmark.Plan):
     table.add_row("at once", ", ".join(f"{a} {benchmark.workers_for(a, p.workers)}" for a in adapters)
                   + " calls, shared by an adapter's runs")
     # Note: shown even when false: `score only  false` is what says this will spend money.
-    for name, on in (("score only", p.score_only), ("rescoring", p.rescore)):
+    for name, on in (("score only", p.score_only),):
         table.add_row(name, Text(str(on).lower(), style="bold" if on else "dim"))
     return table
 

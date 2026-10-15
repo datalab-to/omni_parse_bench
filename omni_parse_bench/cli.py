@@ -180,7 +180,7 @@ def cmd_benchmark(a: argparse.Namespace) -> int:
         logging.getLogger(name).setLevel(logging.WARNING)
     p = benchmark.plan(a.providers, out=a.out, dataset=a.dataset, suites=a.suites, limit=a.limit,
                        sample=a.sample, options=read_options(a.options), timeout=a.timeout,
-                       workers=a.workers, rescore=a.rescore, score_only=a.score_only,
+                       workers=a.workers, score_only=a.score_only,
                        retry_failed=a.retry_failed,
                        only=frozenset(a.pages.read_text().split()) if a.pages else None)
     if not a.yes and not a.score_only and not confirm_plan(p):
@@ -209,7 +209,7 @@ def cmd_grade(a: argparse.Namespace) -> int:
         benchmark.write_json(path, (benchmark.read_json(path) or {}) | said)
     run = benchmark.Run((benchmark.read_json(path) or {}).get("provider", out.name), {}, out)
     _, pages = data.read_manifest(a.dataset)
-    s = benchmark.grade(run, pages, rescore=a.rescore, say=lambda m: print(m, file=sys.stderr))
+    s = benchmark.grade(run, pages, say=lambda m: print(m, file=sys.stderr))
     print(json.dumps({**{o: v["score"] for o, v in s.items() if isinstance(v, dict) and "score" in v},
                       "pages": s["pages"], "pages_pending": s["pages_pending"]}, indent=2))
     return 2 if benchmark.errors_in(s) else 0
@@ -276,8 +276,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                    help="calls at once per adapter, shared by its runs: N for every adapter, or a number "
                         'per adapter, e.g. \'{"datalab": 20, "llm": 3}\' (llm: every OpenRouter model id; '
                         "default: a table per vendor)")
-    b.add_argument("--rescore", action="store_true", help="grade every page again (a changed gold or scorer "
-                   "grades its pages again without it)")
     b.add_argument("--score-only", action="store_true", help="grade what's recorded; predict nothing")
     b.add_argument("--retry-failed", action="store_true",
                    help="predict again outputs whose call may go otherwise: timeouts, outages, 429 and 5xx; "
@@ -291,8 +289,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     g.add_argument("--unsupported", nargs="*", metavar="OUTPUT", choices=vocab.OUTPUT_TYPES,
                    help="output types your system can't produce, once for the folder (kept in its "
                         "settings.json); their tests are unsupported, not failed")
-    g.add_argument("--rescore", action="store_true", help="grade every page again (a changed gold or scorer "
-                   "grades its pages again without it)")
 
     tt = sub.add_parser("tests", help="every test as a JSON line, with its page's suite and document")
     tt.add_argument("--dataset", default=data.DEFAULT_DATASET,
