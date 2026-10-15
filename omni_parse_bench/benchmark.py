@@ -197,7 +197,12 @@ def gold_digest(page: data.Page) -> str:
 
 
 def tests(page: data.Page) -> tuple[gold.Test, ...]:
-    """The page's tests (`scorer.gold`), read once per process."""
+    """The page's tests (`scorer.gold`), read once per process.
+
+    Note: cached because reading them is the slow part of grading (each LaTeX arg is rendered by
+    KaTeX: about 2 s for the whole dataset), and one invocation reads them once per run. The cache
+    keys on the page's gold file, not its contents, so a gold file edited in a process that has
+    already read it isn't read again: restart the process, or `_tests.cache_clear()`."""
     return _tests(page.page_id, page.gt_path, page.outputs)
 
 

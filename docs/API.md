@@ -360,7 +360,8 @@ benchmark.grade(run, every)
   `manifest(dataset)[1]`, so a smaller loop never shrinks a run's scores), writes `scores.jsonl` and
   `summary.json`, and returns the summary. A page with no prediction is pending, not failed; a run
   never prepared is refused. Each page's tests are read from its gold file (`page.gt_path`) when it is
-  graded.
+  graded, once per process: a gold file edited in a process that has already graded it is not read
+  again until the process restarts.
 
 The folder is then exactly one `opb benchmark` writes, so either can resume or grade it.
 
