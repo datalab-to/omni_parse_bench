@@ -129,18 +129,8 @@ def layout_blocks(blocks: list[dict], turned: int = 0) -> list[dict]:
         plain = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", b.get("content") or "")).strip()
         out.append(layout.block(layout.label(LABELS, b.get("type") or ""), corners,
                                 (page["width"], page["height"]), plain))
-    if turned % 360: out = [x | {"bbox": unturned(x["bbox"], turned)} for x in out]
+    if turned % 360: out = [x | {"bbox": layout.unturned(x["bbox"], turned)} for x in out]
     return out
-
-
-def unturned(box: list[float], turned: int) -> list[float]:
-    """A box `[x0, y0, x1, y1]` (fractions) in a frame turned `turned` degrees clockwise, in the frame
-    before."""
-    if turned % 90: raise errors.VendorError(f"rotationApplied {turned} isn't a quarter turn", status=200)
-    x0, y0, x1, y1 = box
-    # Note: undoing one clockwise quarter turn sends the upright point (u, v) to (v, 1 - u) on the page.
-    for _ in range(turned // 90 % 4): x0, y0, x1, y1 = y0, 1 - x1, y1, 1 - x0
-    return [x0, y0, x1, y1]
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,

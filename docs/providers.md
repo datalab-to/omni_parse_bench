@@ -314,9 +314,11 @@ Each model runs with the defaults its vendor recommends; each adapter's docstrin
 | MinerU2.5-Pro | `mineru` | `mineru` | html, blocks |
 | GLM-OCR | `glm-ocr` | `glm_ocr` | html, blocks |
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr_vl` | html, blocks |
+| Indra OCR | `indra-ocr` | `indra` | html, blocks |
 | Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets` | html |
 
-olmOCR-2 and Nanonets-OCR2 return no layout, so they have no blocks.
+olmOCR-2 and Nanonets-OCR2 return no layout, so they have no blocks. Indra OCR runs on CPU (ONNX Runtime),
+no GPU: its server reads pages in one worker process per core, and its image runs without `--gpus`.
 
 Their labels (LightOn's table is above):
 
@@ -468,6 +470,19 @@ Surya OCR 2 (`providers/surya_ocr.py`):
 | Table | table |
 | Form | form |
 | Picture, Figure, Diagram, ChemicalBlock | figure |
+
+Indra OCR (`providers/indra_ocr.py`):
+
+| Indra OCR label | label |
+| --- | --- |
+| Text, Table-Of-Contents | text |
+| Section-Header | heading |
+| Page-Header, Page-Footer | page_furniture |
+| List-Group | list |
+| Caption | caption |
+| Footnote | footnote |
+| Table | table |
+| Form | form |
 
 ## What differs between vendors, by necessity
 

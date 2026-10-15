@@ -1,0 +1,145 @@
+{
+ "model": "Indra OCR",
+ "page": "rotation_skew-rs0700454e_rot270-p1",
+ "provider": "indra-ocr",
+ "options": {},
+ "outputs": [
+  "html",
+  "blocks"
+ ],
+ "sent": null,
+ "raw": {
+  "markdown": "AUTOPSY REPORT\n\n2\n\nWILLIAM DEBOSE 2020-1949-26\n\nIII. Minor cutaneous blunt force injuries of the face and knees\n\nIV. No evidence of significant natural disease processes\n\nV. Toxicology is positive for ethanol and cannabinoids in postmortem peripheral blood\n\n## TOXICOLOGY\n\nREFERENCE LABORATORY: National Medical Services, Inc.\n\n## Horsham, PA\n\nBasic postmortem blood panel results:\n\n<table>\n<tr><th>Compound</th><th>Result</th><th>Units</th><th colspan=\"2\">Matrix Source</th></tr>\n<tr><td>Ethanol</td><td>28</td><td>mg/dL</td><td colspan=\"2\">001 - Femoral Blood</td></tr>\n<tr><td colspan=\"2\">Blood Alcohol Concentration 0.028 </td><td>g/100mL</td><td colspan=\"2\">001 - Femoral Blood</td></tr>\n<tr><td>11-Hydroxy Delta-9 THC</td><td>1.9</td><td>ng/mL</td><td>001 -</td><td>Femoral Blood</td></tr>\n<tr><td>Delta-9 Carboxy THC</td><td>14</td><td>ng/mL</td><td colspan=\"2\">001 - Femoral Blood</td></tr>\n<tr><td>Delta-9 THC</td><td>8.5</td><td>ng/mL</td><td colspan=\"2\">001 - Femoral Blood</td></tr>\n</table>\n\nOther than as noted above, examination of the specimen(s) submitted did not reveal any positive findings of toxicological significance.",
+  "text": "AUTOPSY REPORT\n2\nWILLIAM DEBOSE\n2020-1949-26\nIII. Minor cutaneous blunt force injuries of the face and knees\nIV. No evidence of significant natural disease processes\nV. Toxicology is positive for ethanol and cannabinoids in postmortem\nperipheral blood\nTOXICOLOGY\nREFERENCE LABORATORY: National Medical Services, Inc.\nHorsham, PA\nBasic postmortem blood panel results:\nResult\nUnits\nCompound\nMatrix Source\nEthanol\n28\nmg/dL\n001 - Femoral Blood\nBlood Alcohol Concentration 0.028\ng/100mL\n• 001 - Femoral Blood\n11-Hydroxy Delta-9 THC\n1.9\nng/mL\n001 - Femoral Blood\nDelta-9 Carboxy THC\n14\nng/mL\n001 - Femoral Blood\nDelta-9 THC\n8.5\nng/mL\n001 - Femoral Blood\nOther than as noted above, examination of the specimen(s) submitted\ndid not reveal any positive findings of toxicological significance.",
+  "blocks": [
+   {
+    "label": "Page-Header",
+    "bbox": [
+     155.7,
+     202.0,
+     437.3,
+     224.0
+    ],
+    "text": "AUTOPSY REPORT"
+   },
+   {
+    "label": "Page-Header",
+    "bbox": [
+     795.8,
+     202.6,
+     819.8,
+     225.4
+    ],
+    "text": "2"
+   },
+   {
+    "label": "Page-Header",
+    "bbox": [
+     1174.0,
+     205.4,
+     1455.7,
+     263.3
+    ],
+    "text": "WILLIAM DEBOSE\n2020-1949-26"
+   },
+   {
+    "label": "Text",
+    "bbox": [
+     128.9,
+     316.4,
+     1392.2,
+     345.0
+    ],
+    "text": "III. Minor cutaneous blunt force injuries of the face and knees"
+   },
+   {
+    "label": "Text",
+    "bbox": [
+     150.3,
+     391.8,
+     1276.2,
+     420.9
+    ],
+    "text": "IV. No evidence of significant natural disease processes"
+   },
+   {
+    "label": "Text",
+    "bbox": [
+     163.2,
+     468.4,
+     1551.3,
+     535.2
+    ],
+    "text": "V. Toxicology is positive for ethanol and cannabinoids in postmortem\nperipheral blood"
+   },
+   {
+    "label": "Section-Header",
+    "bbox": [
+     155.9,
+     696.7,
+     355.5,
+     717.4
+    ],
+    "text": "TOXICOLOGY"
+   },
+   {
+    "label": "Text",
+    "bbox": [
+     155.1,
+     773.5,
+     1228.5,
+     799.7
+    ],
+    "text": "REFERENCE LABORATORY: National Medical Services, Inc."
+   },
+   {
+    "label": "Section-Header",
+    "bbox": [
+     627.7,
+     812.4,
+     850.5,
+     838.9
+    ],
+    "text": "Horsham, PA"
+   },
+   {
+    "label": "Text",
+    "bbox": [
+     154.7,
+     887.9,
+     889.4,
+     916.2
+    ],
+    "text": "Basic postmortem blood panel results:"
+   },
+   {
+    "label": "Table",
+    "bbox": [
+     154.6,
+     964.5,
+     1434.5,
+     1183.0
+    ],
+    "text": "Result\nUnits\nCompound\nMatrix Source\nEthanol\n28\nmg/dL\n001 - Femoral Blood\nBlood Alcohol Concentration 0.028\ng/100mL\n• 001 - Femoral Blood\n11-Hydroxy Delta-9 THC\n1.9\nng/mL\n001 - Femoral Blood\nDelta-9 Carboxy THC\n14\nng/mL\n001 - Femoral Blood\nDelta-9 THC\n8.5\nng/mL\n001 - Femoral Blood"
+   },
+   {
+    "label": "Text",
+    "bbox": [
+     154.6,
+     1231.1,
+     1495.3,
+     1298.0
+    ],
+    "text": "Other than as noted above, examination of the specimen(s) submitted\ndid not reveal any positive findings of toxicological significance."
+   }
+  ],
+  "source": "ocr",
+  "note": "no text layer; order=model",
+  "rotation": 90,
+  "skew": 0.0,
+  "image_size": [
+   2200,
+   1700
+  ]
+ }
+}

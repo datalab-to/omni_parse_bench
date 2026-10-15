@@ -16,9 +16,9 @@ import re
 from typing import Any
 
 from . import contract
-from .providers import (azure, chandra_ocr, datalab, deepseek_ocr, dots, extend, glm_ocr, hunyuan, infinity,
-                        lighton, llamaparse, llm, mineru, mistral, nanonets, olmocr, paddleocr_vl, reducto,
-                        surya_ocr, tesseract, unlimited)
+from .providers import (azure, chandra_ocr, datalab, deepseek_ocr, dots, extend, glm_ocr, hunyuan, indra_ocr,
+                        infinity, lighton, llamaparse, llm, mineru, mistral, nanonets, olmocr, paddleocr_vl,
+                        reducto, surya_ocr, tesseract, unlimited)
 
 DEFAULT_TIMEOUT = 900.0
 MODEL_SEPARATOR = "/"
@@ -38,6 +38,7 @@ ADAPTERS = {
     "dots-mocr": dots,
     "glm-ocr": glm_ocr,
     "hunyuan-ocr": hunyuan,
+    "indra-ocr": indra_ocr,
     "infinity-parser2": infinity,
     "lightonocr": lighton,
     "mineru": mineru,
