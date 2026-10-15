@@ -1,5 +1,5 @@
 """The gold: a page's tests, read from its gold file and checked. Which pages there are, and where their
-gold files are, is `data`'s; reading one page's tests is `scorer.gold(page)`, built on `read`.
+gold files are, is `data`'s; reading one page's tests is the scorer's `gold(page)`, built on `read`.
 
 A test says what structure it checks (`test_type`), in which output (`output_type`), on what content
 (`args`), with what else its runner needs (`settings`); how its claim was established (`derivation`);

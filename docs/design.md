@@ -189,7 +189,7 @@ its own:
 | `args` | the content it compares, by role (`content`, `before`, `cell`, ...) |
 | `settings` | the test type's other parameters (`kind`, `expected_count`) |
 
-`gold.py` checks every field against the vocabulary when a test is loaded, and rejects anything
+`scorers/unit_tests/tests.py` checks every field against the vocabulary when a test is loaded, and rejects anything
 else. A page's output types are the ones its tests read, and aren't stored anywhere else. A test's
 suite and document are its page's.
 
@@ -200,17 +200,22 @@ predict(provider, page, wants=None, timeout=…, **options) -> record   # page: 
 ```
 
 The benchmark asks a provider only for what a page's tests read: the page's `outputs` in the
-manifest, the `output_type` of every test on it (`gold.wants`), less what its record already holds,
+manifest, the `output_type` of every test on it (`tests.wants`), less what its record already holds,
 are the `wants` it calls `predict` with. The record holds
 the outputs, an error per output that failed or is unsupported, each call (what was sent, its cost
 and time) and the vendor's raw answers; [API.md](./API.md) shows one.
 
 ## Score
 
+The scorer is `scorers/unit_tests`, a package that owns the shape of its gold: what a unit test is
+(`tests.py`), how each test type is run (`runners.py`), and the functions every scorer has:
+
 ```python
-score(outputs, tests, unsupported=()) -> [Verdict(id, result, why)]
-lines(verdicts, tests) -> [score line]   # each verdict beside what its test is
-summarize(lines, pages=None) -> summary  # over score lines: these, or a run's scores.jsonl
+gold(page) -> tests                              # the page's tests, from its gold file, checked
+score(pred, gold, unsupported=()) -> [Verdict(id, result, why)]
+lines(verdicts, tests, page) -> [score line]     # each verdict beside its page and its test
+summarize(lines) -> summary                      # over score lines: these, or a run's scores.jsonl
+check(pages) -> tests                            # every test of a dataset, and the dataset as a whole
 ```
 
 A test's text and a provider's text view are compared after `fold` (normalize.py), the same function
@@ -227,8 +232,8 @@ in, so a subset scores on the families it holds. A system with no scored test in
 one unsupported or an error) has no headline.
 
 Each output type also has its own score, the share of its tests passed, with `per_test_type` and
-`per_tag`; the summary also gives `per_suite` and `per_derivation`. With the pages the tests belong
-to, each score also counts the source documents its tests are from (`documents`). A document's tests
+`per_tag`; the summary also gives `per_suite` and `per_derivation`. Each score also counts the source
+documents its tests are from (`documents`), read off its lines. A document's tests
 pass or fail together: one misread table fails all its cells, a page's image copy is the same page,
 and a form's blank, filled and scanned copies are one form. The manifest's `document` column
 records each page's document, set once when the page is added. So a score over few documents says less
@@ -259,7 +264,7 @@ TYPES: dict[str, tuple[type[NamedTuple], Runner]] = {
 
 A test runs in four steps:
 
-- Load: `gold.test` checks the test against the vocabulary and builds the runner's parameters from
+- Load: `tests.test` checks the test against the vocabulary and builds the runner's parameters from
   its args and settings. A missing, unknown or misspelled field raises, naming the test's id;
 - View: `score` builds each output's view once per page: `views.Html` (the HTML, its text view, and
   its seen view, the text without image alt text) for an HTML output, and the block list for
@@ -296,17 +301,19 @@ records/, predictions/, scores.jsonl and summary.json.
 
 ```
 omni_parse_bench/
-  __init__.py     gold, score, summarize, Verdict
-  gold.py         the dataset: loading the manifest and gold files into typed pages and tests
+  __init__.py     data, scorers, and the scorer's score, lines, summarize and Verdict
+  data.py         the dataset: downloading it, reading its manifest into pages, choosing pages to run
+  scorers/
+    unit_tests/   the scorer: gold, check, score, lines, summarize
+      tests.py    what a unit test is: a gold file read into typed, checked tests
+      runners.py  one parameter tuple and one runner per test type, and the TYPES registry
   vocab.py        the closed vocabularies: output types, derivations, families, what each test type reads, tags
-  runners.py      one parameter tuple and one runner per test type, and the TYPES registry
   views.py        what a runner reads: views.Html (the HTML, its text and seen views), views.Block
   normalize.py    fold and squeeze, the comparison normal form both sides go through
   tables.py       HTML tables as grids of cells, with neighbors and headings (from olmOCR's parser)
   equations.py    equations compared by what KaTeX renders them to
   katex/          KaTeX (MIT), run in an embedded V8 (mini-racer)
   markdown.py     markdown → HTML, the one converter the harness runs on every provider's markdown
-  scorer.py       score (one page's verdicts) and summarize (a run's scores)
   harness/        producing predictions:
     contract.py   the adapter protocol (Config, SUPPORTS, requests, call, parse) and Request/Call/Cost
     errors.py     how a call fails, and whether a retry can fix it

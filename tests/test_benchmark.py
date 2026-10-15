@@ -800,3 +800,25 @@ def test_a_runs_lines_are_read_back_as_written(tmp_path, monkeypatch):
     (run,) = p.runs
     assert [x["page_id"] for x in benchmark.read_scores(run)] == ["a-p0", "a-p1"]
     assert benchmark.read_scores(benchmark.Run("x", {}, tmp_path / "nothing")) == []
+
+
+def test_a_folder_of_your_own_graded_for_one_suite_counts_only_it(tmp_path, capsys):
+    """Grading part of the dataset on purpose: `--suites` keeps the rest from failing."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    ds = dataset(tmp_path / "data", n=2)
+    m = pathlib.Path(ds) / "manifest.parquet"
+    rows = pq.read_table(m).to_pylist()
+    rows[1]["suite"] = "b"
+    pq.write_table(pa.Table.from_pylist(rows), m)
+    mine = tmp_path / "mine"
+    (mine / "predictions").mkdir(parents=True)
+    (mine / "predictions" / "a-p0.json").write_text(json.dumps({"html": "<p>alpha</p>"}))
+    (mine / "settings.json").write_text(json.dumps({"unsupported": []}))
+    assert cli.main(["grade", str(mine), "--dataset", ds]) == 0
+    whole = json.loads(capsys.readouterr().out)
+    assert whole["html"] == 0.5 and whole["pages"] == 2, "a page left out of your folder fails"
+    assert cli.main(["grade", str(mine), "--dataset", ds, "--suites", "a"]) == 0
+    one = json.loads(capsys.readouterr().out)
+    assert one["html"] == 1.0 and (one["pages"], one["pages_pending"]) == (1, 0)

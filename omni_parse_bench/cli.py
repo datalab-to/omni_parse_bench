@@ -209,7 +209,7 @@ def cmd_grade(a: argparse.Namespace) -> int:
         benchmark._write_json(path, (benchmark._read_json(path) or {}) | said)
     run = benchmark.Run((benchmark._read_json(path) or {}).get("provider", out.name), {}, out)
     _, pages = data.read_manifest(a.dataset)
-    s = benchmark.grade(run, pages, say=lambda m: print(m, file=sys.stderr))
+    s = benchmark.grade(run, data.select(pages, a.suites), say=lambda m: print(m, file=sys.stderr))
     print(json.dumps({**{o: v["score"] for o, v in s.items() if isinstance(v, dict) and "score" in v},
                       "pages": s["pages"], "pages_pending": s["pages_pending"]}, indent=2))
     return 2 if benchmark._errors_in(s) else 0
@@ -289,6 +289,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     g.add_argument("--unsupported", nargs="*", metavar="OUTPUT", choices=vocab.OUTPUT_TYPES,
                    help="output types your system can't produce, once for the folder (kept in its "
                         "settings.json); their tests are unsupported, not failed")
+    g.add_argument("--suites", nargs="*", metavar="SUITE",
+                   help="grade only these suites; otherwise every page, and a page with no prediction fails")
 
     tt = sub.add_parser("tests", help="every test as a JSON line, with its page's suite and document")
     tt.add_argument("--dataset", default=data.DEFAULT_DATASET,

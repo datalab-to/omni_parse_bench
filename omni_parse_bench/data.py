@@ -13,7 +13,7 @@ its gold are without the dataset beside it. The functions over a dataset:
     dataset_id(dataset)          what a run's dataset is, whatever its revision
 
 `dataset` is a folder's path or `hf://datasets/<repo>[@<revision>]`. `read_manifest` reads once per
-process. Checking every test of a dataset is `scorer.check(pages)`.
+process. Checking every test of a dataset is the scorer's, `scorers.unit_tests.check(pages)`.
 """
 from __future__ import annotations
 

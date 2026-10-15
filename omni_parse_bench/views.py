@@ -27,7 +27,7 @@ each block's label is one of `LABELS`, and its box is checked to be within the p
 
 A view checks the output's shape: HTML that isn't a string, or a block that isn't `{label, bbox[,
 text]}` as above, raises `MalformedOutput`. That is the provider's fault, so its tests fail; any other
-exception while grading is the scorer's (`scorer.score`).
+exception while grading is the scorer's (`scorers.unit_tests.score`).
 
 `hold` and `release` swap spans for private-use placeholders and back, so a rewrite can step
 around text it must not touch.
