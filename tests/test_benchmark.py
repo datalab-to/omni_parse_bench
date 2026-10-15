@@ -227,31 +227,6 @@ def test_a_hugging_face_dataset_is_downloaded_whole_at_one_revision(tmp_path, mo
     assert got["repo"] == "org/data" and got["revision"] == "main" and "allow_patterns" not in got
 
 
-def test_the_names_that_moved_to_data_still_work_and_warn(tmp_path):
-    """gold's and benchmark's old dataset names answer as before, for one release, each with a warning."""
-    ds = dataset(tmp_path / "data")
-    with pytest.warns(DeprecationWarning, match=r"data\.read_manifest"):
-        assert gold.manifest(ds) == data.read_manifest(ds)[1]
-    with pytest.warns(DeprecationWarning, match=r"data\.check_dataset"):
-        assert gold.load(ds) == data.check_dataset(ds)
-    with pytest.warns(DeprecationWarning, match=r"data\.Page"):
-        assert gold.Page is data.Page
-    with pytest.warns(DeprecationWarning, match=r"data\.read_manifest"):
-        root, pages = benchmark.manifest(ds)
-    raw = dataclasses.replace(pages[0], gt_path="gold/a-p0.json")
-    with pytest.warns(DeprecationWarning, match=r"scorer\.gold"):
-        assert gold.tests(root, raw) == benchmark.tests(pages[0])
-    with pytest.warns(DeprecationWarning, match=r"data\.check_dataset"):
-        assert benchmark.load(ds)[1] == pages
-    with pytest.warns(DeprecationWarning, match=r"data\.DEFAULT_DATASET"):
-        assert benchmark.DEFAULT_DATASET == data.DEFAULT_DATASET
-    with pytest.warns(DeprecationWarning, match=r"scorer\.score"):
-        from omni_parse_bench import metric, scorer
-        assert metric.score is scorer.score
-    with pytest.warns(DeprecationWarning, match=r"page\.doc_path"):
-        assert benchmark.page_file(ds, root, "pages/a-p0.pdf") == pathlib.Path(pages[0].doc_path)
-
-
 def test_a_run_folder_holds_one_dataset_and_a_changed_gold_grades_its_page_again(tmp_path, monkeypatch):
     use(monkeypatch, {"stub": stub()})
     one, two = dataset(tmp_path / "one"), dataset(tmp_path / "two")

@@ -44,7 +44,6 @@ import json
 import logging
 import os
 import threading
-import warnings
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -542,58 +541,3 @@ def execute(p: Plan, say: Callable[[str], None] = print) -> dict[str, dict]:
     finally:
         summaries = grade_all(p, say)
     return summaries
-
-
-# Note: the names that moved to `data`, kept for one release. Each warns, naming its replacement.
-MOVED = {"HF_PREFIX": "data.HF_PREFIX", "DEFAULT_DATASET": "data.DEFAULT_DATASET",
-         "DOWNLOAD_ATTEMPTS": "data.DOWNLOAD_ATTEMPTS"}
-
-
-def __getattr__(name: str) -> Any:
-    if name not in MOVED: raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    _deprecated(f"benchmark.{name}", MOVED[name])
-    return getattr(data, MOVED[name].removeprefix("data."))
-
-
-def dataset_root(dataset: str | Path) -> Path:
-    """Deprecated: `data.download_dataset(dataset)`."""
-    _deprecated("benchmark.dataset_root(dataset)", "data.download_dataset(dataset)")
-    return data.download_dataset(dataset)
-
-
-def dataset_id(dataset: str | Path) -> str:
-    """Deprecated: `data.dataset_id(dataset)`."""
-    _deprecated("benchmark.dataset_id(dataset)", "data.dataset_id(dataset)")
-    return data.dataset_id(dataset)
-
-
-def manifest(dataset: str) -> tuple[Path, tuple[data.Page, ...]]:
-    """Deprecated: `data.read_manifest(dataset)`."""
-    _deprecated("benchmark.manifest(dataset)", "data.read_manifest(dataset)")
-    return data.read_manifest(dataset)
-
-
-def pages(dataset: str, suites: list[str] | None = None, limit: int = 0,
-          sample: int = 0, only: frozenset[str] | None = None) -> tuple[data.Page, ...]:
-    """Deprecated: `data.select(data.read_manifest(dataset)[1], ...)`."""
-    _deprecated("benchmark.pages(dataset, ...)", "data.select(data.read_manifest(dataset)[1], ...)")
-    return data.select(data.read_manifest(dataset)[1], suites, limit, sample, only)
-
-
-def page_file(dataset: str, root: Path, doc_path: str) -> Path:
-    """Deprecated: `page.doc_path`, a full local path once `data.read_manifest` has read it."""
-    _deprecated("benchmark.page_file(dataset, root, doc_path)", "page.doc_path")
-    return Path(root) / doc_path
-
-
-def load(dataset: str) -> tuple[Path, tuple[data.Page, ...], dict[str, tuple[gold.Test, ...]]]:
-    """Deprecated: `data.check_dataset(dataset)`, which returns the pages and the tests."""
-    _deprecated("benchmark.load(dataset)", "data.check_dataset(dataset)")
-    root, _ = data.read_manifest(dataset)
-    ps, ts = data.check_dataset(dataset)
-    return root, ps, gold.by_page(ts)
-
-
-def _deprecated(old: str, new: str) -> None:
-    warnings.warn(f"{old} is deprecated: use {new}. The old name will be removed in a later release.",
-                  DeprecationWarning, stacklevel=3)

@@ -26,20 +26,15 @@ that doesn't match its type (an empty string counts as a mismatch), a max_diffs 
 its folded text's characters (it would pass on any output), LaTeX that KaTeX can't render or that
 renders to nothing (it would fail, or pass, on any output), or a value outside the vocabulary raises
 `GoldError` naming it. `data` raises it too, for a manifest row that breaks the dataset's rules.
-
-`Page`, `manifest`, `load`, `tests` and `page` moved to `data` and `scorer`; their old names here still
-work, with a DeprecationWarning, and will be removed in a later release.
 """
 from __future__ import annotations
 
 import collections
-import dataclasses
 import functools
 import json
 import re
 import types
 import typing
-import warnings
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -70,49 +65,6 @@ _SCRIPT = re.compile(r"[A-Z][a-z]{3}")   # ISO 15924
 
 class GoldError(ValueError):
     """A manifest row or a test that breaks the dataset's rules."""
-
-
-# Note: the names that moved, kept for one release. Each warns, naming its replacement; the functions
-# import `data` and `scorer` when called, since both import this module.
-MOVED = {"Page": "data.Page", "MANIFEST": "data.MANIFEST", "PAGE_FIELDS": "data.PAGE_FIELDS",
-         "page": "data.page"}
-
-
-def __getattr__(name: str) -> Any:
-    if name not in MOVED: raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from omni_parse_bench import data
-
-    _deprecated(f"gold.{name}", MOVED[name])
-    return getattr(data, MOVED[name].removeprefix("data."))
-
-
-def manifest(root: str | Path) -> tuple[Any, ...]:
-    """Deprecated: `data.read_manifest(dataset)[1]`."""
-    from omni_parse_bench import data
-
-    _deprecated("gold.manifest(root)", "data.read_manifest(dataset)[1]")
-    return data.read_manifest(str(root))[1]
-
-
-def load(root: str | Path) -> tuple[tuple[Any, ...], tuple[Test, ...]]:
-    """Deprecated: `data.check_dataset(dataset)`."""
-    from omni_parse_bench import data
-
-    _deprecated("gold.load(root)", "data.check_dataset(dataset)")
-    return data.check_dataset(str(root))
-
-
-def tests(root: str | Path, p: Any) -> tuple[Test, ...]:
-    """Deprecated: `scorer.gold(page)`."""
-    from omni_parse_bench import scorer
-
-    _deprecated("gold.tests(root, page)", "scorer.gold(page)")
-    return scorer.gold(dataclasses.replace(p, gt_path=str(Path(root).expanduser() / p.gt_path)))
-
-
-def _deprecated(old: str, new: str) -> None:
-    warnings.warn(f"{old} is deprecated: use {new}. The old name will be removed in a later release.",
-                  DeprecationWarning, stacklevel=3)
 
 
 class Test(NamedTuple):

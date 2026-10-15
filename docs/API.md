@@ -431,11 +431,7 @@ data.check_dataset(dataset)     # (pages, tests): everything, checked across the
 scorer.gold(page)               # one page's tests, from its gold file (`page.gt_path`)
 ```
 
-Each needs the benchmark extra, for parquet. `gold.manifest`, `gold.load`, `gold.tests`, `gold.Page`,
-`benchmark.manifest`, `benchmark.pages`, `benchmark.load`, `benchmark.page_file`, `benchmark.dataset_root`,
-`benchmark.dataset_id` and `benchmark.DEFAULT_DATASET` are their old names, and the module `metric` is
-the old name of `scorer`: they still work, with a DeprecationWarning, and will be removed in a later
-release.
+Each needs the benchmark extra, for parquet.
 
 ```python
 from omni_parse_bench import data, lines, score, scorer, summarize
