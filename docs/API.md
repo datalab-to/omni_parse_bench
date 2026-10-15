@@ -250,7 +250,7 @@ opb benchmark --providers datalab openai/gpt-5.6-sol --out runs/ --limit 5
 
 It shows the plan (each run, its settings, and how many pages it will predict and grade) and, in a
 terminal, asks before calling any vendor; `-y` skips the question, and a script or pipe proceeds
-without it. It prints each run's scores with `pages` (graded) and `pages_pending` (never attempted)
+without it. It prints each run's scores with `pages` (graded) and `pending` (never attempted)
 beside them. It exits 2, with a warning, when a test's grading failed in our code (`errors` in a
 summary's output type), since those tests are left out of the score.
 
@@ -634,12 +634,12 @@ and cost:
 ```json
 {"headline": 0.905, "families": {"...": "..."}, "documents": 2343, "html": {"...": "..."}, "blocks": {"...": "..."},
  "per_suite": {"...": "..."}, "per_derivation": {"...": "..."},
- "scorer": "0.1.1+a09ce5ecf32a", "pages": 2937, "pages_pending": 0, "usd": 13.668,
+ "scorer": "0.1.1+a09ce5ecf32a", "pages": 2937, "pending": 0, "usd": 13.668,
  "credits": 0}
 ```
 
 - `scorer` is the package version and a digest of its scoring code, which graded it;
-- `pages` is how many pages were graded, and `pages_pending` how many of the dataset's pages the run
+- `pages` is how many pages were graded, and `pending` how many of the dataset's pages the run
   never attempted (no prediction and no record); and
 - `usd` and `credits` are what the vendor said the calls cost.
 

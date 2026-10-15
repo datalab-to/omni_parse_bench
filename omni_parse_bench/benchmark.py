@@ -27,7 +27,7 @@ time: every predicted page is graded again, and scores.jsonl and summary.json ar
 run's scores are always one grading's, by this opb against this dataset's gold. A folder of predictions/
 made by anything (your own model) is graded the same way, with what it can't produce said in its
 settings.json (`opb grade`). A run never mixes datasets. Concurrency is per adapter, not per run:
-every run of one adapter (two datalab modes, every OpenRouter model) shares one pool of `workers_for`
+every run of one adapter (two datalab modes, every OpenRouter model) shares one pool of `_workers_for`
 its adapter. Credentials come from the environment
 and everything else from `--options`.
 
@@ -240,7 +240,7 @@ def plan(providers: list[str], *, out: str | Path = Path("runs"), dataset: str =
                 retry_failed)
 
 
-def workers_for(adapter: str, requested: int | Mapping[str, int] = 0) -> int:
+def _workers_for(adapter: str, requested: int | Mapping[str, int] = 0) -> int:
     """Calls in flight at once for every run of this adapter (`registry.resolve`) together: what was
     requested (one number for every adapter, or a number per adapter), else `WORKERS`."""
     if isinstance(requested, Mapping): requested = requested.get(adapter, 0)
@@ -343,7 +343,7 @@ def unsupported(run: Run) -> frozenset[str]:
 
 def predict_all(p: Plan) -> None:
     """Predict what each run's records lack. Every run of one adapter drains through that adapter's
-    one pool (`workers_for`), the adapters go at once, and a live table shows each run (`progress.py`)."""
+    one pool (`_workers_for`), the adapters go at once, and a live table shows each run (`progress.py`)."""
     from omni_parse_bench import harness, progress
 
     # Note: set on an interrupt, so no run starts another page; a call already made is let finish.
@@ -373,7 +373,7 @@ def predict_all(p: Plan) -> None:
 
     def drain(adapter: str, runs: list[Run], bars: progress.Progress) -> None:
         """Every page of every run of one adapter, through its one pool."""
-        workers = workers_for(adapter, p.workers)
+        workers = _workers_for(adapter, p.workers)
         reporters = {r.out.name: bars.reporter(r.out.name) for r in runs}
         for x in reporters.values(): x.start(len(p.pages), workers)
         halt = threading.Event()
@@ -470,7 +470,7 @@ def _headline(name: str, summary: dict) -> str:
                        if isinstance(s := summary.get(o), dict) and s.get("score") is not None)
     errs = _errors_in(summary)
     return (f"{name}: {scores or 'no score'} over {summary['pages']} pages graded, "
-            f"{summary['pages_pending']} pending" + (f"; {errs} tests errored in our code" if errs else ""))
+            f"{summary['pending']} pending" + (f"; {errs} tests errored in our code" if errs else ""))
 
 
 def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = print) -> dict:
@@ -509,7 +509,7 @@ def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = pri
         lines += _grade_page(run, pred or {}, g, _tests(g), cannot)
     _write_text(run.out / "scores.jsonl", "".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines))
     summary = scorer.summarize(lines)
-    summary |= {"scorer": SCORER, "pages": len(pages) - pending, "pages_pending": pending,
+    summary |= {"scorer": SCORER, "pages": len(pages) - pending, "pending": pending,
                 "usd": round(sum(c.get("usd") or 0 for c in calls), 4),
                 "credits": round(sum(c.get("credits") or 0 for c in calls), 4)}
     _write_json(run.out / "summary.json", summary)

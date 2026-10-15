@@ -111,14 +111,14 @@ def test_runs_of_one_adapter_share_its_cap(tmp_path, monkeypatch):
     assert len(p.runs) == 2
     benchmark.execute(p, say=QUIET)
     assert peak[0] <= 2, f"two runs of one adapter had {peak[0]} calls out at once, over its cap of 2"
-    assert benchmark.workers_for("datalab") == benchmark.WORKERS["datalab"]
-    assert benchmark.workers_for("datalab", 3) == 3 and benchmark.workers_for("unknown") == 5
+    assert benchmark._workers_for("datalab") == benchmark.WORKERS["datalab"]
+    assert benchmark._workers_for("datalab", 3) == 3 and benchmark._workers_for("unknown") == 5
 
 
 def test_workers_may_be_set_per_adapter(tmp_path, monkeypatch):
     """Per adapter, the vendor account the limit is: a model id is refused, naming its adapter."""
     assert benchmark._per_adapter({"datalab": 20, "llm": 3}) == {"datalab": 20, "llm": 3}
-    assert benchmark.workers_for("reducto", {"datalab": 20}) == benchmark.WORKERS["reducto"]
+    assert benchmark._workers_for("reducto", {"datalab": 20}) == benchmark.WORKERS["reducto"]
     for bad, why in [({"nope": 2}, "the adapters are"), ({"openai/gpt-5.6-sol": 3}, 'write {"llm": 3}'),
                      ({"datalab": 0}, "1 or more"), ({"datalab": True}, "1 or more")]:
         with pytest.raises(ValueError, match=why):
@@ -129,7 +129,7 @@ def test_workers_may_be_set_per_adapter(tmp_path, monkeypatch):
     use(monkeypatch, {"shared": stub("shared")})
     p = benchmark.plan(["shared"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data"),
                        workers={"tesseract": 7})
-    assert p.workers == {"tesseract": 7} and benchmark.workers_for("tesseract", p.workers) == 7
+    assert p.workers == {"tesseract": 7} and benchmark._workers_for("tesseract", p.workers) == 7
 
 
 # 2. An account failure stops its adapter's runs, and only those.
@@ -385,13 +385,13 @@ def test_a_renamed_test_is_a_gold_change(tmp_path, monkeypatch):
 # 7, 8. The CLI: errors in our code exit 2; scores come with their coverage.
 
 def test_opb_benchmark_exits_2_when_our_code_errored(monkeypatch, capsys):
-    clean = {"html": {"score": 0.9}, "pages": 3, "pages_pending": 1}
+    clean = {"html": {"score": 0.9}, "pages": 3, "pending": 1}
     for summaries, code in (({"r": clean}, 0), ({"r": clean | {"html": {"score": 0.9, "errors": 2}}}, 2)):
         monkeypatch.setattr(benchmark, "plan", lambda *a, **k: None)
         monkeypatch.setattr(benchmark, "execute", lambda p, say, s=summaries: s)
         assert cli.main(["benchmark", "--providers", "x", "-y"]) == code
         out, err = capsys.readouterr()
-        assert json.loads(out) == {"r": {"html": 0.9, "pages": 3, "pages_pending": 1}}
+        assert json.loads(out) == {"r": {"html": 0.9, "pages": 3, "pending": 1}}
         assert ("warning" in err) == bool(code)
 
 
@@ -733,7 +733,7 @@ def test_a_folder_of_your_own_predictions_is_graded(tmp_path, capsys):
     assert [(x["test_id"], x["result"]) for x in lines] == [("t0", "pass"), ("k0", "unsupported"),
                                                          ("t1", "fail"), ("k1", "unsupported")]
     out = json.loads(capsys.readouterr().out)
-    assert out["html"] == 0.5 and out["pages"] == 2 and out["pages_pending"] == 0
+    assert out["html"] == 0.5 and out["pages"] == 2 and out["pending"] == 0
 
 
 def test_a_page_a_run_never_attempted_is_pending(tmp_path, monkeypatch):
@@ -743,7 +743,7 @@ def test_a_page_a_run_never_attempted_is_pending(tmp_path, monkeypatch):
     ds = dataset(tmp_path / "data", 2)
     p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=ds, limit=1)
     (s,) = benchmark.execute(p, say=QUIET).values()
-    assert (s["pages"], s["pages_pending"]) == (1, 1) and s["html"]["score"] == 1.0
+    assert (s["pages"], s["pending"]) == (1, 1) and s["html"]["score"] == 1.0
 
 
 def test_an_output_left_out_fails_rather_than_being_unsupported(tmp_path):
@@ -776,7 +776,7 @@ def test_a_page_whose_prediction_is_lost_is_predicted_again_not_left_pending(tmp
     (run.predictions / "a-p0.json").unlink()
     assert benchmark.owed(p, run) == (1, 1)
     (s,) = benchmark.execute(p, say=QUIET).values()
-    assert len(calls) == 2 and s["pages"] == 1 and s["pages_pending"] == 0
+    assert len(calls) == 2 and s["pages"] == 1 and s["pending"] == 0
 
 
 def test_an_adapter_of_your_own_is_filed_and_checked(monkeypatch):
@@ -821,4 +821,4 @@ def test_a_folder_of_your_own_graded_for_one_suite_counts_only_it(tmp_path, caps
     assert whole["html"] == 0.5 and whole["pages"] == 2, "a page left out of your folder fails"
     assert cli.main(["grade", str(mine), "--dataset", ds, "--suites", "a"]) == 0
     one = json.loads(capsys.readouterr().out)
-    assert one["html"] == 1.0 and (one["pages"], one["pages_pending"]) == (1, 0)
+    assert one["html"] == 1.0 and (one["pages"], one["pending"]) == (1, 0)

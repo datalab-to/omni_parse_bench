@@ -38,6 +38,7 @@ Grading:
   folder that keeps `records/`); otherwise every test of it fails. So a page left out of a folder of
   your own predictions now fails. `opb grade --suites` grades part of a dataset on purpose;
 - score lines carry only the `scorer` stamp; the prediction and gold digests are gone;
+- `summary.json`'s `pages_pending` is `pending`, as in omni-extract-bench;
 - `benchmark.read_scores(run)` reads a run's lines back; and
 - `scorers.unit_tests.check(pages)` (was `gold.load`) checks a whole dataset, for publishing and
   `opb tests`. Grading doesn't use it.
@@ -48,7 +49,7 @@ Datasets:
 - `Page` is a frozen dataclass (it was a NamedTuple), with `id`, the page's `page_id`.
 
 Helpers that were public by accident are private: `data.page`, `benchmark.missing`, `retryable`,
-`merged`, `grade_page`, `errors_in`, `headline`, `per_adapter`, `tests`, `write_json`, `write_text`
-and `read_json`.
+`merged`, `grade_page`, `errors_in`, `headline`, `per_adapter`, `tests`, `workers_for`, `write_json`,
+`write_text` and `read_json`.
 
 The scoring-code digest changes, so every run is graded again once; no provider is called.

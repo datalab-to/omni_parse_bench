@@ -188,7 +188,7 @@ def cmd_benchmark(a: argparse.Namespace) -> int:
     summaries = benchmark.execute(p, lambda s: print(s, file=sys.stderr))
     # Note: the coverage beside the scores, since a run with pages pending is scored on fewer pages.
     print(json.dumps({k: {**{o: v["score"] for o, v in s.items() if isinstance(v, dict) and "score" in v},
-                          "pages": s["pages"], "pages_pending": s["pages_pending"]}
+                          "pages": s["pages"], "pending": s["pending"]}
                       for k, s in summaries.items()}, indent=2))
     if errored := {k: n for k, s in summaries.items() if (n := benchmark._errors_in(s))}:
         print(f"warning: grading failed in our code (not the vendor's) for {sum(errored.values())} tests: "
@@ -211,7 +211,7 @@ def cmd_grade(a: argparse.Namespace) -> int:
     _, pages = data.read_manifest(a.dataset)
     s = benchmark.grade(run, data.select(pages, a.suites), say=lambda m: print(m, file=sys.stderr))
     print(json.dumps({**{o: v["score"] for o, v in s.items() if isinstance(v, dict) and "score" in v},
-                      "pages": s["pages"], "pages_pending": s["pages_pending"]}, indent=2))
+                      "pages": s["pages"], "pending": s["pending"]}, indent=2))
     return 2 if benchmark._errors_in(s) else 0
 
 
