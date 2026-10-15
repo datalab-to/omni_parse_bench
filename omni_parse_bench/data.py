@@ -22,6 +22,7 @@ import collections
 import functools
 import re
 import time
+import types
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -49,13 +50,18 @@ _DOC_PATH = re.compile(r"pages/(.+)\.(?:pdf|png)")
 
 class Page(NamedTuple):
     """A row of the manifest, its paths full local paths (`read_manifest` resolves the manifest's, which are
-    relative to the dataset folder), so a page's file and tests are read from the page alone."""
+    relative to the dataset folder), so a page's file and tests are read from the page alone.
+
+    `extra` holds the row's other columns, read-only: omni-parse-bench reads none of them, so a dataset
+    can carry columns of its own (a language, a tag, another gold) for scorers of its own. It makes a
+    page unhashable."""
     page_id: str
     document: str   # the source document: a page's tests pass or fail with its document's
     suite: str
     doc_path: str   # the page file: <dataset>/pages/<page_id>.pdf or .png
     gt_path: str    # its tests: <dataset>/gold/<page_id>.json
     outputs: tuple[str, ...]    # what to predict: the output types its tests read (`gold.wants`), sorted
+    extra: Mapping[str, Any] = types.MappingProxyType({})   # the manifest's other columns, by name
 
     @property
     def id(self) -> str:
@@ -115,7 +121,8 @@ def dataset_id(dataset: str | Path) -> str:
 @functools.cache
 def read_manifest(dataset: str | Path) -> tuple[Path, tuple[Page, ...]]:
     """The dataset's folder (`download_dataset`) and its pages, checked, each with what to predict for it,
-    and its file and gold as full paths. It reads the manifest alone: no gold file is opened."""
+    and its file and gold as full paths. It reads the manifest alone: no gold file is opened. Its columns
+    must include `PAGE_FIELDS`; any other column is carried on each page's `extra`, never refused."""
     try:
         import pyarrow.parquet as pq
     except ImportError:
@@ -125,10 +132,6 @@ def read_manifest(dataset: str | Path) -> tuple[Path, tuple[Page, ...]]:
     table = pq.read_table(root / MANIFEST)
     if "outputs" not in table.column_names:
         raise gold.GoldError(OLD_DATASET.format(root=root))
-    if unknown := [c for c in table.column_names if c not in PAGE_FIELDS]:
-        raise gold.GoldError(f"the dataset's manifest has columns this omni-parse-bench ({_version()}) "
-                             f"doesn't know: {unknown}. The dataset is newer than this omni-parse-bench; "
-                             f"upgrade it: pip install -U omni-parse-bench")
     rows = tuple((p := page(r))._replace(doc_path=str(root / p.doc_path), gt_path=str(root / p.gt_path))
                  for r in table.to_pylist())
     if twice := [i for i, n in collections.Counter(p.page_id for p in rows).items() if n > 1]:
@@ -188,10 +191,6 @@ def page(r: Mapping[str, Any]) -> Page:
     where = f"page {r.get('page_id')!r}"
     if missing := [f for f in PAGE_FIELDS if f not in r]:
         raise gold.GoldError(f"{where} lacks {missing}")
-    if unknown := [f for f in r if f not in PAGE_FIELDS]:
-        raise gold.GoldError(f"{where}: unknown columns {unknown}; a manifest row has {list(PAGE_FIELDS)}. "
-                             "If the dataset is newer than this omni-parse-bench, upgrade it: "
-                             "pip install -U omni-parse-bench")
     if not all(isinstance(r[f], str) and r[f].strip() for f in NAMES):
         raise gold.GoldError(f"{where}: {list(NAMES)} must be non-empty strings")
     if not ((m := _DOC_PATH.fullmatch(r["doc_path"])) and m[1] == r["page_id"]):
@@ -203,13 +202,6 @@ def page(r: Mapping[str, Any]) -> Page:
             or len(set(outputs)) != len(outputs)):
         raise gold.GoldError(f"{where}: outputs must be a non-empty list of distinct output types from "
                              f"{sorted(OUTPUTS)}, not {outputs!r}")
-    return Page(r["page_id"], r["document"], r["suite"], r["doc_path"], r["gt_path"], tuple(sorted(outputs)))
-
-
-def _version() -> str:
-    import importlib.metadata
-
-    try:
-        return importlib.metadata.version("omni-parse-bench")
-    except importlib.metadata.PackageNotFoundError:
-        return "unknown version"
+    extra = types.MappingProxyType({k: v for k, v in r.items() if k not in PAGE_FIELDS})
+    return Page(r["page_id"], r["document"], r["suite"], r["doc_path"], r["gt_path"], tuple(sorted(outputs)),
+                extra)

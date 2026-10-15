@@ -132,6 +132,10 @@ gold/<page_id>.json    the page's tests
 | `gt_path` | `gold/<page_id>.json` | the tests, relative to the dataset root |
 | `outputs` | `["html", "blocks"]` | what to predict for the page: the output types its tests read, so planning a run reads the manifest alone. Made from the gold when the dataset is published, and checked against it whenever the gold is read; a manifest from before the column has it read from the gold |
 
+A manifest may carry other columns of its own (a language, a tag, a gold of another kind, for a scorer of
+your own): omni-parse-bench reads none of them, refuses none of them, and keeps them on each page, read-only,
+as `page.extra`.
+
 The 2,937 pages come from 2,343 documents.
 
 ### `pages/<page_id>.pdf` or `.png`

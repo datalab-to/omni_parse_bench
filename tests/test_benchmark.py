@@ -266,7 +266,7 @@ def test_a_run_folder_holds_one_dataset_and_a_changed_gold_grades_its_page_again
         benchmark.plan(["stub"], out=tmp_path / "runs", dataset=two)
     gold = pathlib.Path(one) / "gold" / "a-p0.json"
     gold.write_text(gold.read_text().replace('"alpha"', '"beta"'))
-    for f in (data.check_dataset, data.read_manifest, benchmark.tests): f.cache_clear()
+    for f in (data.check_dataset, data.read_manifest, benchmark._tests): f.cache_clear()
     graded = graded_pages(monkeypatch)
     (s,) = benchmark.execute(benchmark.plan(["stub"], out=tmp_path / "runs", dataset=one), say=QUIET).values()
     assert graded == ["a-p0"] and s["html"]["score"] == 0.0, "the stub still says alpha"
@@ -356,11 +356,18 @@ def test_outputs_must_be_distinct_known_output_types(tmp_path, outputs):
         data.read_manifest(ds)[1]
 
 
-def test_an_unknown_manifest_column_says_to_upgrade(tmp_path):
-    """What an older omni-parse-bench meets in a newer dataset: the fix is in the message."""
-    ds = dataset(tmp_path / "data", extra={"weight": "1"})
-    with pytest.raises(gold.GoldError, match="pip install -U omni-parse-bench"):
-        data.read_manifest(ds)[1]
+def test_a_manifest_column_of_its_own_is_carried_not_refused(tmp_path, monkeypatch):
+    """A dataset may carry columns omni-parse-bench doesn't read (a language, a tag, another gold), for
+    scorers of its own: they ride on the page, read-only, and the run is the same."""
+    ds = dataset(tmp_path / "data", extra={"weight": "1", "language": "tha"})
+    (page,) = data.read_manifest(ds)[1]
+    assert dict(page.extra) == {"weight": "1", "language": "tha"}
+    with pytest.raises(TypeError):
+        page.extra["weight"] = "2"
+    assert data.Page("p", "d", "s", "pages/p.pdf", "gold/p.json", ("html",)).extra == {}
+    use(monkeypatch, {"stub": stub()})
+    (s,) = benchmark.execute(benchmark.plan(["stub"], out=tmp_path / "runs", dataset=ds), say=QUIET).values()
+    assert s["html"]["score"] == 1.0
 
 
 # 5. The plan counts what will be predicted.
@@ -407,7 +414,7 @@ def test_a_renamed_test_is_a_gold_change(tmp_path, monkeypatch):
     benchmark.execute(p, say=QUIET)
     gold = pathlib.Path(ds) / "gold" / "a-p0.json"
     gold.write_text(gold.read_text().replace('"t0"', '"t0-renamed"'))
-    for f in (data.check_dataset, data.read_manifest, benchmark.tests): f.cache_clear()
+    for f in (data.check_dataset, data.read_manifest, benchmark._tests): f.cache_clear()
     (s,) = benchmark.execute(p._replace(score_only=True), say=QUIET).values()
     assert s["html"]["score"] == 1.0
     lines = [json.loads(x) for x in (p.runs[0].out / "scores.jsonl").read_text().splitlines()]

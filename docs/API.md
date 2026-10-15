@@ -417,7 +417,8 @@ predictions](#grading-your-own-predictions)), or loop over `score` (see [The dat
 ## The dataset
 
 ```
-manifest.parquet        one row per page: page_id, document, suite, doc_path, gt_path, outputs
+manifest.parquet        one row per page: page_id, document, suite, doc_path, gt_path, outputs; any other
+                        column is kept on the page as page.extra, unread
 pages/<page_id>.pdf     the page that gets sent (or .png)
 gold/<page_id>.json     its tests: {"tests": [...]}
 ```

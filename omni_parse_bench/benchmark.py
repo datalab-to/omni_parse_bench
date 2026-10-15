@@ -196,10 +196,16 @@ def gold_digest(page: data.Page) -> str:
     return h.hexdigest()[:16]
 
 
-@functools.cache
 def tests(page: data.Page) -> tuple[gold.Test, ...]:
     """The page's tests (`scorer.gold`), read once per process."""
-    return scorer.gold(page)
+    return _tests(page.page_id, page.gt_path, page.outputs)
+
+
+@functools.cache
+def _tests(page_id: str, gt_path: str, outputs: tuple[str, ...]) -> tuple[gold.Test, ...]:
+    # Note: keyed by what reading a page's tests depends on, since a page, holding its `extra`
+    # columns, can't be hashed.
+    return scorer.gold(data.Page(page_id, "", "", "", gt_path, outputs))
 
 
 def configurations(providers: list[str], options: dict | None = None) -> list[tuple[str, dict]]:
