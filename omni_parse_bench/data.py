@@ -19,13 +19,13 @@ its gold are without the dataset beside it. The functions over a dataset:
 from __future__ import annotations
 
 import collections
+import dataclasses
 import functools
 import re
 import time
-import types
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any
 
 from omni_parse_bench import gold, scorer, vocab
 
@@ -48,20 +48,22 @@ OLD_DATASET = (
 _DOC_PATH = re.compile(r"pages/(.+)\.(?:pdf|png)")
 
 
-class Page(NamedTuple):
+@dataclasses.dataclass(frozen=True)
+class Page:
     """A row of the manifest, its paths full local paths (`read_manifest` resolves the manifest's, which are
     relative to the dataset folder), so a page's file and tests are read from the page alone.
 
-    `extra` holds the row's other columns, read-only: omni-parse-bench reads none of them, so a dataset
-    can carry columns of its own (a language, a tag, another gold) for scorers of its own. It makes a
-    page unhashable."""
+    `extra` holds the row's other columns: omni-parse-bench reads none of them, so a dataset can carry
+    columns of its own (a language, a tag, another gold) for scorers of its own. Treat it as read-only.
+    A frozen dataclass rather than a NamedTuple so each page gets its own `extra`; a copy with a field
+    changed is `dataclasses.replace(page, ...)`. A dict makes a page unhashable."""
     page_id: str
     document: str   # the source document: a page's tests pass or fail with its document's
     suite: str
     doc_path: str   # the page file: <dataset>/pages/<page_id>.pdf or .png
     gt_path: str    # its tests: <dataset>/gold/<page_id>.json
     outputs: tuple[str, ...]    # what to predict: the output types its tests read (`gold.wants`), sorted
-    extra: Mapping[str, Any] = types.MappingProxyType({})   # the manifest's other columns, by name
+    extra: dict[str, Any] = dataclasses.field(default_factory=dict)   # the manifest's other columns
 
     @property
     def id(self) -> str:
@@ -132,8 +134,8 @@ def read_manifest(dataset: str | Path) -> tuple[Path, tuple[Page, ...]]:
     table = pq.read_table(root / MANIFEST)
     if "outputs" not in table.column_names:
         raise gold.GoldError(OLD_DATASET.format(root=root))
-    rows = tuple((p := page(r))._replace(doc_path=str(root / p.doc_path), gt_path=str(root / p.gt_path))
-                 for r in table.to_pylist())
+    rows = tuple(dataclasses.replace(p := page(r), doc_path=str(root / p.doc_path),
+                                     gt_path=str(root / p.gt_path)) for r in table.to_pylist())
     if twice := [i for i, n in collections.Counter(p.page_id for p in rows).items() if n > 1]:
         raise gold.GoldError(f"{len(twice)} page ids are in the manifest more than once, e.g. {twice[:3]}")
     return root, rows
@@ -202,6 +204,6 @@ def page(r: Mapping[str, Any]) -> Page:
             or len(set(outputs)) != len(outputs)):
         raise gold.GoldError(f"{where}: outputs must be a non-empty list of distinct output types from "
                              f"{sorted(OUTPUTS)}, not {outputs!r}")
-    extra = types.MappingProxyType({k: v for k, v in r.items() if k not in PAGE_FIELDS})
+    extra = {k: v for k, v in r.items() if k not in PAGE_FIELDS}
     return Page(r["page_id"], r["document"], r["suite"], r["doc_path"], r["gt_path"], tuple(sorted(outputs)),
                 extra)

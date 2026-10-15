@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import pytest
 
+import dataclasses
+
 from omni_parse_bench import data, gold, scorer, runners, score, summarize, views
 from omni_parse_bench.scorer import lines
 
@@ -129,7 +131,7 @@ def test_each_score_counts_the_documents_its_tests_are_from():
     s = summarize(lines(half(tests), tests), pages)
     assert s["html"]["documents"] == s["html"]["per_tag"]["table"]["documents"] == 9
     assert s["headline"]["documents"] == 9 and s["headline"]["families"]["text"]["documents"] == 9
-    one = [p._replace(document="d") for p in pages]
+    one = [dataclasses.replace(p, document="d") for p in pages]
     assert summarize(lines(half(tests), tests), one)["html"]["documents"] == 1
     assert "documents" not in summarize(lines(half(tests), tests))["html"]
     assert "interval" not in s["html"] and "interval" not in s["headline"]

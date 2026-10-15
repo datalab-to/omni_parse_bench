@@ -238,7 +238,7 @@ def test_the_names_that_moved_to_data_still_work_and_warn(tmp_path):
         assert gold.Page is data.Page
     with pytest.warns(DeprecationWarning, match=r"data\.read_manifest"):
         root, pages = benchmark.manifest(ds)
-    raw = pages[0]._replace(gt_path="gold/a-p0.json")
+    raw = dataclasses.replace(pages[0], gt_path="gold/a-p0.json")
     with pytest.warns(DeprecationWarning, match=r"scorer\.gold"):
         assert gold.tests(root, raw) == benchmark.tests(pages[0])
     with pytest.warns(DeprecationWarning, match=r"data\.check_dataset"):
@@ -358,13 +358,12 @@ def test_outputs_must_be_distinct_known_output_types(tmp_path, outputs):
 
 def test_a_manifest_column_of_its_own_is_carried_not_refused(tmp_path, monkeypatch):
     """A dataset may carry columns omni-parse-bench doesn't read (a language, a tag, another gold), for
-    scorers of its own: they ride on the page, read-only, and the run is the same."""
+    scorers of its own: they ride on the page, and the run is the same."""
     ds = dataset(tmp_path / "data", extra={"weight": "1", "language": "tha"})
     (page,) = data.read_manifest(ds)[1]
-    assert dict(page.extra) == {"weight": "1", "language": "tha"}
-    with pytest.raises(TypeError):
-        page.extra["weight"] = "2"
-    assert data.Page("p", "d", "s", "pages/p.pdf", "gold/p.json", ("html",)).extra == {}
+    assert page.extra == {"weight": "1", "language": "tha"}
+    bare = [data.Page("p", "d", "s", "pages/p.pdf", "gold/p.json", ("html",)) for _ in range(2)]
+    assert bare[0].extra == {} and bare[0].extra is not bare[1].extra, "each page has its own"
     use(monkeypatch, {"stub": stub()})
     (s,) = benchmark.execute(benchmark.plan(["stub"], out=tmp_path / "runs", dataset=ds), say=QUIET).values()
     assert s["html"]["score"] == 1.0

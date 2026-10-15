@@ -33,6 +33,7 @@ work, with a DeprecationWarning, and will be removed in a later release.
 from __future__ import annotations
 
 import collections
+import dataclasses
 import functools
 import json
 import re
@@ -106,7 +107,7 @@ def tests(root: str | Path, p: Any) -> tuple[Test, ...]:
     from omni_parse_bench import scorer
 
     _deprecated("gold.tests(root, page)", "scorer.gold(page)")
-    return scorer.gold(p._replace(gt_path=str(Path(root).expanduser() / p.gt_path)))
+    return scorer.gold(dataclasses.replace(p, gt_path=str(Path(root).expanduser() / p.gt_path)))
 
 
 def _deprecated(old: str, new: str) -> None:
