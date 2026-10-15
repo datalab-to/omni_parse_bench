@@ -349,7 +349,7 @@ benchmark.grade(run, every)
 - `record(run, page_id, result)` writes: it merges a new result (a record from `predict`) into what
   the run has for the page, writes it and its prediction, and returns what it kept;
 - `recorded(run, page_id)` reads the page's record (its calls, for an audit), or None;
-- `predicted(run, page_id)` reads the page's outputs and their digest, or None: what grading reads; and
+- `predicted(run, page_id)` reads the page's outputs, or None: what grading reads; and
 - `grade(run, pages)` grades the pages of `pages` predicted so far (pass the whole dataset,
   `manifest(dataset)[1]`, so a smaller loop never shrinks a run's scores), writes `scores.jsonl` and
   `summary.json`, and returns the summary. A page with no prediction is pending, not failed; a run
@@ -427,8 +427,8 @@ The dataset is read by `data`, and a page's tests by `scorer.gold`:
 data.download_dataset(dataset)  # a local copy: an hf:// dataset downloaded whole; a folder as it is
 data.read_manifest(dataset)     # (folder, pages): every page, its file and gold as full local paths
 data.select(pages, ...)         # the pages to run: by suite, by id, sampled or limited
-data.check_dataset(dataset)     # (pages, tests): everything, checked across the dataset, for publishing
-scorer.gold(page)               # one page's tests, from its gold file (`page.gt_path`)
+scorer.gold(page)               # one page's tests, from its gold file (`page.gt_path`), checked
+scorer.check(pages)             # every page's tests, and the dataset as a whole, checked: for publishing
 ```
 
 Each needs the benchmark extra, for parquet.
@@ -619,8 +619,7 @@ and cost:
  "credits": 0}
 ```
 
-- `scorer` is the package version and a digest of its scoring code, which graded it (each line in
-  `scores.jsonl` also says which gold it was graded against);
+- `scorer` is the package version and a digest of its scoring code, which graded it;
 - `pages` is how many pages were graded, and `pages_pending` how many of the dataset's pages have
   no prediction yet; and
 - `usd` and `credits` are what the vendor said the calls cost.
@@ -646,10 +645,10 @@ One line per test, in manifest order: its verdict, what the test is, and the sta
  "suite": "olmo_arxiv_math", "document": "olmo_arxiv_math:2502.15977",
  "test_id": "2502.15977_pg21_math_003", "test_type": "present", "output_type": "html",
  "derivation": "upstream_olmocr", "tags": ["math"], "result": "pass", "why": "",
- "prediction": "5f0c...", "gold": "fb8cb369b9538d1a", "scorer": "0.2.0+f5c5ce802b77"}
+ "scorer": "0.2.0+f5c5ce802b77"}
 ```
 
 - `run` and `provider` name the run (its folder) and its provider; `settings.json` has the rest;
 - `page_id` to `tags` say what the test is (`opb tests` writes the same, its id as `id`);
 - `result` is `pass`, `fail`, `unsupported` or `error`, and `why` says what went wrong; and
-- `prediction`, `gold` and `scorer` stamp what was graded and by what.
+- `scorer` says which scoring code graded the line.

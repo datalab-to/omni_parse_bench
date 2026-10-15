@@ -231,7 +231,7 @@ derivation is `model_panel`.
    the structure (publisher XML, form fields, pages you authored) over readings of the image.
 3. For each fact, pick the test type, fill its roles from the source, pick each arg's kind, and set
    the settings.
-4. Check the dataset with `data.check_dataset` (or `opb tests --dataset <folder>`). It rejects args with the
+4. Check the dataset with `scorer.check(data.read_manifest(folder)[1])` (or `opb tests --dataset <folder>`). It rejects args with the
    wrong keys, roles a type doesn't allow, kinds a role can't compare, values outside the vocabulary
    (a tag must be a vocabulary tag, a language code or a script code), and a `max_diffs` that would
    let any output pass. Fix or drop what it rejects.

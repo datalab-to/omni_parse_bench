@@ -26,7 +26,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from omni_parse_bench import benchmark, data, progress, vocab
+from omni_parse_bench import benchmark, data, progress, scorer, vocab
 
 # command -> the extra it needs; `score` needs none.
 EXTRAS = {"predict": "harness", "providers": "harness", "reparse": "harness", "benchmark": "benchmark",
@@ -82,7 +82,8 @@ def cmd_score(a: argparse.Namespace) -> int:
 def cmd_tests(a: argparse.Namespace) -> int:
     """Every test of a dataset as a JSON line, with its page's id, suite and document: a flat table
     to query (polars, DuckDB, pandas), made from the gold files and never stored."""
-    pages, _ = data.check_dataset(a.dataset)   # Note: first, so only a dataset that checks is written out.
+    _, pages = data.read_manifest(a.dataset)
+    scorer.check(pages)   # Note: first, so only a dataset that checks is written out.
     for p in pages:
         for t in json.loads(Path(p.gt_path).read_text())["tests"]:
             row = {"id": t["id"], "page_id": p.page_id, "suite": p.suite, "document": p.document} | t

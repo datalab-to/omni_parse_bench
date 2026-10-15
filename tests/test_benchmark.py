@@ -19,7 +19,7 @@ pytest.importorskip("openai")
 
 import httpx  # noqa: E402
 
-from omni_parse_bench import benchmark, cli, data, gold, harness  # noqa: E402
+from omni_parse_bench import benchmark, cli, data, gold, harness, scorer  # noqa: E402
 from omni_parse_bench.harness import budget, contract, errors, page, registry  # noqa: E402
 from omni_parse_bench.harness.providers import azure, extend, reducto  # noqa: E402
 
@@ -241,29 +241,11 @@ def test_a_run_folder_holds_one_dataset_and_a_changed_gold_grades_its_page_again
         benchmark.plan(["stub"], out=tmp_path / "runs", dataset=two)
     gold = pathlib.Path(one) / "gold" / "a-p0.json"
     gold.write_text(gold.read_text().replace('"alpha"', '"beta"'))
-    for f in (data.check_dataset, data.read_manifest, benchmark._tests): f.cache_clear()
+    data.read_manifest.cache_clear()
+    benchmark._TESTS.clear()
     graded = graded_pages(monkeypatch)
     (s,) = benchmark.execute(benchmark.plan(["stub"], out=tmp_path / "runs", dataset=one), say=QUIET).values()
     assert graded == ["a-p0"] and s["html"]["score"] == 0.0, "the stub still says alpha"
-    (line,) = [json.loads(x) for x in (run.out / "scores.jsonl").read_text().splitlines()]
-    (page,) = data.read_manifest(one)[1]
-    assert line["gold"] == benchmark.gold_digest(page)
-
-
-def test_a_dataset_change_that_grades_nothing_differently_is_the_same_gold(tmp_path):
-    """A card, a results table or the derived outputs column change the commit, not the gold."""
-    def digest(d):
-        (page,) = data.read_manifest(d)[1]
-        return benchmark.gold_digest(page)
-    a = dataset(tmp_path / "a")
-    b = dataset(tmp_path / "b", outputs=["html"])
-    assert digest(a) == digest(b)
-    c = dataset(tmp_path / "c")
-    g = pathlib.Path(c) / "gold" / "a-p0.json"
-    g.write_text(g.read_text().replace('"alpha"', '"beta"'))
-    assert digest(c) != digest(a)
-
-
 
 
 def test_each_call_keeps_the_timeout_it_ran_under(tmp_path, monkeypatch):
@@ -321,7 +303,7 @@ def test_a_dataset_from_before_outputs_says_how_to_get_the_current_one(tmp_path)
 def test_outputs_out_of_step_with_the_gold_are_refused(tmp_path):
     ds = dataset(tmp_path / "data", blocks=True, outputs=["html"])
     with pytest.raises(gold.GoldError, match="out of step with the gold"):
-        data.check_dataset(ds)
+        scorer.check(data.read_manifest(ds)[1])
 
 
 @pytest.mark.parametrize("outputs", [[], ["html", "html"], ["html", "pdf"]])
@@ -390,7 +372,8 @@ def test_a_renamed_test_is_a_gold_change(tmp_path, monkeypatch):
     benchmark.execute(p, say=QUIET)
     gold = pathlib.Path(ds) / "gold" / "a-p0.json"
     gold.write_text(gold.read_text().replace('"t0"', '"t0-renamed"'))
-    for f in (data.check_dataset, data.read_manifest, benchmark._tests): f.cache_clear()
+    data.read_manifest.cache_clear()
+    benchmark._TESTS.clear()
     (s,) = benchmark.execute(p._replace(score_only=True), say=QUIET).values()
     assert s["html"]["score"] == 1.0
     lines = [json.loads(x) for x in (p.runs[0].out / "scores.jsonl").read_text().splitlines()]
@@ -666,8 +649,7 @@ def test_scores_are_one_line_per_test_with_what_the_test_is(tmp_path, monkeypatc
     lines = [json.loads(x) for x in (run.out / "scores.jsonl").read_text().splitlines()]
     assert [x["page_id"] for x in lines] == ["a-p0", "a-p1"]
     assert list(lines[0]) == ["run", "provider", "page_id", "suite", "document", "test_id", "test_type",
-                              "output_type", "derivation", "tags", "result", "why", "prediction", "gold",
-                              "scorer"]
+                              "output_type", "derivation", "tags", "result", "why", "scorer"]
     assert lines[0]["run"] == run.out.name and lines[0]["provider"] == "stub"
 
 
@@ -689,7 +671,7 @@ def test_a_runs_scores_are_summarized_as_they_are_on_disk(tmp_path, monkeypatch)
 def graded_pages(monkeypatch) -> list[str]:
     """The pages `grade_page` is called on, in order, from here on."""
     graded, real = [], benchmark.grade_page
-    monkeypatch.setattr(benchmark, "grade_page", lambda *a: graded.append(a[3].page_id) or real(*a))
+    monkeypatch.setattr(benchmark, "grade_page", lambda *a: graded.append(a[2].page_id) or real(*a))
     return graded
 
 
@@ -706,7 +688,7 @@ def test_a_lost_line_comes_back_on_the_next_grading(tmp_path, monkeypatch):
     assert [json.loads(x)["test_id"] for x in path.read_text().splitlines()] == ["t0", "k0", "t1", "k1"]
 
 
-def test_a_line_missing_a_column_is_graded_again_not_a_crash(tmp_path, monkeypatch):
+def test_a_broken_scores_file_is_written_over_not_a_crash(tmp_path, monkeypatch):
     use(monkeypatch, {"stub": stub()})
     p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data", 2))
     benchmark.execute(p, say=QUIET)

@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import collections
 import concurrent.futures as cf
-import functools
 import hashlib
 import importlib.metadata
 import json
@@ -136,12 +135,12 @@ def recorded(run: Run, page_id: str) -> dict | None:
     got = _read(run.records / f"{page_id}.json",
                 lambda r: isinstance(r, dict) and isinstance(r.get("outputs"), dict) and "calls" in r,
                 "a record")
-    return None if got is None else got[0]
+    return got
 
 
-def predicted(run: Run, page_id: str) -> tuple[dict, str] | None:
-    """The page's outputs (`predictions/`), `{output type: its value, or None when it failed}`, and the
-    digest of their file, which grading stamps; None when it has none (or none readable)."""
+def predicted(run: Run, page_id: str) -> dict | None:
+    """The page's outputs (`predictions/`), `{output type: its value, or None when it failed}`; None
+    when it has none (or none readable)."""
     return _read(run.predictions / f"{page_id}.json",
                  lambda o: isinstance(o, dict) and set(o) <= set(vocab.OUTPUT_TYPES),
                  f"a prediction (an object whose keys are among {list(vocab.OUTPUT_TYPES)})")
@@ -179,30 +178,19 @@ class Plan(NamedTuple):
     retry_failed: bool = False
 
 
-def gold_digest(page: data.Page) -> str:
-    """Which gold a page is graded against: a digest of what grading reads, its id, document and suite
-    (they decide the counts) and its gold file, stamped on each of its score lines. So a dataset commit
-    that changes nothing graded (a card, a results table, the derived `outputs` column) is the same gold."""
-    h = hashlib.sha256(json.dumps([page.page_id, page.document, page.suite]).encode())
-    h.update(Path(page.gt_path).read_bytes())
-    return h.hexdigest()[:16]
-
-
 def tests(page: data.Page) -> tuple[gold.Test, ...]:
     """The page's tests (`scorer.gold`), read once per process.
 
     Note: cached because reading them is the slow part of grading (each LaTeX arg is rendered by
     KaTeX: about 2 s for the whole dataset), and one invocation reads them once per run. The cache
     keys on the page's gold file, not its contents, so a gold file edited in a process that has
-    already read it isn't read again: restart the process, or `_tests.cache_clear()`."""
-    return _tests(page.page_id, page.gt_path, page.outputs)
+    already read it isn't read again: restart the process, or `_TESTS.clear()`."""
+    if page.gt_path not in _TESTS:
+        _TESTS[page.gt_path] = scorer.gold(page)
+    return _TESTS[page.gt_path]
 
 
-@functools.cache
-def _tests(page_id: str, gt_path: str, outputs: tuple[str, ...]) -> tuple[gold.Test, ...]:
-    # Note: keyed by what reading a page's tests depends on, since a page, holding its `extra`
-    # columns, can't be hashed.
-    return scorer.gold(data.Page(page_id, "", "", "", gt_path, outputs))
+_TESTS: dict[str, tuple[gold.Test, ...]] = {}   # `tests`, by gold file
 
 
 def configurations(providers: list[str], options: dict | None = None) -> list[tuple[str, dict]]:
@@ -318,12 +306,11 @@ def read_json(path: Path) -> Any:
         return None
 
 
-def _read(path: Path, valid: Callable[[Any], bool], what: str) -> tuple[Any, str] | None:
-    """A run file's contents and the digest of its text; None when it's absent, or unreadable or not
-    `what` (logged), which makes its page one not predicted."""
+def _read(path: Path, valid: Callable[[Any], bool], what: str) -> Any:
+    """A run file's contents; None when it's absent, or unreadable or not `what` (logged), which makes its
+    page one not predicted."""
     try:
-        text = path.read_text()
-        got = json.loads(text)
+        got = json.loads(path.read_text())
     except FileNotFoundError:
         return None
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
@@ -332,7 +319,7 @@ def _read(path: Path, valid: Callable[[Any], bool], what: str) -> tuple[Any, str
     if not valid(got):
         log.warning("%s isn't %s; its page counts as not predicted", path, what)
         return None
-    return got, digest(text)
+    return got
 
 
 def unsupported(run: Run) -> frozenset[str]:
@@ -460,20 +447,14 @@ def merged(old: dict, new: dict) -> dict:
                            "calls": calls + new["calls"], "raw": old.get("raw", []) + new.get("raw", [])}
 
 
-def digest(text: str) -> str:
-    """A prediction's digest, kept on its page's score lines: which prediction they grade."""
-    return hashlib.sha256(text.encode()).hexdigest()[:16]
-
-
-def grade_page(r: Run, outputs: dict, prediction: str, page: data.Page, ts: Sequence[gold.Test],
+def grade_page(r: Run, outputs: dict, page: data.Page, ts: Sequence[gold.Test],
                cannot: frozenset[str]) -> list[dict]:
     """One page's score lines (`scorer.lines`), one per test: the verdict beside what its test is, so a
-    run's scores are a table to query as they stand, stamped with what they grade and what graded them.
+    run's scores are a table to query as they stand, stamped with the scoring code that graded them.
     `cannot` is what the run's system can't produce (`unsupported`)."""
     head = {"run": r.out.name, "provider": r.provider, "page_id": page.page_id, "suite": page.suite,
             "document": page.document}
-    stamps = {"prediction": prediction, "gold": gold_digest(page), "scorer": SCORER}
-    return [head | x | stamps for x in scorer.lines(scorer.score(outputs, ts, cannot), ts)]
+    return [head | x | {"scorer": SCORER} for x in scorer.lines(scorer.score(outputs, ts, cannot), ts)]
 
 
 def errors_in(summary: dict) -> int:
@@ -503,9 +484,9 @@ def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = pri
 
     Every page is graded fresh, every time, and scores.jsonl and summary.json are written whole once it
     finishes: they are always one grading's, of `pages`, never a mix. An interrupted grading writes
-    nothing, so the last finished one's files stand. Each line says which prediction, gold and scorer it
-    graded. A run that was never prepared is refused: its folder is most likely another one (another
-    option, another --out)."""
+    nothing, so the last finished one's files stand. Each line says which scorer graded it. A run that
+    was never prepared is refused: its folder is most likely another one (another option, another
+    --out)."""
     if not run.predictions.is_dir():
         raise ValueError(f"no run at {run.out}: {run.provider} with settings {run.options or 'by default'} "
                          "was never prepared there (it has no predictions/). Check --out and --options, or "
@@ -513,10 +494,9 @@ def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = pri
     cannot = unsupported(run)
     lines, calls, graded = [], [], 0
     for g in pages:
-        if (got := predicted(run, g.page_id)) is None: continue
-        outputs, text = got
+        if (outputs := predicted(run, g.page_id)) is None: continue
         if (rec := recorded(run, g.page_id)) is not None: calls += rec["calls"]
-        lines += grade_page(run, outputs, text, g, tests(g), cannot)
+        lines += grade_page(run, outputs, g, tests(g), cannot)
         graded += 1
     write_text(run.out / "scores.jsonl", "".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines))
     summary = scorer.summarize(lines, pages)

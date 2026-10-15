@@ -35,6 +35,7 @@ from __future__ import annotations
 import collections
 import statistics
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 # Note: imported as `_gold`, since `gold` here is the function that reads a page's gold.
@@ -69,6 +70,23 @@ def gold(page: data.Page) -> tuple[_gold.Test, ...]:
                               f"{list(page.outputs)}, but its tests read {sorted(_gold.wants(ts))}; the "
                               "manifest is out of step with the gold")
     return ts
+
+
+def check(pages: Sequence[data.Page]) -> tuple[_gold.Test, ...]:
+    """Every test of `pages` (a dataset's, `data.read_manifest`), each page's checked (`gold`), and the
+    dataset as a whole: a gold file with no page, a test id used twice, and a page with no tests are
+    refused. What publishing a dataset checks, and `opb tests` writes; grading needs none of it."""
+    named = {Path(p.gt_path).name for p in pages}
+    folders = {Path(p.gt_path).parent for p in pages}
+    if stray := sorted(f.name for d in folders for f in d.glob("*.json") if f.name not in named):
+        raise _gold.GoldError(f"{len(stray)} gold files have no manifest row, e.g. {stray[:3]}")
+    every = tuple(t for p in pages for t in gold(p))
+    if twice := [i for i, n in collections.Counter(t.id for t in every).items() if n > 1]:
+        raise _gold.GoldError(f"{len(twice)} test ids are used more than once, e.g. {twice[:3]}")
+    if empty := sorted({p.page_id for p in pages} - {t.page_id for t in every}):
+        raise _gold.GoldError(f"{len(empty)} pages have no tests, e.g. {empty[:3]}; remove them or give "
+                              "them tests")
+    return every
 
 
 def score(outputs: Mapping[str, Any], tests: Sequence[_gold.Test],

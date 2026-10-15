@@ -10,11 +10,10 @@ its gold are without the dataset beside it. The functions over a dataset:
     download_dataset(dataset)    a local copy of the whole dataset; a local folder as it is
     read_manifest(dataset)       the folder and every page, checked; reads the manifest alone
     select(pages, ...)           the pages to run: by suite or id, sampled, limited
-    check_dataset(dataset)       every page and every test, checked across the dataset, for publishing
     dataset_id(dataset)          what a run's dataset is, whatever its revision
 
-`dataset` is a folder's path or `hf://datasets/<repo>[@<revision>]`. `read_manifest` and
-`check_dataset` read once per process.
+`dataset` is a folder's path or `hf://datasets/<repo>[@<revision>]`. `read_manifest` reads once per
+process. Checking every test of a dataset is `scorer.check(pages)`.
 """
 from __future__ import annotations
 
@@ -27,7 +26,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from omni_parse_bench import gold, scorer, vocab
+from omni_parse_bench import gold, vocab
 
 HF_PREFIX = "hf://datasets/"
 DEFAULT_DATASET = "hf://datasets/datalab-to/omni_parse_bench"
@@ -167,25 +166,6 @@ def select(pages: Sequence[Page], suites: list[str] | None = None, limit: int = 
         chosen = {r.page_id for r in turns[:sample]}
         rows = tuple(r for r in rows if r.page_id in chosen)
     return rows[:limit] if limit else rows
-
-
-@functools.cache
-def check_dataset(dataset: str | Path) -> tuple[tuple[Page, ...], tuple[gold.Test, ...]]:
-    """Every page of the dataset and every test, checked, each page's tests in its gold file's order: what
-    publishing a dataset checks, and `opb tests` writes. A page's `outputs` is checked against its tests,
-    and the dataset as a whole: a gold file with no manifest row, a test id used twice, and a page with
-    no tests are refused. Grading needs none of it: it reads each page's tests when it grades the page."""
-    root, rows = read_manifest(str(dataset))
-    named = {Path(p.gt_path).name for p in rows}
-    if stray := sorted(f.name for f in (root / "gold").glob("*.json") if f.name not in named):
-        raise gold.GoldError(f"{len(stray)} gold files have no manifest row, e.g. {stray[:3]}")
-    every = tuple(t for p in rows for t in scorer.gold(p))
-    if twice := [i for i, n in collections.Counter(t.id for t in every).items() if n > 1]:
-        raise gold.GoldError(f"{len(twice)} test ids are used more than once, e.g. {twice[:3]}")
-    if empty := sorted({p.page_id for p in rows} - {t.page_id for t in every}):
-        raise gold.GoldError(f"{len(empty)} pages have no tests, e.g. {empty[:3]}; remove them or give "
-                             "them tests")
-    return rows, every
 
 
 def page(r: Mapping[str, Any]) -> Page:

@@ -32,7 +32,7 @@ def fixture_tests() -> tuple[gold.Test, ...]:
 def tests(request) -> tuple[gold.Test, ...]:
     if request.param == "fixture": return fixture_tests()
     if not (DATASET / data.MANIFEST).exists(): pytest.skip("set OPB_DATASET to a dataset root")
-    return data.check_dataset(DATASET)[1]
+    return scorer.check(data.read_manifest(DATASET)[1])
 
 
 def answer(t: gold.Test) -> dict[str, Any]:
