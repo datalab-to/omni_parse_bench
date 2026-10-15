@@ -37,7 +37,6 @@ from __future__ import annotations
 import collections
 import statistics
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 from omni_parse_bench import views, vocab
@@ -79,19 +78,19 @@ def gold(page: data.Page) -> tuple[_tests.Test, ...]:
 
 
 def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
-    """Every test of `pages` (a dataset's, `data.read_manifest`), each page's checked (`gold`), and the
-    dataset as a whole: a gold file with no page, a test id used twice, and a page with no tests are
-    refused. What publishing a dataset checks, and `opb tests` writes; grading needs none of it."""
-    named = {Path(p.gt_path).name for p in pages}
-    folders = {Path(p.gt_path).parent for p in pages}
-    if stray := sorted(f.name for d in folders for f in d.glob("*.json") if f.name not in named):
-        raise _tests.GoldError(f"{len(stray)} gold files have no manifest row, e.g. {stray[:3]}")
+    """Every test of `pages` (a manifest's, `data.read_manifest`), each page's checked (`gold`), and what
+    no single page can show: a test id used twice, and a page with no tests. What publishing a dataset
+    checks, and `opb tests` writes; grading needs none of it.
+
+    Note: a gold file no manifest names is not refused here: a dataset may hold several manifests (a
+    sample beside the whole), each naming some of the gold files, so one manifest can't say a file is
+    stray."""
     every = tuple(t for p in pages for t in gold(p))
     if twice := [i for i, n in collections.Counter(t.id for t in every).items() if n > 1]:
         raise _tests.GoldError(f"{len(twice)} test ids are used more than once, e.g. {twice[:3]}")
     if empty := sorted({p.page_id for p in pages} - {t.page_id for t in every}):
         raise _tests.GoldError(f"{len(empty)} pages have no tests, e.g. {empty[:3]}; remove them or give "
-                              "them tests")
+                               "them tests")
     return every
 
 

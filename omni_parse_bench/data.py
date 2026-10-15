@@ -8,7 +8,7 @@ A page is a manifest row (`Page`) whose paths are full local paths, so a page sa
 its gold are without the dataset beside it. The functions over a dataset:
 
     download_dataset(dataset)    a local copy of the whole dataset; a local folder as it is
-    read_manifest(dataset)       the folder and every page, checked; reads the manifest alone
+    read_manifest(dataset, ...)  the folder and every page of a manifest, checked; reads the manifest alone
     select(pages, ...)           the pages to run: by suite or id, sampled, limited
     dataset_id(dataset)          what a run's dataset is, whatever its revision
 
@@ -20,7 +20,6 @@ from __future__ import annotations
 import collections
 import dataclasses
 import functools
-import re
 import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -44,7 +43,6 @@ OLD_DATASET = (
     "  - a downloaded copy: download it again: "
     "hf download datalab-to/omni_parse_bench --repo-type dataset --local-dir <folder>; or\n"
     "  - to keep this copy, use the omni-parse-bench made for it: pip install 'omni-parse-bench==0.1.1'")
-_DOC_PATH = re.compile(r"pages/(.+)\.(?:pdf|png)")
 
 
 
@@ -85,8 +83,8 @@ def download_dataset(dataset: str | Path) -> Path:
     """
     if not str(dataset).startswith(HF_PREFIX):
         root = Path(dataset).expanduser()
-        if not (root / MANIFEST).exists():
-            raise FileNotFoundError(f"no {MANIFEST} in {root}; pass --dataset a dataset folder "
+        if not root.is_dir():
+            raise FileNotFoundError(f"no dataset folder at {root}; pass --dataset a dataset folder "
                                     f"or {HF_PREFIX}<repo>")
         return root
     from huggingface_hub import errors as hf_errors
@@ -124,7 +122,7 @@ def dataset_id(dataset: str | Path) -> str:
 
 
 @functools.cache
-def read_manifest(dataset: str | Path) -> tuple[Path, tuple[Page, ...]]:
+def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, tuple[Page, ...]]:
     """The dataset's folder (`download_dataset`) and its pages, checked, each with what to predict for it,
     and its file and gold as full paths. It reads the manifest alone: no gold file is opened. Its columns
     must include `PAGE_FIELDS`; any other column is carried on each page's `extra`, never refused."""
@@ -134,7 +132,11 @@ def read_manifest(dataset: str | Path) -> tuple[Path, tuple[Page, ...]]:
         raise ImportError("omni-parse-bench reads the manifest with pyarrow: "
                           "pip install 'omni-parse-bench[benchmark]'") from None
     root = download_dataset(dataset).resolve()
-    table = pq.read_table(root / MANIFEST)
+    if not (root / manifest).is_file():
+        raise ManifestError(f"no manifest {manifest} in {root}. A dataset holds manifest.parquet, and may "
+                            "hold others (e.g. manifests/sample.parquet), each naming its pages; pass "
+                            "--manifest one")
+    table = pq.read_table(root / manifest)
     if "outputs" not in table.column_names:
         raise ManifestError(OLD_DATASET.format(root=root))
     rows = tuple(dataclasses.replace(p := _page(r), doc_path=str(root / p.doc_path),
@@ -179,10 +181,12 @@ def _page(r: Mapping[str, Any]) -> Page:
         raise ManifestError(f"{where} lacks {missing}")
     if not all(isinstance(r[f], str) and r[f].strip() for f in NAMES):
         raise ManifestError(f"{where}: {list(NAMES)} must be non-empty strings")
-    if not ((m := _DOC_PATH.fullmatch(r["doc_path"])) and m[1] == r["page_id"]):
-        raise ManifestError(f"{where}: doc_path must be pages/<page_id>.pdf or .png, not {r['doc_path']!r}")
-    if r["gt_path"] != f"gold/{r['page_id']}.json":
-        raise ManifestError(f"{where}: gt_path must be gold/<page_id>.json, not {r['gt_path']!r}")
+    if not _inside(r["doc_path"], r["page_id"], (".pdf", ".png")):
+        raise ManifestError(f"{where}: doc_path must be a path inside the dataset named <page_id>.pdf or "
+                            f".png, e.g. pages/{r['page_id']}.pdf, not {r['doc_path']!r}")
+    if not _inside(r["gt_path"], r["page_id"], (".json",)):
+        raise ManifestError(f"{where}: gt_path must be a path inside the dataset named <page_id>.json, "
+                            f"e.g. gold/{r['page_id']}.json, not {r['gt_path']!r}")
     outputs = r["outputs"]
     if (not isinstance(outputs, list | tuple) or not outputs or not set(outputs) <= OUTPUTS
             or len(set(outputs)) != len(outputs)):
@@ -191,3 +195,12 @@ def _page(r: Mapping[str, Any]) -> Page:
     extra = {k: v for k, v in r.items() if k not in PAGE_FIELDS}
     return Page(r["page_id"], r["document"], r["suite"], r["doc_path"], r["gt_path"], tuple(sorted(outputs)),
                 extra)
+
+
+def _inside(path: str, page_id: str, suffixes: tuple[str, ...]) -> bool:
+    """Whether `path` is relative, stays inside the dataset, and names the page's file: `<page_id><suffix>`.
+
+    Note: the folder is free (gold/, transcripts/, ...), so one dataset's pages can carry golds of several
+    kinds, one manifest each; the name is not, so a page can't point at another page's file."""
+    p = Path(path)
+    return (not p.is_absolute() and ".." not in p.parts and p.suffix in suffixes and p.stem == page_id)

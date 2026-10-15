@@ -81,7 +81,7 @@ def cmd_score(a: argparse.Namespace) -> int:
 def cmd_tests(a: argparse.Namespace) -> int:
     """Every test of a dataset as a JSON line, with its page's id, suite and document: a flat table
     to query (polars, DuckDB, pandas), made from the gold files and never stored."""
-    _, pages = data.read_manifest(a.dataset)
+    _, pages = data.read_manifest(a.dataset, a.manifest)
     scorer.check(pages)   # Note: first, so only a dataset that checks is written out.
     for p in pages:
         for t in json.loads(Path(p.gt_path).read_text())["tests"]:
@@ -178,7 +178,8 @@ def cmd_benchmark(a: argparse.Namespace) -> int:
     # huggingface_hub 2 makes its requests through httpx2, whose logger is its own.
     for name in ("httpx", "httpx2", "httpcore", "openai", "huggingface_hub"):
         logging.getLogger(name).setLevel(logging.WARNING)
-    p = benchmark.plan(a.providers, out=a.out, dataset=a.dataset, suites=a.suites, limit=a.limit,
+    p = benchmark.plan(a.providers, out=a.out, dataset=a.dataset, manifest=a.manifest,
+                       suites=a.suites, limit=a.limit,
                        sample=a.sample, options=read_options(a.options), timeout=a.timeout,
                        workers=a.workers, score_only=a.score_only,
                        retry_failed=a.retry_failed,
@@ -208,7 +209,7 @@ def cmd_grade(a: argparse.Namespace) -> int:
         said = {"unsupported": sorted(set(a.unsupported))}
         benchmark._write_json(path, (benchmark._read_json(path) or {}) | said)
     run = benchmark.Run((benchmark._read_json(path) or {}).get("provider", out.name), {}, out)
-    _, pages = data.read_manifest(a.dataset)
+    _, pages = data.read_manifest(a.dataset, a.manifest)
     s = benchmark.grade(run, data.select(pages, a.suites), say=lambda m: print(m, file=sys.stderr))
     print(json.dumps({**{o: v["score"] for o, v in s.items() if isinstance(v, dict) and "score" in v},
                       "pages": s["pages"], "pending": s["pending"]}, indent=2))
@@ -263,6 +264,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     b.add_argument("--providers", nargs="+", required=True, metavar="NAME")
     b.add_argument("--dataset", default=data.DEFAULT_DATASET,
                    help="a dataset folder, or hf://datasets/<repo>[@revision]")
+    b.add_argument("--manifest", default=data.MANIFEST,
+                    help="which of the dataset's manifests: its pages, and where their gold is")
     b.add_argument("--out", type=Path, default=Path("runs"), help="where run directories go")
     b.add_argument("--suites", nargs="+", help="limit to these suites")
     b.add_argument("--limit", type=int, default=0, help="first N pages")
@@ -286,6 +289,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     g.add_argument("run", help="the folder holding predictions/ (and settings.json)")
     g.add_argument("--dataset", default=data.DEFAULT_DATASET,
                    help="a dataset folder, or hf://datasets/<repo>[@revision]")
+    g.add_argument("--manifest", default=data.MANIFEST,
+                    help="which of the dataset's manifests: its pages, and where their gold is")
     g.add_argument("--unsupported", nargs="*", metavar="OUTPUT", choices=vocab.OUTPUT_TYPES,
                    help="output types your system can't produce, once for the folder (kept in its "
                         "settings.json); their tests are unsupported, not failed")
@@ -295,6 +300,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     tt = sub.add_parser("tests", help="every test as a JSON line, with its page's suite and document")
     tt.add_argument("--dataset", default=data.DEFAULT_DATASET,
                     help="a dataset folder, or hf://datasets/<repo>[@revision]")
+    tt.add_argument("--manifest", default=data.MANIFEST,
+                     help="which of the dataset's manifests: its pages, and where their gold is")
 
     rp = sub.add_parser("reparse", help="read outputs again from saved answers, after a parsing fix")
     rp.add_argument("runs", nargs="+", type=Path, metavar="RUN_DIR")

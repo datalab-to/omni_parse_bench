@@ -184,7 +184,7 @@ def test_retry_failed_asks_again_only_what_may_go_otherwise(failure, error, agai
 
 def test_a_loop_of_ones_own_keeps_a_run_through_its_functions(tmp_path, monkeypatch):
     """prepare, needs, record and recorded: predict_all's bookkeeping, for a loop that predicts elsewhere."""
-    monkeypatch.setattr(data, "read_manifest", lambda d: (tmp_path / "gold-1", ()))
+    monkeypatch.setattr(data, "read_manifest", lambda d, m=data.MANIFEST: (tmp_path / "gold-1", ()))
     r = benchmark.Run("tesseract", {}, tmp_path / "run")
     benchmark.prepare(r, "some/dataset", 900.0)
     settings = json.loads((r.out / "settings.json").read_text())
@@ -822,3 +822,42 @@ def test_a_folder_of_your_own_graded_for_one_suite_counts_only_it(tmp_path, caps
     assert cli.main(["grade", str(mine), "--dataset", ds, "--suites", "a"]) == 0
     one = json.loads(capsys.readouterr().out)
     assert one["html"] == 1.0 and (one["pages"], one["pending"]) == (1, 0)
+
+
+def test_a_dataset_may_hold_several_manifests_over_the_same_pages(tmp_path, monkeypatch):
+    """A manifest names its pages and where their gold is, so one dataset's pages can carry golds of
+    several kinds, one manifest each, without copying a page."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    ds = pathlib.Path(dataset(tmp_path / "data", 2))
+    rows = pq.read_table(ds / "manifest.parquet").to_pylist()
+    (ds / "other").mkdir()
+    for r in rows:
+        (ds / "other" / f"{r['page_id']}.json").write_text((ds / r["gt_path"]).read_text())
+    (ds / "manifests").mkdir()
+    pq.write_table(pa.Table.from_pylist([r | {"gt_path": f"other/{r['page_id']}.json"} for r in rows[:1]]),
+                   ds / "manifests" / "one.parquet")
+    _, pages = data.read_manifest(ds, "manifests/one.parquet")
+    assert [p.gt_path for p in pages] == [str(ds.resolve() / "other" / "a-p0.json")]
+    assert pages[0].doc_path == data.read_manifest(ds)[1][0].doc_path, "the same page file"
+    use(monkeypatch, {"stub": stub()})
+    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=str(ds), manifest="manifests/one.parquet")
+    (s,) = benchmark.execute(p, say=QUIET).values()
+    assert s["pages"] == 1 and s["html"]["score"] == 1.0
+    assert json.loads((p.runs[0].out / "settings.json").read_text())["manifest"] == "manifests/one.parquet"
+    with pytest.raises(data.ManifestError, match="no manifest nope.parquet"):
+        data.read_manifest(ds, "nope.parquet")
+
+
+@pytest.mark.parametrize("column, value", [("gt_path", "/abs/a-p0.json"), ("gt_path", "../a-p0.json"),
+                                           ("gt_path", "gold/a-p1.json"), ("doc_path", "pages/a-p0.txt")])
+def test_a_path_must_stay_inside_the_dataset_and_name_its_page(tmp_path, column, value):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    ds = pathlib.Path(dataset(tmp_path / "data"))
+    rows = pq.read_table(ds / "manifest.parquet").to_pylist()
+    pq.write_table(pa.Table.from_pylist([rows[0] | {column: value}]), ds / "manifest.parquet")
+    with pytest.raises(data.ManifestError, match=f"{column} must be a path inside the dataset"):
+        data.read_manifest(ds)

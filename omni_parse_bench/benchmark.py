@@ -90,7 +90,7 @@ class Run(NamedTuple):
     The functions below are the bookkeeping of any loop over its pages, so a loop of your own (another
     machine, another scheduler) keeps a run exactly as `predict_all` does:
 
-        prepare(run, dataset, timeout)                # once: the folder, and settings.json
+        prepare(run, dataset, timeout, manifest)      # once: the folder, and settings.json
         need = needs(run, page)                       # the outputs the page's record still lacks
         record(run, page_id, harness.predict(...))    # the page's new result, merged and written
         grade(run, pages)                             # scores.jsonl and summary.json, as they stand
@@ -111,15 +111,15 @@ class Run(NamedTuple):
         return self.out / "predictions"
 
 
-def prepare(run: Run, dataset: str, timeout: float) -> None:
+def prepare(run: Run, dataset: str, timeout: float, manifest: str = data.MANIFEST) -> None:
     """The run's folder made, and what the run asks written to its settings.json, beside what it already
-    says: provider, settings, dataset (and the commit of a Hugging Face one), the timeout per call and the
-    outputs its provider can't produce (`unsupported`). What graded it is stamped on its score lines and
-    in summary.json."""
+    says: provider, settings, dataset (and the commit of a Hugging Face one), manifest, the timeout per call
+    and the outputs its provider can't produce (`unsupported`). What graded it is stamped on its score
+    lines and in summary.json."""
     from omni_parse_bench import harness
     from omni_parse_bench.harness import registry
 
-    root, _ = data.read_manifest(dataset)
+    root, _ = data.read_manifest(dataset, manifest)
     run.records.mkdir(parents=True, exist_ok=True)
     run.predictions.mkdir(exist_ok=True)
     commit = {"commit": root.name} if str(dataset).startswith(data.HF_PREFIX) else {}
@@ -127,7 +127,7 @@ def prepare(run: Run, dataset: str, timeout: float) -> None:
     _write_json(path, (_read_json(path) or {}) | {
         "run": run.out.name, "provider": run.provider,
         "settings": harness.settings_for(run.provider, run.options), "dataset": data.dataset_id(dataset),
-        **commit, "timeout_s": timeout,
+        **commit, "manifest": manifest, "timeout_s": timeout,
         "unsupported": sorted(set(vocab.OUTPUT_TYPES) - registry.adapter(run.provider).SUPPORTS)})
 
 
@@ -159,12 +159,12 @@ def needs(run: Run, page: data.Page, retry_failed: bool = False) -> frozenset[st
     return _missing(old, frozenset(page.outputs), retry_failed)
 
 
-def record(run: Run, page_id: str, new: dict) -> dict:
-    """A new record of the page made part of the run, and returned: merged into the old one if any
-    (`_merged`: the outputs asked again take the new outcome, every call is kept), its outputs written to
-    predictions/, then the record itself."""
+def record(run: Run, page_id: str, result: dict) -> dict:
+    """What `harness.predict` returned for the page made part of the run, and returned: merged into its old
+    record if any (`_merged`: the outputs asked again take the new outcome, every call is kept), its outputs
+    written to predictions/, then the record itself."""
     old = recorded(run, page_id)
-    kept = _merged(old, new) if old is not None else new
+    kept = _merged(old, result) if old is not None else result
     _write_json(run.predictions / f"{page_id}.json", kept["outputs"])
     _write_json(run.records / f"{page_id}.json", kept)
     return kept
@@ -174,6 +174,7 @@ class Plan(NamedTuple):
     runs: tuple[Run, ...]
     pages: tuple[data.Page, ...]
     dataset: str
+    manifest: str                      # which of the dataset's manifests: its pages, where their gold is
     timeout: float
     workers: int | Mapping[str, int]   # calls in flight: one number for every adapter, or per adapter
     score_only: bool
@@ -211,7 +212,8 @@ def configurations(providers: list[str], options: dict | None = None) -> list[tu
 
 
 def plan(providers: list[str], *, out: str | Path = Path("runs"), dataset: str = data.DEFAULT_DATASET,
-         suites: list[str] | None = None, limit: int = 0, sample: int = 0, options: dict | None = None,
+         manifest: str = data.MANIFEST, suites: list[str] | None = None, limit: int = 0, sample: int = 0,
+         options: dict | None = None,
          timeout: float = 0, workers: int = 0,
          score_only: bool = False, retry_failed: bool = False, only: frozenset[str] | None = None) -> Plan:
     """Every run this invocation makes, checked before any call: a bad option or provider fails here.
@@ -230,13 +232,13 @@ def plan(providers: list[str], *, out: str | Path = Path("runs"), dataset: str =
         raise ValueError(f"run {twice[0]} is asked for more than once: the same provider with the same "
                          "settings (an option set to its default is the same setting); drop the repeat from "
                          "--providers or --options")
-    ps = data.select(data.read_manifest(dataset)[1], suites, limit, sample, only)
+    ps = data.select(data.read_manifest(dataset, manifest)[1], suites, limit, sample, only)
     ident = data.dataset_id(dataset)
     for r in runs:
         if (was := (_read_json(r.out / "settings.json") or {}).get("dataset", ident)) != ident:
             raise ValueError(f"{r.out} is a run on dataset {was}, not {ident}, and a run never mixes "
                              f"datasets; pass another --out, or --dataset {was}")
-    return Plan(runs, ps, str(dataset), timeout or harness.DEFAULT_TIMEOUT, workers, score_only,
+    return Plan(runs, ps, str(dataset), manifest, timeout or harness.DEFAULT_TIMEOUT, workers, score_only,
                 retry_failed)
 
 
@@ -350,7 +352,7 @@ def predict_all(p: Plan) -> None:
     stop = threading.Event()
     by: dict[str, list[Run]] = {}
     for r in p.runs:
-        prepare(r, p.dataset, p.timeout)
+        prepare(r, p.dataset, p.timeout, p.manifest)
         by.setdefault(harness.resolve(r.provider), []).append(r)
 
     def one(r: Run, g: data.Page, bar: progress.Reporter, halt: threading.Event) -> None:
@@ -534,7 +536,7 @@ def read_scores(run: Run) -> list[dict]:
 
 def grade_all(p: Plan, say: Callable[[str], None] = print) -> dict[str, dict]:
     """`grade` each run of the plan; their summaries by run name."""
-    _, every = data.read_manifest(p.dataset)
+    _, every = data.read_manifest(p.dataset, p.manifest)
     return {r.out.name: grade(r, every, say) for r in p.runs}
 
 

@@ -283,6 +283,10 @@ That's 2 runs.
 - `--dataset`: a dataset folder, or `hf://datasets/<repo>[@revision]`. The default is ours,
   `hf://datasets/datalab-to/omni_parse_bench`, a private repository, so run `hf auth login`
   first. A Hugging Face dataset is downloaded whole (1.5 GB), once, into Hugging Face's cache;
+- `--manifest`: which of the dataset's manifests, a parquet inside it (default `manifest.parquet`). A
+  dataset may hold others: a sample (`manifests/sample40.parquet`), or the same pages with a gold of
+  another kind (`gt_path` pointing at `transcripts/` instead of `gold/`), each naming its pages and
+  where their gold is. `opb grade` and `opb tests` take it too;
 - `--suites`: only these suites;
 - `--limit N`: the first N pages;
 - `--sample N`: N pages spread over every suite, the same ones each time; and
@@ -360,7 +364,7 @@ benchmark.grade(run, every)
   the run has for the page, writes it and its prediction, and returns what it kept;
 - `recorded(run, page_id)` reads the page's record (its calls, for an audit), or None;
 - `predicted(run, page_id)` reads the page's outputs, or None: what grading reads; and
-- `grade(run, pages)` grades every page of `pages` (pass the whole dataset, `data.read_manifest(dataset)[1]`,
+- `grade(run, pages)` grades every page of `pages` (pass the whole manifest, `data.read_manifest(dataset, manifest)[1]`,
   so a smaller loop never shrinks a run's scores), fresh, writes `scores.jsonl` and `summary.json`
   whole, and returns the summary. A page with no prediction is pending only when the run never
   attempted it (no record either); otherwise all its tests fail. A run never prepared is refused;
@@ -439,7 +443,8 @@ The dataset is read by `data`, and a page's tests by the scorer, `unit_tests.gol
 
 ```python
 data.download_dataset(dataset)  # a local copy: an hf:// dataset downloaded whole; a folder as it is
-data.read_manifest(dataset)     # (folder, pages): every page, its file and gold as full local paths
+data.read_manifest(dataset, manifest="manifest.parquet")  # (folder, pages): every page of that manifest,
+                                # its file and gold as full local paths
 data.select(pages, ...)         # the pages to run: by suite, by id, sampled or limited
 unit_tests.gold(page)           # one page's tests, from its gold file (`page.gt_path`), checked
 unit_tests.check(pages)         # every page's tests, and the dataset as a whole, checked: for publishing

@@ -128,9 +128,13 @@ gold/<page_id>.json    the page's tests
 | `page_id` | `realdoc_pdfs-0103655f_docs_finance_2-p1` | the key; the files carry it |
 | `document` | `realdoc_pdfs:0103655f_docs_finance_2` | the source document: a page's copies and siblings share one, since their tests pass or fail together |
 | `suite` | `realdoc_pdfs` | where the page came from; its license is in `licenses/`. `--suites` filters on it |
-| `doc_path` | `pages/<page_id>.pdf` | the input, relative to the dataset root: a `.pdf` or a `.png` |
-| `gt_path` | `gold/<page_id>.json` | the tests, relative to the dataset root |
+| `doc_path` | `pages/<page_id>.pdf` | the input: a path inside the dataset, named `<page_id>.pdf` or `.png` |
+| `gt_path` | `gold/<page_id>.json` | the tests: a path inside the dataset, named `<page_id>.json` |
 | `outputs` | `["html", "blocks"]` | what to predict for the page: the output types its tests read, so planning a run reads the manifest alone. Made from the gold when the dataset is published, and checked against it whenever the gold is read; a manifest from before the column has it read from the gold |
+
+A dataset holds `manifest.parquet`, and may hold others (`--manifest`): a sample of its pages, or the same
+pages with a gold of another kind in another folder. Each manifest names its pages and where their gold is,
+so a page file is never copied. A path's folder is free; its name must be the page's.
 
 A manifest may carry other columns of its own (a language, a tag, a gold of another kind, for a scorer of
 your own): omni-parse-bench reads none of them, refuses none of them, and keeps them on each page, read-only,

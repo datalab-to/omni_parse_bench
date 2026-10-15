@@ -2,7 +2,7 @@
 
     OPB_DATASET=~/parse_bench/dataset-v2 pytest tests/test_dataset.py
 
-`scorer.check` already checks every manifest row and test, unique ids, stray gold files and every
+`unit_tests.check` already checks every manifest row and test, unique ids, and every
 page's tests; this checks what only the folder can say: that it loads, and that pages/ holds each
 page's file and nothing else.
 """
