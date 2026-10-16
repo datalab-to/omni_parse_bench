@@ -196,10 +196,10 @@ def _page(r: Mapping[str, Any]) -> Page:
         raise ManifestError(f"{where} lacks {missing}")
     if not all(isinstance(r[f], str) and r[f].strip() for f in NAMES):
         raise ManifestError(f"{where}: {list(NAMES)} must be non-empty strings")
-    if not _inside(r["doc_path"], r["page_id"], (".pdf", ".png")):
-        raise ManifestError(f"{where}: doc_path must be a path inside the dataset named <page_id>.pdf or "
-                            f".png, e.g. pages/{r['page_id']}.pdf, not {r['doc_path']!r}")
-    if not _inside(r["gt_path"], r["page_id"], (".json",)):
+    if not _inside(r["doc_path"], (".pdf", ".png")):
+        raise ManifestError(f"{where}: doc_path must be a path inside the dataset to a .pdf or .png, "
+                            f"e.g. pages/{r['page_id']}.pdf, not {r['doc_path']!r}")
+    if not _inside(r["gt_path"], (".json",), r["page_id"]):
         raise ManifestError(f"{where}: gt_path must be a path inside the dataset named <page_id>.json, "
                             f"e.g. gold/{r['page_id']}.json, not {r['gt_path']!r}")
     outputs = r["outputs"]
@@ -212,10 +212,13 @@ def _page(r: Mapping[str, Any]) -> Page:
                 extra)
 
 
-def _inside(path: str, page_id: str, suffixes: tuple[str, ...]) -> bool:
-    """Whether `path` is relative, stays inside the dataset, and names the page's file: `<page_id><suffix>`.
+def _inside(path: str, suffixes: tuple[str, ...], stem: str | None = None) -> bool:
+    """Whether `path` is relative, stays inside the dataset, ends in one of `suffixes`, and, given `stem`,
+    is named `<stem><suffix>`.
 
-    Note: the folder is free (gold/, transcripts/, ...), so one dataset's pages can carry golds of several
-    kinds, one manifest each; the name is not, so a page can't point at another page's file."""
+    Note: a gold is named for its page, in any folder (gold/, transcripts/, ...), so one dataset's pages
+    can carry golds of several kinds, one manifest each, and no two pages share one. An input is not:
+    several pages may read one file."""
     p = Path(path)
-    return (not p.is_absolute() and ".." not in p.parts and p.suffix in suffixes and p.stem == page_id)
+    return (not p.is_absolute() and ".." not in p.parts and p.suffix in suffixes
+            and (stem is None or p.stem == stem))

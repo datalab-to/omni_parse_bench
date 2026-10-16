@@ -874,7 +874,7 @@ def test_a_dataset_may_hold_several_manifests_over_the_same_pages(tmp_path, monk
 
 @pytest.mark.parametrize("column, value", [("gt_path", "/abs/a-p0.json"), ("gt_path", "../a-p0.json"),
                                            ("gt_path", "gold/a-p1.json"), ("doc_path", "pages/a-p0.txt")])
-def test_a_path_must_stay_inside_the_dataset_and_name_its_page(tmp_path, column, value):
+def test_a_path_must_stay_inside_the_dataset_and_a_gold_name_its_page(tmp_path, column, value):
     import pyarrow as pa
     import pyarrow.parquet as pq
 
@@ -883,6 +883,18 @@ def test_a_path_must_stay_inside_the_dataset_and_name_its_page(tmp_path, column,
     pq.write_table(pa.Table.from_pylist([rows[0] | {column: value}]), ds / "manifest.parquet")
     with pytest.raises(data.ManifestError, match=f"{column} must be a path inside the dataset"):
         data.read_manifest(ds)
+
+
+def test_pages_may_share_an_input_file(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    ds = pathlib.Path(dataset(tmp_path / "data", n=2))
+    rows = pq.read_table(ds / "manifest.parquet").to_pylist()
+    pq.write_table(pa.Table.from_pylist([r | {"doc_path": "pages/shared.pdf"} for r in rows]),
+                   ds / "manifest.parquet")
+    _, pages = data.read_manifest(ds)
+    assert len(pages) == 2 and pages[0].doc_path == pages[1].doc_path
 
 
 def test_a_run_planned_at_another_commit_of_its_dataset_warns_and_carries_on(tmp_path):
