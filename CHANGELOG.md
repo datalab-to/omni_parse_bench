@@ -53,6 +53,9 @@ Datasets:
 - `record(run, page_id, result)`: the argument is what `harness.predict` returned (it was `new`);
 - `plan` warns when a run made at one commit of its dataset is planned at another, and carries on;
 - `plan` refuses an empty selection;
+- `execute` grades what was predicted when predicting fails part way, but not when it is interrupted
+  (Ctrl-C); `--score-only` grades it then;
+- page ids must be unique ignoring case, since each names files;
 - `owed` counts what grading will grade over the whole manifest, as `grade_all` does; it counted
   only the selected pages;
 - `prepare` writes `settings.json` whole; it merged into what was there;

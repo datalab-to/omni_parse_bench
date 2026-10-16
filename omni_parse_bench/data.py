@@ -156,8 +156,11 @@ def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, 
         raise ManifestError(OLD_DATASET.format(root=root))
     rows = tuple(dataclasses.replace(p := _page(r), doc_path=str(root / p.doc_path),
                                      gt_path=str(root / p.gt_path)) for r in table.to_pylist())
-    if twice := [i for i, n in collections.Counter(p.page_id for p in rows).items() if n > 1]:
-        raise ManifestError(f"{len(twice)} page ids are in the manifest more than once, e.g. {twice[:3]}")
+    # Note: ignoring case, because an id names files, and two ids that differ only in case name one file
+    # on a case-insensitive disk (macOS, Windows).
+    if twice := [i for i, n in collections.Counter(p.page_id.casefold() for p in rows).items() if n > 1]:
+        raise ManifestError(f"{len(twice)} page ids are in the manifest more than once (ignoring case), "
+                            f"e.g. {twice[:3]}")
     return root, rows
 
 

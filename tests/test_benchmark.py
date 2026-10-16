@@ -897,6 +897,31 @@ def test_pages_may_share_an_input_file(tmp_path):
     assert len(pages) == 2 and pages[0].doc_path == pages[1].doc_path
 
 
+def test_page_ids_must_differ_by_more_than_case(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    ds = pathlib.Path(dataset(tmp_path / "data"))
+    (row,) = pq.read_table(ds / "manifest.parquet").to_pylist()
+    (ds / "gold" / "A-P0.json").write_text((ds / "gold" / "a-p0.json").read_text())
+    pq.write_table(pa.Table.from_pylist([row, row | {"page_id": "A-P0", "gt_path": "gold/A-P0.json"}]),
+                   ds / "manifest.parquet")
+    with pytest.raises(data.ManifestError, match="ignoring case"):
+        data.read_manifest(ds)
+
+
+@pytest.mark.parametrize("stop, graded", [(errors.AccountFailure("out of credits"), True),
+                                          (KeyboardInterrupt(), False)])
+def test_a_failure_part_way_is_graded_and_an_interrupt_is_not(tmp_path, monkeypatch, stop, graded):
+    def call(config):
+        raise stop
+    use(monkeypatch, {"stub": stub(call=call)})
+    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data"))
+    with pytest.raises(type(stop)):
+        benchmark.execute(p, say=QUIET)
+    assert (p.runs[0].out / "summary.json").exists() == graded
+
+
 def test_a_run_planned_at_another_commit_of_its_dataset_warns_and_carries_on(tmp_path):
     r = benchmark.Run("stub", {}, tmp_path / "run")
     assert benchmark._another_commit(r, "abc", "abc") is None
