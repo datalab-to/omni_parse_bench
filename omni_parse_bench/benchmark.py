@@ -376,7 +376,7 @@ def owed(p: Plan, run: Run) -> tuple[int, int]:
 
 
 def describe(p: Plan) -> str:
-    """What `execute(p)` would do, as plain text (`progress.plan_view`), with no vendor call."""
+    """What `execute(p)` would do, as plain text (`progress.describe`), with no vendor call."""
     from omni_parse_bench import progress
 
     return progress.describe(p)

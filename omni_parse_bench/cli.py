@@ -40,7 +40,6 @@ EXTRAS = {"predict": "harness", "providers": "harness", "reparse": "harness", "b
           "grade": "benchmark", "tests": "benchmark", "check": "benchmark"}
 
 
-
 def read_object(path: str, flag: str) -> dict:
     """The JSON object in the file `path` that `flag` names."""
     try:
