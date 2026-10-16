@@ -12,8 +12,9 @@
 Everything goes to stdout as JSON except `benchmark`'s progress, and `benchmark` shows its plan
 and waits for a yes unless given `-y`; nothing in the library ever reads stdin. `benchmark` exits 2
 when a test's grading failed in our code, so a scorer bug can't pass as a vendor's score. A mistake in
-what was asked (a ValueError or a missing file) is printed as `opb <command>: <what was wrong>`, and
-exits 1; anything else is a bug of ours, and is raised as it is.
+what was asked (a ValueError or a missing file), and a vendor account's or credential's failure, is
+printed as `opb <command>: <what was wrong>`, and exits 1; an interrupt exits 130; anything else is a
+bug of ours, and is raised as it is.
 
 `score` needs only the core install; every other command needs an extra (EXTRAS), and on an
 install without it says which to add instead of failing on the first missing import.
@@ -61,6 +62,13 @@ def read_workers(value: str) -> int | dict:
     if not isinstance(out, dict):
         raise argparse.ArgumentTypeError(f"--workers must be a number or a JSON object, not {value!r}")
     return out
+
+
+def read_ids(path: Path) -> frozenset[str]:
+    """A file of ids, one per line; blank lines and `#` comments are skipped."""
+    if not path.is_file():
+        raise FileNotFoundError(f"no file at {path}; --pages is a file of page ids, one per line")
+    return frozenset(x for line in path.read_text().splitlines() if (x := line.split("#", 1)[0].strip()))
 
 
 def read_options(value: str | None) -> dict:
@@ -117,8 +125,10 @@ def cmd_check(a: argparse.Namespace) -> int:
     _, pages = data.read_manifest(a.dataset, a.manifest)
     if not pages:
         raise ValueError(f"the manifest {a.manifest} names no pages")
-    if missing := [f for p in pages for f in (p.doc_path, p.gt_path) if not Path(f).is_file()]:
-        raise ValueError(f"{len(missing)} files the manifest names don't exist, e.g. {missing[:3]}")
+    if missing := [f"{p.page_id} {c} {f}" for p in pages for c, f in (("doc_path", p.doc_path),
+                   ("gt_path", p.gt_path)) if not Path(f).is_file()]:
+        raise ValueError(f"{len(missing)} files the manifest names don't exist, e.g. "
+                         + "; ".join(missing[:3]))
     scorer.check(pages)
     print(json.dumps({"ok": True, "manifest": a.manifest, "pages": len(pages),
                       "suites": len({p.suite for p in pages}), "inputs": len({p.doc_path for p in pages})}))
@@ -230,7 +240,7 @@ def cmd_benchmark(a: argparse.Namespace) -> int:
                        sample=a.sample, options=read_options(a.options), timeout=a.timeout,
                        workers=a.workers, score_only=a.score_only,
                        retry_failed=a.retry_failed,
-                       only=frozenset(a.pages.read_text().split()) if a.pages else None)
+                       only=read_ids(a.pages) if a.pages else None)
     if not a.yes and not a.score_only and not confirm_plan(p):
         return 1
     summaries = benchmark.execute(p, lambda s: print(s, file=sys.stderr))
@@ -248,9 +258,10 @@ def cmd_benchmark(a: argparse.Namespace) -> int:
 
 def cmd_grade(a: argparse.Namespace) -> int:
     """Grade a folder of predictions/<page_id>.json, whatever made them, and print its scores and
-    coverage. `--unsupported` says, once for the folder, which outputs its system can't produce; it is
-    kept in the folder's settings.json. A run's folder is graded against the dataset and manifest its
-    settings.json names, unless they are given; another dataset than its own is refused."""
+    coverage. A folder holds one dataset and one manifest: a run's are in its settings.json, and a folder
+    of your own gets them there (with `--unsupported`, what its system can't produce) once its first
+    grading succeeds, so a later grading needs no flags and another dataset or manifest is refused.
+    `--unsupported` is for your own folders: a run's adapter says what it can't produce."""
     import logging
 
     logging.basicConfig(level=logging.WARNING, format="%(message)s", stream=sys.stderr)
@@ -259,21 +270,35 @@ def cmd_grade(a: argparse.Namespace) -> int:
         raise FileNotFoundError(f"no folder at {out}; pass the folder holding predictions/<page_id>.json")
     path = out / "settings.json"
     said = benchmark._read_json(path) or {}
+    run = benchmark.Run(said.get("provider", out.name), {}, out)
+    if a.unsupported is not None and run.records.is_dir():
+        raise ValueError(f"{out} is a run, whose adapter says what it can't produce; --unsupported is for a "
+                         "folder of your own predictions")
     dataset = a.dataset or said.get("dataset") or data.DEFAULT_DATASET
     if a.dataset and (was := said.get("dataset")) and data.dataset_id(a.dataset) != was:
-        raise ValueError(f"{out} is a run on dataset {was}, not {data.dataset_id(a.dataset)}, and a run "
-                         f"never mixes datasets; pass --dataset {was}, or grade a copy of the folder")
+        raise ValueError(f"{out} is graded on dataset {was}, not {data.dataset_id(a.dataset)}, and a folder "
+                         f"never mixes datasets; pass --dataset {was}, or grade a copy without its "
+                         "settings.json")
     manifest = a.manifest or said.get("manifest") or data.MANIFEST
-    if a.unsupported is not None:
-        benchmark._write_json(path, said | {"unsupported": sorted(set(a.unsupported))})
-    run = benchmark.Run(said.get("provider", out.name), {}, out)
-    if a.suites and run.records.is_dir():
-        print(f"warning: {out}: grading only {', '.join(a.suites)} replaces the run's summary of every suite "
-              "with theirs; grade it without --suites to get it back", file=sys.stderr)
-    _, pages = data.read_manifest(dataset, manifest)
-    s = benchmark.grade(run, data.select(pages, a.suites), say=lambda m: print(m, file=sys.stderr))
+    if a.manifest and (was := said.get("manifest")) and a.manifest != was:
+        raise ValueError(f"{out} is graded on manifest {was}, not {a.manifest}, and a folder never mixes "
+                         f"manifests; pass --manifest {was}, or grade a copy without its settings.json")
+    if a.suites and (out / "summary.json").exists():
+        print(f"warning: {out}: grading only {', '.join(a.suites)} replaces its summary of every suite with "
+              "theirs; grade it without --suites to get it back", file=sys.stderr)
+    root, pages = data.read_manifest(dataset, manifest)
+    cannot = sorted(set(a.unsupported)) if a.unsupported is not None else None
+    s = benchmark.grade(run, data.select(pages, a.suites), say=lambda m: print(m, file=sys.stderr),
+                        among=pages, cannot=cannot)
+    if not run.records.is_dir():
+        # Note: only once grading succeeded, so a failed one leaves the folder as it was.
+        commit = {"commit": root.name} if data._hf_dataset(dataset) is not None else {}
+        kept = cannot if cannot is not None else said["unsupported"]
+        benchmark._write_json(path, said | {"dataset": data.dataset_id(dataset), **commit,
+                                            "manifest": manifest, "unsupported": kept})
     print(json.dumps({**{o: v["score"] for o, v in s.items() if isinstance(v, dict) and "score" in v},
-                      "pages": s["pages"], "pending": s["pending"]}, indent=2))
+                      "headline": s["headline"], "pages": s["pages"], "failed": s["failed"],
+                      "pending": s["pending"]}, indent=2))
     return 2 if benchmark._errors_in(s) else 0
 
 
@@ -305,8 +330,9 @@ def cmd_reparse(a: argparse.Namespace) -> int:
         for path, new in done:
             benchmark._write_json(path, new)
             benchmark._write_json(run / "predictions" / path.name, new["outputs"])
-        print(f"{run}: {len(done)} of {len(list((run / 'records').glob('*.json')))} records changed",
-              file=sys.stderr)
+        print(f"{run}: {len(done)} of {len(list((run / 'records').glob('*.json')))} records changed"
+              + ("; regrade it to see them: opb benchmark ... --score-only, or opb grade " + str(run)
+                 if done else ""), file=sys.stderr)
     return 0
 
 
@@ -397,6 +423,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (ValueError, FileNotFoundError) as exc:   # Note: ManifestError and GoldError are ValueErrors.
         print(f"opb {a.cmd}: {exc}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print(f"opb {a.cmd}: interrupted; rerun to resume", file=sys.stderr)
+        return 130
     except ImportError as exc:
         # Note: only a third-party module is fixed by installing an extra; a broken import of our own
         # must surface as itself. The harness's own error (`MissingDependency`) names its module only
@@ -406,6 +435,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         extra = EXTRAS[a.cmd]
         raise ImportError(f"opb {a.cmd} needs {missing.split('.')[0]}, which comes with the {extra} extra: "
                           f"pip install 'omni-parse-bench[{extra}]'", name=exc.name) from exc
+    except Exception as exc:
+        # Note: the harness's errors are matched only once it is loaded: importing it here would need its
+        # extra, which `opb score` doesn't, and an error of a module never loaded was never raised.
+        errs = sys.modules.get("omni_parse_bench.harness.errors")
+        if errs is None or not isinstance(exc, errs.AccountFailure | errs.MissingCredential): raise
+        print(f"opb {a.cmd}: {exc}" + ("; fix it and rerun to resume: what was predicted is kept"
+                                         if a.cmd == "benchmark" else ""), file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

@@ -98,6 +98,9 @@ def score(pred: Mapping[str, Any], gold: Sequence[_tests.Test],
           unsupported: Collection[str] = ()) -> list[Verdict]:
     """One verdict per test of `gold`, the page's tests. `pred` maps an output type to its value, or to
     None when it errored; `unsupported` lists the output types the provider declares it can't produce."""
+    if isinstance(unsupported, str) or (bad := sorted(set(unsupported) - set(vocab.OUTPUT_TYPES))):
+        raise ValueError(f"unsupported is a collection of output types from {list(vocab.OUTPUT_TYPES)}, not "
+                         f"{unsupported!r}" + ("" if isinstance(unsupported, str) else f" ({bad} aren't)"))
     built: dict[str, Any] = {}   # output type -> its view, or the Verdict its tests all get
     out = []
     for t in gold:

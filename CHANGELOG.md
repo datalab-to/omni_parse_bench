@@ -70,8 +70,8 @@ Datasets:
   `harness.predict(wants=...)`); an option value of the wrong type is refused, naming the option;
 - `plan` and `select` refuse a bare string where a list of names goes, a negative or non-integer count,
   a negative `timeout` and a `workers` that isn't a number or a mapping; `only` takes any iterable;
-- `registry.resolve` keeps a plugin adapter's full module name (only ours are shortened), and
-  `--workers` may name a plugin's adapter;
+- `registry.resolve` gives an adapter of yours the name it was filed or declared under (ours keep their
+  short module name), so `--workers '{"mine": 2}'` names a plugin's adapter;
 - a gold file that isn't JSON, isn't an object, or holds a test that isn't an object is a `GoldError`
   naming its page; `opb score` names a prediction that isn't an object, or is a whole record;
 - `opb reparse` refuses a folder without records/, and checks every record before rewriting any;
@@ -83,6 +83,24 @@ Datasets:
   only the selected pages;
 - `prepare` writes `settings.json` whole; it merged into what was there;
 - an `hf://` address is checked: `hf://datasets/<org>/<name>[@<revision>]`;
+- while any page is pending, summary.json's `headline` is null and the closing line prints `—` for
+  each score: a run has a headline only once it is finished;
+- summary.json gains `failed` (pages with an output missing or null that the system can produce) and
+  `suites` (pages, failed and pending per suite); `credits` is null when no call reported any; the
+  closing line says how many failed, and that `--retry-failed` and `opb reparse` may help;
+- a run folder holds one manifest, as it holds one dataset: `plan` and `opb grade` refuse another;
+  `--score-only` into a folder never predicted is refused;
+- `opb grade` on a folder of your own writes its dataset, manifest and `unsupported` to settings.json once
+  a grading succeeds (a failed one writes nothing), so later gradings need no flags and refuse another
+  dataset or manifest; `--unsupported` is refused on a run's folder; `--suites` on any folder already
+  graded warns that it replaces the summary;
+- a prediction is read only under its exact name, case too, so a folder grades the same on every disk;
+  files of pages outside `--suites` aren't reported as stray;
+- an option given as a whole number for a float setting is that float, so it names the same run;
+- an account failure, a missing key and Ctrl-C (exit 130) are one line on the command line, not a
+  traceback; `opb check` names the page and column of a missing file; a `--pages` file skips blank
+  lines and `#` comments; `unit_tests.score` refuses an unknown output name in `unsupported`;
+  `read_scores` refuses a folder that doesn't exist; `opb reparse` says to regrade;
 - a manifest may carry columns of its own: they're kept on `page.extra`, never refused; and
 - `Page` is a frozen dataclass (it was a NamedTuple), with `id`, the page's `page_id`.
 

@@ -107,17 +107,19 @@ def adapter(provider: str) -> contract.Adapter:
 
 
 def resolve(provider: str) -> str:
-    """This adapter's module name; groups every model id that reaches the same adapter. What `WORKERS` and
-    `--workers` are keyed by."""
-    return _name(adapter(provider))
+    """The name of the adapter `provider` reaches, which groups its runs into one pool: what `WORKERS` and
+    `--workers` are keyed by. One of ours is its module's short name (`llm` for every model id); one of
+    yours is the name it was filed or declared under (`add_adapter`, `ENTRY_POINT_GROUP`).
+
+    Note: not an outside module's name: that is an internal path its user never typed, and two packages'
+    modules may end in the same word."""
+    return _named(provider, adapter(provider))
 
 
-def _name(module: ModuleType) -> str:
-    """An adapter module's name as `resolve` gives it.
-
-    Note: only our own modules are shortened; two outside ones may end in the same word."""
+def _named(provider: str, module: ModuleType) -> str:
+    """`resolve`'s name for an adapter filed under `provider`."""
     name = module.__name__
-    return name.rsplit(".", 1)[-1] if name.startswith(f"{__package__}.providers.") else name
+    return name.rsplit(".", 1)[-1] if name.startswith(f"{__package__}.providers.") else provider
 
 
 def out_name(provider: str, options: dict | None = None) -> str:
@@ -158,18 +160,22 @@ def config_for(provider: str, options: dict | None = None) -> Any:
                 f"one you want: --providers {options['model']}")
         options = {**options, "model": provider}
     try:
-        config = config_type(**options)
-    except TypeError as exc:
-        known = ", ".join(f.name for f in dataclasses.fields(config_type)) or "(none)"
-        raise ValueError(f"{provider}: {exc}. Its options are: {known}") from None
-    try:
         hints = typing.get_type_hints(config_type)
     except (NameError, TypeError):   # Note: an annotation that doesn't resolve leaves its value unchecked.
         hints = {}
     for name, value in options.items():
         if (want := hints.get(name)) in (str, int, float, bool) and not _of(value, want):
             raise ValueError(f"{provider}: option {name} is a {want.__name__}, not {value!r}")
-    return config
+    # Note: a whole number given for a float option becomes that float, so 0 and the default 0.0 are one
+    # setting and name one run, not two.
+    options = {k: float(v) if hints.get(k) is float else v for k, v in options.items()}
+    try:
+        return config_type(**options)
+    except TypeError as exc:
+        known = ", ".join(f.name for f in dataclasses.fields(config_type)) or "(none)"
+        said = str(exc).rstrip(".")
+        raise ValueError(f"{provider}: {said}{'' if said.endswith('?') else '.'} Its options are: {known}"
+                         ) from None
 
 
 def _of(value: Any, want: type) -> bool:

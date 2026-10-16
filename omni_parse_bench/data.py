@@ -150,9 +150,9 @@ def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, 
         raise ImportError("omni-parse-bench reads the manifest with pyarrow: "
                           "pip install 'omni-parse-bench[benchmark]'") from None
     if Path(manifest).is_absolute() or ".." in Path(manifest).parts:
-        raise ManifestError(f"--manifest {manifest} is outside the dataset; a manifest is a path inside it, "
-                            f"e.g. manifests/sample.parquet. Pass --dataset its folder, and --manifest its "
-                            f"path in there")
+        raise ManifestError(f"--manifest {manifest} must be a path inside the dataset, relative to it, e.g. "
+                            "manifests/sample.parquet: pass --dataset the dataset's folder, and --manifest "
+                            "the manifest's path in there")
     root = download_dataset(dataset).resolve()
     if not (root / manifest).is_file():
         # Note: a manifest is a path inside the dataset; one given as a path on disk is a common slip.
@@ -224,7 +224,7 @@ def _page(r: Mapping[str, Any]) -> Page:
         raise ManifestError(f"{where}: suite must be a string, or null for {NO_SUITE!r}, not {r['suite']!r}")
     if not _inside(r["doc_path"], (".pdf", ".png")):
         raise ManifestError(f"{where}: doc_path must be a path inside the dataset to a .pdf or .png, "
-                            f"e.g. pages/{r['page_id']}.pdf, not {r['doc_path']!r}")
+                            f"e.g. pages/scan.pdf (any name), not {r['doc_path']!r}")
     if not _inside(r["gt_path"], (".json",), r["page_id"]):
         raise ManifestError(f"{where}: gt_path must be a path inside the dataset named <page_id>.json, "
                             f"e.g. gold/{r['page_id']}.json, not {r['gt_path']!r}")

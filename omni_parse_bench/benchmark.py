@@ -26,10 +26,9 @@ Resumable: a page is predicted again only for the outputs its record lacks. Grad
 time: every predicted page is graded again, and scores.jsonl and summary.json are written whole, so a
 run's scores are always one grading's, by this opb against this dataset's gold. A folder of predictions/
 made by anything (your own model) is graded the same way, with what it can't produce said in its
-settings.json (`opb grade`). A run never mixes datasets. Concurrency is per adapter, not per run:
-every run of one adapter (two datalab modes, every OpenRouter model) shares one pool of `_workers_for`
-its adapter. Credentials come from the environment
-and everything else from `--options`.
+settings.json (`opb grade`). A run never mixes datasets or manifests. Concurrency is per adapter, not
+per run: every run of one adapter (two datalab modes, every OpenRouter model) shares one pool of
+`_workers_for` its adapter. Credentials come from the environment and everything else from `--options`.
 
     pip install 'omni-parse-bench[benchmark]'
 """
@@ -251,10 +250,19 @@ def plan(providers: Sequence[str], *, out: str | Path = Path("runs"), dataset: s
     commit = root.name if data._hf_dataset(dataset) is not None else None
     ident = data.dataset_id(dataset)
     for r in runs:
+        if score_only and not r.out.is_dir():
+            raise FileNotFoundError(f"no run at {r.out}: {r.provider} with these settings was never "
+                                    "predicted under this --out; check --out and --options, or drop "
+                                    "--score-only")
         said = _read_json(r.out / "settings.json") or {}
         if (was := said.get("dataset", ident)) != ident:
             raise ValueError(f"{r.out} is a run on dataset {was}, not {ident}, and a run never mixes "
                              f"datasets; pass another --out, or --dataset {was}")
+        # Note: a run's manifest is fixed too: another one (a sample, or other gold) would replace the
+        # run's scores with those of other pages, or of other gold, under the same name.
+        if (was := said.get("manifest", manifest)) != manifest:
+            raise ValueError(f"{r.out} is a run on manifest {was}, not {manifest}, and a run never mixes "
+                             f"manifests; pass --manifest {was}, or another --out")
         if (msg := _another_commit(r, said.get("commit"), commit)) is not None:
             log.warning("%s", msg)
     return Plan(runs, ps, str(dataset), manifest, timeout or harness.DEFAULT_TIMEOUT, workers, score_only,
@@ -287,7 +295,7 @@ def _per_adapter(workers: Mapping[str, int]) -> dict[str, int]:
     from omni_parse_bench.harness import registry
 
     # Note: the adapters filed so far, which include every plugin a provider of the plan loaded.
-    adapters = {registry._name(m) for m in registry.ADAPTERS.values()} | {"llm"}
+    adapters = {registry._named(name, m) for name, m in registry.ADAPTERS.items()} | {"llm"}
     for key, n in workers.items():
         if key not in adapters:
             try:
@@ -351,10 +359,10 @@ def _read(path: Path, valid: Callable[[Any], bool], what: str) -> Any:
     except FileNotFoundError:
         return None
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        log.warning("%s isn't readable JSON (%s); its page counts as not predicted", path, exc)
+        log.warning("%s isn't readable JSON (%s); it is treated as missing", path, exc)
         return None
     if not valid(got):
-        log.warning("%s isn't %s; its page counts as not predicted", path, what)
+        log.warning("%s isn't %s; it is treated as missing", path, what)
         return None
     return got
 
@@ -366,6 +374,9 @@ def unsupported(run: Run) -> frozenset[str]:
     Note: one set for the whole run, never read off a page: a prediction that leaves out an output its
     page asks for fails that output's tests, so leaving out hard pages can't take them out of a score."""
     path = run.out / "settings.json"
+    if not path.exists():
+        raise ValueError(f"{run.out} has no settings.json to say which outputs its system can't produce; "
+                         "pass opb grade --unsupported with them (or with none, for none)")
     said = (_read_json(path) or {}).get("unsupported")
     if said is None:
         raise ValueError(f"{path} doesn't say which outputs the run can't produce. Add \"unsupported\": [] "
@@ -504,35 +515,45 @@ def _errors_in(summary: dict) -> int:
                if isinstance(summary.get(o), dict))
 
 
-def _headline(name: str, summary: dict) -> str:
-    """One run's scores, with the coverage they stand on."""
-    scores = ", ".join(f"{o} {100 * s['score']:.1f}" for o in vocab.OUTPUT_TYPES
+def _headline(name: str, summary: dict, resumable: bool = False) -> str:
+    """One run's scores, with the coverage they stand on: no score while pages are pending, since a score
+    over the pages graded so far isn't the run's."""
+    pending, failed = summary["pending"], summary.get("failed", 0)
+    scores = ", ".join(f"{o} " + ("—" if pending else f"{100 * s['score']:.1f}") for o in vocab.OUTPUT_TYPES
                        if isinstance(s := summary.get(o), dict) and s.get("score") is not None)
     errs = _errors_in(summary)
-    return (f"{name}: {scores or 'no score'} over {summary['pages']} pages graded, "
-            f"{summary['pending']} pending" + (f"; {errs} tests errored in our code" if errs else ""))
+    return (f"{name}: {scores or 'no score'} over {summary['pages']} pages graded, {pending} pending"
+            + (" (headline needs every page)" if pending else "")
+            + (f"; {failed} failed" + ("; --retry-failed may redo some, opb reparse re-reads answers"
+                                       if resumable else "") if failed else "")
+            + (f"; {errs} tests errored in our code" if errs else ""))
 
 
-def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = print) -> dict:
+def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = print, *,
+          among: Sequence[data.Page] | None = None, cannot: Iterable[str] | None = None) -> dict:
     """Grade every page of `pages` the run has a prediction for, and write its scores and summary; returns
     the summary. `pages` is usually the whole dataset (`data.read_manifest(dataset)`), as `grade_all`
-    passes it.
+    passes it; `among` is the manifest's pages when `pages` is a part of them (`opb grade --suites`), so a
+    prediction of one of its other pages isn't reported as stray. `cannot` is what the run's system can't
+    produce, when given rather than read from its settings.json (`unsupported`).
 
     Grading reads predictions/ alone, the run's `unsupported` and each page's gold file (`gt_path`);
     records add only their cost to the summary, so a folder of predictions made by anything is graded the
     same way. Given the whole dataset, it covers every page, whatever `--suites` and `--limit` chose to
-    predict.
+    predict. A page's prediction is `predictions/<page_id>.json`, named exactly: a name that differs only
+    in case is stray, on every disk.
 
     A page with no prediction is pending (left out, and counted) only when the run's records say it was
     never attempted: no record either, in a folder that keeps records (`prepare` makes `records/`).
     Otherwise it fails, every test of it: a call that failed, or a folder of your own predictions
-    (no `records/`), where a page left out is a page your system didn't answer.
+    (no `records/`), where a page left out is a page your system didn't answer. While any page is pending
+    the summary's `headline` is None: a run has a headline only once it is finished. `failed` counts the
+    pages with an output missing or null that the system can produce; `suites` counts, per suite, the
+    pages graded, failed and pending.
 
     Every page is graded fresh, every time, and scores.jsonl and summary.json are written whole once it
     finishes: they are always one grading's, of `pages`, never a mix. An interrupted grading writes
-    nothing, so the last finished one's files stand. Each line says which scorer graded it. A run that
-    was never prepared is refused: its folder is most likely another one (another option, another
-    --out)."""
+    nothing, so the last finished one's files stand. Each line says which scorer graded it."""
     if not run.out.is_dir():
         raise FileNotFoundError(f"no folder at {run.out}; pass the folder holding predictions/<page_id>.json")
     if not run.predictions.is_dir():
@@ -542,24 +563,34 @@ def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = pri
     if not pages:
         raise ValueError(f"no pages to grade in {run.out}: the selection is empty (check --suites, or the "
                          "manifest)")
-    cannot = unsupported(run)
+    cannot = unsupported(run) if cannot is None else frozenset(cannot)
     keeps_records = run.records.is_dir()
-    lines, calls, pending, unread = [], [], 0, []
+    # Note: listed once, and a page's prediction read only under its exact name, so the score and the
+    # stray-file warning agree on every disk, case-insensitive ones included.
+    names = {f.name for f in run.predictions.iterdir()}
+    lines, calls, unread, count = [], [], [], {}
     for g in pages:
-        pred, rec = predicted(run, g.page_id), recorded(run, g.page_id)
+        c = count.setdefault(g.suite, {"pages": 0, "failed": 0, "pending": 0})
+        named = f"{g.page_id}.json" in names
+        pred, rec = predicted(run, g.page_id) if named else None, recorded(run, g.page_id)
         if pred is None and rec is None and keeps_records:
-            pending += 1
+            c["pending"] += 1
             continue
         if rec is not None: calls += rec["calls"]
-        if (pred is None and (run.predictions / f"{g.page_id}.json").exists()
-                or pred is not None and not set(pred) & set(vocab.OUTPUT_TYPES)):
-            unread.append(g.page_id)
+        if named and (pred is None or not set(pred) & set(vocab.OUTPUT_TYPES)): unread.append(g.page_id)
+        c["pages"] += 1
+        c["failed"] += any((pred or {}).get(o) is None for o in set(g.outputs) - cannot)
         lines += _grade_page(run, pred or {}, g, _tests(g), cannot)
-    _warn_unused(run, pages, unread)
+    _warn_unused(run, among or pages, names, unread)
     summary = scorer.summarize(lines)
-    summary |= {"scorer": SCORER, "pages": len(pages) - pending, "pending": pending,
+    pending = sum(c["pending"] for c in count.values())
+    if pending: summary["headline"] = None
+    credits = [c["credits"] for c in calls if c.get("credits") is not None]
+    summary |= {"scorer": SCORER, "pages": sum(c["pages"] for c in count.values()),
+                "failed": sum(c["failed"] for c in count.values()), "pending": pending,
+                "suites": dict(sorted(count.items())),
                 "usd": round(sum(c.get("usd") or 0 for c in calls), 4),
-                "credits": round(sum(c.get("credits") or 0 for c in calls), 4)}
+                "credits": round(sum(credits), 4) if credits else None}
     # Note: both written beside the old, then both moved into place, so an interrupt leaves the last
     # finished grading's pair, never one file of each.
     scores, summ = run.out / "scores.jsonl", run.out / "summary.json"
@@ -567,20 +598,19 @@ def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = pri
               (summ, json.dumps(summary, ensure_ascii=False, indent=2) + "\n")]
     for path, text in staged: path.with_suffix(path.suffix + ".tmp").write_text(text)
     for path, _ in staged: os.replace(path.with_suffix(path.suffix + ".tmp"), path)
-    say(_headline(run.out.name, summary))
+    say(_headline(run.out.name, summary, keeps_records))
     return summary
 
 
-def _warn_unused(run: Run, pages: Sequence[data.Page], unread: list[str]) -> None:
-    """Logs the predictions grading couldn't use: files named for no page of `pages` (left out), and
-    those that couldn't be read or hold no output type (graded as failed). A naming slip
-    (`<page_id>.pdf.json`) otherwise shows only as a low score."""
-    ids = {g.page_id for g in pages}
-    stray = sorted(f.name for f in run.predictions.iterdir() if not (f.suffix == ".json" and f.stem in ids))
+def _warn_unused(run: Run, every: Sequence[data.Page], names: set[str], unread: list[str]) -> None:
+    """Logs the predictions grading couldn't use: files named for no page of `every` (left out), and those
+    that couldn't be read or hold no output type (graded as failed). A naming slip (`<page_id>.pdf.json`,
+    another case) otherwise shows only as a low score."""
+    ids = {f"{g.page_id}.json" for g in every}
+    stray = sorted(n + ("/" if (run.predictions / n).is_dir() else "") for n in names - ids)
     if stray:
-        log.warning("%s: %d files in predictions/ are named for no page being graded (another suite, or a "
-                    "naming slip), so they were left out, e.g. %s; a prediction is "
-                    "predictions/<page_id>.json",
+        log.warning("%s: %d files in predictions/ are named for no page of the manifest, so they were left "
+                    "out, e.g. %s; a prediction is predictions/<page_id>.json, named exactly (case too)",
                     run.out, len(stray), stray[:3])
     if unread:
         log.warning("%s: %d predictions couldn't be read or hold none of the output types %s, so their pages "
@@ -589,8 +619,11 @@ def _warn_unused(run: Run, pages: Sequence[data.Page], unread: list[str]) -> Non
 
 
 def read_scores(run: Run) -> list[dict]:
-    """A run's score lines on disk (scores.jsonl), in file order; [] when it has none. A line that isn't
-    readable JSON is left out, and logged."""
+    """A run's score lines on disk (scores.jsonl), in file order; [] when it was never graded. A line that
+    isn't readable JSON is left out, and logged. A folder that doesn't exist is refused: a mistyped path
+    isn't a run with no scores."""
+    if not run.out.is_dir():
+        raise FileNotFoundError(f"no folder at {run.out}; pass a run's folder, which holds scores.jsonl")
     path = run.out / "scores.jsonl"
     if not path.exists(): return []
     out = []

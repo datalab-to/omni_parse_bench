@@ -251,8 +251,13 @@ opb benchmark --providers datalab openai/gpt-5.6-sol --out runs/ --limit 5
 It shows the plan (each run, its settings, and how many pages it will predict and grade) and, in a
 terminal, asks before calling any vendor; `-y` skips the question, and a script or pipe proceeds
 without it. It prints each run's scores with `pages` (graded) and `pending` (never attempted)
-beside them. It exits 2, with a warning, when a test's grading failed in our code (`errors` in a
-summary's output type), since those tests are left out of the score.
+beside them, and how many pages `failed` (an output missing or null that the provider can produce:
+`--retry-failed` may redo some, `opb reparse` re-reads answers that arrived). While a run has pages
+pending its `headline` is null and its scores print as `—`: a run has a headline only once it is
+finished. It exits 2, with a warning, when a test's grading failed in our code (`errors` in a
+summary's output type), since those tests are left out of the score. A mistake in what was asked, an
+account failure or a missing key is printed in one line, `opb benchmark: ...`, and exits 1; Ctrl-C
+exits 130. Either way, what was predicted is kept, and the same command resumes.
 
 ### At once
 
@@ -263,9 +268,16 @@ mistral and llm 5, reducto, llamaparse and azure 3, tesseract the CPU count up t
 `--workers N` sets N for every adapter; `--workers '{"datalab": 20, "llm": 3}'` sets only the adapters
 named, and the others keep their defaults. Keys are adapters, not providers or models: the limit is
 the vendor account's, so 3 for `llm` is 3 in flight across every OpenRouter model id together. A
-model id as a key is refused, naming its adapter. When one run hits an account failure or a missing
-key, every run of its adapter stops at once; other adapters go on, the run is graded, and the failure
-is then raised.
+model id as a key is refused, naming its adapter. An adapter of yours is keyed by the name you filed or
+declared it under (`add_adapter("mine", ...)` is `{"mine": 2}`). When one run hits an account failure
+or a missing key, every run of its adapter stops at once; other adapters go on, the run is graded, and
+the failure is then raised. An exception from an adapter that isn't a vendor's answer (a bug in it)
+stops that adapter's runs the same way, naming the run, the page and the file, rather than being
+recorded as the page's failure.
+
+Inside one call, a 429 or 5xx is tried again after 20, 60 and then 120 seconds before it is recorded,
+so a page a vendor throttles holds its worker for up to about 200 seconds plus the calls. A timeout is
+not tried again within the call: that would spend a second whole budget.
 
 ### Settings per provider
 
@@ -286,11 +298,14 @@ That's 2 runs.
 - `--manifest`: which of the dataset's manifests, a parquet inside it (default `manifest.parquet`). A
   dataset may hold others: a sample (`manifests/sample40.parquet`), or the same pages with a gold of
   another kind (`gt_path` pointing at `transcripts/` instead of `gold/`), each naming its pages and
-  where their gold is. `opb grade` and `opb tests` take it too;
+  where their gold is. `opb grade`, `opb check` and `opb tests` take it too. A run folder holds one
+  manifest, as it holds one dataset: another `--manifest` into it is refused;
 - `--suites`: only these suites;
 - `--limit N`: the first N pages;
-- `--sample N`: N pages spread over every suite, the same ones each time; and
-- `--pages FILE`: the page ids in a file, one per line. To run one tag's pages, see
+- `--sample N`: N pages spread over every suite, the same ones each time; N larger than the
+  selection runs all of it, and with `--pages` it samples among those pages; and
+- `--pages FILE`: the page ids in a file, one per line (blank lines and `#` comments are skipped). To
+  run one tag's pages, see
   [Exploring the tests](#exploring-the-tests).
 
 ### Resuming
@@ -312,7 +327,8 @@ It's resumable, and safe to run twice.
 - an interrupted grading writes nothing: both files are written beside the old ones and moved into place
   together at the end, so the last finished grading's pair stands.
 
-A run folder holds one dataset: an invocation with another `--dataset` into it is refused. A dataset
+A run folder holds one dataset and one manifest: an invocation with another `--dataset` or
+`--manifest` into it is refused, and `--score-only` into a folder that was never predicted is too. A dataset
 is downloaded at one commit, its pages and gold together. An invocation at another commit of the run's
 dataset is warned about and carries on: its predictions are graded against the new commit's gold, which
 is what a gold correction wants; if the pages changed too, pass another `--out`.
@@ -320,7 +336,9 @@ is what a gold correction wants; if the pages changed too, pass another `--out`.
 `--score-only` predicts nothing, and grades. `--retry-failed` predicts again
 the outputs whose failure may not recur: a timeout, an outage, a 429 or 5xx (Cloudflare's 520 to 524
 too), or a failure with no HTTP status. A 400, a vendor's failed job, or an LLM reply that was
-truncated, refused or unusable is an answer, and is not retried.
+truncated, refused or unusable is an answer, and is not retried. It decides from each failed call's
+`class` and `status` in the record; a record's `transient` says something else, whether the call was
+tried again within itself (a 429 or 5xx), which a timeout never is.
 
 An output whose answer arrived but didn't parse is fixed for free: after a parsing fix,
 `opb reparse RUN_DIR` reads every record's outputs again from its saved answers, and
@@ -371,9 +389,14 @@ benchmark.grade(run, every)
   so a smaller loop never shrinks a run's scores), fresh, writes `scores.jsonl` and `summary.json`
   whole, and returns the summary. A page with no prediction is pending only when the run never
   attempted it (no record either); otherwise all its tests fail. A run never prepared is refused;
-- `read_scores(run)` reads the run's score lines back, in file order. Each page's tests are read from its gold file (`page.gt_path`) when it is
-  graded, once per process: a gold file edited in a process that has already graded it is not read
-  again until the process restarts; and
+- `read_scores(run)` reads the run's score lines back, in file order; `[]` for a run never graded, and
+  a folder that doesn't exist is refused; and
+- `owed(plan, run)` is `(to predict, to grade)`: how many of the plan's pages the run will predict,
+  and how many of the manifest's pages it will then grade, as `describe` shows them.
+
+Each page's tests are read from its gold file (`page.gt_path`) when it is graded, once per process: a
+gold file edited in a process that has already graded it is not read again until the process
+restarts.
 
 The folder is then exactly one `opb benchmark` writes, so either can resume or grade it.
 
@@ -438,6 +461,33 @@ pages/<page_id>.pdf     the page that gets sent (or .png)
 gold/<page_id>.json     its tests: {"tests": [...]}
 ```
 
+Paths are relative to the dataset's folder and stay inside it. A gold file is named for its page,
+`<page_id>.json`, in any folder; a page file may have any name, and pages may share one. A page whose
+suite is null or empty is in the suite `"other"` (`data.NO_SUITE`), with any real suite of that name.
+
+A test is a JSON object with `id`, `test_type`, `output_type` (what the type reads), `derivation`,
+`tags`, `args` and `settings`. One of each type:
+
+```json
+{"id": "t1", "test_type": "present", "output_type": "html", "derivation": "authored", "tags": ["math"],
+ "args": {"content": {"latex": "f(0)"}}, "settings": {}}
+{"id": "t2", "test_type": "order", "output_type": "html", "derivation": "authored", "tags": ["eng"],
+ "args": {"before": {"text": "May 22nd, 1914.", "max_diffs": 0},
+          "after": {"text": "Theodore Roosevelt", "max_diffs": 0}}, "settings": {}}
+{"id": "t3", "test_type": "repeat", "output_type": "html", "derivation": "authored", "tags": ["table"],
+ "args": {"content": {"text": "$ 422,091", "max_diffs": 0}}, "settings": {"expected_count": 3}}
+{"id": "t4", "test_type": "table_cell", "output_type": "html", "derivation": "authored", "tags": ["table"],
+ "args": {"cell": {"text": "5%", "max_diffs": 0}, "up": {"text": "7%", "max_diffs": 0}}, "settings": {}}
+{"id": "t5", "test_type": "layout_kind", "output_type": "blocks", "derivation": "authored", "tags": ["table"],
+ "args": {"content": {"text": "6.00", "max_diffs": 0, "place": [[0.303, 0.533, 0.314, 0.54]]}},
+ "settings": {"kind": "table"}}
+```
+
+`opb check --dataset DIR [--manifest M]` says whether a dataset is one opb can run: its manifest, that
+every file it names exists, and every gold (`unit_tests.check`); the first problem is printed, naming
+its row. A dataset that passes prints `{"ok": true, "manifest": ..., "pages": N, "suites": N,
+"inputs": N}`, `inputs` being the distinct page files (fewer than `pages` when pages share one).
+
 The dataset is the source of truth: a correction is an edit to a gold file, and a dropped page is
 removed with its files and its manifest row. The pages' licenses are in `licenses/`.
 
@@ -496,18 +546,22 @@ output your system failed on is `null`), and grade the folder:
 opb grade mine/ --unsupported blocks      # mine/predictions/<page_id>.json, one per page you predicted
 ```
 
-`--unsupported` names the outputs your system can't produce, once for the folder; their tests are
-`unsupported` rather than failed, and it is kept in `mine/settings.json`. An output a page asks for
+`--unsupported` names the outputs your system can't produce, once for the folder (`--unsupported` with
+none for none); their tests are `unsupported` rather than failed. The folder's first grading that
+succeeds writes `mine/settings.json` with the dataset, the manifest and `unsupported`, so a later
+`opb grade mine/` needs no flags, and another `--dataset` or `--manifest` is refused; a grading that
+fails writes nothing. `--unsupported` is refused on a run's folder, whose adapter says it. An output a page asks for
 that its prediction leaves out fails, so leaving out a hard page's output can't take it out of the
 score. A page with no prediction fails, every test of it: your folder is your submission, so a page
 left out is one your system didn't answer. To grade part of the dataset on purpose, pass `--suites`.
 The folder gets `scores.jsonl` and `summary.json`, as a run's does. Grading says how many files in
-`predictions/` are named for no page (left out), and how many couldn't be read or hold no output type
-(graded as failed); keys other than output types are ignored.
+`predictions/` are named for no page of the manifest (left out), and how many couldn't be read or hold
+no output type (graded as failed); keys other than output types are ignored. A prediction is read only
+under its exact name, case too, so a folder grades the same on every disk.
 
 A run's folder is graded against the dataset and manifest its `settings.json` names, so
-`opb grade runs/<run>` needs no `--dataset`; another dataset than the run's is refused. `--suites`
-on a run's folder replaces its summary of every suite, and says so.
+`opb grade runs/<run>` needs no `--dataset`; another dataset or manifest than the run's is refused.
+`--suites` on a folder already graded replaces its summary of every suite, and says so.
 
 ### Exploring the tests
 
@@ -649,20 +703,26 @@ and cost:
 ```json
 {"headline": 0.905, "families": {"...": "..."}, "documents": 2343, "html": {"...": "..."}, "blocks": {"...": "..."},
  "per_suite": {"...": "..."}, "per_derivation": {"...": "..."},
- "scorer": "0.1.1+a09ce5ecf32a", "pages": 2937, "pending": 0, "usd": 13.668,
- "credits": 0}
+ "scorer": "0.1.1+a09ce5ecf32a", "pages": 2937, "failed": 12, "pending": 0,
+ "suites": {"olmo_arxiv_math": {"pages": 180, "failed": 1, "pending": 0}, "...": "..."},
+ "usd": 13.668, "credits": null}
 ```
 
+- `headline` is null while any page is `pending`: a run has a headline only once it is finished;
+  the other scores stand, over the pages graded so far;
 - `scorer` is the package version and a digest of its scoring code, which graded it;
-- `pages` is how many pages were graded, and `pending` how many of the dataset's pages the run
-  never attempted (no prediction and no record); and
-- `usd` and `credits` are what the vendor said the calls cost.
+- `pages` is how many pages were graded, `failed` how many of them have an output missing or null
+  that the system can produce, and `pending` how many of the dataset's pages the run never attempted
+  (no prediction and no record); `suites` counts the three per suite; and
+- `usd` and `credits` are what the vendor said the calls cost; `credits` is null when no call
+  reported any.
 
 ### records/&lt;page_id&gt;.json
 
 Everything about one page's prediction, for an audit: the record `predict` returns (outputs, errors,
 calls, raw answers, settings), with the time it was captured. Grading reads only its cost. Each call keeps its timeout (`timeout_s`) and its
-failure (`class`, `status`, `transient`), which `--retry-failed` reads. The raw answers are what
+failure (`class`, `status`, `transient`): `--retry-failed` reads its `class` and `status`, and
+`transient` says whether the call was tried again within itself. The raw answers are what
 `opb reparse` reads. A record from before this version may also hold `page_sha256`; it is ignored.
 
 ### predictions/&lt;page_id&gt;.json
