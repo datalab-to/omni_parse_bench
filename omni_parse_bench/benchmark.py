@@ -293,7 +293,7 @@ def owed(p: Plan, r: Run) -> tuple[int, int]:
     for g in p.pages:
         coming = not p.score_only and bool(needs(r, g, p.retry_failed))
         predict += coming
-        grade += coming or predicted(r, g.page_id) is not None
+        grade += coming or predicted(r, g.page_id) is not None or recorded(r, g.page_id) is not None
     return predict, grade
 
 
