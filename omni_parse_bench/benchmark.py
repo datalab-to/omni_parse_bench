@@ -162,7 +162,8 @@ def predicted(run: Run, page_id: str) -> dict | None:
     has none, or none readable as a JSON object. Other keys are kept and ignored, as `scorer.score` ignores
     them. Quiet: `grade` says once how many it couldn't read."""
     try:
-        got = json.loads((run.predictions / f"{page_id}.json").read_text())
+        # Note: utf-8-sig, so a file saved with a byte-order mark (Windows Notepad) reads as its JSON.
+        got = json.loads((run.predictions / f"{page_id}.json").read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return None
     return got if isinstance(got, dict) else None
@@ -371,7 +372,7 @@ def _per_adapter(workers: Mapping[str, int]) -> dict[str, int]:
 def owed(p: Plan, run: Run) -> tuple[int, int]:
     """How many pages the run will predict, and then grade, by the rules `predict_all` and `grade_all`
     follow: it predicts the plan's pages it still needs, and grades every page of the manifest it will have
-    attempted (`_tried`; the rest are pending), or every page in a folder without records/."""
+    attempted (`_tried`; the rest are pending), or every page in a folder of your own (`is_run`)."""
     coming = set() if p.score_only else {g.page_id for g in p.pages if needs(run, g, p.retry_failed)}
     _, every = data.read_manifest(p.dataset, p.manifest)
     if p.score_only and not is_run(_said(run.out)): return 0, len(every)

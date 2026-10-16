@@ -69,7 +69,8 @@ Grading:
   missing or null that the system can produce) and, per suite, `pages`, `failed` and `pending`;
   `pages_pending` is `pending`; `credits` is null when no call reported any;
 - a prediction is read only under its exact name, case too, so a folder grades the same on every disk;
-  any JSON object is a prediction, keys other than output types ignored. Grading warns once about files
+  any JSON object is a prediction, keys other than output types ignored, and a UTF-8 byte-order mark is
+  read through. Grading warns once about files
   named for no page, predictions it couldn't read, and predictions holding no output type (both graded
   as failed);
 - `owed` counts what grading will grade over the whole manifest, by the same rule as `grade`; and

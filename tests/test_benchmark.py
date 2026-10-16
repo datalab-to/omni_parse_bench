@@ -1462,3 +1462,13 @@ def test_a_wholly_unsupported_output_keeps_its_count(tmp_path, monkeypatch):
     p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data", blocks=True))
     (s,) = benchmark.execute(p, say=QUIET).values()
     assert s["blocks"]["score"] is None and s["blocks"]["unsupported"] == 1
+
+
+def test_a_prediction_with_a_byte_order_mark_reads_as_its_json(tmp_path):
+    ds = dataset(tmp_path / "data")
+    mine = own(tmp_path, ds, {})
+    bom = b"\xef\xbb\xbf"
+    (mine / "predictions" / "a-p0.json").write_bytes(bom + json.dumps({"html": "<p>alpha</p>"}).encode())
+    (mine / "settings.json").write_text(json.dumps({"unsupported": []}))
+    s = benchmark.grade(benchmark.Run("mine", {}, mine), data.read_manifest(ds)[1], say=QUIET)
+    assert s["failed"] == 0 and s["html"]["score"] == 1.0
