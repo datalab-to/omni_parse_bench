@@ -164,9 +164,10 @@ def normal(manifest: str) -> str:
     refuses a path that isn't inside the dataset, absolute or with `..`."""
     m = PurePosixPath(manifest)
     if m.is_absolute() or ".." in m.parts:
+        here = (f"; for this one, pass --dataset {Path(manifest).parent} --manifest {Path(manifest).name}"
+                if Path(manifest).is_file() else "")
         raise ManifestError(f"--manifest {manifest} must be a path inside the dataset, relative to it, e.g. "
-                            "manifests/sample.parquet: pass --dataset the dataset's folder, and --manifest "
-                            "the manifest's path in there")
+                            f"manifests/sample.parquet{here}")
     return m.as_posix()
 
 
