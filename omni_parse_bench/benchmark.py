@@ -300,6 +300,7 @@ def plan(providers: Sequence[str], *, out: str | Path = Path("runs"),
     seconds per call; 0 takes `harness.DEFAULT_TIMEOUT`."""
     from omni_parse_bench import harness
 
+    dataset, manifest = data.located(dataset, manifest)
     if isinstance(providers, str):
         raise TypeError(f"providers is a list of names, not the string {providers!r}; pass [{providers!r}]")
     if isinstance(workers, bool) or not isinstance(workers, int | Mapping):

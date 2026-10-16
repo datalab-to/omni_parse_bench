@@ -112,6 +112,8 @@ Datasets:
 
 - a dataset may hold several manifests: `read_manifest(dataset, manifest="manifest.parquet")` and
   `--manifest` (a path inside the dataset) on `benchmark`, `grade`, `check` and `tests`;
+- a manifest may also be given whole, `hf://datasets/<org>/<name>[@<revision>]/<path>`, as
+  omni-extract-bench took it before 1.0: `data.located` splits it into its dataset and its path;
 - a `doc_path` is any relative path inside the dataset to a .pdf or .png, and pages may share one; a
   `gt_path` is a relative path inside the dataset named `<page_id>.json` (both were exactly `pages/...`
   and `gold/...`); a page_id is a filename, unique ignoring case; a null or empty suite is `"other"`
@@ -136,7 +138,7 @@ The command line:
 - the closing hint counts only the pages `--retry-failed` would predict again;
 - `opb benchmark -y`, and `--score-only`, which spends nothing, print the plan and don't ask; a declined
   plan prints `nothing run`; the question goes to stderr; with no terminal to ask (a pipe, a notebook,
-  CI), `opb benchmark` refuses unless given `-y`;
+  CI), `opb benchmark` goes ahead without asking, as before;
 - a bug of ours is a traceback and exits 1, as a `UsageError` or a `Stop` does; stderr tells them apart;
 - `opb check` (new) says whether a dataset is one opb can run: its manifest, every file it names, and
   every gold; it names the page and column of a missing file;

@@ -101,13 +101,12 @@ def confirm_plan(plan: Any) -> bool:
     """Show what the benchmark is about to do, and ask; `-y` / `--yes` skips this entirely. The plan and the
     question go to stderr, leaving stdout for the summaries.
 
-    Note: with no terminal to ask (a pipe, a notebook, CI), the run is refused rather than taken as consent:
-    it costs money, and a script says so once with `-y`."""
+    Note: with no terminal to ask (a pipe, a notebook, CI), it goes ahead: a command that was scripted was
+    meant to run, as 0.x did. `-y` says so explicitly."""
     from rich import console
 
     console.Console(stderr=True, highlight=False).print(progress.plan_view(plan))
-    if not sys.stdin.isatty():
-        raise errors.UsageError("no terminal to ask before calling vendors; pass -y to run")
+    if not sys.stdin.isatty(): return True
     sys.stderr.write("  proceed? [y/N] ")
     sys.stderr.flush()
     try:
@@ -190,6 +189,7 @@ def cmd_grade(a: argparse.Namespace) -> int:
     first grading succeeds."""
     out = Path(a.run)
     benchmark.gradable(out)   # Note: first, so a mistyped folder is named before a dataset is read.
+    a.dataset, a.manifest = data.located(a.dataset, a.manifest)
     said = benchmark.settled(out, a.dataset, a.manifest)
     if a.unsupported is not None:
         if benchmark.is_run(said):
@@ -217,7 +217,7 @@ def cmd_check(a: argparse.Namespace) -> int:
     """`opb check`: whether a dataset is one opb can run, stopping at the first problem: its manifest
     (`data.read_manifest`), every file the manifest names on disk, and every gold (`unit_tests.check`).
     It opens no input and runs no test; docs/API.md lists every rule."""
-    _, pages = data.read_manifest(a.dataset, a.manifest)
+    _, pages = data.read_manifest(*data.located(a.dataset, a.manifest))
     if missing := [f"{p.page_id} {c} {f}" for p in pages for c, f in (("doc_path", p.doc_path),
                    ("gt_path", p.gt_path)) if not f.is_file()]:
         raise errors.UsageError(f"files the manifest names that don't exist: "
@@ -232,7 +232,7 @@ def cmd_check(a: argparse.Namespace) -> int:
 def cmd_tests(a: argparse.Namespace) -> int:
     """Every test of a dataset as a JSON line, with its page's id, suite and document: a flat table
     to query (polars, DuckDB, pandas), made from the gold files and never stored."""
-    _, pages = data.read_manifest(a.dataset, a.manifest)
+    _, pages = data.read_manifest(*data.located(a.dataset, a.manifest))
     scorer.check(pages)   # Note: first, so only a dataset that checks is written out.
     for p in pages:
         for t in json.loads(Path(p.gt_path).read_text())["tests"]:

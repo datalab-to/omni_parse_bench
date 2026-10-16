@@ -1508,12 +1508,14 @@ def test_a_prediction_with_a_byte_order_mark_reads_as_its_json(tmp_path):
 
 # Final pre-release fixes.
 
-def test_benchmark_with_no_terminal_needs_yes_and_its_question_goes_to_stderr(tmp_path, monkeypatch, capsys):
+def test_benchmark_with_no_terminal_goes_ahead_and_its_question_goes_to_stderr(tmp_path, monkeypatch, capsys):
     use(monkeypatch, {"stub": stub()})
     ds = dataset(tmp_path / "data")
     argv = ["benchmark", "--providers", "stub", "--dataset", ds, "--out", str(tmp_path / "runs")]
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-    assert cli.main(argv) == 1 and not (tmp_path / "runs").exists(), "no terminal and no -y: nothing run"
+    monkeypatch.setattr("builtins.input", lambda *a: pytest.fail("no terminal: nothing to ask"))
+    assert cli.main(argv) == 0 and (tmp_path / "runs").exists(), "no terminal: a scripted command runs"
+    argv[-1] = str(tmp_path / "runs2")
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     monkeypatch.setattr("builtins.input", lambda *a: "n")
     capsys.readouterr()
@@ -1605,3 +1607,16 @@ def test_grade_on_the_parent_of_run_folders_names_them(tmp_path):
     (tmp_path / "runs" / "stub-1" / "predictions").mkdir(parents=True)
     with pytest.raises(UsageError, match="stub-1"):
         benchmark.gradable(tmp_path / "runs")
+
+
+def test_a_manifest_given_whole_is_split_into_its_dataset_and_its_path():
+    """omni-extract-bench before 1.0 named a manifest hf://datasets/<org>/<name>/<path>; it still works."""
+    hub = "hf://datasets/someone/theirs"
+    assert data.located(None, f"{hub}/manifests/s.parquet") == (hub, "manifests/s.parquet")
+    assert data.located(data.DEFAULT_DATASET, f"{hub}@v2/m.parquet") == (f"{hub}@v2", "m.parquet")
+    assert data.located(f"{hub}@v1", f"{hub}/m.parquet") == (f"{hub}@v1", "m.parquet"), "--dataset's revision"
+    assert data.located("ds", "manifest.parquet") == ("ds", "manifest.parquet"), "a path inside it stands"
+    with pytest.raises(data.ManifestError, match="someone/theirs"):
+        data.located("hf://datasets/other/one", f"{hub}/m.parquet")
+    with pytest.raises(data.ManifestError):
+        data.located(None, hub)
