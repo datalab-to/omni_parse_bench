@@ -897,6 +897,29 @@ def test_pages_may_share_an_input_file(tmp_path):
     assert len(pages) == 2 and pages[0].doc_path == pages[1].doc_path
 
 
+@pytest.mark.parametrize("suite, read", [(None, "other"), ("", "other"), ("tables", "tables")])
+def test_a_page_with_no_suite_is_in_other(tmp_path, suite, read):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    ds = pathlib.Path(dataset(tmp_path / "data"))
+    (row,) = pq.read_table(ds / "manifest.parquet").to_pylist()
+    pq.write_table(pa.Table.from_pylist([row | {"suite": suite}]), ds / "manifest.parquet")
+    assert data.read_manifest(ds)[1][0].suite == read
+
+
+def test_a_page_id_must_be_a_filename(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    ds = pathlib.Path(dataset(tmp_path / "data"))
+    (row,) = pq.read_table(ds / "manifest.parquet").to_pylist()
+    pq.write_table(pa.Table.from_pylist([row | {"page_id": "a/p0", "gt_path": "gold/a/p0.json"}]),
+                   ds / "manifest.parquet")
+    with pytest.raises(data.ManifestError, match="page_id must be a filename"):
+        data.read_manifest(ds)
+
+
 def test_page_ids_must_differ_by_more_than_case(tmp_path):
     import pyarrow as pa
     import pyarrow.parquet as pq

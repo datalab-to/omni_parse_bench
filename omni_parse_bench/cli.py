@@ -83,10 +83,11 @@ def cmd_check(a: argparse.Namespace) -> int:
     """`opb check`: whether a dataset is one opb can run. It checks, stopping at the first problem:
 
         1. the manifest, as `data.read_manifest` does: the columns page_id, document, suite, doc_path,
-           gt_path and outputs are there; the first five are non-empty strings; each doc_path is a
-           relative path inside the dataset to a .pdf or .png; each gt_path is a relative path inside
-           the dataset named `<page_id>.json`; each outputs is a non-empty list of distinct output
-           types; and page ids are unique, ignoring case;
+           gt_path and outputs are there; page_id, document, doc_path and gt_path are non-empty
+           strings; each page_id is a filename; each suite is a string, or null for "other"; each
+           doc_path is a relative path inside the dataset to a .pdf or .png; each gt_path is a
+           relative path inside the dataset named `<page_id>.json`; each outputs is a non-empty list
+           of distinct output types; and page ids are unique, ignoring case;
         2. every doc_path and gt_path exists as a file; and
         3. every gold, as `unit_tests.check` does: it is JSON holding only `tests`, a list; each test
            has exactly the fields a test has, a non-empty id, a known test_type reading its own

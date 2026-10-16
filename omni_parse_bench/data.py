@@ -32,7 +32,8 @@ DEFAULT_DATASET = "hf://datasets/datalab-to/omni_parse_bench"
 DOWNLOAD_ATTEMPTS = 5
 MANIFEST = "manifest.parquet"
 PAGE_FIELDS = ("page_id", "document", "suite", "doc_path", "gt_path", "outputs")
-NAMES = PAGE_FIELDS[:-1]    # the fields that are names and paths: non-empty strings
+NAMES = ("page_id", "document", "doc_path", "gt_path")    # names and paths: non-empty strings
+NO_SUITE = "other"          # the suite of a page whose manifest gives none (null or "")
 OUTPUTS = frozenset(vocab.READS.values())     # the output types a test can read: html, blocks
 # Note: the dataset's commits before 41131f2 (175cc91, 1c35a52) have no outputs column; omni-parse-bench
 # 0.1.x reads them.
@@ -199,6 +200,11 @@ def _page(r: Mapping[str, Any]) -> Page:
         raise ManifestError(f"{where} lacks {missing}")
     if not all(isinstance(r[f], str) and r[f].strip() for f in NAMES):
         raise ManifestError(f"{where}: {list(NAMES)} must be non-empty strings")
+    if r["page_id"] in (".", "..") or Path(r["page_id"]).name != r["page_id"]:
+        raise ManifestError(f"{where}: page_id must be a filename, one path component: it names the page's "
+                            "prediction, its record and its gold")
+    if r["suite"] is not None and not isinstance(r["suite"], str):
+        raise ManifestError(f"{where}: suite must be a string, or null for {NO_SUITE!r}, not {r['suite']!r}")
     if not _inside(r["doc_path"], (".pdf", ".png")):
         raise ManifestError(f"{where}: doc_path must be a path inside the dataset to a .pdf or .png, "
                             f"e.g. pages/{r['page_id']}.pdf, not {r['doc_path']!r}")
@@ -211,7 +217,8 @@ def _page(r: Mapping[str, Any]) -> Page:
         raise ManifestError(f"{where}: outputs must be a non-empty list of distinct output types from "
                              f"{sorted(OUTPUTS)}, not {outputs!r}")
     extra = {k: v for k, v in r.items() if k not in PAGE_FIELDS}
-    return Page(r["page_id"], r["document"], r["suite"], r["doc_path"], r["gt_path"], tuple(sorted(outputs)),
+    suite = r["suite"] if (r["suite"] or "").strip() else NO_SUITE
+    return Page(r["page_id"], r["document"], suite, r["doc_path"], r["gt_path"], tuple(sorted(outputs)),
                 extra)
 
 
