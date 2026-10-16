@@ -117,6 +117,7 @@ def download_dataset(dataset: str | Path) -> Path:
     from huggingface_hub import snapshot_download
 
     repo, revision = at
+    log.info("reading %s from the Hugging Face cache, downloading what it lacks", dataset)
     # Note: thousands of small files; the Hub drops some requests under that load, and a download
     # picks up where the last left off, so it is simply tried again. A missing repo, revision or
     # access, or no network with nothing cached, is the same on every attempt, so it fails at once.
