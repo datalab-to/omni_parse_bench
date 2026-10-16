@@ -51,6 +51,7 @@ Datasets:
   `gt_path` may be any path inside the dataset named for its page (was exactly `pages/...` and
   `gold/...`), and `unit_tests.check` no longer refuses a gold file its manifest doesn't name;
 - `record(run, page_id, result)`: the argument is what `harness.predict` returned (it was `new`);
+- `plan` warns when a run made at one commit of its dataset is planned at another, and carries on;
 - a manifest may carry columns of its own: they're kept on `page.extra`, never refused; and
 - `Page` is a frozen dataclass (it was a NamedTuple), with `id`, the page's `page_id`.
 

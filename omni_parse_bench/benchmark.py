@@ -232,14 +232,31 @@ def plan(providers: list[str], *, out: str | Path = Path("runs"), dataset: str =
         raise ValueError(f"run {twice[0]} is asked for more than once: the same provider with the same "
                          "settings (an option set to its default is the same setting); drop the repeat from "
                          "--providers or --options")
-    ps = data.select(data.read_manifest(dataset, manifest)[1], suites, limit, sample, only)
+    root, every = data.read_manifest(dataset, manifest)
+    ps = data.select(every, suites, limit, sample, only)
+    commit = root.name if str(dataset).startswith(data.HF_PREFIX) else None
     ident = data.dataset_id(dataset)
     for r in runs:
-        if (was := (_read_json(r.out / "settings.json") or {}).get("dataset", ident)) != ident:
+        said = _read_json(r.out / "settings.json") or {}
+        if (was := said.get("dataset", ident)) != ident:
             raise ValueError(f"{r.out} is a run on dataset {was}, not {ident}, and a run never mixes "
                              f"datasets; pass another --out, or --dataset {was}")
+        if (msg := _another_commit(r, said.get("commit"), commit)) is not None:
+            log.warning("%s", msg)
     return Plan(runs, ps, str(dataset), manifest, timeout or harness.DEFAULT_TIMEOUT, workers, score_only,
                 retry_failed)
+
+
+def _another_commit(r: Run, was: str | None, now: str | None) -> str | None:
+    """A warning when a run made at one commit of its dataset is planned at another, else None.
+
+    Note: warned, not refused: a new commit is usually a gold correction, which grading takes in on its
+    own. But the run's pages were predicted at the old commit, so a changed page would be graded on an
+    old prediction; a new --out keeps the two apart."""
+    if was is None or now is None or was == now: return None
+    return (f"{r.out} was predicted at commit {was} of its dataset, and this is commit {now}: its "
+            "predictions will be graded against this commit's gold. If the pages changed, pass another "
+            "--out to predict them again")
 
 
 def _workers_for(adapter: str, requested: int | Mapping[str, int] = 0) -> int:

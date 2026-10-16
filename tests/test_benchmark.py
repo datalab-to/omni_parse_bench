@@ -861,3 +861,11 @@ def test_a_path_must_stay_inside_the_dataset_and_name_its_page(tmp_path, column,
     pq.write_table(pa.Table.from_pylist([rows[0] | {column: value}]), ds / "manifest.parquet")
     with pytest.raises(data.ManifestError, match=f"{column} must be a path inside the dataset"):
         data.read_manifest(ds)
+
+
+def test_a_run_planned_at_another_commit_of_its_dataset_warns_and_carries_on(tmp_path):
+    r = benchmark.Run("stub", {}, tmp_path / "run")
+    assert benchmark._another_commit(r, "abc", "abc") is None
+    assert benchmark._another_commit(r, None, "abc") is None
+    msg = benchmark._another_commit(r, "abc", "def")
+    assert "commit abc" in msg and "commit def" in msg and "--out" in msg
