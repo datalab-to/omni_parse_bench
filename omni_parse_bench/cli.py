@@ -255,9 +255,10 @@ def cmd_benchmark(a: argparse.Namespace) -> int:
 
 def cmd_grade(a: argparse.Namespace) -> int:
     """Grade a folder of predictions/<page_id>.json, whatever made them, and print its summary, as its
-    summary.json holds it. A folder holds one dataset and one manifest: a run's are in its settings.json, and a folder
-    of your own gets them there (with `--unsupported`, what its system can't produce) once its first
-    grading succeeds, so a later grading needs no flags and another dataset or manifest is refused.
+    summary.json holds it. A folder holds one dataset and one manifest: a run's are in its settings.json,
+    and a folder of your own gets them there (with `--unsupported`, what its system can't produce) once
+    its first grading succeeds, so a later grading needs no flags and another dataset or manifest is
+    refused.
     `--unsupported` is for your own folders: a run's adapter says what it can't produce."""
     import logging
 
