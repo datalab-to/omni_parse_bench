@@ -180,6 +180,9 @@ def config_for(provider: str, options: dict | None = None) -> Any:
     for name, value in options.items():
         if (want := hints.get(name)) in (str, int, float, bool) and not _of(value, want):
             raise base_errors.UsageError(f"{provider}: option {name} is a {want.__name__}, not {value!r}")
+        # Note: NaN and infinity are no JSON, and a run's settings are written as JSON.
+        if not _finite(value):
+            raise base_errors.UsageError(f"{provider}: option {name} is {value!r}; give a finite number")
     # Note: a whole number given for a float option becomes that float, so 0 and the default 0.0 are one
     # setting and name one run, not two.
     options = {k: float(v) if hints.get(k) is float else v for k, v in options.items()}
@@ -188,6 +191,15 @@ def config_for(provider: str, options: dict | None = None) -> Any:
     except ValueError as exc:   # Note: an adapter's own check of a value (`__post_init__`).
         if isinstance(exc, base_errors.UsageError): raise
         raise base_errors.UsageError(f"{provider}: {exc}") from None
+
+
+def _finite(value: Any) -> bool:
+    """Whether `value` is JSON without NaN or infinity anywhere in it."""
+    try:
+        json.dumps(value, allow_nan=False, default=str)
+    except ValueError:
+        return False
+    return True
 
 
 def _of(value: Any, want: type) -> bool:

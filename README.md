@@ -63,7 +63,7 @@ With `[benchmark]` installed, run vendors on the dataset (5 pages here):
 opb benchmark --out runs/ --limit 5 --providers datalab openai/gpt-5.6-sol
 ```
 
-It shows the plan and asks before calling any vendor. A run is resumable. Each setting of a provider is its own run. For example here we have two:
+It shows the plan and asks before calling any vendor; with no terminal to ask (a pipe, a notebook, CI), pass `-y`, or it refuses. A run is resumable. Each setting of a provider is its own run. For example here we have two:
 
 ```bash
 opb benchmark --out runs/ --limit 5 --providers datalab \

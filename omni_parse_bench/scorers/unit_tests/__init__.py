@@ -39,8 +39,7 @@ import statistics
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
-from omni_parse_bench import views, vocab
-from omni_parse_bench.errors import counted
+from omni_parse_bench import errors, views, vocab
 
 from . import runners
 from . import tests as _tests
@@ -92,11 +91,11 @@ def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
     every = tuple(t for p in pages for t in gold(p))
     if twice := [i for i, n in collections.Counter(t.id for t in every).items() if n > 1]:
         raise _tests.GoldError(f"test ids used more than once, across the dataset: "
-                               f"{counted(len(twice), 'id')}, e.g. {twice[:3]}; each test's id is unique in "
-                               "its dataset")
+                               f"{errors.counted(len(twice), 'id')}, e.g. {twice[:3]}; each test's id is "
+                               "unique in its dataset")
     if empty := sorted({p.page_id for p in pages} - {t.page_id for t in every}):
-        raise _tests.GoldError(f"pages with no tests: {counted(len(empty), 'page')}, e.g. {empty[:3]}; "
-                               "remove them or give them tests")
+        raise _tests.GoldError(f"pages with no tests: {errors.counted(len(empty), 'page')}, e.g. "
+                               f"{empty[:3]}; remove them or give them tests")
     return every
 
 
@@ -105,8 +104,9 @@ def score(pred: Mapping[str, Any], gold: Sequence[_tests.Test],
     """One verdict per test of `gold`, the page's tests. `pred` maps an output type to its value, or to
     None when it errored; `unsupported` lists the output types the provider declares it can't produce."""
     if isinstance(unsupported, str) or (bad := sorted(set(unsupported) - set(vocab.OUTPUT_TYPES))):
-        raise ValueError(f"unsupported is a collection of output types from {list(vocab.OUTPUT_TYPES)}, not "
-                         f"{unsupported!r}" + ("" if isinstance(unsupported, str) else f" ({bad} aren't)"))
+        raise errors.UsageError(f"unsupported is a collection of output types from "
+                                f"{list(vocab.OUTPUT_TYPES)}, not {unsupported!r}"
+                                + ("" if isinstance(unsupported, str) else f" ({bad} aren't)"))
     built: dict[str, Any] = {}   # output type -> its view, or the Verdict its tests all get
     out = []
     for t in gold:

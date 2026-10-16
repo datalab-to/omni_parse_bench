@@ -108,10 +108,15 @@ def settled(out: Path, dataset: str | None = None, manifest: str | None = None) 
              ("manifest", manifest and data.normal(manifest)))
     for key, now in asked:
         if now and (was := said.get(key)) and was != now:
-            held = "a run" if is_run(said) else "predictions graded"
-            raise errors.UsageError(f"{out} holds {held} on {key} {was}, not {now}: a folder holds one "
-                                    f"dataset and one manifest; pass --{key} {was}, another folder, or "
-                                    f"delete {out / 'settings.json'} to use it with another")
+            # Note: a run's records are answers for its own dataset's pages; deleting its settings.json would
+            # grade them against another dataset's gold, so a run is only ever given another --out.
+            if is_run(said):
+                raise errors.UsageError(f"{out} holds a run on {key} {was}, not {now}: a run folder holds "
+                                        f"one dataset and one manifest; pass --{key} {was}, or use another "
+                                        "--out")
+            raise errors.UsageError(f"{out} holds predictions graded on {key} {was}, not {now}: a folder "
+                                    f"holds one dataset and one manifest; pass --{key} {was}, another "
+                                    f"folder, or delete {out / 'settings.json'} to grade it on another")
     return said
 
 
@@ -143,19 +148,30 @@ def _said(out: Path) -> dict:
 
 def recorded(run: Run, page_id: str) -> dict | None:
     """The page's record, the audit trail of its calls (`records/`), or None when it has none (or none
-    readable, which is logged)."""
+    readable, which is logged once)."""
     path = run.records / f"{page_id}.json"
     try:
         got = json.loads(path.read_text())
     except FileNotFoundError:
         return None
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        log.warning("%s isn't readable JSON (%s); it is treated as missing", path, exc)
+        _warn_once(path, f"{path} isn't readable JSON ({exc}); it is treated as missing")
         return None
     if not (isinstance(got, dict) and isinstance(got.get("outputs"), dict) and "calls" in got):
-        log.warning("%s isn't a record; it is treated as missing", path)
+        _warn_once(path, f"{path} isn't a record; it is treated as missing")
         return None
     return got
+
+
+_WARNED: set[Path] = set()   # `_warn_once`'s files
+
+
+def _warn_once(path: Path, message: str) -> None:
+    """Logs `message` the first time a file is found unreadable in this process: a record is read by
+    `restore`, `needs` and grading alike, and one warning is enough."""
+    if path in _WARNED: return
+    _WARNED.add(path)
+    log.warning("%s", message)
 
 
 def predicted(run: Run, page_id: str) -> dict | None:
@@ -366,9 +382,9 @@ def _per_adapter(workers: Mapping[str, int]) -> dict[str, int]:
             except errors.UsageError:
                 hint = f"the adapters are {sorted(adapters)}"
             raise errors.UsageError(f"--workers is per adapter, and {key!r} isn't one: {hint}")
-        if isinstance(n, bool) or not isinstance(n, int) or n < 1:
-            raise errors.UsageError(f"--workers gives {key!r} {n!r}; calls at once is a whole number, 1 or "
-                                    "more")
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise errors.UsageError(f"--workers gives {key!r} {n!r}; calls at once is a whole number, or 0 "
+                                    "for the adapter's default")
     return dict(workers)
 
 
@@ -480,8 +496,10 @@ def gradable(out: Path) -> None:
         raise errors.UsageError(f"no folder at {out}; pass the folder holding predictions/<page_id>.json")
     if not (out / "predictions").is_dir():
         loose = sorted(f.name for f in out.glob("*.json") if f.name not in ("settings.json", "summary.json"))
+        runs = sorted(d.name for d in out.iterdir() if (d / "predictions").is_dir())
         hint = (f"; {out} looks like the predictions/ folder itself: pass its parent, {out.parent}"
                 if out.name == "predictions" else
+                f"; it holds run folders: pass one of {', '.join(runs[:5])}" if runs else
                 f"; it holds {errors.counted(len(loose), 'JSON file')} (e.g. {loose[0]}): move them into "
                 f"{out}/predictions/"
                 if loose else "")
@@ -511,12 +529,13 @@ def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = pri
         raise errors.UsageError(f"none of the {errors.counted(len(listed), 'file')} in {run.predictions} "
                                 f"names a page of the {errors.counted(len(pages), 'page')} graded (e.g. "
                                 f"{pages[0].page_id}.json): is --dataset right?")
-    lines, count, calls, unread, keyless = _graded(run, pages, _unsupported(said, run.out), keeps, listed)
+    lines, count, calls, unread, keyless, malformed = _graded(run, pages, _unsupported(said, run.out), keeps,
+                                                              listed)
     summary = _summary(run, said, lines, count, calls)
     _write_text(run.out / "scores.jsonl", "".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines))
     # Note: last, so summary.json always stands beside the scores it summarizes.
     write_json(run.out / "summary.json", summary)
-    _warn_unusable(run, said, pages, listed, unread, keyless)
+    _warn_unusable(run, said, pages, listed, unread, keyless, malformed)
     say(_closing(summary))
     return summary
 
@@ -528,12 +547,13 @@ def is_run(said: Mapping[str, Any]) -> bool:
 
 
 def _graded(run: Run, pages: Sequence[data.Page], cannot: frozenset[str], keeps: bool, listed: frozenset[str]
-            ) -> tuple[list[dict], dict[str, dict[str, int]], list[dict], list[str], dict[str, list[str]]]:
+            ) -> tuple[list[dict], dict[str, dict[str, int]], list[dict], list[str], dict[str, list[str]],
+                       dict[str, str]]:
     """The score lines of the folder's predictions of `pages`; each suite's pages graded, failed (an output
-    the system can produce, missing or null) and pending (only where `keeps`, a run's); the calls its records
-    hold; the pages whose prediction couldn't be read; and those holding no output type, with the keys they
-    hold. Writes nothing."""
-    lines, calls, unread, keyless, count = [], [], [], {}, {}
+    the system can produce, missing, null or malformed) and pending (only where `keeps`, a run's); the calls
+    its records hold; the pages whose prediction couldn't be read; those holding no output type, with the keys
+    they hold; and those with a malformed output, with why. Writes nothing."""
+    lines, calls, unread, keyless, malformed, count = [], [], [], {}, {}, {}
     for g in pages:
         c = count.setdefault(g.suite, {"pages": 0, "failed": 0, "pending": 0})
         if keeps and not _tried(run, g.page_id, listed):
@@ -544,16 +564,22 @@ def _graded(run: Run, pages: Sequence[data.Page], cannot: frozenset[str], keeps:
         if named and pred is None: unread.append(g.page_id)
         if pred and not set(pred) & set(vocab.OUTPUT_TYPES): keyless[g.page_id] = sorted(pred)
         if (rec := recorded(run, g.page_id)) is not None: calls += rec["calls"]
-        c["pages"] += 1
-        c["failed"] += any((pred or {}).get(o) is None for o in set(g.outputs) - cannot)
         try:
-            lines += _grade_page(run, pred or {}, g, _tests(g), cannot)
+            mine = _grade_page(run, pred or {}, g, _tests(g), cannot)
         except Exception as exc:
             if isinstance(exc, errors.UsageError): raise
             exc.add_note(f"{run.out.name}: grading page {g.page_id} raised in our scorer, a bug of ours; "
                          "no scores or summary were written")
             raise
-    return lines, count, calls, unread, keyless
+        # Note: the scorer fails every test of an output of the wrong shape with this why
+        # (`unit_tests._view`).
+        if why := next((x["why"] for x in mine if x["why"].startswith("malformed ")), None):
+            malformed[g.page_id] = why
+        c["pages"] += 1
+        c["failed"] += (g.page_id in malformed
+                        or any((pred or {}).get(o) is None for o in set(g.outputs) - cannot))
+        lines += mine
+    return lines, count, calls, unread, keyless, malformed
 
 
 def _tests(page: data.Page) -> tuple[scorer.Test, ...]:
@@ -589,7 +615,7 @@ def _unsupported(said: Mapping[str, Any], out: Path) -> frozenset[str]:
                                     "none; it is kept for the folder's later gradings")
         raise errors.UsageError(f"{out} doesn't say which outputs its system can't produce (its "
                                 "settings.json has no \"unsupported\"); pass opb grade --unsupported with "
-                                                                    "them, or with none for none")
+                                "them, or with none for none")
     if not (isinstance(got, list) and set(got) <= set(vocab.OUTPUT_TYPES)):
         raise errors.UsageError(f"{out / 'settings.json'}: unsupported must be a list of output types from "
                                 f"{list(vocab.OUTPUT_TYPES)}, not {got!r}")
@@ -615,12 +641,14 @@ def _summary(run: Run, said: Mapping[str, Any], lines: list[dict], count: dict[s
     for x in per.values():
         if x["pending"]: x["headline"] = None
     pending = sum(c["pending"] for c in count.values())
+    # Note: None, not 0, when no call reported one: a vendor billed in credits isn't free.
+    usd = [c["usd"] for c in calls if c.get("usd") is not None]
     credits = [c["credits"] for c in calls if c.get("credits") is not None]
     return {"run": run.out.name, "provider": run.provider, "settings": said.get("settings", {}),
             "scorer": SCORER, **s, "headline": None if pending else s["headline"], "per_suite": per,
             "pages": sum(c["pages"] for c in count.values()),
             "failed": sum(c["failed"] for c in count.values()), "pending": pending,
-            "usd": round(sum(c.get("usd") or 0 for c in calls), 4),
+            "usd": round(sum(usd), 4) if usd else None,
             "credits": round(sum(credits), 4) if credits else None}
 
 
@@ -634,7 +662,7 @@ def _closing(s: dict) -> str:
 
 
 def _warn_unusable(run: Run, said: Mapping[str, Any], pages: Sequence[data.Page], listed: frozenset[str],
-                   unread: list[str], keyless: dict[str, list[str]]) -> None:
+                   unread: list[str], keyless: dict[str, list[str]], malformed: dict[str, str]) -> None:
     """Logs the predictions grading couldn't use: files named for no page of the manifest (left out), those
     that couldn't be read as a JSON object, and those holding no output type (both graded as failed); and a
     grading of fewer pages than the folder's manifest. A naming slip (`<page_id>.pdf.json`, another case, a
@@ -642,9 +670,12 @@ def _warn_unusable(run: Run, said: Mapping[str, Any], pages: Sequence[data.Page]
     whole = _manifest_of(run, said) or pages
     ids = {f"{g.page_id}.json" for g in whole}
     if stray := sorted(n + ("/" if (run.predictions / n).is_dir() else "") for n in listed - ids):
+        folded = {i.casefold(): i for i in ids}
+        meant = next((f"; did you mean {folded[n.casefold()]} for {n}?" for n in stray
+                      if n.casefold() in folded), "")
         log.warning("%s: %s in predictions/ named for no page of the manifest, so left out, e.g. %s; a "
-                    "prediction is predictions/<page_id>.json, named exactly (case too)",
-                    run.out, errors.counted(len(stray), "file"), stray[:3])
+                    "prediction is predictions/<page_id>.json, named exactly (case too)%s",
+                    run.out, errors.counted(len(stray), "file"), stray[:3], meant)
     if unread:
         log.warning("%s: %s couldn't be read as a JSON object, so %s graded as failed, e.g. %s", run.out,
                     errors.counted(len(unread), "prediction"),
@@ -656,6 +687,11 @@ def _warn_unusable(run: Run, said: Mapping[str, Any], pages: Sequence[data.Page]
                     "holds" if len(keyless) == 1 else "hold",
                     list(vocab.OUTPUT_TYPES), "its page was" if len(keyless) == 1 else "their pages were", k,
                     keys[:5])
+    if malformed:
+        k, why = next(iter(malformed.items()))
+        log.warning("%s: %s %s a malformed output, so %s graded as failed, e.g. %s: %s", run.out,
+                    errors.counted(len(malformed), "prediction"), "holds" if len(malformed) == 1 else "hold",
+                    "its page was" if len(malformed) == 1 else "their pages were", k, why)
     if len(pages) < len(whole):
         log.warning("%s: graded %s of its manifest's %d, so its summary covers only those; grade_all passes "
                     "the whole manifest", run.out, errors.counted(len(pages), "page"), len(whole))

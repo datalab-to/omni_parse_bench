@@ -160,8 +160,14 @@ def dataset_id(dataset: str | Path) -> str:
 
 
 def normal(manifest: str) -> str:
-    """A manifest's path in its dataset, spelled one way: `./manifest.parquet` is `manifest.parquet`."""
-    return PurePosixPath(manifest).as_posix()
+    """A manifest's path in its dataset, spelled one way (`./manifest.parquet` is `manifest.parquet`);
+    refuses a path that isn't inside the dataset, absolute or with `..`."""
+    m = PurePosixPath(manifest)
+    if m.is_absolute() or ".." in m.parts:
+        raise ManifestError(f"--manifest {manifest} must be a path inside the dataset, relative to it, e.g. "
+                            "manifests/sample.parquet: pass --dataset the dataset's folder, and --manifest "
+                            "the manifest's path in there")
+    return m.as_posix()
 
 
 def commit(dataset: str | Path, root: Path) -> str | None:
@@ -180,10 +186,6 @@ def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, 
         raise ImportError("omni-parse-bench reads the manifest with pyarrow: "
                           "pip install 'omni-parse-bench[benchmark]'") from None
     manifest = normal(manifest)
-    if Path(manifest).is_absolute() or ".." in Path(manifest).parts:
-        raise ManifestError(f"--manifest {manifest} must be a path inside the dataset, relative to it, e.g. "
-                            "manifests/sample.parquet: pass --dataset the dataset's folder, and --manifest "
-                            "the manifest's path in there")
     root = download_dataset(dataset).resolve()
     if not (root / manifest).is_file():
         # Note: a manifest is a path inside the dataset; one given as a path on disk is a common slip.
@@ -206,7 +208,8 @@ def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, 
     for p in rows: by.setdefault(p.page_id.casefold(), []).append(p.page_id)
     if twice := [ids for ids in by.values() if len(ids) > 1]:
         raise ManifestError(f"page ids in the manifest more than once (ignoring case, since each names "
-                            f"files): {errors.counted(len(twice), 'id')}, e.g. {twice[:3]}")
+                            f"files): {errors.counted(len(twice), 'id')}, e.g. "
+                            + "; ".join(" and ".join(ids) for ids in twice[:3]))
     return root, rows
 
 

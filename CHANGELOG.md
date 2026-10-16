@@ -69,13 +69,13 @@ Grading:
 - while any page is pending, `headline` is null, overall and for each suite with pending pages: a run
   has a headline only once it is finished;
 - summary.json starts with `run`, `provider` and `settings`; it gains `failed` (pages with an output
-  missing or null that the system can produce) and, per suite, `pages`, `failed` and `pending`;
-  `pages_pending` is `pending`; `credits` is null when no call reported any;
+  missing, null or malformed that the system can produce) and, per suite, `pages`, `failed` and
+  `pending`; `pages_pending` is `pending`; `usd` and `credits` are each null when no call reported it;
 - a prediction is read only under its exact name, case too, so a folder grades the same on every disk;
   any JSON object is a prediction, keys other than output types ignored, and a UTF-8 byte-order mark is
   read through. Grading warns once about files
-  named for no page, predictions it couldn't read, and predictions holding no output type (both graded
-  as failed);
+  named for no page (with "did you mean" for a slip of case), predictions it couldn't read, predictions
+  holding no output type, and predictions with a malformed output (all graded as failed);
 - `owed` counts what grading will grade over the whole manifest, by the same rule as `grade`; and
 - score lines carry only the `scorer` stamp; the prediction and gold digests are gone.
 
@@ -84,10 +84,12 @@ Runs and folders:
 - a folder holds one dataset and one manifest: `plan` and `opb grade` refuse another, in one wording.
   `opb grade` reads them from the folder's settings.json when not given; a folder of your own gets them
   there, with `unsupported` (required on its first grading), once its first grading succeeds (a
-  failed one writes no settings, scores or summary); another
-  `--unsupported` is refused too, and every refusal says the folder's settings.json can be deleted to
-  start over. `--unsupported` is refused on a run's folder; a manifest's path is spelled one way
-  (`./manifest.parquet` is `manifest.parquet`, `data.normal`);
+  failed one writes no settings, scores or summary); another `--unsupported` is refused too. A folder of
+  your own's refusal says its settings.json can be deleted to start over; a run's says to use another
+  `--out`, since its records are answers for its own dataset's pages. The rule is per run folder;
+  `--out` is only their parent. `--unsupported` is refused on a run's folder; a manifest's path is
+  spelled one way (`./manifest.parquet` is `manifest.parquet`, `data.normal`), and one outside the
+  dataset is refused before anything is compared;
 - the record is the source of truth for an answer: a prediction lost or unreadable beside its record is
   rebuilt from it, with no call, whenever the run is graded (`--score-only` and `opb grade` too) and by
   `opb reparse`;
@@ -133,7 +135,9 @@ The command line:
   one of these, not an argparse error;
 - the closing hint counts only the pages `--retry-failed` would predict again;
 - `opb benchmark -y`, and `--score-only`, which spends nothing, print the plan and don't ask; a declined
-  plan prints `nothing run`;
+  plan prints `nothing run`; the question goes to stderr; with no terminal to ask (a pipe, a notebook,
+  CI), `opb benchmark` refuses unless given `-y`;
+- a bug of ours is a traceback and exits 1, as a `UsageError` or a `Stop` does; stderr tells them apart;
 - `opb check` (new) says whether a dataset is one opb can run: its manifest, every file it names, and
   every gold; it names the page and column of a missing file;
 - `opb score` names the flag and file of a missing or non-object prediction, and a record passed as
@@ -141,4 +145,7 @@ The command line:
   checks every record before rewriting any, rebuilds lost predictions, and says to regrade; an unknown
   option is named, with the nearest one; a folder of loose `<page_id>.json` files is told to move them
   into `predictions/`; and
-- a `--pages` file skips blank lines and `#` comments; `--options` says when a path doesn't exist.
+- a `--pages` file skips blank lines and `#` comments; `--options` says when a path doesn't exist; files
+  given to the command line may start with a UTF-8 byte-order mark; an option of NaN or infinity is
+  refused; `--workers` takes 0 for one adapter as its default; and `opb score --pred` given a gold file
+  says so.

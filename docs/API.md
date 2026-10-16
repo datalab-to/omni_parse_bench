@@ -251,8 +251,9 @@ opb benchmark --providers datalab openai/gpt-5.6-sol --out runs/ --limit 5
 ```
 
 It shows the plan (each run, its settings, and how many pages it will predict and grade) and, in a
-terminal, asks before calling any vendor; `-y` skips the question, and a script or pipe proceeds
-without it; with `-y`, or with `--score-only`, which spends nothing, it prints the plan and goes on.
+terminal, asks before calling any vendor, the question on stderr; `-y` skips the question. With no
+terminal to ask (a pipe, a notebook, CI) it refuses unless given `-y`, since a run costs money; with
+`-y`, or with `--score-only`, which spends nothing, it prints the plan and goes on.
 It prints each run's summary to stdout, by run name, as its summary.json holds it, and each run's
 closing line to stderr: `<run>: headline 0.905; 2937 of 2937 pages graded, 12 failed`, or, while pages
 are pending, `headline — (3 pending: a headline needs every page)`. When pages failed it says that
@@ -264,7 +265,8 @@ raises is a bug of ours, never the provider's fault: grading stops with the trac
 the page and the test, and that run writes no scores or summary (a lost prediction may already have
 been rebuilt from its record), since a score with that test left out would be
 wrong. Runs are graded one after another, so those graded before it keep their new files, each a whole
-grading. Fix the bug, then grade again with `--score-only`.
+grading. Fix the bug, then grade again with `--score-only`. A bug of ours is a traceback, and exits 1, as a
+`UsageError` or a `Stop` does: the exit code doesn't tell them apart, stderr does.
 
 ### At once
 
@@ -273,7 +275,7 @@ rate limit is per account. Two datalab modes share datalab's pool, and every Ope
 shares the llm adapter's. Each adapter's pool size is in `benchmark.WORKERS` (datalab 10, extend,
 mistral and llm 5, reducto, llamaparse and azure 3, tesseract the CPU count up to 8, others 5);
 `--workers N` sets N for every adapter; `--workers '{"datalab": 20, "llm": 3}'` sets only the adapters
-named, and the others keep their defaults. Keys are adapters, not providers or models: the limit is
+named, and the others keep their defaults; 0, as one number or for one adapter, is the default. Keys are adapters, not providers or models: the limit is
 the vendor account's, so 3 for `llm` is 3 in flight across every OpenRouter model id together. A
 model id as a key is refused, naming its adapter. An adapter of yours is keyed by the name you filed or
 declared it under (`add_adapter("mine", ...)` is `{"mine": 2}`). When one run hits an account failure
@@ -303,10 +305,12 @@ That's 2 runs.
   `hf://datasets/datalab-to/omni_parse_bench`, a private repository, so run `hf auth login`
   first. A Hugging Face dataset is downloaded whole (1.5 GB), once, into Hugging Face's cache;
 - `--manifest`: which of the dataset's manifests, a parquet inside it (default `manifest.parquet`). A
-  dataset may hold others: a sample (`manifests/sample40.parquet`), or the same pages with a gold of
+  dataset may hold others: a sample manifest you make (e.g. `manifests/sample.parquet`), or the same pages with a gold of
   another kind (`gt_path` pointing at `transcripts/` instead of `gold/`), each naming its pages and
   where their gold is. `opb grade`, `opb check` and `opb tests` take it too. A run folder holds one
-  manifest, as it holds one dataset: another `--manifest` into it is refused;
+  manifest, as it holds one dataset: another `--manifest` into it is refused. The rule is per run
+  folder; `--out` is only their parent, so two runs in one `--out` may be on different manifests, and
+  their headlines then aren't comparable;
 - `--suites`: only these suites;
 - `--limit N`: the first N pages;
 - `--sample N`: N pages spread over every suite, the same ones each time; N larger than the
@@ -344,10 +348,10 @@ is what a gold correction wants; if the pages changed too, pass another `--out`.
 `--score-only` predicts nothing, and grades. `--retry-failed` predicts again
 the outputs whose failure may not recur: a timeout, an outage (`VendorUnreachable`: the vendor couldn't
 be reached), or a 429 or 5xx (Cloudflare's 520 to 524 too). A 400, a vendor's failed job, or an LLM reply
-that was truncated, refused or unusable is an answer, and is not retried. Within one call, a 429 or 5xx
-is tried again after 20, 60 and 120 seconds before it is recorded. It decides from each failed call's
+that was truncated, refused or unusable is an answer, and is not retried. Within one call, a 429, a 5xx or
+an outage is tried again after 20, 60 and 120 seconds before it is recorded. It decides from each failed call's
 `class` and `status` in the record; a record's `transient` says something else, whether the call was
-tried again within itself (a 429 or 5xx), which a timeout never is.
+tried again within itself (a 429, a 5xx or an outage), which a timeout never is.
 
 An output whose answer arrived but didn't parse is fixed for free: after a parsing fix,
 `opb reparse RUN_DIR` reads every record's outputs again from its saved answers, and
@@ -467,7 +471,9 @@ harness.settings_for("datalab", {"mode": "balanced"})
 html and blocks. A provider of your own plugs in as an adapter: a module with the five names of
 `harness/contract.py`, filed with `harness.add_adapter("mine", module)`, or declared by its package under
 the entry-point group `omni_parse_bench.adapters` (`[project.entry-points."omni_parse_bench.adapters"]
-mine = "my_package.my_adapter"`), and then named like any other provider. Or write its predictions to a
+mine = "my_package.my_adapter"`), and then named like any other provider. Read and interpret the
+vendor's answer in `parse`, not `call`: an error raised in `call` is recorded as the vendor's failure
+of that page, with no answer saved for `opb reparse` to read again. Or write its predictions to a
 folder and run `opb grade` on it (see [Grading your own predictions](#grading-your-own-predictions)), or
 loop over `score` (see [The dataset](#the-dataset)).
 
@@ -518,7 +524,8 @@ The dataset is read by `data`, and a page's tests by the scorer, `unit_tests.gol
 data.download_dataset(dataset)  # a local copy: an hf:// dataset downloaded whole; a folder as it is
 data.read_manifest(dataset, manifest="manifest.parquet")  # (folder, pages): every page of that manifest,
                                 # its file and gold as full local paths
-data.select(pages, ...)         # the pages to run: by suite, by id, sampled or limited
+data.select(pages, suites=None, limit=0, sample=0, only=None)   # the pages to run: suites, the
+                                # first `limit`, `sample` spread over every suite, `only` these ids
 unit_tests.gold(page)           # one page's tests, from its gold file (`page.gt_path`), checked
 unit_tests.check(pages)         # every page's tests, and the dataset as a whole, checked: for publishing
 ```
@@ -568,6 +575,8 @@ output your system failed on is `null`), and grade the folder:
 opb grade mine/ --unsupported blocks      # mine/predictions/<page_id>.json, one per page you predicted
 ```
 
+With blocks unsupported, the layout family has no scored test, so `headline` is null
+(`headline — (a family of tests has none scored)`): read `families` and `html.score` instead.
 `--unsupported` names the outputs your system can't produce, once for the folder (`--unsupported` with
 none for none), and a folder's first grading requires it; their tests are `unsupported` rather than
 failed. The folder's first grading that
@@ -743,7 +752,7 @@ and cost:
 
 ```json
 {"run": "datalab-f45991d3", "provider": "datalab", "settings": {"mode": "balanced", "...": "..."},
- "scorer": "0.1.1+a09ce5ecf32a", "headline": 0.905, "families": {"...": "..."}, "documents": 2343, "html": {"...": "..."},
+ "scorer": "1.0.0+…", "headline": 0.905, "families": {"...": "..."}, "documents": 2343, "html": {"...": "..."},
  "blocks": {"...": "..."},
  "per_suite": {"olmo_arxiv_math": {"headline": 0.874, "score": 0.861, "pages": 180, "failed": 1,
                                    "pending": 0}, "...": "..."},
@@ -765,13 +774,14 @@ and cost:
   `unsupported` count;
 - a sample's headline (`--manifest manifests/sample...`) is over that sample's tests and families, so it
   isn't comparable with the whole manifest's; and
-- `usd` and `credits` are what the vendor said the calls cost; `credits` is null when no call
-  reported any.
+- `usd` and `credits` are what the vendor said the calls cost; each is null when no call reported
+  it, so a vendor billed in credits doesn't read as free.
 
 ### records/&lt;page_id&gt;.json
 
 Everything about one page's prediction, for an audit: the record `predict` returns (outputs, errors,
-calls, raw answers, settings), with the time it was captured. Grading reads only its cost. Each call keeps its timeout (`timeout_s`) and its
+calls, raw answers, provider, settings), with the time it was captured; `opb reparse` needs every one
+of them. Grading reads only its cost. Each call keeps its timeout (`timeout_s`) and its
 failure (`class`, `status`, `transient`): `--retry-failed` reads its `class` and `status`, and
 `transient` says whether the call was tried again within itself. The raw answers are what
 `opb reparse` reads. A record from before this version may also hold `page_sha256`; it is ignored.
@@ -790,7 +800,7 @@ One line per test, in manifest order: its verdict, what the test is, and the sta
  "suite": "olmo_arxiv_math", "document": "olmo_arxiv_math:2502.15977",
  "test_id": "2502.15977_pg21_math_003", "test_type": "present", "output_type": "html",
  "derivation": "upstream_olmocr", "tags": ["math"], "result": "pass", "why": "",
- "scorer": "0.2.0+f5c5ce802b77"}
+ "scorer": "1.0.0+…"}
 ```
 
 - `run` and `provider` name the run (its folder) and its provider; `settings.json` has the rest;

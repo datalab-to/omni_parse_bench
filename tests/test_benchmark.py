@@ -120,7 +120,7 @@ def test_workers_may_be_set_per_adapter(tmp_path, monkeypatch):
     assert benchmark._per_adapter({"datalab": 20, "llm": 3}) == {"datalab": 20, "llm": 3}
     assert benchmark._workers_for("reducto", {"datalab": 20}) == benchmark.WORKERS["reducto"]
     for bad, why in [({"nope": 2}, "the adapters are"), ({"openai/gpt-5.6-sol": 3}, 'write {"llm": 3}'),
-                     ({"datalab": 0}, "1 or more"), ({"datalab": True}, "1 or more")]:
+                     ({"datalab": -1}, "whole number"), ({"datalab": True}, "whole number")]:
         with pytest.raises(ValueError, match=why):
             benchmark._per_adapter(bad)
     assert cli.read_workers("8") == 8 and cli.read_workers('{"datalab": 20}') == {"datalab": 20}
@@ -1504,3 +1504,104 @@ def test_a_prediction_with_a_byte_order_mark_reads_as_its_json(tmp_path):
     (mine / "settings.json").write_text(json.dumps({"unsupported": []}))
     s = benchmark.grade(benchmark.Run("mine", {}, mine), data.read_manifest(ds)[1], say=QUIET)
     assert s["failed"] == 0 and s["html"]["score"] == 1.0
+
+
+# Final pre-release fixes.
+
+def test_benchmark_with_no_terminal_needs_yes_and_its_question_goes_to_stderr(tmp_path, monkeypatch, capsys):
+    use(monkeypatch, {"stub": stub()})
+    ds = dataset(tmp_path / "data")
+    argv = ["benchmark", "--providers", "stub", "--dataset", ds, "--out", str(tmp_path / "runs")]
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    assert cli.main(argv) == 1 and not (tmp_path / "runs").exists(), "no terminal and no -y: nothing run"
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda *a: "n")
+    capsys.readouterr()
+    assert cli.main(argv) == 1
+    out, err = capsys.readouterr()
+    assert out == "" and "proceed?" in err, "the question is on stderr, stdout holds only the summaries"
+
+
+def test_a_run_folder_is_never_told_to_delete_its_settings(tmp_path):
+    (tmp_path / "run").mkdir()
+    (tmp_path / "run" / "settings.json").write_text(json.dumps({"provider": "stub", "dataset": "/a",
+                                                                  "manifest": "manifest.parquet"}))
+    with pytest.raises(UsageError) as e:
+        benchmark.settled(tmp_path / "run", manifest="other.parquet")
+    assert "--out" in str(e.value) and "settings.json" not in str(e.value)
+
+
+def test_a_manifest_outside_the_dataset_is_refused_before_any_comparison(tmp_path):
+    (tmp_path / "f").mkdir()
+    (tmp_path / "f" / "settings.json").write_text(json.dumps({"manifest": "manifest.parquet"}))
+    for bad in ("/abs/manifest.parquet", "../manifest.parquet"):
+        with pytest.raises(data.ManifestError):
+            benchmark.settled(tmp_path / "f", manifest=bad)
+    assert data.normal("./manifests/s.parquet") == "manifests/s.parquet"
+
+
+def test_usd_is_null_when_no_call_reported_one(tmp_path):
+    ds = dataset(tmp_path / "data")
+    mine = tmp_path / "mine"
+    (mine / "predictions").mkdir(parents=True)
+    (mine / "predictions" / "a-p0.json").write_text(json.dumps({"html": "<p>alpha</p>"}))
+    s = benchmark.grade(benchmark.Run("mine", {}, mine), data.read_manifest(ds)[1], QUIET,
+                        settings={"unsupported": []})
+    assert s["usd"] is None and s["credits"] is None
+
+
+def test_a_malformed_output_is_warned_about_and_counted_as_failed(tmp_path, caplog):
+    ds = dataset(tmp_path / "data", blocks=True)
+    mine = tmp_path / "mine"
+    (mine / "predictions").mkdir(parents=True)
+    (mine / "predictions" / "a-p0.json").write_text(json.dumps(
+        {"html": "<p>alpha</p>",
+         "blocks": [{"kind": "text", "bbox": [100, 100, 500, 200], "html": "alpha"}]}))
+    with caplog.at_level(logging.WARNING):
+        s = benchmark.grade(benchmark.Run("mine", {}, mine), data.read_manifest(ds)[1], QUIET,
+                            settings={"unsupported": []})
+    assert s["failed"] == 1 and any("malformed" in r.getMessage() for r in caplog.records)
+
+
+def test_cli_files_may_start_with_a_byte_order_mark(tmp_path):
+    f = tmp_path / "pred.json"
+    f.write_bytes(b"\xef\xbb\xbf" + json.dumps({"html": "x"}).encode())
+    assert cli.read_object(str(f), "--pred") == {"html": "x"}
+    ids = tmp_path / "ids.txt"
+    ids.write_bytes(b"\xef\xbb\xbfa-p0\n")
+    assert cli.read_ids(ids, "--pages") == frozenset({"a-p0"})
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf")])
+def test_a_non_finite_option_is_refused(value):
+    with pytest.raises(UsageError, match="poll_interval"):
+        registry.config_for("azure", {"poll_interval": value})
+
+
+def test_workers_zero_per_adapter_is_its_default():
+    assert benchmark._per_adapter({"datalab": 0}) == {"datalab": 0}
+    assert benchmark._workers_for("datalab", {"datalab": 0}) == benchmark.WORKERS["datalab"]
+
+
+def test_an_unreadable_record_is_warned_about_once(tmp_path, caplog):
+    ds = dataset(tmp_path / "data")
+    run = tmp_path / "run"
+    for sub in ("predictions", "records"): (run / sub).mkdir(parents=True)
+    (run / "settings.json").write_text(json.dumps({"provider": "stub", "unsupported": []}))
+    (run / "records" / "a-p0.json").write_text("{not json")
+    with caplog.at_level(logging.WARNING):
+        # Note: grading reads the record twice (`restore`, then scoring), and here a third time.
+        benchmark.grade(benchmark.Run("stub", {}, run), data.read_manifest(ds)[1], QUIET)
+        benchmark.recorded(benchmark.Run("stub", {}, run), "a-p0")
+    assert sum("isn't readable JSON" in r.getMessage() for r in caplog.records) == 1
+
+
+def test_score_refuses_an_unknown_output_name_as_a_usage_error():
+    with pytest.raises(UsageError):
+        scorer.score({"html": "x"}, (), unsupported={"block"})
+
+
+def test_grade_on_the_parent_of_run_folders_names_them(tmp_path):
+    (tmp_path / "runs" / "stub-1" / "predictions").mkdir(parents=True)
+    with pytest.raises(UsageError, match="stub-1"):
+        benchmark.gradable(tmp_path / "runs")

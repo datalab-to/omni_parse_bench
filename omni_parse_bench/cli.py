@@ -44,7 +44,7 @@ EXAMPLE_MODELS = ("openai/gpt-5.6-sol",)
 def read_object(path: str, flag: str) -> dict:
     """The JSON object in the file `path` that `flag` names."""
     try:
-        got = json.loads(Path(path).read_text())
+        got = json.loads(Path(path).read_text(encoding="utf-8-sig"))
     except FileNotFoundError:
         raise errors.UsageError(f"{flag} {path}: no such file") from None
     except IsADirectoryError:
@@ -62,7 +62,7 @@ def read_options(value: str | None) -> dict:
     if not value: return {}
     is_file = Path(value).is_file()
     try:
-        out = json.loads(Path(value).read_text() if is_file else value)
+        out = json.loads(Path(value).read_text(encoding="utf-8-sig") if is_file else value)
     except json.JSONDecodeError as e:
         if is_file: raise errors.UsageError(f"--options: {value} isn't JSON: {e}") from None
         if value.lstrip()[:1] in ("{", "["): raise errors.UsageError(f"--options isn't JSON: {e}") from None
@@ -93,25 +93,25 @@ def read_ids(path: Path, flag: str) -> frozenset[str]:
     """A file of ids, one per line; blank lines and `#` comments are skipped."""
     if not path.is_file():
         raise errors.UsageError(f"{flag} {path}: no such file; it holds ids, one per line")
-    return frozenset(x for line in path.read_text().splitlines() if (x := line.split("#", 1)[0].strip()))
+    lines = path.read_text(encoding="utf-8-sig").splitlines()
+    return frozenset(x for line in lines if (x := line.split("#", 1)[0].strip()))
 
 
 def confirm_plan(plan: Any) -> bool:
-    """Show what the benchmark is about to do, and ask. `-y` / `--yes` skips this entirely.
+    """Show what the benchmark is about to do, and ask; `-y` / `--yes` skips this entirely. The plan and the
+    question go to stderr, leaving stdout for the summaries.
 
-    A run costs money, so the default is to say what it will do before it starts. The plan goes
-    to stderr with the rest of the progress, leaving stdout for the scores.
-
-    Nobody to ask is not the same as no: a pipe, a cron job or a CI step has no terminal, so it
-    proceeds, since it was scripted, which is consent. Only an interactive session is asked.
-    """
+    Note: with no terminal to ask (a pipe, a notebook, CI), the run is refused rather than taken as consent:
+    it costs money, and a script says so once with `-y`."""
     from rich import console
 
     console.Console(stderr=True, highlight=False).print(progress.plan_view(plan))
     if not sys.stdin.isatty():
-        return True
+        raise errors.UsageError("no terminal to ask before calling vendors; pass -y to run")
+    sys.stderr.write("  proceed? [y/N] ")
+    sys.stderr.flush()
     try:
-        return input("  proceed? [y/N] ").strip().lower() in ("y", "yes")
+        return input().strip().lower() in ("y", "yes")
     except EOFError:
         return False
 
@@ -137,7 +137,9 @@ def cmd_score(a: argparse.Namespace) -> int:
     """What `score` returns: one verdict per test of the page."""
     pred = read_object(a.pred, "--pred")
     if pred and not set(pred) & set(vocab.OUTPUT_TYPES):
-        hint = (" It looks like a record from opb predict; pass its outputs." if "outputs" in pred else "")
+        hint = (" It looks like a record from opb predict; pass its outputs." if "outputs" in pred else
+                " It looks like a gold file; --pred is the outputs, {output type: value}." if "tests" in pred
+                else "")
         raise errors.UsageError(f"--pred {a.pred} holds none of the output types {list(vocab.OUTPUT_TYPES)}, "
                                 f"only {sorted(pred)[:5]}.{hint}")
     vs = scorer.score(pred, scorer.tests.read(a.gold), unsupported=set(a.unsupported or ()))
@@ -195,11 +197,9 @@ def cmd_grade(a: argparse.Namespace) -> int:
                                     "--unsupported is for a folder of your own predictions")
         now = sorted(set(a.unsupported))
         if (was := said.get("unsupported")) is not None and was != now:
-            raise errors.UsageError(f"{out} holds a folder graded with --unsupported "
-                                    f"{' '.join(was) or '(none)'}, not {' '.join(now) or '(none)'}: a folder "
-                                    f"says once what its system can't produce; pass --unsupported "
-                                    f"{' '.join(was) or 'with none'}, or delete {out / 'settings.json'} to "
-                                    "start over")
+            name = lambda xs: " ".join(xs) or "none"   # noqa: E731
+            raise errors.UsageError(f"{out} was graded with --unsupported {name(was)}, not {name(now)}; pass "
+                                    f"the same, or delete its settings.json to start over")
         said = said | {"unsupported": now}
     dataset = a.dataset or said.get("dataset") or data.DEFAULT_DATASET
     manifest = a.manifest or said.get("manifest") or data.MANIFEST
@@ -316,10 +316,14 @@ def cmd_reparse(a: argparse.Namespace) -> int:
             new = harness.reparse(record, frozenset(a.add or ()))
             if new["outputs"] != record["outputs"] or new["errors"] != record["errors"]:
                 done.append((path, new))
+        # Note: counted before anything is written: a lost prediction is rebuilt whether its record changed
+        # (written below with its new outputs) or not (`restore`).
+        r = benchmark.Run("", {}, run)
+        rebuilt = sum(benchmark.predicted(r, path.stem) is None for path in paths)
         for path, new in done:
             benchmark.write_json(path, new)
             benchmark.write_json(run / "predictions" / path.name, new["outputs"])
-        rebuilt = sum(benchmark.restore(benchmark.Run("", {}, run), path.stem) for path in paths)
+        for path in paths: benchmark.restore(r, path.stem)
         print(f"{run}: {len(done)} of {errors.counted(len(paths), 'record')} changed, "
               f"{errors.counted(rebuilt, 'prediction')} rebuilt from "
               f"{'its record' if rebuilt == 1 else 'their records'}"
