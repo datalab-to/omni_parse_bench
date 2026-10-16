@@ -412,8 +412,6 @@ def facts(p: benchmark.Plan):
     from rich.table import Table
     from rich.text import Text
 
-    from omni_parse_bench import harness
-
     table = Table(box=None, show_header=False, pad_edge=False)
     table.add_column("", style="dim", no_wrap=True)
     table.add_column("", overflow="fold")
@@ -422,8 +420,7 @@ def facts(p: benchmark.Plan):
     table.add_row("dataset", p.dataset)
     table.add_row("pages", str(len(p.pages)))
     table.add_row("timeout", f"{p.timeout:.0f}s per call")
-    adapters = sorted({harness.resolve(r.provider) for r in p.runs})
-    table.add_row("at once", ", ".join(f"{a} {benchmark._workers_for(a, p.workers)}" for a in adapters)
+    table.add_row("at once", ", ".join(f"{a} {n}" for a, n in benchmark.pools(p).items())
                   + " calls, shared by an adapter's runs")
     # Note: shown even when false: `score only  false` is what says this will spend money.
     for name, on in (("score only", p.score_only),):

@@ -1,8 +1,8 @@
 """The dataset: its pages, read from a folder or downloaded from Hugging Face. A dataset folder holds
 
     manifest.parquet       a row per page: page_id, document, suite, doc_path, gt_path, outputs
-    pages/<page_id>.pdf    the page that gets sent: a one-page PDF, or a .png for an image page
-    gold/<page_id>.json    its tests: {"tests": [...]}, read by the scorer (`scorers.unit_tests.gold`)
+    pages/...              the page files that get sent: one-page PDFs, or .png for image pages
+    gold/<page_id>.json    each page's tests: {"tests": [...]}, read by the scorer (`scorers.unit_tests.gold`)
 
 A page is a manifest row (`Page`) whose paths are full local paths, so a page says where its file and
 its gold are without the dataset beside it. The functions over a dataset:
@@ -11,6 +11,7 @@ its gold are without the dataset beside it. The functions over a dataset:
     read_manifest(dataset, ...)  the folder and every page of a manifest, checked; reads the manifest alone
     select(pages, ...)           the pages to run: by suite or id, sampled, limited
     dataset_id(dataset)          what a run's dataset is, whatever its revision
+    commit(dataset, root)        the commit a Hugging Face dataset was read at; None for a folder
 
 `dataset` is a folder's path or `hf://datasets/<repo>[@<revision>]`. `read_manifest` reads once per
 process. Checking every test of a dataset is the scorer's, `scorers.unit_tests.check(pages)`.
@@ -26,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from omni_parse_bench import vocab
+from omni_parse_bench.errors import UsageError
 
 HF_PREFIX = "hf://datasets/"
 DEFAULT_DATASET = "hf://datasets/datalab-to/omni_parse_bench"
@@ -46,9 +48,9 @@ OLD_DATASET = (
     "  - to keep this copy, use the omni-parse-bench made for it: pip install 'omni-parse-bench==0.1.1'")
 
 
-
-class ManifestError(ValueError):
+class ManifestError(UsageError):
     """A manifest, or a row of one, that breaks the dataset's rules; the message names it and the fix."""
+
 
 @dataclasses.dataclass(frozen=True)
 class Page:
@@ -62,8 +64,8 @@ class Page:
     page_id: str
     document: str   # the source document: a page's tests pass or fail with its document's
     suite: str
-    doc_path: str   # the page file: <dataset>/pages/<page_id>.pdf or .png
-    gt_path: str    # its tests: <dataset>/gold/<page_id>.json
+    doc_path: Path  # the page file, a .pdf or .png
+    gt_path: Path   # its tests: <dataset>/.../<page_id>.json
     outputs: tuple[str, ...]    # what to predict: the output types its tests read (`gold.wants`), sorted
     extra: dict[str, Any] = dataclasses.field(default_factory=dict)   # the manifest's other columns
 
@@ -78,15 +80,15 @@ def _hf_dataset(dataset: str | Path) -> tuple[str, str | None] | None:
     form = f"{HF_PREFIX}<org>/<name>[@<revision>], e.g. {DEFAULT_DATASET}"
     s = str(dataset)
     if isinstance(dataset, Path) and s.startswith("hf:"):
-        raise ValueError(f"the dataset {s!r} was made a Path, which folds the '//' out of an address. "
+        raise UsageError(f"the dataset {s!r} was made a Path, which folds the '//' out of an address. "
                          f"Pass it as a str: {form}")
     if s.startswith("hf:") and not s.startswith("hf://"):
-        raise ValueError(f"{s!r} looks like a Hugging Face address with a slash missing. Write it as {form}")
+        raise UsageError(f"{s!r} looks like a Hugging Face address with a slash missing. Write it as {form}")
     if not s.startswith("hf://"): return None
     org, _, name = s.removeprefix(HF_PREFIX).partition("/")
     name, at, revision = name.partition("@")
     if not s.startswith(HF_PREFIX) or not org or not name or "/" in name or (at and not revision):
-        raise ValueError(f"{s!r} does not name a Hugging Face dataset. Write it as {form}")
+        raise UsageError(f"{s!r} does not name a Hugging Face dataset. Write it as {form}")
     return f"{org}/{name}", revision or None
 
 
@@ -102,8 +104,8 @@ def download_dataset(dataset: str | Path) -> Path:
     if (at := _hf_dataset(dataset)) is None:
         root = Path(dataset).expanduser()
         if not root.is_dir():
-            raise FileNotFoundError(f"no dataset folder at {root}; pass --dataset a dataset folder "
-                                    f"or {HF_PREFIX}<repo>")
+            raise UsageError(f"no dataset folder at {root}; pass --dataset a dataset folder "
+                             f"or {HF_PREFIX}<org>/<name>")
         return root
     from huggingface_hub import errors as hf_errors
     from huggingface_hub import snapshot_download
@@ -118,13 +120,13 @@ def download_dataset(dataset: str | Path) -> Path:
                                           max_workers=4))
         except (hf_errors.RepositoryNotFoundError, hf_errors.GatedRepoError,
                 hf_errors.RevisionNotFoundError) as exc:
-            raise ValueError(f"can't read dataset {dataset}: {type(exc).__name__}. Check the repo and "
+            raise UsageError(f"can't read dataset {dataset}: {type(exc).__name__}. Check the repo and "
                              "revision, and that you're logged in with access (huggingface-cli login)"
                              ) from None
         except hf_errors.HfHubHTTPError as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
             if status in (401, 403):
-                raise ValueError(f"can't read dataset {dataset}: HTTP {status}. Log in with access to it "
+                raise UsageError(f"can't read dataset {dataset}: HTTP {status}. Log in with access to it "
                                  "(huggingface-cli login)") from None
             if attempt == DOWNLOAD_ATTEMPTS - 1: raise
         except Exception:
@@ -137,6 +139,11 @@ def dataset_id(dataset: str | Path) -> str:
     """What a run's dataset is, whatever revision: the repo of an `hf://` dataset, or a folder's path."""
     if (at := _hf_dataset(dataset)) is not None: return f"{HF_PREFIX}{at[0]}"
     return str(Path(dataset).expanduser().resolve())
+
+
+def commit(dataset: str | Path, root: Path) -> str | None:
+    """The commit `dataset` was read at, its downloaded folder `root`'s name; None for a folder."""
+    return root.name if _hf_dataset(dataset) is not None else None
 
 
 @functools.cache
@@ -165,8 +172,10 @@ def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, 
     table = pq.read_table(root / manifest)
     if "outputs" not in table.column_names:
         raise ManifestError(OLD_DATASET.format(root=root))
-    rows = tuple(dataclasses.replace(p := _page(r), doc_path=str(root / p.doc_path),
-                                     gt_path=str(root / p.gt_path)) for r in table.to_pylist())
+    rows = tuple(dataclasses.replace(p := _page(r), doc_path=root / p.doc_path, gt_path=root / p.gt_path)
+                 for r in table.to_pylist())
+    if not rows:
+        raise ManifestError(f"the manifest {manifest} in {root} names no pages")
     # Note: ignoring case, because an id names files, and two ids that differ only in case name one file
     # on a case-insensitive disk (macOS, Windows).
     if twice := [i for i, n in collections.Counter(p.page_id.casefold() for p in rows).items() if n > 1]:
@@ -182,21 +191,20 @@ def select(pages: Sequence[Page], suites: Iterable[str] | None = None, limit: in
 
     `sample` picks that many pages spread over every suite: suites in turn, each page evenly spaced
     within its suite, so a smoke test sees every kind of page and the same pages each time."""
-    for name, xs in (("suites", suites), ("only", only)):
-        if isinstance(xs, str):
-            raise TypeError(f"{name} is a list of names, not the string {xs!r}; pass [{xs!r}]")
+    suites, only = _names(suites, "suites") or None, _names(only, "only")
     for name, n in (("limit", limit), ("sample", sample)):
-        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
-            raise ValueError(f"{name} is {n!r}, but it counts pages: a whole number, 0 for no limit")
+        if isinstance(n, bool) or not isinstance(n, int):
+            raise TypeError(f"{name} is a whole number, not {n!r}")
+        if n < 0:
+            raise UsageError(f"--{name} is {n}, but it counts pages, so it can't be negative; 0 is no limit")
     rows = tuple(pages)
     known = {r.suite for r in rows}
-    if bad := sorted(set(suites or ()) - known):
-        raise ValueError(f"unknown suites {bad}; the dataset's suites are {sorted(known)}")
-    rows = tuple(r for r in rows if not suites or r.suite in set(suites))
+    if suites is not None and (bad := sorted(suites - known)):
+        raise UsageError(f"unknown suites {bad}; the dataset's suites are {sorted(known)}")
+    rows = tuple(r for r in rows if suites is None or r.suite in suites)
     if only is not None:
-        only = frozenset(only)
         if bad := sorted(only - {r.page_id for r in rows}):
-            raise ValueError(f"{len(bad)} of the pages asked for aren't in the dataset"
+            raise UsageError(f"{len(bad)} of the pages asked for aren't in the dataset"
                              f"{' (or its suites)' if suites else ''}, e.g. {bad[:3]}; nothing has been run")
         rows = tuple(r for r in rows if r.page_id in only)
     if sample and rows:
@@ -208,6 +216,14 @@ def select(pages: Sequence[Page], suites: Iterable[str] | None = None, limit: in
         chosen = {r.page_id for r in turns[:sample]}
         rows = tuple(r for r in rows if r.page_id in chosen)
     return rows[:limit] if limit else rows
+
+
+def _names(xs: Iterable[str] | None, what: str) -> frozenset[str] | None:
+    """`xs` as a set, read once (a generator is a one-pass iterable); a bare str is refused, since iterated it
+    is one-letter names."""
+    if isinstance(xs, str):
+        raise TypeError(f"{what} is a list of names, not the string {xs!r}; pass [{xs!r}]")
+    return None if xs is None else frozenset(xs)
 
 
 def _page(r: Mapping[str, Any]) -> Page:

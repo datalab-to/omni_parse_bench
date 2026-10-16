@@ -30,6 +30,7 @@ from typing import Any
 import httpx
 
 from omni_parse_bench import vocab
+from omni_parse_bench.errors import UsageError
 
 from . import budget, contract, errors, registry
 
@@ -91,11 +92,11 @@ def predict(provider: str, page: str | Path, wants: set[str] | frozenset[str] | 
     api = adapter(provider)
     page = Path(page)
     if not page.exists():
-        raise FileNotFoundError(f"no page at {page}")
+        raise UsageError(f"no page at {page}")
     if isinstance(wants, str):
         raise TypeError(f"wants is a set of output types, not the string {wants!r}; pass {{{wants!r}}}")
     if wants is not None and (bad := sorted(set(wants) - set(vocab.OUTPUT_TYPES))):
-        raise ValueError(f"unknown output types {bad}; the output types are {list(vocab.OUTPUT_TYPES)}")
+        raise UsageError(f"unknown output types {bad}; the output types are {list(vocab.OUTPUT_TYPES)}")
     wants = frozenset(api.SUPPORTS if wants is None else wants)
     config = registry.config_for(provider, options)
     outputs: dict[str, Any] = {}

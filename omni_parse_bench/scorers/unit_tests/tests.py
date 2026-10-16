@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from omni_parse_bench import equations, normalize, vocab
+from omni_parse_bench.errors import UsageError
 
 from . import runners
 
@@ -65,8 +66,8 @@ _LANGUAGE = re.compile(r"[a-z]{3}")    # ISO 639-3
 _SCRIPT = re.compile(r"[A-Z][a-z]{3}")   # ISO 15924
 
 
-class GoldError(ValueError):
-    """A manifest row or a test that breaks the dataset's rules."""
+class GoldError(UsageError):
+    """A gold file, or a test in one, that breaks the dataset's rules."""
 
 
 class Test(NamedTuple):
@@ -84,6 +85,8 @@ def read(path: str | Path) -> tuple[Test, ...]:
     path = Path(path)
     try:
         doc = json.loads(path.read_text())
+    except FileNotFoundError:
+        raise GoldError(f"{path.stem}: no gold file at {path}") from None
     except json.JSONDecodeError as exc:
         raise GoldError(f"{path.stem}: its gold file {path} isn't JSON: {exc}") from None
     return parse(path.stem, doc)

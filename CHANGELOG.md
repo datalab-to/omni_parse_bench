@@ -3,112 +3,117 @@
 ## 1.0.0 (unreleased)
 
 Breaking changes throughout, so omni-parse-bench and omni-extract-bench share one layout: the same
-modules, the same names, at the same levels. Only the row's type differs (`Page` here, `Doc` there).
-`docs/API.md` has the full surface.
+modules, the same names, at the same levels, and the same rules. Only the row's type differs (`Page`
+here, `Doc` there). `docs/API.md` has the full surface.
 
-The modules:
+Modules:
 
 - `data` (new) reads a dataset: `Page`, `download_dataset` (the whole dataset, at one commit),
-  `read_manifest` (every page, with `doc_path` and `gt_path` as full local paths), `select`,
-  `dataset_id` and `ManifestError`. It replaces `gold.manifest`, `gold.load`, `benchmark.manifest`,
-  `benchmark.pages`, `benchmark.page_file` and `benchmark.dataset_root`;
+  `read_manifest`, `select`, `dataset_id`, `commit` and `ManifestError`. It replaces `gold.manifest`,
+  `gold.load`, `benchmark.manifest`, `benchmark.pages`, `benchmark.page_file` and
+  `benchmark.dataset_root`;
 - `scorers/unit_tests` is the scorer, a package that owns the shape of its gold: `gold(page)`,
-  `check(pages)`, `score`, `lines` and `summarize`, with `tests.py` (what a unit test is; was
-  `gold.py`) and `runners.py` (was `runners.py`). It replaces `metric.py`. The text tools any scorer
-  can use (`views`, `normalize`, `tables`, `equations`, `vocab`) stay at the top;
-- `benchmark` is the loop, as before; and
-- `harness` gains `add_adapter`, and loads adapters declared under the entry-point group
-  `omni_parse_bench.adapters`.
+  `check(pages)`, `score`, `lines` and `summarize`, with `tests.py` (what a unit test is; was `gold.py`)
+  and `runners.py`. It replaces `metric.py`. The text tools any scorer can use (`views`, `normalize`,
+  `tables`, `equations`, `vocab`) stay at the top;
+- `errors` (new) holds the two kinds of error a user meets: `UsageError` (a `ValueError`: what was asked
+  is wrong) and `Stop` (a run can't go on). `ManifestError` and `GoldError` are `UsageError`s;
+  `AccountFailure`, `MissingCredential` and `MissingDependency` are `Stop`s;
+- `benchmark` is the loop. New public functions: `settled` and `declare` (a folder's settings.json,
+  read and checked, and written), `gradable` (refuses a folder grading can't read), `pools` (each
+  adapter's calls at once), `scorer_errors` (tests whose grading raised in our code), `write_json` and
+  `read_scores`;
+- `harness` gains `add_adapter`, loads adapters declared under the entry-point group
+  `omni_parse_bench.adapters`, and exports `VendorUnreachable`; `registry.adapter_names()` lists the
+  names `--workers` takes; and
+- the package exports `data`, `scorers`, `gold`, `score`, `lines`, `summarize`, `check` and `Verdict`.
+
+Helpers that were public by accident are private: `data.page`, `benchmark.missing`, `retryable`,
+`merged`, `grade_page`, `headline`, `per_adapter`, `tests`, `workers_for`, `write_text` and
+`read_json`.
 
 The scorer:
 
-- `score(pred, gold, unsupported=())`: the prediction, then the page's tests;
+- `score(pred, gold, unsupported=())`: the prediction, then the page's tests; an unknown output name in
+  `unsupported` is refused;
 - `lines(verdicts, tests, page)`: each line carries its page's `suite` and `document`;
-- `summarize(lines)` needs nothing but the lines, so a `scores.jsonl`, or any part of one, is
-  summarized as it is; and
-- `summary["headline"]` is the number (it was a dict), beside `families` and `documents`.
+- `summarize(lines)` needs nothing but the lines, so a `scores.jsonl`, or any part of one, is summarized
+  as it is. `headline` is the number (it was a dict), beside `families` and `documents`; `per_suite` is
+  one block per suite, its `headline` and `score` (it was the pass rate alone);
+- a gold file that is missing, isn't JSON, isn't an object, has no `tests` list, or holds a test that
+  isn't an object is a `GoldError` naming its page; and
+- the scoring-code digest changes, so every run is graded again once; no provider is called.
 
 Grading:
 
-- `grade(run, pages)` replaces `grade(run, dataset)`;
-- grading is fresh every time: every page is graded again, and `scores.jsonl` and `summary.json` are
-  written whole when it finishes, so they're always one grading's. An interrupted grading writes
-  nothing. `--rescore` is gone, and so is the refusal of a run graded with another scorer or gold;
-- a page with no prediction is pending only when the run never attempted it (no record either, in a
-  folder that keeps `records/`); otherwise every test of it fails. So a page left out of a folder of
-  your own predictions now fails. `opb grade --suites` grades part of a dataset on purpose;
-- score lines carry only the `scorer` stamp; the prediction and gold digests are gone;
-- `summary.json`'s `pages_pending` is `pending`, as in omni-extract-bench;
-- `benchmark.read_scores(run)` reads a run's lines back; and
-- `scorers.unit_tests.check(pages)` (was `gold.load`) checks a whole dataset, for publishing and
-  `opb tests`. Grading doesn't use it.
+- `grade(run, pages, say=print, *, settings=None)` replaces `grade(run, dataset)`. It always covers the
+  whole manifest (`grade_all` passes it), so `--limit` and `--suites` narrow what is predicted, never
+  what is scored; `opb grade` has no `--suites`;
+- grading is fresh every time: every page is graded again, and `scores.jsonl`, then `summary.json`, are
+  written when it finishes; an interrupted grading writes nothing. `--rescore` is gone, and so is the
+  refusal of a run graded with another scorer or gold;
+- a page with no prediction is pending only when the run never attempted it (no record, in a folder that
+  keeps `records/`); otherwise every test of it fails, so a page left out of a folder of your own fails;
+- while any page is pending, `headline` is null, overall and for each suite with pending pages: a run
+  has a headline only once it is finished;
+- summary.json starts with `run`, `provider` and `settings`; it gains `failed` (pages with an output
+  missing or null that the system can produce) and, per suite, `pages`, `failed` and `pending`;
+  `pages_pending` is `pending`; `credits` is null when no call reported any;
+- a prediction is read only under its exact name, case too, so a folder grades the same on every disk;
+  any JSON object is a prediction, keys other than output types ignored. Grading warns once about files
+  named for no page and predictions it couldn't read (graded as failed);
+- `owed` counts what grading will grade over the whole manifest, by the same rule as `grade`; and
+- score lines carry only the `scorer` stamp; the prediction and gold digests are gone.
+
+Runs and folders:
+
+- a folder holds one dataset and one manifest: `plan` and `opb grade` refuse another, in one wording.
+  `opb grade` reads them from the folder's settings.json when not given; a folder of your own gets them
+  there, with `unsupported`, once its first grading succeeds (a failed one writes nothing);
+  `--unsupported` is refused on a run's folder;
+- `prepare` writes settings.json whole; `record(run, page_id, result)` takes what `harness.predict`
+  returned (it was `new`);
+- `plan` warns when a run made at one commit of its dataset is planned at another, and carries on; it
+  refuses an empty selection, a run asked for twice, `--score-only` into a folder never predicted, a
+  negative `timeout` or `workers` (a `workers` of the wrong type is a `TypeError`);
+- `--retry-failed` predicts again a timeout, an outage (`VendorUnreachable`) or a 429, 5xx or 52x; an
+  answer that arrived and couldn't be used, with no HTTP status, is no longer retried;
+- `--workers` is keyed by adapter: one of yours by the name it was filed or declared under; an option
+  given as a whole number for a float setting is that float, so it names the same run; one of the wrong
+  type is refused; and
+- `execute` grades what was predicted when predicting fails part way (an account failure included),
+  but not when it is interrupted; `--score-only` grades it then. A bug in an adapter stops its runs, with
+  a note naming the run, the page and the adapter.
 
 Datasets:
 
-- a dataset may hold several manifests: `read_manifest(dataset, manifest="manifest.parquet")`, and
-  `--manifest` on `benchmark`, `grade` and `tests` (as in omni-extract-bench). A sample, or the same pages
-  with a gold of another kind, is a manifest of its own; `settings.json` records which. A `doc_path` may be
-  any path inside the dataset, and pages may share one; a `gt_path` may be any path inside the dataset
-  named for its page, `<page_id>.json` (both were exactly `pages/...` and `gold/...`), and `unit_tests.check` no longer refuses a gold file its manifest doesn't name;
-- `record(run, page_id, result)`: the argument is what `harness.predict` returned (it was `new`);
-- `plan` warns when a run made at one commit of its dataset is planned at another, and carries on;
-- `plan` refuses an empty selection;
-- `execute` grades what was predicted when predicting fails part way, but not when it is interrupted
-  (Ctrl-C); `--score-only` grades it then;
-- page ids must be unique ignoring case, since each names files;
-- `opb benchmark` and `opb grade` print each run's whole summary (its summary.json), as
-  omni-extract-bench does; they printed a digest with each output's score flattened (`html` is now
-  `html.score`);
-- a mistake on the command line (a ValueError or a missing file) prints `opb <command>: <message>` and
-  exits 1, instead of a traceback;
-- `opb grade <folder>` takes the dataset and manifest from the folder's settings.json when they aren't
-  given, and refuses another dataset than the run's; `--suites` on a run's folder warns that it replaces
-  the full summary; a missing folder is named;
-- grading says which files in predictions/ match no page (left out) and which couldn't be read or hold
-  no output type (graded as failed); a prediction's other keys are ignored, as `score` ignores them; it
-  refuses an empty selection; scores.jsonl and summary.json are moved into place together;
-- `opb check` refuses a manifest with no pages; `--manifest` outside the dataset is refused, and one given
-  as a path on disk is pointed at `--dataset`; `hf:/...` (one slash) is named as a typo;
-- output names are checked where they are given (`opb score --unsupported`, `opb predict --wants`,
-  `harness.predict(wants=...)`); an option value of the wrong type is refused, naming the option;
-- `plan` and `select` refuse a bare string where a list of names goes, a negative or non-integer count,
-  a negative `timeout` and a `workers` that isn't a number or a mapping; `only` takes any iterable;
-- `registry.resolve` gives an adapter of yours the name it was filed or declared under (ours keep their
-  short module name), so `--workers '{"mine": 2}'` names a plugin's adapter;
-- a gold file that isn't JSON, isn't an object, or holds a test that isn't an object is a `GoldError`
-  naming its page; `opb score` names a prediction that isn't an object, or is a whole record;
-- `opb reparse` refuses a folder without records/, and checks every record before rewriting any;
-- a page's suite may be null or empty, and is then `"other"` (`data.NO_SUITE`); a page_id must be a
-  filename, one path component;
-- `opb check` says whether a dataset is one opb can run: its manifest, that every file it names
-  exists, and every gold (`unit_tests.check`). A gold without `tests` is a `GoldError`, naming its page;
-- `owed` counts what grading will grade over the whole manifest, as `grade_all` does; it counted
-  only the selected pages;
-- `prepare` writes `settings.json` whole; it merged into what was there;
-- an `hf://` address is checked: `hf://datasets/<org>/<name>[@<revision>]`;
-- while any page is pending, summary.json's `headline` is null and the closing line prints `—` for
-  each score: a run has a headline only once it is finished;
-- summary.json gains `failed` (pages with an output missing or null that the system can produce) and
-  `suites` (pages, failed and pending per suite); `credits` is null when no call reported any; the
-  closing line says how many failed, and that `--retry-failed` and `opb reparse` may help;
-- a run folder holds one manifest, as it holds one dataset: `plan` and `opb grade` refuse another;
-  `--score-only` into a folder never predicted is refused;
-- `opb grade` on a folder of your own writes its dataset, manifest and `unsupported` to settings.json once
-  a grading succeeds (a failed one writes nothing), so later gradings need no flags and refuse another
-  dataset or manifest; `--unsupported` is refused on a run's folder; `--suites` on any folder already
-  graded warns that it replaces the summary;
-- a prediction is read only under its exact name, case too, so a folder grades the same on every disk;
-  files of pages outside `--suites` aren't reported as stray;
-- an option given as a whole number for a float setting is that float, so it names the same run;
-- an account failure, a missing key and Ctrl-C (exit 130) are one line on the command line, not a
-  traceback; `opb check` names the page and column of a missing file; a `--pages` file skips blank
-  lines and `#` comments; `unit_tests.score` refuses an unknown output name in `unsupported`;
-  `read_scores` refuses a folder that doesn't exist; `opb reparse` says to regrade;
-- a manifest may carry columns of its own: they're kept on `page.extra`, never refused; and
-- `Page` is a frozen dataclass (it was a NamedTuple), with `id`, the page's `page_id`.
+- a dataset may hold several manifests: `read_manifest(dataset, manifest="manifest.parquet")` and
+  `--manifest` (a path inside the dataset) on `benchmark`, `grade`, `check` and `tests`;
+- a `doc_path` is any relative path inside the dataset to a .pdf or .png, and pages may share one; a
+  `gt_path` is a relative path inside the dataset named `<page_id>.json` (both were exactly `pages/...`
+  and `gold/...`); a page_id is a filename, unique ignoring case; a null or empty suite is `"other"`
+  (`data.NO_SUITE`); an empty manifest is refused;
+- `Page` is a frozen dataclass (it was a NamedTuple) with `id`, the page's `page_id`; its `doc_path` and
+  `gt_path` are `Path`s; a manifest's columns of its own are kept on `page.extra`, never refused;
+- `select` reads `suites` and `only` once, so any iterable works, and refuses a bare string;
+- an `hf://` address is checked (`hf://datasets/<org>/<name>[@<revision>]`; `hf:/...` is named as a
+  typo), and a download is tried again up to five times; and
+- `unit_tests.check` no longer refuses a gold file its manifest doesn't name.
 
-Helpers that were public by accident are private: `data.page`, `benchmark.missing`, `retryable`,
-`merged`, `grade_page`, `errors_in`, `headline`, `per_adapter`, `tests`, `workers_for`, `write_json`,
-`write_text` and `read_json`.
+The command line:
 
-The scoring-code digest changes, so every run is graded again once; no provider is called.
+- results go to stdout as JSON: `opb benchmark` and `opb grade` print each run's whole summary (its
+  summary.json; `html` is now `html.score`); the closing line and messages go to stderr, and `-q`, before
+  or after the command, turns them off;
+- a `UsageError` or a `Stop` prints `opb <command>: <message>` and exits 1 (`benchmark` adds that a
+  rerun resumes); Ctrl-C exits 130; anything else is a traceback, a bug of ours. A bad `--workers` is
+  one of these, not an argparse error;
+- `opb benchmark` and `opb grade` exit 2, with a warning, when a test's grading raised in our code;
+- `opb benchmark -y`, and `--score-only`, which spends nothing, print the plan and don't ask; a declined
+  plan prints `nothing run`;
+- `opb check` (new) says whether a dataset is one opb can run: its manifest, every file it names, and
+  every gold; it names the page and column of a missing file;
+- `opb score` names the flag and file of a missing or non-object prediction, and a record passed as
+  one; `opb reparse` refuses a folder without records/ or a file that isn't a record, checks every
+  record before rewriting any, and says to regrade; and
+- a `--pages` file skips blank lines and `#` comments; `--options` says when a path doesn't exist.

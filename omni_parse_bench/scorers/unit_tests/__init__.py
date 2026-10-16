@@ -149,8 +149,9 @@ def summarize(xs: Iterable[Line]) -> dict[str, Any]:
     """The score lines `xs` (from `lines`, or a scores.jsonl's) summarized: `headline`, the one number to
     compare runs by (see `_families`), beside `families` and `documents`; then per output type: `score`,
     the test counts (`tests` scored, `unsupported`, `errors`), `documents`, `per_test_type` and `per_tag`
-    (each `{score, tests, pages, documents}`); then `per_suite` and `per_derivation`. Scores are
-    fractions from 0 to 1. An output type with no scored tests is left out."""
+    (each `{score, tests, pages, documents}`); then `per_suite`, each suite's `headline` and `score` (its
+    pass rate), and `per_derivation`. Scores are fractions from 0 to 1. An output type with no scored tests
+    is left out."""
     every = list(xs)
     scored = [(x, x["result"] == "pass") for x in every if x["result"] not in UNSCORED]
     summary: dict[str, Any] = _families(scored, every)
@@ -173,7 +174,9 @@ def summarize(xs: Iterable[Line]) -> dict[str, Any]:
             "per_test_type": _means(ys, lambda x: x["test_type"], order=list(runners.TYPES)),
             "per_tag": per_tag,
         }
-    summary["per_suite"] = _means(scored, lambda x: x["suite"])
+    by_suite: dict[str, list[Line]] = collections.defaultdict(list)
+    for x in every: by_suite[x["suite"]].append(x)
+    summary["per_suite"] = {k: _suite(xs) for k, xs in sorted(by_suite.items())}
     summary["per_derivation"] = _means(scored, lambda x: x["derivation"], order=list(vocab.DERIVATIONS))
     return summary
 
@@ -192,6 +195,13 @@ def _families(scored: Sequence[tuple[Line, bool]], graded: Sequence[Line]) -> di
     complete = bool(families) and all(x["score"] is not None for x in families.values())
     return {"headline": _mean(x["score"] for x in families.values()) if complete else None,
             "families": families, "documents": _documents(scored)}
+
+
+def _suite(graded: Sequence[Line]) -> dict[str, Any]:
+    """One suite's `headline` (`_families` over its lines) and `score`, its pass rate."""
+    scored = [(x, x["result"] == "pass") for x in graded if x["result"] not in UNSCORED]
+    return {"headline": _families(scored, graded)["headline"],
+            "score": _mean(ok for _, ok in scored) if scored else None}
 
 
 def _documents(xs: Sequence[tuple[Line, bool]]) -> int:

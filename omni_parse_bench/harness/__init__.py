@@ -31,7 +31,8 @@ Orchestration (which pages, in what order, how many at once) is left to the call
 from __future__ import annotations
 
 from .contract import Adapter, Call, Cost, Request
-from .errors import AccountFailure, MissingCredential, MissingDependency, VendorError, VendorTimeout
+from .errors import (AccountFailure, MissingCredential, MissingDependency, VendorError, VendorTimeout,
+                     VendorUnreachable)
 
 # Note: vendor SDKs are checked once, here, so a missing extra fails at import with one message
 # naming it, not hours into a run.
@@ -51,6 +52,7 @@ except ImportError as exc:
 
 __all__ = [
     "predict", "reparse", "adapter", "add_adapter", "Adapter", "Request", "Call", "Cost",
-    "VendorError", "VendorTimeout", "AccountFailure", "MissingCredential", "MissingDependency",
+    "VendorError", "VendorTimeout", "VendorUnreachable", "AccountFailure", "MissingCredential",
+    "MissingDependency",
     "PROVIDERS", "DEFAULT_TIMEOUT", "settings_for", "resolve", "out_name",
 ]

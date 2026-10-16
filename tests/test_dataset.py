@@ -35,4 +35,4 @@ def test_the_dataset_loads(dataset):
 
 def test_pages_holds_each_page_file_and_nothing_else(dataset):
     pages, _ = dataset
-    assert {p.doc_path for p in pages} == {str(f) for f in (ROOT.resolve() / "pages").iterdir()}
+    assert {p.doc_path for p in pages} == set((ROOT.resolve() / "pages").iterdir())

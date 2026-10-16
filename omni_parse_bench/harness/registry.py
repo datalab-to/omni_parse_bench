@@ -20,6 +20,8 @@ from importlib import metadata
 from types import ModuleType
 from typing import Any
 
+from omni_parse_bench.errors import UsageError
+
 from . import contract
 from .providers import (azure, chandra_ocr, datalab, deepseek_ocr, dots, extend, glm_ocr, hunyuan, indra_ocr,
                         infinity, lighton, llamaparse, llm, mineru, mistral, nanonets, olmocr, paddleocr_vl,
@@ -100,7 +102,7 @@ def adapter(provider: str) -> contract.Adapter:
             exc.add_note(f"while loading adapter {provider!r} from package {ep.dist.name!r}")
             raise
     if provider not in ADAPTERS:
-        raise ValueError(f"unknown provider {provider!r}. Known vendors: "
+        raise UsageError(f"unknown provider {provider!r}. Known vendors: "
                          f"{', '.join(PROVIDERS)}. Any OpenRouter model id also works, "
                          f"e.g. openai/gpt-5.6-sol")
     return ADAPTERS[provider]
@@ -113,11 +115,16 @@ def resolve(provider: str) -> str:
 
     Note: not an outside module's name: that is an internal path its user never typed, and two packages'
     modules may end in the same word."""
-    return _named(provider, adapter(provider))
+    return _name(provider, adapter(provider))
 
 
-def _named(provider: str, module: ModuleType) -> str:
-    """`resolve`'s name for an adapter filed under `provider`."""
+def adapter_names() -> frozenset[str]:
+    """`resolve`'s name for every adapter filed so far, and `llm`, every model id's."""
+    return frozenset(_name(p, m) for p, m in ADAPTERS.items()) | {"llm"}
+
+
+def _name(provider: str, module: ModuleType) -> str:
+    """`resolve`'s name for the adapter `module`, filed under `provider`."""
     name = module.__name__
     return name.rsplit(".", 1)[-1] if name.startswith(f"{__package__}.providers.") else provider
 
@@ -154,7 +161,7 @@ def config_for(provider: str, options: dict | None = None) -> Any:
     options = options or {}
     if MODEL_SEPARATOR in provider:
         if "model" in options:
-            raise ValueError(
+            raise UsageError(
                 f"{provider}: `model` is the provider name, not an option -- otherwise the "
                 f"run would be stored and published under a model it did not use. Run the "
                 f"one you want: --providers {options['model']}")
@@ -165,7 +172,7 @@ def config_for(provider: str, options: dict | None = None) -> Any:
         hints = {}
     for name, value in options.items():
         if (want := hints.get(name)) in (str, int, float, bool) and not _of(value, want):
-            raise ValueError(f"{provider}: option {name} is a {want.__name__}, not {value!r}")
+            raise UsageError(f"{provider}: option {name} is a {want.__name__}, not {value!r}")
     # Note: a whole number given for a float option becomes that float, so 0 and the default 0.0 are one
     # setting and name one run, not two.
     options = {k: float(v) if hints.get(k) is float else v for k, v in options.items()}
@@ -174,7 +181,7 @@ def config_for(provider: str, options: dict | None = None) -> Any:
     except TypeError as exc:
         known = ", ".join(f.name for f in dataclasses.fields(config_type)) or "(none)"
         said = str(exc).rstrip(".")
-        raise ValueError(f"{provider}: {said}{'' if said.endswith('?') else '.'} Its options are: {known}"
+        raise UsageError(f"{provider}: {said}{'' if said.endswith('?') else '.'} Its options are: {known}"
                          ) from None
 
 

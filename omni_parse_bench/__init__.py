@@ -22,6 +22,6 @@ changes a verdict:
 See docs/design.md for the full design.
 """
 from omni_parse_bench import data, scorers
-from omni_parse_bench.scorers.unit_tests import Verdict, lines, score, summarize
+from omni_parse_bench.scorers.unit_tests import Verdict, check, gold, lines, score, summarize
 
-__all__ = ["data", "lines", "score", "scorers", "summarize", "Verdict"]
+__all__ = ["check", "data", "gold", "lines", "score", "scorers", "summarize", "Verdict"]
