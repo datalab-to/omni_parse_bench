@@ -14,10 +14,10 @@ pytest.importorskip("openai")
 from omni_parse_bench import benchmark, harness  # noqa: E402
 from omni_parse_bench.harness import contract, errors, page, registry  # noqa: E402
 from omni_parse_bench.harness.providers import (  # noqa: E402
-    azure, datalab, extend, llamaparse, llm, mistral, reducto, tesseract)
+    azure, datalab, extend, llamaparse, llm, mistral, reducto, tesseract, unstructured)
 
 
-ADAPTERS = [datalab, llm, reducto, extend, llamaparse, azure, tesseract, mistral]
+ADAPTERS = [datalab, llm, reducto, extend, llamaparse, azure, tesseract, mistral, unstructured]
 
 
 @pytest.mark.parametrize("api", ADAPTERS)

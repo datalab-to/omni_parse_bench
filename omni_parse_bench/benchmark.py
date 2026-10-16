@@ -53,7 +53,7 @@ from omni_parse_bench.scorers import unit_tests as scorer
 # Note: calls in flight at one vendor, shared by every run of its adapter. A vendor's rate limit is
 # per account, so two datalab modes or ten OpenRouter models must not each get a full pool.
 WORKERS = {"datalab": 10, "reducto": 3, "extend": 5, "llamaparse": 3, "azure": 3, "mistral": 5, "llm": 5,
-           "tesseract": min(8, os.cpu_count() or 1)}
+           "unstructured": 5, "tesseract": min(8, os.cpu_count() or 1)}
 DEFAULT_WORKERS = 5
 log = logging.getLogger(__name__)
 

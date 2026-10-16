@@ -38,6 +38,7 @@ ADAPTERS = {
     "llamaparse": llamaparse,
     "azure": azure,
     "mistral": mistral,
+    "unstructured": unstructured,
     "tesseract": tesseract,
     # Open models, each served from its folder in providers/oss/: the vendor's own code on a server of
     # ours, or vLLM alone where the vendor offers only the model.

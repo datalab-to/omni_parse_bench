@@ -176,6 +176,22 @@ figures are their own blocks):
 | table | table |
 | figure | figure |
 
+Unstructured (its documented element types; `PageBreak` holds no text and is left out):
+
+| Unstructured type | label |
+| --- | --- |
+| NarrativeText, UncategorizedText, Text, Address, EmailAddress | text |
+| Title | heading |
+| Header, Footer, PageNumber | page_furniture |
+| ListItem | list |
+| FigureCaption | caption |
+| Footnote | footnote |
+| Formula | equation |
+| CodeSnippet | code |
+| Table | table |
+| Form, FormKeysValues | form |
+| Image, Figure, Picture | figure |
+
 LightOn (the labels of its model card, and those its own ParseBench parser also reads; a label
 ending in `+` continues the block before it and is read without the `+`):
 
@@ -203,6 +219,7 @@ ending in `+` continues the block before it and is read without the `+`):
 | `llamaparse` | /api/v2/parse/upload, poll, expand=markdown,items,usage | html, blocks | header and footer fields beside the markdown, put back | LLAMA_CLOUD_API_KEY |
 | `azure` | Content Understanding, prebuilt-layout | html, blocks | comments in its markdown, unwrapped | AZURE_CU_KEY, and the `endpoint` option |
 | `mistral` | /v1/ocr (mistral-ocr-4-1) | html, blocks | header and footer fields beside the markdown, put back | MISTRAL_API_KEY |
+| `unstructured` | Transform /api/v2/parse, /api/v2/jobs | html, blocks | kept as elements in place | UNSTRUCTURED_API_KEY |
 | a served open-weight model (see Open-weight models) | its oss/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2: html) | kept: vendor defaults that leave them out turned off | OPB_ENDPOINT_KEY, when the server has one |
 | `tesseract` | the local `tesseract` binary, no model of the page | html | kept: it has no notion of them | none |
 
@@ -252,7 +269,15 @@ Per vendor:
   dropped; their regions stay in the blocks). Its page markdown leaves tables as placeholders
   (`[tbl-0.html]`) whose html is beside it, and moves header and footer into their own fields, so
   html is header, markdown and footer joined, tables put in place. Blocks are its paragraph blocks,
-  typed, with boxes in the page's pixels. Cost: unknown (it states pages processed); and
+  typed, with boxes in the page's pixels. Cost: unknown (it states pages processed);
+- unstructured: one POST to Transform's `/api/v2/parse` at `profile=best`, its most accurate, with
+  `output=elements` and `include=coordinates` and `include=table_html` (repeated query parameters,
+  also sent on each poll of `/api/v2/jobs/<id>`, which otherwise answers markdown without boxes),
+  polled. It returns typed elements in reading order, page headers, footers and page numbers among
+  them; html is the elements joined, each as html (a table as its `text_as_html`, a title as a
+  heading, list items as a list, any other element as a paragraph of its escaped text), recorded in
+  `sent` as `derived`. Blocks are the elements with a box, in the page's pixels with the frame on
+  each box. Cost: unknown (it states none); and
 - tesseract: the floor, plain OCR with no model of the page beyond its characters, run locally at no
   cost. A PDF page is rendered at 300 dpi (pypdfium2); Tesseract detects the page's script itself
   (`--psm 0`) and reads it with that script's model, English when it detects none it has a model

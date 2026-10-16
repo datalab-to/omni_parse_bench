@@ -23,13 +23,13 @@ from omni_parse_bench.errors import UsageError  # noqa: E402
 from omni_parse_bench.scorers.unit_tests import tests as gold  # noqa: E402
 from omni_parse_bench.scorers import unit_tests as scorer  # noqa: E402
 from omni_parse_bench.harness import budget, contract, errors, page, registry  # noqa: E402
-from omni_parse_bench.harness.providers import azure, extend, reducto  # noqa: E402
+from omni_parse_bench.harness.providers import azure, extend, reducto, unstructured  # noqa: E402
 
 QUIET = lambda s: None  # noqa: E731
 PROVIDERS = pathlib.Path(benchmark.__file__).parent / "harness" / "providers"
 CREDENTIALS = {"DATALAB_API_KEY", "REDUCTO_API_KEY", "EXTEND_API_KEY", "EXTEND_WORKSPACE_ID",
                "LLAMA_CLOUD_API_KEY", "MISTRAL_API_KEY", "OPENROUTER_API_KEY", "OPB_ENDPOINT_KEY",
-               "OPENAI_API_KEY", "AZURE_CU_KEY"}
+               "OPENAI_API_KEY", "AZURE_CU_KEY", "UNSTRUCTURED_API_KEY"}
 
 
 def stub(name: str = "stub", call=None, supports=frozenset({"html"})) -> types.ModuleType:
@@ -515,6 +515,52 @@ def test_reducto_retries_its_result_url_and_a_403_there_is_not_the_account(tmp_p
     assert harness.predict("reducto", pdf, {"html"})["outputs"]["html"]
     rec = harness.predict("reducto", pdf, {"html"})
     assert rec["outputs"]["html"] is None and "403" in rec["errors"]["html"]
+
+
+def test_unstructured_asks_for_boxes_and_table_html_on_the_submit_and_every_poll(tmp_path, monkeypatch):
+    box = {"points": [[100, 50], [100, 150], [1100, 150], [1100, 50]], "layout_width": 2000,
+           "layout_height": 1000}
+    elements = [{"type": "Title", "text": "A & B", "metadata": {"coordinates": box}},
+                {"type": "ListItem", "text": "one", "metadata": {"coordinates": box}},
+                {"type": "Table", "text": "x", "metadata": {"coordinates": box, "text_as_html": "<table/>"}},
+                {"type": "PageBreak", "text": "", "metadata": {}},
+                {"type": "Header", "text": "running", "metadata": {}}]
+    polls = iter([{"id": "j", "status": "processing"},
+                  {"id": "j", "status": "completed", "result": {"elements": elements}}])
+    seen = []
+
+    def handler(req):
+        seen.append(req)
+        if req.method == "POST": return httpx.Response(202, json={"id": "j", "status": "queued"})
+        return httpx.Response(200, json=next(polls))
+
+    mock(monkeypatch, unstructured, handler)
+    monkeypatch.setenv("UNSTRUCTURED_API_KEY", "test")
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    rec = harness.predict("unstructured", pdf)
+    for req in seen:
+        assert req.url.params.get_list("include") == ["coordinates", "table_html"]
+    assert seen[0].headers["Prefer"] == "wait=0" and b'name="profile"\r\n\r\nbest' in seen[0].content
+    assert all(r.url.params["output"] == "elements" for r in seen[1:])
+    assert rec["outputs"]["html"] == "<h2>A &amp; B</h2>\n<ul>\n<li>one</li>\n</ul>\n<table/>\n<p>running</p>"
+    assert [b["label"] for b in rec["outputs"]["blocks"]] == ["heading", "list", "table"]
+    assert rec["outputs"]["blocks"][0]["bbox"] == [0.05, 0.05, 0.55, 0.15]
+
+
+def test_unstructured_fails_the_page_on_a_failed_job_and_blocks_on_an_unknown_type(tmp_path, monkeypatch):
+    def handler(req):
+        if req.method == "POST": return httpx.Response(202, json={"id": "j"})
+        return httpx.Response(200, json={"id": "j", "status": "failed", "error": {"message": "bad file"}})
+
+    mock(monkeypatch, unstructured, handler)
+    monkeypatch.setenv("UNSTRUCTURED_API_KEY", "test")
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    rec = harness.predict("unstructured", pdf, {"html"})
+    assert rec["outputs"]["html"] is None and "bad file" in rec["errors"]["html"]
+    box = {"points": [[0, 0], [1, 1]], "layout_width": 2, "layout_height": 2}
+    raw = {"result": {"elements": [{"type": "Hologram", "text": "", "metadata": {"coordinates": box}}]}}
+    outputs, errs = unstructured.parse(raw, contract.Request(frozenset({"blocks"}), {}))
+    assert "blocks" not in outputs and "Hologram" in errs["blocks"]
 
 
 def test_cloudflare_statuses_are_transient():
