@@ -11,7 +11,9 @@
 
 Everything goes to stdout as JSON except `benchmark`'s progress, and `benchmark` shows its plan
 and waits for a yes unless given `-y`; nothing in the library ever reads stdin. `benchmark` exits 2
-when a test's grading failed in our code, so a scorer bug can't pass as a vendor's score.
+when a test's grading failed in our code, so a scorer bug can't pass as a vendor's score. A mistake in
+what was asked (a ValueError or a missing file) is printed as `opb <command>: <what was wrong>`, and
+exits 1; anything else is a bug of ours, and is raised as it is.
 
 `score` needs only the core install; every other command needs an extra (EXTRAS), and on an
 install without it says which to add instead of failing on the first missing import.
@@ -39,8 +41,10 @@ EXTRAS = {"predict": "harness", "providers": "harness", "reparse": "harness", "b
 def read_json(path: str) -> Any:
     try:
         return json.loads(Path(path).read_text())
+    except FileNotFoundError:
+        raise FileNotFoundError(f"no file at {path}") from None
     except json.JSONDecodeError as e:
-        raise ValueError(f"{path} isn't JSON: {e}") from e
+        raise ValueError(f"{path} isn't JSON: {e}") from None
 
 
 def read_workers(value: str) -> int | dict:
@@ -62,11 +66,13 @@ def read_workers(value: str) -> int | dict:
 def read_options(value: str | None) -> dict:
     """`--options` as a dict: inline JSON, or a path to a JSON file."""
     if not value: return {}
-    text = Path(value).read_text() if Path(value).exists() else value
+    is_file = Path(value).is_file()
     try:
-        out = json.loads(text)
+        out = json.loads(Path(value).read_text() if is_file else value)
     except json.JSONDecodeError as e:
-        raise ValueError(f"--options isn't JSON: {e}") from e
+        if is_file: raise ValueError(f"--options: {value} isn't JSON: {e}") from None
+        if value.lstrip()[:1] in ("{", "["): raise ValueError(f"--options isn't JSON: {e}") from None
+        raise ValueError(f"--options {value!r} is neither inline JSON nor a file that exists") from None
     if not isinstance(out, dict):
         raise ValueError(f"--options must be a JSON object, got {type(out).__name__}")
     return out
@@ -74,7 +80,17 @@ def read_options(value: str | None) -> dict:
 
 def cmd_score(a: argparse.Namespace) -> int:
     """What `score` returns: one verdict per test of the page."""
-    vs = scorer.score(read_json(a.pred), scorer.tests.read(a.gold), unsupported=set(a.unsupported or ()))
+    pred = read_json(a.pred)
+    if not isinstance(pred, dict):
+        raise ValueError(f"{a.pred} holds a JSON {type(pred).__name__}; a prediction is an object, "
+                         '{output type: value}, e.g. {"html": "..."}')
+    if pred and not set(pred) & set(vocab.OUTPUT_TYPES):
+        hint = (" It looks like a record from opb predict; pass its outputs." if "outputs" in pred else "")
+        raise ValueError(f"{a.pred} holds none of the output types {list(vocab.OUTPUT_TYPES)}, only "
+                         f"{sorted(pred)[:5]}.{hint}")
+    if not Path(a.gold).is_file():
+        raise FileNotFoundError(f"no gold file at {a.gold}")
+    vs = scorer.score(pred, scorer.tests.read(a.gold), unsupported=set(a.unsupported or ()))
     print(json.dumps([v._asdict() for v in vs], indent=2, ensure_ascii=False))
     return 0
 
@@ -98,14 +114,12 @@ def cmd_check(a: argparse.Namespace) -> int:
     It does not open an input (a PDF isn't checked to be a PDF), or run a test against a prediction.
     The problem goes to stderr, naming its row; a dataset that passes is described on stdout, as JSON,
     and exits 0."""
-    try:
-        _, pages = data.read_manifest(a.dataset, a.manifest)
-        if missing := [f for p in pages for f in (p.doc_path, p.gt_path) if not Path(f).is_file()]:
-            raise ValueError(f"{len(missing)} files the manifest names don't exist, e.g. {missing[:3]}")
-        scorer.check(pages)
-    except (ValueError, FileNotFoundError) as exc:   # Note: ManifestError and GoldError are ValueErrors.
-        print(f"opb check: {exc}", file=sys.stderr)
-        return 1
+    _, pages = data.read_manifest(a.dataset, a.manifest)
+    if not pages:
+        raise ValueError(f"the manifest {a.manifest} names no pages")
+    if missing := [f for p in pages for f in (p.doc_path, p.gt_path) if not Path(f).is_file()]:
+        raise ValueError(f"{len(missing)} files the manifest names don't exist, e.g. {missing[:3]}")
+    scorer.check(pages)
     print(json.dumps({"ok": True, "manifest": a.manifest, "pages": len(pages),
                       "suites": len({p.suite for p in pages}), "inputs": len({p.doc_path for p in pages})}))
     return 0
@@ -235,14 +249,28 @@ def cmd_benchmark(a: argparse.Namespace) -> int:
 def cmd_grade(a: argparse.Namespace) -> int:
     """Grade a folder of predictions/<page_id>.json, whatever made them, and print its scores and
     coverage. `--unsupported` says, once for the folder, which outputs its system can't produce; it is
-    kept in the folder's settings.json."""
+    kept in the folder's settings.json. A run's folder is graded against the dataset and manifest its
+    settings.json names, unless they are given; another dataset than its own is refused."""
+    import logging
+
+    logging.basicConfig(level=logging.WARNING, format="%(message)s", stream=sys.stderr)
     out = Path(a.run)
+    if not out.is_dir():
+        raise FileNotFoundError(f"no folder at {out}; pass the folder holding predictions/<page_id>.json")
     path = out / "settings.json"
+    said = benchmark._read_json(path) or {}
+    dataset = a.dataset or said.get("dataset") or data.DEFAULT_DATASET
+    if a.dataset and (was := said.get("dataset")) and data.dataset_id(a.dataset) != was:
+        raise ValueError(f"{out} is a run on dataset {was}, not {data.dataset_id(a.dataset)}, and a run "
+                         f"never mixes datasets; pass --dataset {was}, or grade a copy of the folder")
+    manifest = a.manifest or said.get("manifest") or data.MANIFEST
     if a.unsupported is not None:
-        said = {"unsupported": sorted(set(a.unsupported))}
-        benchmark._write_json(path, (benchmark._read_json(path) or {}) | said)
-    run = benchmark.Run((benchmark._read_json(path) or {}).get("provider", out.name), {}, out)
-    _, pages = data.read_manifest(a.dataset, a.manifest)
+        benchmark._write_json(path, said | {"unsupported": sorted(set(a.unsupported))})
+    run = benchmark.Run(said.get("provider", out.name), {}, out)
+    if a.suites and run.records.is_dir():
+        print(f"warning: {out}: grading only {', '.join(a.suites)} replaces the run's summary of every suite "
+              "with theirs; grade it without --suites to get it back", file=sys.stderr)
+    _, pages = data.read_manifest(dataset, manifest)
     s = benchmark.grade(run, data.select(pages, a.suites), say=lambda m: print(m, file=sys.stderr))
     print(json.dumps({**{o: v["score"] for o, v in s.items() if isinstance(v, dict) and "score" in v},
                       "pages": s["pages"], "pending": s["pending"]}, indent=2))
@@ -260,16 +288,25 @@ def cmd_reparse(a: argparse.Namespace) -> int:
     from omni_parse_bench import harness
 
     for run in a.runs:
-        changed = total = 0
+        if not (run / "records").is_dir():
+            raise FileNotFoundError(f"no records/ in {run}; reparse reads a run folder's "
+                                    "records/<page_id>.json")
+        # Note: every record read and reparsed before any is rewritten, so a bad one stops nothing half-done.
+        done = []
         for path in sorted((run / "records").glob("*.json")):
-            record = json.loads(path.read_text())
-            new = harness.reparse(record, frozenset(a.add or ()))
-            total += 1
-            if new["outputs"] == record["outputs"] and new["errors"] == record["errors"]: continue
-            changed += 1
+            try:
+                record = json.loads(path.read_text())
+                new = harness.reparse(record, frozenset(a.add or ()))
+            except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                raise ValueError(f"{path} isn't a record opb can reparse ({type(exc).__name__}: {exc}); "
+                                 "nothing in this run was rewritten") from None
+            if new["outputs"] != record["outputs"] or new["errors"] != record["errors"]:
+                done.append((path, new))
+        for path, new in done:
             benchmark._write_json(path, new)
             benchmark._write_json(run / "predictions" / path.name, new["outputs"])
-        print(f"{run}: {changed} of {total} records changed", file=sys.stderr)
+        print(f"{run}: {len(done)} of {len(list((run / 'records').glob('*.json')))} records changed",
+              file=sys.stderr)
     return 0
 
 
@@ -281,13 +318,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     s = sub.add_parser("score", help="grade one page's outputs against its tests: one verdict per test")
     s.add_argument("--pred", required=True, help="the outputs, JSON: {output type: value}")
     s.add_argument("--gold", required=True, help="the page's gold file, gold/<page_id>.json")
-    s.add_argument("--unsupported", nargs="*", metavar="OUTPUT",
+    s.add_argument("--unsupported", nargs="*", metavar="OUTPUT", choices=vocab.OUTPUT_TYPES,
                    help="output types the provider can't produce")
 
     d = sub.add_parser("predict", help="run one page through one provider")
     d.add_argument("--provider", required=True, help="a vendor (opb providers), or an OpenRouter model id")
     d.add_argument("--page", required=True, help="the page, .pdf or .png")
-    d.add_argument("--wants", nargs="*", metavar="OUTPUT",
+    d.add_argument("--wants", nargs="*", metavar="OUTPUT", choices=vocab.OUTPUT_TYPES,
                    help="output types to produce (default: all it supports)")
     d.add_argument("--timeout", type=float, default=900, help="seconds per vendor call")
     d.add_argument("--options", metavar="JSON", help="the provider's options, inline JSON or a file")
@@ -320,10 +357,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     g = sub.add_parser("grade", help="grade a folder of predictions/<page_id>.json: yours, or a run's")
     g.add_argument("run", help="the folder holding predictions/ (and settings.json)")
-    g.add_argument("--dataset", default=data.DEFAULT_DATASET,
-                   help="a dataset folder, or hf://datasets/<repo>[@revision]")
-    g.add_argument("--manifest", default=data.MANIFEST,
-                    help="which of the dataset's manifests: its pages, and where their gold is")
+    g.add_argument("--dataset", default=None,
+                   help="a dataset folder, or hf://datasets/<repo>[@revision]; default: the one the folder's "
+                        "settings.json names, else ours")
+    g.add_argument("--manifest", default=None,
+                   help="which of the dataset's manifests, a path inside it; default: the one the folder's "
+                        "settings.json names, else manifest.parquet")
     g.add_argument("--unsupported", nargs="*", metavar="OUTPUT", choices=vocab.OUTPUT_TYPES,
                    help="output types your system can't produce, once for the folder (kept in its "
                         "settings.json); their tests are unsupported, not failed")
@@ -355,6 +394,9 @@ def main(argv: Sequence[str] | None = None) -> int:
            "check": cmd_check, "tests": cmd_tests, "providers": cmd_providers, "reparse": cmd_reparse}[a.cmd]
     try:
         return cmd(a)
+    except (ValueError, FileNotFoundError) as exc:   # Note: ManifestError and GoldError are ValueErrors.
+        print(f"opb {a.cmd}: {exc}", file=sys.stderr)
+        return 1
     except ImportError as exc:
         # Note: only a third-party module is fixed by installing an extra; a broken import of our own
         # must surface as itself. The harness's own error (`MissingDependency`) names its module only

@@ -309,7 +309,8 @@ It's resumable, and safe to run twice.
   always one grading's, and a gold correction or a new scorer reaches a run on its next grading;
 - grading covers every page the run has a prediction for, so `--limit` and `--suites` narrow what is
   predicted, never what is scored; and
-- an interrupted grading writes nothing: the last finished grading's files stand.
+- an interrupted grading writes nothing: both files are written beside the old ones and moved into place
+  together at the end, so the last finished grading's pair stands.
 
 A run folder holds one dataset: an invocation with another `--dataset` into it is refused. A dataset
 is downloaded at one commit, its pages and gold together. An invocation at another commit of the run's
@@ -385,14 +386,13 @@ opb providers
 azure
 datalab
 extend
-llamaparse
-mistral
-reducto
+...
 tesseract
 openai/gpt-5.6-sol
 ```
 
-The model id is an example: any OpenRouter `org/model` id works.
+An excerpt: the real list is longer, and grows with the adapters installed. The model id is an
+example: any OpenRouter `org/model` id works.
 
 What each takes, and its defaults:
 
@@ -501,7 +501,13 @@ opb grade mine/ --unsupported blocks      # mine/predictions/<page_id>.json, one
 that its prediction leaves out fails, so leaving out a hard page's output can't take it out of the
 score. A page with no prediction fails, every test of it: your folder is your submission, so a page
 left out is one your system didn't answer. To grade part of the dataset on purpose, pass `--suites`.
-The folder gets `scores.jsonl` and `summary.json`, as a run's does.
+The folder gets `scores.jsonl` and `summary.json`, as a run's does. Grading says how many files in
+`predictions/` are named for no page (left out), and how many couldn't be read or hold no output type
+(graded as failed); keys other than output types are ignored.
+
+A run's folder is graded against the dataset and manifest its `settings.json` names, so
+`opb grade runs/<run>` needs no `--dataset`; another dataset than the run's is refused. `--suites`
+on a run's folder replaces its summary of every suite, and says so.
 
 ### Exploring the tests
 
@@ -582,10 +588,12 @@ Comparing providers on a slice of the tests takes four steps.
    lines you select:
 
    ```python
+   from pathlib import Path
+
    from omni_parse_bench import benchmark
    from omni_parse_bench.scorers import unit_tests
 
-   run = benchmark.Run("datalab", {}, "runs/datalab-f45991d3")
+   run = benchmark.Run("datalab", {}, Path("runs/datalab-f45991d3"))
    picked = [x for x in benchmark.read_scores(run) if {"handwriting", "table"} <= set(x["tags"])]
    s = unit_tests.summarize(picked)
    s["headline"], s["families"], s["documents"]

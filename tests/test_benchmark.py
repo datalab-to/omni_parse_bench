@@ -209,9 +209,11 @@ def test_a_loop_of_ones_own_keeps_a_run_through_its_functions(tmp_path, monkeypa
 
 def test_a_run_never_prepared_is_not_graded(tmp_path):
     """Most likely another folder (another option, another --out), so it is refused, not passed over."""
-    r = benchmark.Run("tesseract", {}, tmp_path / "nowhere")
-    with pytest.raises(ValueError, match="never prepared"):
-        benchmark.grade(r, ())
+    with pytest.raises(FileNotFoundError, match="no folder at"):
+        benchmark.grade(benchmark.Run("tesseract", {}, tmp_path / "nowhere"), ())
+    (tmp_path / "empty").mkdir()
+    with pytest.raises(ValueError, match="has no predictions/ folder"):
+        benchmark.grade(benchmark.Run("tesseract", {}, tmp_path / "empty"), ())
 
 
 def test_a_hugging_face_dataset_is_downloaded_whole_at_one_revision(tmp_path, monkeypatch):
@@ -543,8 +545,7 @@ def test_a_bad_count_or_an_empty_options_list_is_refused():
             benchmark.plan(["datalab"], dataset="unused", **kwargs)
     with pytest.raises(ValueError, match="empty list"):
         benchmark.plan(["datalab"], dataset="unused", options={"datalab": []})
-    with pytest.raises(ValueError, match="negative"):
-        cli.main(["benchmark", "--providers", "datalab", "--limit", "-1", "-y"])
+    assert cli.main(["benchmark", "--providers", "datalab", "--limit", "-1", "-y"]) == 1
 
 
 def test_a_missing_repo_fails_at_once_and_a_network_fault_is_retried(monkeypatch):
@@ -958,6 +959,161 @@ def test_check_says_whether_a_dataset_can_run(tmp_path, capsys):
     (ds / "gold" / "a-p1.json").write_text("{}")
     assert cli.main(["check", "--dataset", str(ds)]) == 1
     assert "a-p1" in capsys.readouterr().err
+
+
+# 14. Guardrails: what a user gets wrong is refused, or said, never graded silently.
+
+def test_grade_reads_a_runs_own_dataset_and_refuses_another(tmp_path, monkeypatch, capsys):
+    import shutil
+
+    use(monkeypatch, {"stub": stub()})
+    ds = dataset(tmp_path / "data", n=2)
+    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=ds)
+    benchmark.execute(p, say=QUIET)
+    run = p.runs[0].out
+    assert cli.main(["grade", str(run)]) == 0, "no --dataset: the run's own"
+    assert json.loads(capsys.readouterr().out)["html"] == 1.0
+    other = tmp_path / "other"
+    shutil.copytree(ds, other)
+    before = (run / "summary.json").read_text()
+    assert cli.main(["grade", str(run), "--dataset", str(other)]) == 1
+    assert "never mixes datasets" in capsys.readouterr().err
+    assert (run / "summary.json").read_text() == before, "a refused grading writes nothing"
+    assert cli.main(["grade", str(run), "--suites", "a"]) == 0
+    assert "replaces the run's summary" in capsys.readouterr().err
+    assert cli.main(["grade", str(tmp_path / "typo"), "--unsupported", "blocks"]) == 1
+    assert "no folder at" in capsys.readouterr().err
+    assert not (tmp_path / "typo").exists()
+
+
+def test_grade_says_which_predictions_it_could_not_use(tmp_path, caplog):
+    ds = dataset(tmp_path / "data", n=3)
+    mine = tmp_path / "mine"
+    (mine / "predictions" / "nested").mkdir(parents=True)
+    (mine / "settings.json").write_text(json.dumps({"unsupported": []}))
+    (mine / "predictions" / "a-p0.json").write_text(json.dumps({"html": "<p>alpha</p>", "markdown": "x"}))
+    (mine / "predictions" / "a-p1.json").write_text("not json")
+    (mine / "predictions" / "a-p2.pdf.json").write_text(json.dumps({"html": "<p>alpha</p>"}))
+    with caplog.at_level(logging.WARNING):
+        s = benchmark.grade(benchmark.Run("mine", {}, mine), data.read_manifest(ds)[1], say=QUIET)
+    assert s["html"]["score"] == pytest.approx(1 / 3), "an extra key is ignored; the page still passes"
+    assert "2 files in predictions/ are named for no page" in caplog.text
+    assert "1 predictions couldn't be read" in caplog.text and "a-p1" in caplog.text
+    assert not list(mine.glob("*.tmp")), "both files moved into place"
+    with pytest.raises(ValueError, match="no pages to grade"):
+        benchmark.grade(benchmark.Run("mine", {}, mine), (), say=QUIET)
+
+
+def test_a_mistake_on_the_command_line_is_a_message_not_a_traceback(tmp_path, capsys, monkeypatch):
+    ds = dataset(tmp_path / "data")
+    assert cli.main(["benchmark", "--providers", "stub", "--dataset", ds, "--suites", "zz", "-y"]) == 1
+    assert capsys.readouterr().err.startswith("opb benchmark: ")
+    assert cli.main(["check", "--dataset", "hf:/datasets/x/y"]) == 1
+    assert "slash missing" in capsys.readouterr().err
+    (tmp_path / "local.parquet").write_bytes(b"")
+    assert cli.main(["check", "--dataset", ds, "--manifest", str(tmp_path / "local.parquet")]) == 1
+    assert "outside the dataset" in capsys.readouterr().err
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["check", "--dataset", ds, "--manifest", "local.parquet"]) == 1
+    assert "a manifest is a path inside the dataset" in capsys.readouterr().err
+
+
+def test_check_refuses_a_manifest_with_no_pages(tmp_path, capsys):
+    import pyarrow.parquet as pq
+
+    ds = pathlib.Path(dataset(tmp_path / "data"))
+    table = pq.read_table(ds / "manifest.parquet")
+    pq.write_table(table.slice(0, 0), ds / "manifest.parquet")
+    assert cli.main(["check", "--dataset", str(ds)]) == 1
+    assert "names no pages" in capsys.readouterr().err
+
+
+def test_score_says_what_is_wrong_with_what_it_was_given(tmp_path, capsys):
+    ds = pathlib.Path(dataset(tmp_path / "data"))
+    gold_file = str(ds / "gold" / "a-p0.json")
+    for content, why in [([], "holds a JSON list"), ({"outputs": {"html": "x"}}, "record from opb predict")]:
+        (tmp_path / "pred.json").write_text(json.dumps(content))
+        assert cli.main(["score", "--pred", str(tmp_path / "pred.json"), "--gold", gold_file]) == 1
+        assert why in capsys.readouterr().err
+    assert cli.main(["score", "--pred", str(tmp_path / "nope.json"), "--gold", gold_file]) == 1
+    assert "no file at" in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        cli.main(["score", "--pred", str(tmp_path / "pred.json"), "--gold", gold_file,
+                  "--unsupported", "htm"])
+
+
+def test_a_gold_of_the_wrong_shape_is_a_gold_error_naming_its_page(tmp_path):
+    for i, content in enumerate(["[]", '{"tests": [1]}', "{not json"]):
+        f = tmp_path / f"p{i}.json"
+        f.write_text(content)
+        with pytest.raises(gold.GoldError, match=f"p{i}"):
+            gold.read(f)
+
+
+def test_wrong_kinds_of_values_are_refused_by_name(tmp_path, monkeypatch):
+    pages = data.read_manifest(dataset(tmp_path / "data", n=2))[1]
+    with pytest.raises(TypeError, match="not the string"):
+        data.select(pages, "a")
+    with pytest.raises(ValueError, match="limit is -1"):
+        data.select(pages, limit=-1)
+    assert len(data.select(pages, only=["a-p0"])) == 1, "any iterable of ids"
+    assert data.select((), sample=3) == ()
+    use(monkeypatch, {"stub": stub()})
+    with pytest.raises(TypeError, match="not the string"):
+        benchmark.plan("stub", dataset="unused")
+    for kwargs, why in [({"timeout": -5}, "--timeout"), ({"workers": "3"}, "--workers is a number"),
+                        ({"workers": -3}, "each adapter's default")]:
+        with pytest.raises(ValueError, match=why):
+            benchmark.plan(["stub"], dataset="unused", **kwargs)
+    with pytest.raises(ValueError, match="option tier is a str"):
+        benchmark.plan(["stub"], dataset="unused", options={"stub": {"tier": 3}})
+    import pyarrow.parquet as pq
+
+    empty = pathlib.Path(dataset(tmp_path / "empty"))
+    pq.write_table(pq.read_table(empty / "manifest.parquet").slice(0, 0), empty / "manifest.parquet")
+    with pytest.raises(ValueError, match="has 0 pages"):
+        benchmark.plan(["stub"], out=tmp_path / "runs", dataset=str(empty))
+
+
+def test_output_names_are_checked_where_they_are_given(tmp_path, monkeypatch):
+    use(monkeypatch, {"stub": stub()})
+    (tmp_path / "p.pdf").write_bytes(b"%PDF")
+    with pytest.raises(TypeError, match="not the string"):
+        harness.predict("stub", tmp_path / "p.pdf", "html")
+    with pytest.raises(ValueError, match="unknown output types"):
+        harness.predict("stub", tmp_path / "p.pdf", {"markdown"})
+
+
+def test_an_adapter_a_plugin_declares_is_keyed_by_its_full_name(monkeypatch):
+    m = stub("acme.parser")
+    monkeypatch.setattr(registry, "ADAPTERS", dict(registry.ADAPTERS))
+    monkeypatch.setattr(registry, "PROVIDERS", list(registry.PROVIDERS))
+    registry.add_adapter("acme", m)
+    assert registry.resolve("acme") == "acme.parser" and registry.resolve("datalab") == "datalab"
+    assert benchmark._per_adapter({"acme.parser": 2}) == {"acme.parser": 2}
+
+
+def test_a_bug_in_an_adapter_stops_its_runs_naming_the_page(tmp_path, monkeypatch):
+    def broken(config):
+        raise RuntimeError("a bug in the adapter")
+    use(monkeypatch, {"stub": stub(call=broken)})
+    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data"))
+    with pytest.raises(RuntimeError) as e:
+        benchmark.execute(p, say=QUIET)
+    assert any("predicted page a-p0" in n for n in e.value.__notes__)
+
+
+def test_options_and_reparse_say_what_is_wrong(tmp_path, capsys):
+    with pytest.raises(ValueError, match="neither inline JSON nor a file"):
+        cli.read_options("opts.jsn")
+    with pytest.raises(ValueError, match="must be a JSON object"):
+        cli.read_options("[1]")
+    assert cli.main(["reparse", str(tmp_path)]) == 1
+    assert "no records/" in capsys.readouterr().err
+    (tmp_path / "records").mkdir()
+    (tmp_path / "records" / "a.json").write_text("{}")
+    assert cli.main(["reparse", str(tmp_path)]) == 1
+    assert "a.json isn't a record" in capsys.readouterr().err
 
 
 def test_a_run_planned_at_another_commit_of_its_dataset_warns_and_carries_on(tmp_path):

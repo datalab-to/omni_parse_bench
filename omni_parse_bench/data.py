@@ -21,7 +21,7 @@ import collections
 import dataclasses
 import functools
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -80,6 +80,8 @@ def _hf_dataset(dataset: str | Path) -> tuple[str, str | None] | None:
     if isinstance(dataset, Path) and s.startswith("hf:"):
         raise ValueError(f"the dataset {s!r} was made a Path, which folds the '//' out of an address. "
                          f"Pass it as a str: {form}")
+    if s.startswith("hf:") and not s.startswith("hf://"):
+        raise ValueError(f"{s!r} looks like a Hugging Face address with a slash missing. Write it as {form}")
     if not s.startswith("hf://"): return None
     org, _, name = s.removeprefix(HF_PREFIX).partition("/")
     name, at, revision = name.partition("@")
@@ -147,11 +149,19 @@ def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, 
     except ImportError:
         raise ImportError("omni-parse-bench reads the manifest with pyarrow: "
                           "pip install 'omni-parse-bench[benchmark]'") from None
+    if Path(manifest).is_absolute() or ".." in Path(manifest).parts:
+        raise ManifestError(f"--manifest {manifest} is outside the dataset; a manifest is a path inside it, "
+                            f"e.g. manifests/sample.parquet. Pass --dataset its folder, and --manifest its "
+                            f"path in there")
     root = download_dataset(dataset).resolve()
     if not (root / manifest).is_file():
-        raise ManifestError(f"no manifest {manifest} in {root}. A dataset holds manifest.parquet, and may "
-                            "hold others (e.g. manifests/sample.parquet), each naming its pages; pass "
-                            "--manifest one")
+        # Note: a manifest is a path inside the dataset; one given as a path on disk is a common slip.
+        here = (f" {manifest} is a file here, but a manifest is a path inside the dataset: pass --dataset "
+                f"{Path(manifest).parent} --manifest {Path(manifest).name}." if Path(manifest).is_file()
+                else "")
+        raise ManifestError(f"no manifest {manifest} in {root}.{here} A dataset holds manifest.parquet, and "
+                            "may hold others (e.g. manifests/sample.parquet), each naming its pages; pass "
+                            "--manifest one, a path inside the dataset")
     table = pq.read_table(root / manifest)
     if "outputs" not in table.column_names:
         raise ManifestError(OLD_DATASET.format(root=root))
@@ -165,24 +175,31 @@ def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, 
     return root, rows
 
 
-def select(pages: Sequence[Page], suites: list[str] | None = None, limit: int = 0,
-           sample: int = 0, only: frozenset[str] | None = None) -> tuple[Page, ...]:
+def select(pages: Sequence[Page], suites: Iterable[str] | None = None, limit: int = 0,
+           sample: int = 0, only: Iterable[str] | None = None) -> tuple[Page, ...]:
     """The pages of `pages` (a dataset's, from `read_manifest`) to run, in their order, filtered by suite
     and by `only` (page ids, each of which must be among them), and limited.
 
     `sample` picks that many pages spread over every suite: suites in turn, each page evenly spaced
     within its suite, so a smoke test sees every kind of page and the same pages each time."""
+    for name, xs in (("suites", suites), ("only", only)):
+        if isinstance(xs, str):
+            raise TypeError(f"{name} is a list of names, not the string {xs!r}; pass [{xs!r}]")
+    for name, n in (("limit", limit), ("sample", sample)):
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ValueError(f"{name} is {n!r}, but it counts pages: a whole number, 0 for no limit")
     rows = tuple(pages)
     known = {r.suite for r in rows}
     if bad := sorted(set(suites or ()) - known):
         raise ValueError(f"unknown suites {bad}; the dataset's suites are {sorted(known)}")
-    rows = tuple(r for r in rows if not suites or r.suite in suites)
+    rows = tuple(r for r in rows if not suites or r.suite in set(suites))
     if only is not None:
+        only = frozenset(only)
         if bad := sorted(only - {r.page_id for r in rows}):
             raise ValueError(f"{len(bad)} of the pages asked for aren't in the dataset"
                              f"{' (or its suites)' if suites else ''}, e.g. {bad[:3]}; nothing has been run")
         rows = tuple(r for r in rows if r.page_id in only)
-    if sample:
+    if sample and rows:
         by: dict[str, list] = {}
         for r in rows: by.setdefault(r.suite, []).append(r)
         k = -(-sample // len(by))

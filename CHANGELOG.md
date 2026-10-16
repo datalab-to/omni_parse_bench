@@ -56,6 +56,25 @@ Datasets:
 - `execute` grades what was predicted when predicting fails part way, but not when it is interrupted
   (Ctrl-C); `--score-only` grades it then;
 - page ids must be unique ignoring case, since each names files;
+- a mistake on the command line (a ValueError or a missing file) prints `opb <command>: <message>` and
+  exits 1, instead of a traceback;
+- `opb grade <folder>` takes the dataset and manifest from the folder's settings.json when they aren't
+  given, and refuses another dataset than the run's; `--suites` on a run's folder warns that it replaces
+  the full summary; a missing folder is named;
+- grading says which files in predictions/ match no page (left out) and which couldn't be read or hold
+  no output type (graded as failed); a prediction's other keys are ignored, as `score` ignores them; it
+  refuses an empty selection; scores.jsonl and summary.json are moved into place together;
+- `opb check` refuses a manifest with no pages; `--manifest` outside the dataset is refused, and one given
+  as a path on disk is pointed at `--dataset`; `hf:/...` (one slash) is named as a typo;
+- output names are checked where they are given (`opb score --unsupported`, `opb predict --wants`,
+  `harness.predict(wants=...)`); an option value of the wrong type is refused, naming the option;
+- `plan` and `select` refuse a bare string where a list of names goes, a negative or non-integer count,
+  a negative `timeout` and a `workers` that isn't a number or a mapping; `only` takes any iterable;
+- `registry.resolve` keeps a plugin adapter's full module name (only ours are shortened), and
+  `--workers` may name a plugin's adapter;
+- a gold file that isn't JSON, isn't an object, or holds a test that isn't an object is a `GoldError`
+  naming its page; `opb score` names a prediction that isn't an object, or is a whole record;
+- `opb reparse` refuses a folder without records/, and checks every record before rewriting any;
 - a page's suite may be null or empty, and is then `"other"` (`data.NO_SUITE`); a page_id must be a
   filename, one path component;
 - `opb check` says whether a dataset is one opb can run: its manifest, that every file it names

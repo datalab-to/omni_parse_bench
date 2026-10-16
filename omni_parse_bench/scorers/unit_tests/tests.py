@@ -82,11 +82,18 @@ class Test(NamedTuple):
 def read(path: str | Path) -> tuple[Test, ...]:
     """One gold file's tests; its name is the page's id."""
     path = Path(path)
-    return parse(path.stem, json.loads(path.read_text()))
+    try:
+        doc = json.loads(path.read_text())
+    except json.JSONDecodeError as exc:
+        raise GoldError(f"{path.stem}: its gold file {path} isn't JSON: {exc}") from None
+    return parse(path.stem, doc)
 
 
 def parse(page_id: str, doc: Mapping[str, Any]) -> tuple[Test, ...]:
     """A gold file's contents as the page's tests."""
+    if not isinstance(doc, dict):
+        raise GoldError(f"{page_id}: a gold file is an object, {{\"tests\": [...]}}, not a JSON "
+                        f"{type(doc).__name__}")
     if unknown := set(doc) - {"tests"}:
         raise GoldError(f"{page_id}: unknown keys {sorted(unknown)}; a gold file holds only 'tests'")
     if not isinstance(doc.get("tests"), list):
@@ -109,6 +116,8 @@ def wants(tests: Iterable[Test]) -> frozenset[str]:
 
 def test(page_id: str, t: Mapping[str, Any]) -> Test:
     """One test of a page's gold file, checked."""
+    if not isinstance(t, dict):
+        raise GoldError(f"{page_id}: each test is an object, not {t!r:.80}")
     where = f"{page_id}: test {t.get('id')!r}"
     if missing := [f for f in FIELDS if f not in t]:
         raise GoldError(f"{where} lacks {missing}")

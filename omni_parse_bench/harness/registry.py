@@ -15,6 +15,7 @@ import dataclasses
 import hashlib
 import json
 import re
+import typing
 from importlib import metadata
 from types import ModuleType
 from typing import Any
@@ -106,8 +107,17 @@ def adapter(provider: str) -> contract.Adapter:
 
 
 def resolve(provider: str) -> str:
-    """This adapter's module name; groups every model id that reaches the same adapter."""
-    return adapter(provider).__name__.rsplit(".", 1)[-1]
+    """This adapter's module name; groups every model id that reaches the same adapter. What `WORKERS` and
+    `--workers` are keyed by."""
+    return _name(adapter(provider))
+
+
+def _name(module: ModuleType) -> str:
+    """An adapter module's name as `resolve` gives it.
+
+    Note: only our own modules are shortened; two outside ones may end in the same word."""
+    name = module.__name__
+    return name.rsplit(".", 1)[-1] if name.startswith(f"{__package__}.providers.") else name
 
 
 def out_name(provider: str, options: dict | None = None) -> str:
@@ -148,10 +158,25 @@ def config_for(provider: str, options: dict | None = None) -> Any:
                 f"one you want: --providers {options['model']}")
         options = {**options, "model": provider}
     try:
-        return config_type(**options)
+        config = config_type(**options)
     except TypeError as exc:
         known = ", ".join(f.name for f in dataclasses.fields(config_type)) or "(none)"
         raise ValueError(f"{provider}: {exc}. Its options are: {known}") from None
+    try:
+        hints = typing.get_type_hints(config_type)
+    except (NameError, TypeError):   # Note: an annotation that doesn't resolve leaves its value unchecked.
+        hints = {}
+    for name, value in options.items():
+        if (want := hints.get(name)) in (str, int, float, bool) and not _of(value, want):
+            raise ValueError(f"{provider}: option {name} is a {want.__name__}, not {value!r}")
+    return config
+
+
+def _of(value: Any, want: type) -> bool:
+    """Whether `value` is a `want` as JSON gives one: an int is a float, and a bool is no number."""
+    if want is float: return isinstance(value, int | float) and not isinstance(value, bool)
+    if want is int: return isinstance(value, int) and not isinstance(value, bool)
+    return isinstance(value, want)
 
 
 def settings_for(provider: str, options: dict | None = None) -> dict:
