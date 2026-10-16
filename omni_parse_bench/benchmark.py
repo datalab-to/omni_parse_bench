@@ -623,8 +623,8 @@ def _summary(run: Run, said: Mapping[str, Any], lines: list[dict], count: dict[s
         if x["pending"]: x["headline"] = None
     pending = sum(c["pending"] for c in count.values())
     credits = [c["credits"] for c in calls if c.get("credits") is not None]
-    return {"run": run.out.name, "provider": run.provider, "settings": said.get("settings", {}), **s,
-            "headline": None if pending else s["headline"], "per_suite": per, "scorer": SCORER,
+    return {"run": run.out.name, "provider": run.provider, "settings": said.get("settings", {}), "scorer": SCORER,
+            **s, "headline": None if pending else s["headline"], "per_suite": per,
             "pages": sum(c["pages"] for c in count.values()),
             "failed": sum(c["failed"] for c in count.values()), "pending": pending,
             "usd": round(sum(c.get("usd") or 0 for c in calls), 4),

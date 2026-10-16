@@ -713,12 +713,12 @@ and cost:
 
 ```json
 {"run": "datalab-f45991d3", "provider": "datalab", "settings": {"mode": "balanced", "...": "..."},
- "headline": 0.905, "families": {"...": "..."}, "documents": 2343, "html": {"...": "..."},
+ "scorer": "0.1.1+a09ce5ecf32a", "headline": 0.905, "families": {"...": "..."}, "documents": 2343, "html": {"...": "..."},
  "blocks": {"...": "..."},
  "per_suite": {"olmo_arxiv_math": {"headline": 0.874, "score": 0.861, "pages": 180, "failed": 1,
                                    "pending": 0}, "...": "..."},
  "per_derivation": {"...": "..."},
- "scorer": "0.1.1+a09ce5ecf32a", "pages": 2937, "failed": 12, "pending": 0,
+ "pages": 2937, "failed": 12, "pending": 0,
  "usd": 13.668, "credits": null}
 ```
 
