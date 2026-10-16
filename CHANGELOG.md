@@ -56,6 +56,9 @@ Datasets:
 - `execute` grades what was predicted when predicting fails part way, but not when it is interrupted
   (Ctrl-C); `--score-only` grades it then;
 - page ids must be unique ignoring case, since each names files;
+- `opb benchmark` and `opb grade` print each run's whole summary (its summary.json), as
+  omni-extract-bench does; they printed a digest with each output's score flattened (`html` is now
+  `html.score`);
 - a mistake on the command line (a ValueError or a missing file) prints `opb <command>: <message>` and
   exits 1, instead of a traceback;
 - `opb grade <folder>` takes the dataset and manifest from the folder's settings.json when they aren't

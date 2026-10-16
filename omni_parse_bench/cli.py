@@ -244,10 +244,7 @@ def cmd_benchmark(a: argparse.Namespace) -> int:
     if not a.yes and not a.score_only and not confirm_plan(p):
         return 1
     summaries = benchmark.execute(p, lambda s: print(s, file=sys.stderr))
-    # Note: the coverage beside the scores, since a run with pages pending is scored on fewer pages.
-    print(json.dumps({k: {**{o: v["score"] for o, v in s.items() if isinstance(v, dict) and "score" in v},
-                          "pages": s["pages"], "pending": s["pending"]}
-                      for k, s in summaries.items()}, indent=2))
+    print(json.dumps(summaries, indent=2, ensure_ascii=False))   # each run's summary.json, by run name
     if errored := {k: n for k, s in summaries.items() if (n := benchmark._errors_in(s))}:
         print(f"warning: grading failed in our code (not the vendor's) for {sum(errored.values())} tests: "
               + ", ".join(f"{k} {n}" for k, n in errored.items())
@@ -257,8 +254,8 @@ def cmd_benchmark(a: argparse.Namespace) -> int:
 
 
 def cmd_grade(a: argparse.Namespace) -> int:
-    """Grade a folder of predictions/<page_id>.json, whatever made them, and print its scores and
-    coverage. A folder holds one dataset and one manifest: a run's are in its settings.json, and a folder
+    """Grade a folder of predictions/<page_id>.json, whatever made them, and print its summary, as its
+    summary.json holds it. A folder holds one dataset and one manifest: a run's are in its settings.json, and a folder
     of your own gets them there (with `--unsupported`, what its system can't produce) once its first
     grading succeeds, so a later grading needs no flags and another dataset or manifest is refused.
     `--unsupported` is for your own folders: a run's adapter says what it can't produce."""
@@ -296,9 +293,7 @@ def cmd_grade(a: argparse.Namespace) -> int:
         kept = cannot if cannot is not None else said["unsupported"]
         benchmark._write_json(path, said | {"dataset": data.dataset_id(dataset), **commit,
                                             "manifest": manifest, "unsupported": kept})
-    print(json.dumps({**{o: v["score"] for o, v in s.items() if isinstance(v, dict) and "score" in v},
-                      "headline": s["headline"], "pages": s["pages"], "failed": s["failed"],
-                      "pending": s["pending"]}, indent=2))
+    print(json.dumps(s, indent=2, ensure_ascii=False))   # the folder's summary.json
     return 2 if benchmark._errors_in(s) else 0
 
 

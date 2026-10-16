@@ -250,11 +250,11 @@ opb benchmark --providers datalab openai/gpt-5.6-sol --out runs/ --limit 5
 
 It shows the plan (each run, its settings, and how many pages it will predict and grade) and, in a
 terminal, asks before calling any vendor; `-y` skips the question, and a script or pipe proceeds
-without it. It prints each run's scores with `pages` (graded) and `pending` (never attempted)
-beside them, and how many pages `failed` (an output missing or null that the provider can produce:
-`--retry-failed` may redo some, `opb reparse` re-reads answers that arrived). While a run has pages
-pending its `headline` is null and its scores print as `—`: a run has a headline only once it is
-finished. It exits 2, with a warning, when a test's grading failed in our code (`errors` in a
+without it. It prints each run's summary, by run name, as its summary.json holds it: the scores,
+`pages` (graded), `pending` (never attempted) and how many pages `failed` (an output missing or null
+that the provider can produce: `--retry-failed` may redo some, `opb reparse` re-reads answers that
+arrived). While a run has pages pending its `headline` is null and its closing line shows `—`: a run
+has a headline only once it is finished. It exits 2, with a warning, when a test's grading failed in our code (`errors` in a
 summary's output type), since those tests are left out of the score. A mistake in what was asked, an
 account failure or a missing key is printed in one line, `opb benchmark: ...`, and exits 1; Ctrl-C
 exits 130. Either way, what was predicted is kept, and the same command resumes.

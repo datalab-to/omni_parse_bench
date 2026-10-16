@@ -393,7 +393,7 @@ def test_opb_benchmark_exits_2_when_our_code_errored(monkeypatch, capsys):
         monkeypatch.setattr(benchmark, "execute", lambda p, say, s=summaries: s)
         assert cli.main(["benchmark", "--providers", "x", "-y"]) == code
         out, err = capsys.readouterr()
-        assert json.loads(out) == {"r": {"html": 0.9, "pages": 3, "pending": 1}}
+        assert json.loads(out) == summaries, "each run's summary, as summary.json holds it"
         assert ("warning" in err) == bool(code)
 
 
@@ -739,7 +739,8 @@ def test_a_folder_of_your_own_predictions_is_graded(tmp_path, capsys):
     assert [(x["test_id"], x["result"]) for x in lines] == [("t0", "pass"), ("k0", "unsupported"),
                                                          ("t1", "fail"), ("k1", "unsupported")]
     out = json.loads(capsys.readouterr().out)
-    assert out["html"] == 0.5 and out["pages"] == 2 and out["pending"] == 0
+    assert out["html"]["score"] == 0.5 and out["pages"] == 2 and out["pending"] == 0
+    assert out == json.loads((mine / "summary.json").read_text()), "stdout is the folder's summary.json"
 
 
 def test_a_page_a_run_never_attempted_is_pending(tmp_path, monkeypatch):
@@ -849,10 +850,10 @@ def test_a_folder_of_your_own_graded_for_one_suite_counts_only_it(tmp_path, caps
     (mine / "settings.json").write_text(json.dumps({"unsupported": []}))
     assert cli.main(["grade", str(mine), "--dataset", ds]) == 0
     whole = json.loads(capsys.readouterr().out)
-    assert whole["html"] == 0.5 and whole["pages"] == 2, "a page left out of your folder fails"
+    assert whole["html"]["score"] == 0.5 and whole["pages"] == 2, "a page left out of your folder fails"
     assert cli.main(["grade", str(mine), "--dataset", ds, "--suites", "a"]) == 0
     one = json.loads(capsys.readouterr().out)
-    assert one["html"] == 1.0 and (one["pages"], one["pending"]) == (1, 0)
+    assert one["html"]["score"] == 1.0 and (one["pages"], one["pending"]) == (1, 0)
 
 
 def test_a_dataset_may_hold_several_manifests_over_the_same_pages(tmp_path, monkeypatch):
@@ -980,7 +981,7 @@ def test_grade_reads_a_runs_own_dataset_and_refuses_another(tmp_path, monkeypatc
     benchmark.execute(p, say=QUIET)
     run = p.runs[0].out
     assert cli.main(["grade", str(run)]) == 0, "no --dataset: the run's own"
-    assert json.loads(capsys.readouterr().out)["html"] == 1.0
+    assert json.loads(capsys.readouterr().out)["html"]["score"] == 1.0
     other = tmp_path / "other"
     shutil.copytree(ds, other)
     before = (run / "summary.json").read_text()
