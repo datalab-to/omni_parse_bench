@@ -145,14 +145,14 @@ def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.
             for v in verdicts]
 
 
-def summarize(xs: Iterable[Line]) -> dict[str, Any]:
-    """The score lines `xs` (from `lines`, or a scores.jsonl's) summarized: `headline`, the one number to
+def summarize(lines: Iterable[Line]) -> dict[str, Any]:
+    """The score lines (from `lines()`, or a scores.jsonl's) summarized: `headline`, the one number to
     compare runs by (see `_families`), beside `families` and `documents`; then per output type: `score`,
     the test counts (`tests` scored, `unsupported`, `errors`), `documents`, `per_test_type` and `per_tag`
     (each `{score, tests, pages, documents}`); then `per_suite`, each suite's `headline` and `score` (its
     pass rate), and `per_derivation`. Scores are fractions from 0 to 1. An output type with no scored tests
     is left out."""
-    every = list(xs)
+    every = list(lines)
     scored = [(x, x["result"] == "pass") for x in every if x["result"] not in UNSCORED]
     summary: dict[str, Any] = _families(scored, every)
     for output in vocab.OUTPUT_TYPES:
