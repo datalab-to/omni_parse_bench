@@ -38,6 +38,7 @@ from omni_parse_bench.scorers import unit_tests as scorer
 # command -> the extra it needs; `score` needs none.
 EXTRAS = {"predict": "harness", "providers": "harness", "reparse": "harness", "benchmark": "benchmark",
           "grade": "benchmark", "tests": "benchmark", "check": "benchmark"}
+EXAMPLE_MODELS = ("openai/gpt-5.6-sol",)
 
 
 def read_object(path: str, flag: str) -> dict:
@@ -52,6 +53,21 @@ def read_object(path: str, flag: str) -> dict:
         raise UsageError(f"{flag} {path} holds a JSON {'null' if got is None else type(got).__name__}; it "
                          "must be a JSON object")
     return got
+
+
+def read_options(value: str | None) -> dict:
+    """`--options` as a dict: inline JSON, or a path to a JSON file."""
+    if not value: return {}
+    is_file = Path(value).is_file()
+    try:
+        out = json.loads(Path(value).read_text() if is_file else value)
+    except json.JSONDecodeError as e:
+        if is_file: raise UsageError(f"--options: {value} isn't JSON: {e}") from None
+        if value.lstrip()[:1] in ("{", "["): raise UsageError(f"--options isn't JSON: {e}") from None
+        raise UsageError(f"--options {value!r} is neither inline JSON nor a file that exists") from None
+    if not isinstance(out, dict):
+        raise UsageError(f"--options must be a JSON object, got {type(out).__name__}")
+    return out
 
 
 def read_workers(value: str | None) -> int | dict:
@@ -77,19 +93,38 @@ def read_ids(path: Path, flag: str) -> frozenset[str]:
     return frozenset(x for line in path.read_text().splitlines() if (x := line.split("#", 1)[0].strip()))
 
 
-def read_options(value: str | None) -> dict:
-    """`--options` as a dict: inline JSON, or a path to a JSON file."""
-    if not value: return {}
-    is_file = Path(value).is_file()
+def confirm_plan(plan: Any) -> bool:
+    """Show what the benchmark is about to do, and ask. `-y` / `--yes` skips this entirely.
+
+    A run costs money, so the default is to say what it will do before it starts. The plan goes
+    to stderr with the rest of the progress, leaving stdout for the scores.
+
+    Nobody to ask is not the same as no: a pipe, a cron job or a CI step has no terminal, so it
+    proceeds, since it was scripted, which is consent. Only an interactive session is asked.
+    """
+    from rich.console import Console
+
+    Console(stderr=True, highlight=False).print(progress.plan_view(plan))
+    if not sys.stdin.isatty():
+        return True
     try:
-        out = json.loads(Path(value).read_text() if is_file else value)
-    except json.JSONDecodeError as e:
-        if is_file: raise UsageError(f"--options: {value} isn't JSON: {e}") from None
-        if value.lstrip()[:1] in ("{", "["): raise UsageError(f"--options isn't JSON: {e}") from None
-        raise UsageError(f"--options {value!r} is neither inline JSON nor a file that exists") from None
-    if not isinstance(out, dict):
-        raise UsageError(f"--options must be a JSON object, got {type(out).__name__}")
-    return out
+        return input("  proceed? [y/N] ").strip().lower() in ("y", "yes")
+    except EOFError:
+        return False
+
+
+def _say(a: argparse.Namespace):
+    """Where a grading's closing line and advice go: stderr, or nowhere with `-q`."""
+    return (lambda m: None) if a.quiet else (lambda m: print(m, file=sys.stderr))
+
+
+def _bugs(a: argparse.Namespace, summaries: dict[str, dict]) -> int:
+    """2, said, when a test's grading raised in our code (a scorer bug, left out of the scores); else 0."""
+    if not (errored := {k: n for k, s in summaries.items() if (n := benchmark.scorer_errors(s))}): return 0
+    print(f"opb {a.cmd}: grading raised in our code, not the vendor's, for {sum(errored.values())} tests ("
+          + ", ".join(f"{k} {n}" for k, n in errored.items())
+          + "); they are left out of the scores: report it with the run's scores.jsonl", file=sys.stderr)
+    return 2
 
 
 def cmd_score(a: argparse.Namespace) -> int:
@@ -102,6 +137,63 @@ def cmd_score(a: argparse.Namespace) -> int:
     vs = scorer.score(pred, scorer.tests.read(a.gold), unsupported=set(a.unsupported or ()))
     print(json.dumps([v._asdict() for v in vs], indent=2, ensure_ascii=False))
     return 0
+
+
+def cmd_predict(a: argparse.Namespace) -> int:
+    from omni_parse_bench import harness
+
+    record = harness.predict(a.provider, a.page, set(a.wants) if a.wants else None, timeout=a.timeout,
+                             **read_options(a.options))
+    if not a.raw: record.pop("raw")
+    print(json.dumps(record, indent=2, ensure_ascii=False))
+    return 0 if not any(v != "unsupported" for v in record["errors"].values()) else 1
+
+
+def cmd_benchmark(a: argparse.Namespace) -> int:
+    p = benchmark.plan(a.providers, out=a.out, dataset=a.dataset, manifest=a.manifest,
+                       suites=a.suites, limit=a.limit,
+                       sample=a.sample, options=read_options(a.options), timeout=a.timeout,
+                       workers=read_workers(a.workers), score_only=a.score_only,
+                       retry_failed=a.retry_failed,
+                       only=read_ids(a.pages, "--pages") if a.pages else None)
+    # Note: nothing to ask before grading alone, which spends nothing.
+    if a.yes or a.score_only:
+        print(benchmark.describe(p), file=sys.stderr)
+    elif not confirm_plan(p):
+        print("opb benchmark: nothing run", file=sys.stderr)
+        return 1
+    say = _say(a)
+    summaries = benchmark.execute(p, say)
+    print(json.dumps(summaries, indent=2, ensure_ascii=False))   # each run's summary.json, by run name
+    if failed := sum(s["failed"] for s in summaries.values()):
+        say(f"{failed} pages failed: --retry-failed predicts again those whose failure may not recur, and "
+            "opb reparse re-reads answers that arrived")
+    return _bugs(a, summaries)
+
+
+def cmd_grade(a: argparse.Namespace) -> int:
+    """Grade a folder of predictions/<page_id>.json, whatever made them, against its whole manifest, and
+    print its summary. The folder's settings.json says its dataset and manifest (and, for a folder of your
+    own, what its system can't produce: `--unsupported`); a folder of your own gets them there once its
+    first grading succeeds."""
+    out = Path(a.run)
+    benchmark.gradable(out)   # Note: first, so a mistyped folder is named before a dataset is read.
+    said = benchmark.settled(out, a.dataset, a.manifest)
+    if a.unsupported is not None:
+        if (out / "records").is_dir():
+            raise UsageError(f"{out} is a run, whose adapter says what it can't produce; --unsupported is "
+                             "for a folder of your own predictions")
+        said = said | {"unsupported": sorted(set(a.unsupported))}
+    dataset = a.dataset or said.get("dataset") or data.DEFAULT_DATASET
+    manifest = a.manifest or said.get("manifest") or data.MANIFEST
+    _, pages = data.read_manifest(dataset, manifest)
+    run = benchmark.Run(said.get("provider", out.name), {}, out)
+    s = benchmark.grade(run, pages, _say(a), settings=said)
+    if not run.records.is_dir():
+        # Note: only once grading succeeded, so a failed one leaves the folder as it was.
+        benchmark.declare(out, dataset, manifest, said)
+    print(json.dumps(s, indent=2, ensure_ascii=False))   # the folder's summary.json
+    return _bugs(a, {out.name: s})
 
 
 def cmd_check(a: argparse.Namespace) -> int:
@@ -129,19 +221,6 @@ def cmd_tests(a: argparse.Namespace) -> int:
             row = {"id": t["id"], "page_id": p.page_id, "suite": p.suite, "document": p.document} | t
             print(json.dumps(row, ensure_ascii=False))
     return 0
-
-
-def cmd_predict(a: argparse.Namespace) -> int:
-    from omni_parse_bench import harness
-
-    record = harness.predict(a.provider, a.page, set(a.wants) if a.wants else None, timeout=a.timeout,
-                             **read_options(a.options))
-    if not a.raw: record.pop("raw")
-    print(json.dumps(record, indent=2, ensure_ascii=False))
-    return 0 if not any(v != "unsupported" for v in record["errors"].values()) else 1
-
-
-EXAMPLE_MODELS = ("openai/gpt-5.6-sol",)
 
 
 def cmd_providers(a: argparse.Namespace) -> int:
@@ -188,87 +267,6 @@ def cmd_providers(a: argparse.Namespace) -> int:
         options = json.dumps({a.provider: {first: "..."}})
         print(f"\nopb benchmark --providers {a.provider} --options '{options}'")
     return 0
-
-
-def confirm_plan(plan: Any) -> bool:
-    """Show what the benchmark is about to do, and ask. `-y` / `--yes` skips this entirely.
-
-    A run costs money, so the default is to say what it will do before it starts. The plan goes
-    to stderr with the rest of the progress, leaving stdout for the scores.
-
-    Nobody to ask is not the same as no: a pipe, a cron job or a CI step has no terminal, so it
-    proceeds, since it was scripted, which is consent. Only an interactive session is asked.
-    """
-    from rich.console import Console
-
-    Console(stderr=True, highlight=False).print(progress.plan_view(plan))
-    if not sys.stdin.isatty():
-        return True
-    try:
-        return input("  proceed? [y/N] ").strip().lower() in ("y", "yes")
-    except EOFError:
-        return False
-
-
-def _say(a: argparse.Namespace):
-    """Where a grading's closing line and advice go: stderr, or nowhere with `-q`."""
-    return (lambda m: None) if a.quiet else (lambda m: print(m, file=sys.stderr))
-
-
-def cmd_benchmark(a: argparse.Namespace) -> int:
-    p = benchmark.plan(a.providers, out=a.out, dataset=a.dataset, manifest=a.manifest,
-                       suites=a.suites, limit=a.limit,
-                       sample=a.sample, options=read_options(a.options), timeout=a.timeout,
-                       workers=read_workers(a.workers), score_only=a.score_only,
-                       retry_failed=a.retry_failed,
-                       only=read_ids(a.pages, "--pages") if a.pages else None)
-    # Note: nothing to ask before grading alone, which spends nothing.
-    if a.yes or a.score_only:
-        print(benchmark.describe(p), file=sys.stderr)
-    elif not confirm_plan(p):
-        print("opb benchmark: nothing run", file=sys.stderr)
-        return 1
-    say = _say(a)
-    summaries = benchmark.execute(p, say)
-    print(json.dumps(summaries, indent=2, ensure_ascii=False))   # each run's summary.json, by run name
-    if failed := sum(s["failed"] for s in summaries.values()):
-        say(f"{failed} pages failed: --retry-failed predicts again those whose failure may not recur, and "
-            "opb reparse re-reads answers that arrived")
-    return _bugs(a, summaries)
-
-
-def _bugs(a: argparse.Namespace, summaries: dict[str, dict]) -> int:
-    """2, said, when a test's grading raised in our code (a scorer bug, left out of the scores); else 0."""
-    if not (errored := {k: n for k, s in summaries.items() if (n := benchmark.scorer_errors(s))}): return 0
-    print(f"opb {a.cmd}: grading raised in our code, not the vendor's, for {sum(errored.values())} tests ("
-          + ", ".join(f"{k} {n}" for k, n in errored.items())
-          + "); they are left out of the scores: report it with the run's scores.jsonl", file=sys.stderr)
-    return 2
-
-
-def cmd_grade(a: argparse.Namespace) -> int:
-    """Grade a folder of predictions/<page_id>.json, whatever made them, against its whole manifest, and
-    print its summary. The folder's settings.json says its dataset and manifest (and, for a folder of your
-    own, what its system can't produce: `--unsupported`); a folder of your own gets them there once its
-    first grading succeeds."""
-    out = Path(a.run)
-    benchmark.gradable(out)   # Note: first, so a mistyped folder is named before a dataset is read.
-    said = benchmark.settled(out, a.dataset, a.manifest)
-    if a.unsupported is not None:
-        if (out / "records").is_dir():
-            raise UsageError(f"{out} is a run, whose adapter says what it can't produce; --unsupported is "
-                             "for a folder of your own predictions")
-        said = said | {"unsupported": sorted(set(a.unsupported))}
-    dataset = a.dataset or said.get("dataset") or data.DEFAULT_DATASET
-    manifest = a.manifest or said.get("manifest") or data.MANIFEST
-    _, pages = data.read_manifest(dataset, manifest)
-    run = benchmark.Run(said.get("provider", out.name), {}, out)
-    s = benchmark.grade(run, pages, _say(a), settings=said)
-    if not run.records.is_dir():
-        # Note: only once grading succeeded, so a failed one leaves the folder as it was.
-        benchmark.declare(out, dataset, manifest, said)
-    print(json.dumps(s, indent=2, ensure_ascii=False))   # the folder's summary.json
-    return _bugs(a, {out.name: s})
 
 
 RECORD = {"outputs", "errors", "calls", "raw", "provider", "settings"}   # what `harness.reparse` reads

@@ -37,6 +37,8 @@ PAGE_FIELDS = ("page_id", "document", "suite", "doc_path", "gt_path", "outputs")
 NAMES = ("page_id", "document", "doc_path", "gt_path")    # names and paths: non-empty strings
 NO_SUITE = "other"          # the suite of a page whose manifest gives none (null or "")
 OUTPUTS = frozenset(vocab.READS.values())     # the output types a test can read: html, blocks
+
+
 # Note: the dataset's commits before 41131f2 (175cc91, 1c35a52) have no outputs column; omni-parse-bench
 # 0.1.x reads them.
 OLD_DATASET = (
