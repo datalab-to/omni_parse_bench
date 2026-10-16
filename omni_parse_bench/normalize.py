@@ -206,6 +206,6 @@ def _dense(body: str) -> str:
 
 @functools.cache
 def _latex_converter():
-    from pylatexenc.latex2text import LatexNodes2Text
+    from pylatexenc import latex2text
 
-    return LatexNodes2Text()
+    return latex2text.LatexNodes2Text()

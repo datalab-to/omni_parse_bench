@@ -115,7 +115,7 @@ def download_dataset(dataset: str | Path) -> Path:
                                     f"or {HF_PREFIX}<org>/<name>")
         return root
     from huggingface_hub import errors as hf_errors
-    from huggingface_hub import snapshot_download
+    import huggingface_hub
 
     repo, revision = at
     log.info("reading %s from the Hugging Face cache, downloading what it lacks", dataset)
@@ -124,8 +124,8 @@ def download_dataset(dataset: str | Path) -> Path:
     # access, or no network with nothing cached, is the same on every attempt, so it fails at once.
     for attempt in range(DOWNLOAD_ATTEMPTS):
         try:
-            return Path(snapshot_download(repo, repo_type="dataset", revision=revision,
-                                          max_workers=4))
+            return Path(huggingface_hub.snapshot_download(repo, repo_type="dataset", revision=revision,
+                                                          max_workers=4))
         except (hf_errors.RepositoryNotFoundError, hf_errors.GatedRepoError,
                 hf_errors.RevisionNotFoundError) as exc:
             raise errors.UsageError(f"can't read dataset {dataset}: {type(exc).__name__}. Check the repo and "
