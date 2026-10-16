@@ -6,19 +6,22 @@ structure of it (its `test_type`) on pieces of the page's content (its `args`), 
 what that content is (its `tags`: in a table, handwritten, Thai, ...), which selects tests and never
 changes a verdict:
 
-    from omni_parse_bench import gold, score, summarize
+    from omni_parse_bench import data
+    from omni_parse_bench.scorers import unit_tests
 
-    pages, tests = gold.load("dataset/")         # manifest.parquet and gold/*.json
-    by_page = gold.by_page(tests)
-    verdicts = [v for p in pages for v in score(outputs[p.page_id], by_page[p.page_id])]
-    summary = summarize(verdicts, tests, pages)
+    _, pages = data.read_manifest("dataset/")    # manifest.parquet; p.doc_path is the page's file
+    xs = []
+    for p in pages:
+        tests = unit_tests.gold(p)                # gold/<page_id>.json, read and checked
+        xs += unit_tests.lines(unit_tests.score(preds[p.page_id], tests), tests, p)
+    summary = unit_tests.summarize(xs)
 
-`score` is pure: no files, no network. Producing the outputs is `omni_parse_bench.harness`
+`score` is pure: no files, no network. Producing the predictions is `omni_parse_bench.harness`
 (`pip install 'omni-parse-bench[harness]'`), and nothing here imports it.
 
 See docs/design.md for the full design.
 """
-from omni_parse_bench import gold
-from omni_parse_bench.metric import Verdict, score, summarize
+from omni_parse_bench import data, scorers
+from omni_parse_bench.scorers.unit_tests import Verdict, check, gold, lines, score, summarize
 
-__all__ = ["gold", "score", "summarize", "Verdict"]
+__all__ = ["check", "data", "gold", "lines", "score", "scorers", "summarize", "Verdict"]

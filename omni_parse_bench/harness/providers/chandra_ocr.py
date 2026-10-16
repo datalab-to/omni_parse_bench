@@ -114,9 +114,9 @@ def blocks(html: str) -> list[dict]:
 
 def picture(block: dict) -> str:
     """A picture block as an image whose alt text is its contents, the image's own alt text first."""
-    from bs4 import BeautifulSoup
+    import bs4
 
-    img = BeautifulSoup(block["raw"], "html.parser").find("img")
+    img = bs4.BeautifulSoup(block["raw"], "html.parser").find("img")
     return markdown.alt(" ".join(filter(None, [img.get("alt", "") if img else "", block["raw"]])))
 
 

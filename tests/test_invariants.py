@@ -17,7 +17,10 @@ from typing import Any
 
 import pytest
 
-from omni_parse_bench import equations, gold, metric, runners, tables, views
+from omni_parse_bench import data, equations, tables, views
+from omni_parse_bench.scorers.unit_tests import tests as gold
+from omni_parse_bench.scorers import unit_tests as scorer
+from omni_parse_bench.scorers.unit_tests import runners
 
 FIXTURE = Path(__file__).parent / "fixtures" / "invariants"
 DATASET = Path(os.environ.get("OPB_DATASET", "")).expanduser()
@@ -31,8 +34,8 @@ def fixture_tests() -> tuple[gold.Test, ...]:
 @pytest.fixture(scope="module", params=["fixture", "dataset"])
 def tests(request) -> tuple[gold.Test, ...]:
     if request.param == "fixture": return fixture_tests()
-    if not (DATASET / gold.MANIFEST).exists(): pytest.skip("set OPB_DATASET to a dataset root")
-    return gold.load(DATASET)[1]
+    if not (DATASET / data.MANIFEST).exists(): pytest.skip("set OPB_DATASET to a dataset root")
+    return scorer.check(data.read_manifest(DATASET)[1])
 
 
 def answer(t: gold.Test) -> dict[str, Any]:
@@ -82,7 +85,7 @@ def failures(tests: Sequence[gold.Test], outputs, want: str) -> list[str]:
     """The tests whose verdict on `outputs(t)` isn't `want`, with why."""
     out = []
     for t in tests:
-        [v] = metric.score(outputs(t), [t])
+        [v] = scorer.score(outputs(t), [t])
         if v.result != want: out.append(f"{t.id}: {v.result} ({v.why[:100]})")
     return out
 
@@ -101,10 +104,10 @@ def test_scoring_is_deterministic(tests):
     for page, ts in gold.by_page(tests).items():
         outputs = {"html": "".join(answer(t).get("html", "") for t in ts),
                    "blocks": [b for t in ts for b in answer(t).get("blocks", [])]}
-        first = metric.score(outputs, ts)
+        first = scorer.score(outputs, ts)
         tables.parse.cache_clear()
         equations.symbols.cache_clear()
-        assert metric.score(outputs, ts) == first, page
+        assert scorer.score(outputs, ts) == first, page
 
 
 @pytest.mark.parametrize("change", [

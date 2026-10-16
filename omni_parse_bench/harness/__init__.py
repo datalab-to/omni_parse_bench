@@ -31,13 +31,14 @@ Orchestration (which pages, in what order, how many at once) is left to the call
 from __future__ import annotations
 
 from .contract import Adapter, Call, Cost, Request
-from .errors import AccountFailure, MissingCredential, MissingDependency, VendorError, VendorTimeout
+from .errors import (AccountFailure, MissingCredential, MissingDependency, VendorError, VendorTimeout,
+                     VendorUnreachable)
 
 # Note: vendor SDKs are checked once, here, so a missing extra fails at import with one message
 # naming it, not hours into a run.
 try:
     from .page import predict, reparse
-    from .registry import DEFAULT_TIMEOUT, PROVIDERS, adapter, out_name, resolve, settings_for
+    from .registry import DEFAULT_TIMEOUT, PROVIDERS, adapter, add_adapter, out_name, resolve, settings_for
 except ImportError as exc:
     # Only a missing or incompatible SDK is fixed by installing the extra; a broken import of
     # our own must surface as itself.
@@ -50,7 +51,8 @@ except ImportError as exc:
     ) from None
 
 __all__ = [
-    "predict", "reparse", "adapter", "Adapter", "Request", "Call", "Cost",
-    "VendorError", "VendorTimeout", "AccountFailure", "MissingCredential", "MissingDependency",
+    "predict", "reparse", "adapter", "add_adapter", "Adapter", "Request", "Call", "Cost",
+    "VendorError", "VendorTimeout", "VendorUnreachable", "AccountFailure", "MissingCredential",
+    "MissingDependency",
     "PROVIDERS", "DEFAULT_TIMEOUT", "settings_for", "resolve", "out_name",
 ]

@@ -63,7 +63,7 @@ With `[benchmark]` installed, run vendors on the dataset (5 pages here):
 opb benchmark --out runs/ --limit 5 --providers datalab openai/gpt-5.6-sol
 ```
 
-It shows the plan and asks before calling any vendor. A run is resumable. Each setting of a provider is its own run. For example here we have two:
+It shows the plan and asks before calling any vendor; with no terminal to ask (a pipe, a notebook, CI) it goes ahead without asking, so a script runs as written. A run is resumable. Each setting of a provider is its own run. For example here we have two:
 
 ```bash
 opb benchmark --out runs/ --limit 5 --providers datalab \
@@ -76,13 +76,15 @@ every option.
 
 ## Score
 
-Here is one page with three tests. It is written inline with `gold.parse` so the gold
-file's shape is visible:
+Here is one page with three tests. It is written inline with `unit_tests.tests.parse` so the gold
+file's shape is visible. `unit_tests` is the benchmark's scorer: it owns what a test is, and how one is
+graded.
 
 ```python
-from omni_parse_bench import gold, score, summarize
+from omni_parse_bench import data
+from omni_parse_bench.scorers import unit_tests
 
-tests = gold.parse("example-p1", {"tests": [
+tests = unit_tests.tests.parse("example-p1", {"tests": [
     {
         "id": "t1",
         "test_type": "present",
@@ -118,7 +120,7 @@ tests = gold.parse("example-p1", {"tests": [
     },
 ]})
 
-outputs = {
+pred = {
     "html": (
         "<h2>Summary</h2>"
         "<p>Quarterly revenue rose 12% on the year.</p>"
@@ -129,7 +131,7 @@ outputs = {
         "<h2>Outlook</h2>"
     ),
 }
-verdicts = score(outputs, tests)
+verdicts = unit_tests.score(pred, tests)
 ```
 
 ```python
@@ -138,12 +140,13 @@ verdicts = score(outputs, tests)
  Verdict(id='t2', result='pass', why=''),
  Verdict(id='t3', result='fail', why="no cell matching '4.2' in any table")]
 
->>> s = summarize(verdicts, tests)["html"]
+>>> page = data.Page("example-p1", "example", "example", "pages/example-p1.pdf", "gold/example-p1.json", ("html",))
+>>> s = unit_tests.summarize(unit_tests.lines(verdicts, tests, page))["html"]
 >>> s["score"], s["per_test_type"], s["per_tag"]["table"]
-(0.6666666666666666, {'present': 1.0, 'order': 1.0, 'table_cell': 0.0}, {'score': 0.0, 'tests': 1, 'pages': 1})
+(0.6666666666666666, {'present': 1.0, 'order': 1.0, 'table_cell': 0.0}, {'score': 0.0, 'tests': 1, 'pages': 1, 'documents': 1})
 ```
 
-A verdict is `pass`, `fail`, `unsupported` or `error` with `why` saying what went wrong. `unsupported` and `error` verdicts are left out of every score.
+A verdict is `pass`, `fail` or `unsupported`, with `why` saying what went wrong. `unsupported` verdicts are left out of every score. A test whose grading raises is a bug in our scorer: it is raised, naming the page and the test, not scored.
 
 From the command line:
 
@@ -156,7 +159,7 @@ It prints the verdicts.
 A score is a number over many pages: `summarize` in your code, or
 `summary.json` from `opb benchmark`. 
 
-To grade predictions your brought on the benchmark see [Grading your own predictions](./docs/API.md#grading-your-own-predictions).
+To grade predictions you brought on the benchmark see [Grading your own predictions](./docs/API.md#grading-your-own-predictions).
 
 ## Predict
 
@@ -164,13 +167,14 @@ With `[harness]` installed, predict with our provider adapters:
 
 ```python
 from omni_parse_bench import harness
+from omni_parse_bench.scorers import unit_tests
 
 record = harness.predict("datalab", "pages/<page_id>.pdf", {"html", "blocks"}, mode="balanced")
 record["outputs"]       # {"html": "...", "blocks": [...]}
 record["errors"]        # {output: why} for anything that failed
 record["calls"]         # what was sent, cost, wall time
 
-score(record["outputs"], gold.read("gold/<page_id>.json"))
+unit_tests.score(record["outputs"], unit_tests.tests.read("gold/<page_id>.json"))
 ```
 
 From the command line:

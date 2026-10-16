@@ -5,13 +5,15 @@ read off the HTTP status, never matched in a message.
 
 `AccountFailure`, `MissingCredential` and `MissingDependency` are identical for every page,
 so they are raised past the runner, never recorded: a recorded failure is a settled answer that
-no resume re-attempts.
+no resume re-attempts. Each is a `Stop`.
 """
 from __future__ import annotations
 
 import contextlib
 from collections.abc import Iterator
 from typing import Any
+
+from omni_parse_bench import errors as base_errors
 
 # Note: 520-524 are Cloudflare's: the origin behind it didn't answer, as a 502 or 504 would say.
 TRANSIENT_STATUSES = frozenset({429, 500, 502, 503, 504, 520, 521, 522, 523, 524})
@@ -69,13 +71,13 @@ class VendorTimeout(VendorError):
         return False
 
 
-class AccountFailure(RuntimeError):
+class AccountFailure(base_errors.Stop):
     """The account cannot pay (credit ceiling, expired subscription). Stops the run."""
 
 
-class MissingCredential(RuntimeError):
+class MissingCredential(base_errors.Stop):
     """A vendor's API key is not in the environment."""
 
 
-class MissingDependency(ImportError):
+class MissingDependency(ImportError, base_errors.Stop):
     """An adapter could not import its SDK."""

@@ -270,7 +270,7 @@ def _span(value: str | int | None) -> int:
 
 
 def _fresh_soup(html: str):
-    from bs4 import BeautifulSoup
+    import bs4
 
-    return BeautifulSoup(html, "html.parser")
+    return bs4.BeautifulSoup(html, "html.parser")
 

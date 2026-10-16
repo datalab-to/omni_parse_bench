@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from omni_parse_bench import gold
+from omni_parse_bench.scorers.unit_tests import tests as gold
 
 
 def present(tags: list[str]) -> dict:

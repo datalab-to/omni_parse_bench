@@ -1,8 +1,5 @@
-"""The gold: the dataset's pages and their tests. A dataset folder holds
-
-    manifest.parquet       a row per page: page_id, document, suite, doc_path, gt_path, outputs
-    pages/<page_id>.pdf    the page that gets sent: a one-page PDF, or a .png for an image page
-    gold/<page_id>.json    its tests: {"tests": [...]}
+"""The gold: a page's tests, read from its gold file and checked. Which pages there are, and where their
+gold files are, is `data`'s; reading one page's tests is the scorer's `gold(page)`, built on `read`.
 
 A test says what structure it checks (`test_type`), in which output (`output_type`), on what content
 (`args`), with what else its runner needs (`settings`); how its claim was established (`derivation`);
@@ -16,21 +13,19 @@ and what its content is (`tags`, which grading never reads):
 
 `args` maps each role of the test type to one arg, or a list of them. An arg is exactly one of
 `{"text", "max_diffs"}`, `{"number"}` or `{"latex"}`: its kind, which says how it is compared. A
-`Test` also names its page, the gold file it came from. `load` reads a whole dataset, each test's args
-and settings into its runner's parameters; `read` one gold file:
+`Test` also names its page, the gold file it came from. `read` reads one gold file, each test's args
+and settings into its runner's parameters:
 
-    pages, tests = gold.load("dataset/")
+    tests = read("dataset/gold/<page_id>.json")   # one page's tests
     tests[0].test_type          # "present"
     tests[0].params             # runners.Present(content=runners.Text(text="...", max_diffs=1))
-    by_page(tests)[pages[0].page_id]    # the first page's tests
-    read("dataset/gold/<page_id>.json")  # one page's tests
+    by_page(tests)              # tests by page id
 
-A row or test with a missing, unknown or misspelt field, an arg of a kind its role can't compare, a
-parameter that doesn't match its type (an empty string counts as a mismatch), a max_diffs that isn't
-fewer than its folded text's characters (it would pass on any output), LaTeX that KaTeX can't render
-or that renders to nothing (it would fail, or pass, on any output), or a value outside the
-vocabulary raises `GoldError` naming it; so, in `load`, does a page with no tests, a gold file
-with no manifest row, and an id used twice.
+A test with a missing, unknown or misspelt field, an arg of a kind its role can't compare, a parameter
+that doesn't match its type (an empty string counts as a mismatch), a max_diffs that isn't fewer than
+its folded text's characters (it would pass on any output), LaTeX that KaTeX can't render or that
+renders to nothing (it would fail, or pass, on any output), or a value outside the vocabulary raises
+`GoldError` naming it. `data` raises it too, for a manifest row that breaks the dataset's rules.
 """
 from __future__ import annotations
 
@@ -44,23 +39,12 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from omni_parse_bench import equations, normalize, runners, vocab
+from omni_parse_bench import equations, normalize, vocab
+from omni_parse_bench import errors
 
-PAGE_FIELDS = ("page_id", "document", "suite", "doc_path", "gt_path", "outputs")
-NAMES = PAGE_FIELDS[:-1]    # the fields that are names and paths: non-empty strings
-OUTPUTS = frozenset(vocab.READS.values())     # the output types a test can read: html, blocks
+from . import runners
+
 FIELDS = ("id", "test_type", "output_type", "derivation", "tags", "args", "settings")
-MANIFEST = "manifest.parquet"
-# Note: the dataset's commits before 41131f2 (175cc91, 1c35a52) have no outputs column; omni-parse-bench
-# 0.1.x reads them.
-OLD_DATASET = (
-    "the dataset at {root} is from before omni-parse-bench 0.1.2: its manifest has no 'outputs' column "
-    "(the dataset's commits 1c35a52 and earlier). Use the current dataset:\n"
-    "  - from Hugging Face: drop the @<commit> pin, i.e. --dataset hf://datasets/datalab-to/omni_parse_bench;\n"
-    "  - a downloaded copy: download it again: "
-    "hf download datalab-to/omni_parse_bench --repo-type dataset --local-dir <folder>; or\n"
-    "  - to keep this copy, use the omni-parse-bench made for it: pip install 'omni-parse-bench==0.1.1'")
-_DOC_PATH = re.compile(r"pages/(.+)\.(?:pdf|png)")
 KINDS = {"text": ("text", "max_diffs"), "number": ("number",), "latex": ("latex",)}
 OPTIONAL = {"text": ("place",)}     # fields an arg of that kind may have
 RELATIONS = ("up", "down", "left", "right", "top_heading", "left_heading")
@@ -82,18 +66,8 @@ _LANGUAGE = re.compile(r"[a-z]{3}")    # ISO 639-3
 _SCRIPT = re.compile(r"[A-Z][a-z]{3}")   # ISO 15924
 
 
-class GoldError(ValueError):
-    """A manifest row or a test that breaks the dataset's rules."""
-
-
-class Page(NamedTuple):
-    """A row of the manifest; its paths are relative to the dataset folder."""
-    page_id: str
-    document: str   # the source document: a page's tests pass or fail with its document's
-    suite: str
-    doc_path: str   # the page file: pages/<page_id>.pdf or .png
-    gt_path: str    # its tests: gold/<page_id>.json
-    outputs: tuple[str, ...]    # what to predict: the output types its tests read (`wants`), sorted
+class GoldError(errors.UsageError):
+    """A gold file, or a test in one, that breaks the dataset's rules."""
 
 
 class Test(NamedTuple):
@@ -106,71 +80,30 @@ class Test(NamedTuple):
     params: tuple   # the test type's parameter NamedTuple (`runners.TYPES`)
 
 
-def manifest(root: str | Path) -> tuple[Page, ...]:
-    """The manifest's rows, checked: every page, with what to predict for it. No gold file is read."""
-    try:
-        import pyarrow.parquet as pq
-    except ImportError:
-        raise ImportError("gold reads the manifest with pyarrow: "
-                          "pip install 'omni-parse-bench[benchmark]'") from None
-    table = pq.read_table(Path(root).expanduser() / MANIFEST)
-    if "outputs" not in table.column_names:
-        raise GoldError(OLD_DATASET.format(root=root))
-    if unknown := [c for c in table.column_names if c not in PAGE_FIELDS]:
-        raise GoldError(f"the dataset's manifest has columns this omni-parse-bench ({_version()}) doesn't "
-                        f"know: {unknown}. The dataset is newer than this omni-parse-bench; upgrade it: "
-                        f"pip install -U omni-parse-bench")
-    rows = tuple(page(r) for r in table.to_pylist())
-    if twice := [i for i, n in collections.Counter(p.page_id for p in rows).items() if n > 1]:
-        raise GoldError(f"{len(twice)} page ids are in the manifest more than once, e.g. {twice[:3]}")
-    return rows
-
-
-def _version() -> str:
-    import importlib.metadata
-
-    try:
-        return importlib.metadata.version("omni-parse-bench")
-    except importlib.metadata.PackageNotFoundError:
-        return "unknown version"
-
-
-def tests(root: str | Path, p: Page) -> tuple[Test, ...]:
-    """One page's tests, from its gold file alone; refuses a page whose manifest `outputs` disagree
-    with what its tests read."""
-    ts = read(Path(root).expanduser() / p.gt_path)
-    if frozenset(p.outputs) != wants(ts):
-        raise GoldError(f"page {p.page_id!r}: the manifest says it is asked for {list(p.outputs)}, but its "
-                        f"tests read {sorted(wants(ts))}; the manifest is out of step with the gold")
-    return ts
-
-
-def load(root: str | Path) -> tuple[tuple[Page, ...], tuple[Test, ...]]:
-    """Every page of the dataset folder `root` and every test, checked, each page's tests in its
-    gold file's order. A page's `outputs` is checked against its tests."""
-    root = Path(root).expanduser()
-    rows = manifest(root)
-    named = {Path(p.gt_path).name for p in rows}
-    if stray := sorted(f.name for f in (root / "gold").glob("*.json") if f.name not in named):
-        raise GoldError(f"{len(stray)} gold files have no manifest row, e.g. {stray[:3]}")
-    every = tuple(t for p in rows for t in tests(root, p))
-    if twice := [i for i, n in collections.Counter(t.id for t in every).items() if n > 1]:
-        raise GoldError(f"{len(twice)} test ids are used more than once, e.g. {twice[:3]}")
-    if empty := sorted({p.page_id for p in rows} - {t.page_id for t in every}):
-        raise GoldError(f"{len(empty)} pages have no tests, e.g. {empty[:3]}; remove them or give them tests")
-    return rows, every
-
-
 def read(path: str | Path) -> tuple[Test, ...]:
     """One gold file's tests; its name is the page's id."""
     path = Path(path)
-    return parse(path.stem, json.loads(path.read_text()))
+    try:
+        doc = json.loads(path.read_text())
+    except FileNotFoundError:
+        raise GoldError(f"{path.stem}: no gold file at {path}") from None
+    except IsADirectoryError:
+        raise GoldError(f"{path.stem}: {path} is a folder, not a gold file") from None
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise GoldError(f"{path.stem}: its gold file {path} isn't JSON: {exc}") from None
+    return parse(path.stem, doc)
 
 
 def parse(page_id: str, doc: Mapping[str, Any]) -> tuple[Test, ...]:
     """A gold file's contents as the page's tests."""
+    if not isinstance(doc, dict):
+        raise GoldError(f"{page_id}: a gold file is an object, {{\"tests\": [...]}}, not a JSON "
+                        f"{type(doc).__name__}")
     if unknown := set(doc) - {"tests"}:
         raise GoldError(f"{page_id}: unknown keys {sorted(unknown)}; a gold file holds only 'tests'")
+    if not isinstance(doc.get("tests"), list):
+        raise GoldError(f"{page_id}: a gold file holds 'tests', the list of the page's tests: "
+                        '{"tests": [...]}')
     return tuple(test(page_id, t) for t in doc["tests"])
 
 
@@ -186,31 +119,10 @@ def wants(tests: Iterable[Test]) -> frozenset[str]:
     return frozenset(t.output_type for t in tests)
 
 
-def page(r: Mapping[str, Any]) -> Page:
-    """One manifest row, checked."""
-    where = f"page {r.get('page_id')!r}"
-    if missing := [f for f in PAGE_FIELDS if f not in r]:
-        raise GoldError(f"{where} lacks {missing}")
-    if unknown := [f for f in r if f not in PAGE_FIELDS]:
-        raise GoldError(f"{where}: unknown columns {unknown}; a manifest row has {list(PAGE_FIELDS)}. If "
-                        f"the dataset is newer than this omni-parse-bench, upgrade it: "
-                        f"pip install -U omni-parse-bench")
-    if not all(isinstance(r[f], str) and r[f].strip() for f in NAMES):
-        raise GoldError(f"{where}: {list(NAMES)} must be non-empty strings")
-    if not ((m := _DOC_PATH.fullmatch(r["doc_path"])) and m[1] == r["page_id"]):
-        raise GoldError(f"{where}: doc_path must be pages/<page_id>.pdf or .png, not {r['doc_path']!r}")
-    if r["gt_path"] != f"gold/{r['page_id']}.json":
-        raise GoldError(f"{where}: gt_path must be gold/<page_id>.json, not {r['gt_path']!r}")
-    outputs = r["outputs"]
-    if (not isinstance(outputs, list | tuple) or not outputs or not set(outputs) <= OUTPUTS
-            or len(set(outputs)) != len(outputs)):
-        raise GoldError(f"{where}: outputs must be a non-empty list of distinct output types from "
-                        f"{sorted(OUTPUTS)}, not {outputs!r}")
-    return Page(r["page_id"], r["document"], r["suite"], r["doc_path"], r["gt_path"], tuple(sorted(outputs)))
-
-
 def test(page_id: str, t: Mapping[str, Any]) -> Test:
     """One test of a page's gold file, checked."""
+    if not isinstance(t, dict):
+        raise GoldError(f"{page_id}: each test is an object, not {t!r:.80}")
     where = f"{page_id}: test {t.get('id')!r}"
     if missing := [f for f in FIELDS if f not in t]:
         raise GoldError(f"{where} lacks {missing}")
@@ -279,7 +191,10 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
             case "repeat":
                 if diffs(["content"]) != 0:
                     raise GoldError(f"{where}: repeat counts exact text: max_diffs must be 0")
-                return runners.Repeat(text("content"), **settings)
+                if set(settings) != {"expected_count"}:
+                    raise GoldError(f"{where}: repeat's settings are exactly {{expected_count}}, how many "
+                                    f"times its content appears, not {sorted(settings)}")
+                return runners.Repeat(text("content"), settings["expected_count"])
             case "layout_kind":
                 if set(settings) != {"kind"}:
                     raise GoldError(f"{where}: layout_kind's settings are exactly {{kind}}")
