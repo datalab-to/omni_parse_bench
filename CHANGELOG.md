@@ -31,6 +31,8 @@ Modules:
 Helpers that were public by accident are private: `data.page`, `benchmark.missing`, `retryable`,
 `merged`, `grade_page`, `headline`, `per_adapter`, `tests`, `workers_for`, `write_text` and
 `read_json`.
+A module imports modules, not names, so it no longer holds names it only imported:
+`benchmark.UsageError` (and `Stop`, `counted`) is `errors.UsageError`.
 
 The scorer:
 
