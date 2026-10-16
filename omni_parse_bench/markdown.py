@@ -83,9 +83,10 @@ def unwrapped(md: str) -> str:
 
 @functools.cache
 def _renderer():
-    from markdown_it import MarkdownIt
+    import markdown_it
 
-    return MarkdownIt("commonmark", {"html": True}).enable(["table", "strikethrough"]).disable("reference")
+    md = markdown_it.MarkdownIt("commonmark", {"html": True})
+    return md.enable(["table", "strikethrough"]).disable("reference")
 
 
 def alt(content: str) -> str:

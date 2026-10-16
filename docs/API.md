@@ -261,7 +261,8 @@ a `Stop` (an account, a key or a dependency) is printed in one line, `opb benchm
 after a `Stop`, the summaries grading wrote are printed to stdout first. Ctrl-C exits 130 and grades
 nothing. Either way, what was predicted is kept, and the same command resumes. A test whose grading
 raises is a bug of ours, never the provider's fault: grading stops with the traceback, naming the run,
-the page and the test, and that run writes nothing, since a score with that test left out would be
+the page and the test, and that run writes no scores or summary (a lost prediction may already have
+been rebuilt from its record), since a score with that test left out would be
 wrong. Runs are graded one after another, so those graded before it keep their new files, each a whole
 grading. Fix the bug, then grade again with `--score-only`.
 
@@ -331,7 +332,7 @@ It's resumable, and safe to run twice.
   always one grading's, and a gold correction or a new scorer reaches a run on its next grading;
 - grading covers every page of the manifest, so `--limit` and `--suites` narrow what is predicted,
   never what is scored; and
-- an interrupted grading writes nothing until it finishes; then scores.jsonl, and summary.json last, so
+- an interrupted grading writes no scores or summary until it finishes; then scores.jsonl, and summary.json last, so
   a summary always stands beside the scores it summarizes.
 
 A run folder holds one dataset and one manifest: an invocation with another `--dataset` or
@@ -572,7 +573,7 @@ none for none), and a folder's first grading requires it; their tests are `unsup
 failed. The folder's first grading that
 succeeds writes `mine/settings.json` with the dataset, the manifest and `unsupported`, so a later
 `opb grade mine/` needs no flags, and another `--dataset`, `--manifest` or `--unsupported` is refused
-(delete `mine/settings.json` to start the folder over); a grading that fails writes nothing. A grading
+(delete `mine/settings.json` to start the folder over); a grading that fails writes no settings, scores or summary. A grading
 none of whose files names a page of the manifest is refused, so a forgotten `--dataset` can't grade
 your pages against ours. `--unsupported` is refused on a run's folder (its settings.json names a
 provider), whose adapter says it. An output a

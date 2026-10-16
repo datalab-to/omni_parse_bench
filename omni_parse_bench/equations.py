@@ -65,11 +65,11 @@ class _KaTeX:
     """KaTeX in an embedded V8 (mini-racer), shared by the threads of a scoring run."""
 
     def __init__(self) -> None:
-        from py_mini_racer import MiniRacer
+        import py_mini_racer
 
         # Note: a V8 context runs one call at a time, so the threads take turns.
         self.lock = threading.Lock()
-        self.ctx = MiniRacer()
+        self.ctx = py_mini_racer.MiniRacer()
         self.ctx.eval(KATEX.read_text())
         self.ctx.eval(f"var render = {_RENDER}")
 

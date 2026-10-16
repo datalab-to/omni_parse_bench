@@ -21,7 +21,7 @@ from importlib import metadata
 from types import ModuleType
 from typing import Any
 
-from omni_parse_bench.errors import UsageError
+from omni_parse_bench import errors as base_errors
 
 from . import contract
 from .providers import (azure, chandra_ocr, datalab, deepseek_ocr, dots, extend, glm_ocr, hunyuan, indra_ocr,
@@ -103,9 +103,9 @@ def adapter(provider: str) -> contract.Adapter:
             exc.add_note(f"while loading adapter {provider!r} from package {ep.dist.name!r}")
             raise
     if provider not in ADAPTERS:
-        raise UsageError(f"unknown provider {provider!r}. Known vendors: "
-                         f"{', '.join(PROVIDERS)}. Any OpenRouter model id also works, "
-                         f"e.g. openai/gpt-5.6-sol")
+        raise base_errors.UsageError(f"unknown provider {provider!r}. Known vendors: "
+                                     f"{', '.join(PROVIDERS)}. Any OpenRouter model id also works, "
+                                     f"e.g. openai/gpt-5.6-sol")
     return ADAPTERS[provider]
 
 
@@ -162,7 +162,7 @@ def config_for(provider: str, options: dict | None = None) -> Any:
     options = options or {}
     if MODEL_SEPARATOR in provider:
         if "model" in options:
-            raise UsageError(
+            raise base_errors.UsageError(
                 f"{provider}: `model` is the provider name, not an option -- otherwise the "
                 f"run would be stored and published under a model it did not use. Run the "
                 f"one you want: --providers {options['model']}")
@@ -174,20 +174,20 @@ def config_for(provider: str, options: dict | None = None) -> Any:
     fields = [f.name for f in dataclasses.fields(config_type)]
     if unknown := sorted(set(options) - set(fields)):
         near = difflib.get_close_matches(unknown[0], fields, n=1)
-        raise UsageError(f"{provider} has no option {unknown[0]!r}"
-                         + (f" (did you mean {near[0]!r}?)" if near else "")
-                         + f"; its options are: {', '.join(fields) or '(none)'}")
+        raise base_errors.UsageError(f"{provider} has no option {unknown[0]!r}"
+                                     + (f" (did you mean {near[0]!r}?)" if near else "")
+                                     + f"; its options are: {', '.join(fields) or '(none)'}")
     for name, value in options.items():
         if (want := hints.get(name)) in (str, int, float, bool) and not _of(value, want):
-            raise UsageError(f"{provider}: option {name} is a {want.__name__}, not {value!r}")
+            raise base_errors.UsageError(f"{provider}: option {name} is a {want.__name__}, not {value!r}")
     # Note: a whole number given for a float option becomes that float, so 0 and the default 0.0 are one
     # setting and name one run, not two.
     options = {k: float(v) if hints.get(k) is float else v for k, v in options.items()}
     try:
         return config_type(**options)
     except ValueError as exc:   # Note: an adapter's own check of a value (`__post_init__`).
-        if isinstance(exc, UsageError): raise
-        raise UsageError(f"{provider}: {exc}") from None
+        if isinstance(exc, base_errors.UsageError): raise
+        raise base_errors.UsageError(f"{provider}: {exc}") from None
 
 
 def _of(value: Any, want: type) -> bool:

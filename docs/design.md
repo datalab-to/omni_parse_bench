@@ -293,7 +293,7 @@ A verdict's result is one of four:
 
 `unsupported` verdicts are left out of every score; `summarize` counts them per output type. Grading
 that raises anything else on a well-formed output is a scorer bug: it is raised, naming the page and
-the test, and nothing is written, so a bug never passes as a score.
+the test, and no scores or summary are written, so a bug never passes as a score.
 
 ## Benchmark
 

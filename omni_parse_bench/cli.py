@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from omni_parse_bench import benchmark, data, progress, vocab
-from omni_parse_bench.errors import Stop, UsageError, counted
+from omni_parse_bench import errors
 from omni_parse_bench.scorers import unit_tests as scorer
 
 # command -> the extra it needs; `score` needs none.
@@ -46,14 +46,14 @@ def read_object(path: str, flag: str) -> dict:
     try:
         got = json.loads(Path(path).read_text())
     except FileNotFoundError:
-        raise UsageError(f"{flag} {path}: no such file") from None
+        raise errors.UsageError(f"{flag} {path}: no such file") from None
     except IsADirectoryError:
-        raise UsageError(f"{flag} {path} is a folder; pass a JSON file") from None
+        raise errors.UsageError(f"{flag} {path} is a folder; pass a JSON file") from None
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise UsageError(f"{flag} {path} isn't JSON: {exc}") from None
+        raise errors.UsageError(f"{flag} {path} isn't JSON: {exc}") from None
     if not isinstance(got, dict):
-        raise UsageError(f"{flag} {path} holds a JSON {'null' if got is None else type(got).__name__}; it "
-                         "must be a JSON object")
+        raise errors.UsageError(f"{flag} {path} holds a JSON "
+                                f"{'null' if got is None else type(got).__name__}; it must be a JSON object")
     return got
 
 
@@ -64,11 +64,12 @@ def read_options(value: str | None) -> dict:
     try:
         out = json.loads(Path(value).read_text() if is_file else value)
     except json.JSONDecodeError as e:
-        if is_file: raise UsageError(f"--options: {value} isn't JSON: {e}") from None
-        if value.lstrip()[:1] in ("{", "["): raise UsageError(f"--options isn't JSON: {e}") from None
-        raise UsageError(f"--options {value!r} is neither inline JSON nor a file that exists") from None
+        if is_file: raise errors.UsageError(f"--options: {value} isn't JSON: {e}") from None
+        if value.lstrip()[:1] in ("{", "["): raise errors.UsageError(f"--options isn't JSON: {e}") from None
+        raise errors.UsageError(f"--options {value!r} is neither inline JSON nor a file that "
+                                "exists") from None
     if not isinstance(out, dict):
-        raise UsageError(f"--options must be a JSON object, got {type(out).__name__}")
+        raise errors.UsageError(f"--options must be a JSON object, got {type(out).__name__}")
     return out
 
 
@@ -82,16 +83,16 @@ def read_workers(value: str | None) -> int | dict:
     try:
         out = json.loads(value)
     except json.JSONDecodeError:
-        raise UsageError(f"--workers is a number, or a JSON object like '{{\"datalab\": 20}}', not "
-                         f"{value!r}") from None
+        raise errors.UsageError(f"--workers is a number, or a JSON object like '{{\"datalab\": 20}}', not "
+                                f"{value!r}") from None
     if isinstance(out, dict): return out
-    raise UsageError(f"--workers must be a number or a JSON object, not {value!r}")
+    raise errors.UsageError(f"--workers must be a number or a JSON object, not {value!r}")
 
 
 def read_ids(path: Path, flag: str) -> frozenset[str]:
     """A file of ids, one per line; blank lines and `#` comments are skipped."""
     if not path.is_file():
-        raise UsageError(f"{flag} {path}: no such file; it holds ids, one per line")
+        raise errors.UsageError(f"{flag} {path}: no such file; it holds ids, one per line")
     return frozenset(x for line in path.read_text().splitlines() if (x := line.split("#", 1)[0].strip()))
 
 
@@ -104,9 +105,9 @@ def confirm_plan(plan: Any) -> bool:
     Nobody to ask is not the same as no: a pipe, a cron job or a CI step has no terminal, so it
     proceeds, since it was scripted, which is consent. Only an interactive session is asked.
     """
-    from rich.console import Console
+    from rich import console
 
-    Console(stderr=True, highlight=False).print(progress.plan_view(plan))
+    console.Console(stderr=True, highlight=False).print(progress.plan_view(plan))
     if not sys.stdin.isatty():
         return True
     try:
@@ -137,8 +138,8 @@ def cmd_score(a: argparse.Namespace) -> int:
     pred = read_object(a.pred, "--pred")
     if pred and not set(pred) & set(vocab.OUTPUT_TYPES):
         hint = (" It looks like a record from opb predict; pass its outputs." if "outputs" in pred else "")
-        raise UsageError(f"--pred {a.pred} holds none of the output types {list(vocab.OUTPUT_TYPES)}, only "
-                         f"{sorted(pred)[:5]}.{hint}")
+        raise errors.UsageError(f"--pred {a.pred} holds none of the output types {list(vocab.OUTPUT_TYPES)}, "
+                                f"only {sorted(pred)[:5]}.{hint}")
     vs = scorer.score(pred, scorer.tests.read(a.gold), unsupported=set(a.unsupported or ()))
     print(json.dumps([v._asdict() for v in vs], indent=2, ensure_ascii=False))
     return 0
@@ -169,13 +170,13 @@ def cmd_benchmark(a: argparse.Namespace) -> int:
         return 1
     try:
         summaries = benchmark.execute(p, _say)
-    except Stop:
+    except errors.Stop:
         # Note: `execute` grades what was predicted before it raises, so every run has its summary.
         print(json.dumps(_written(p), indent=2, ensure_ascii=False))
         raise
     print(json.dumps(summaries, indent=2, ensure_ascii=False))   # each run's summary.json, by run name
     if n := _retryable(p):
-        _say(f"{counted(n, 'page')} failed in a way that may not recur: --retry-failed predicts "
+        _say(f"{errors.counted(n, 'page')} failed in a way that may not recur: --retry-failed predicts "
              f"{'it' if n == 1 else 'them'} again")
     return 0
 
@@ -190,14 +191,15 @@ def cmd_grade(a: argparse.Namespace) -> int:
     said = benchmark.settled(out, a.dataset, a.manifest)
     if a.unsupported is not None:
         if benchmark.is_run(said):
-            raise UsageError(f"{out} is a run, whose adapter says what it can't produce; --unsupported is "
-                             "for a folder of your own predictions")
+            raise errors.UsageError(f"{out} is a run, whose adapter says what it can't produce; "
+                                    "--unsupported is for a folder of your own predictions")
         now = sorted(set(a.unsupported))
         if (was := said.get("unsupported")) is not None and was != now:
-            raise UsageError(f"{out} holds a folder graded with --unsupported {' '.join(was) or '(none)'}, "
-                             f"not {' '.join(now) or '(none)'}: a folder says once what its system can't "
-                             f"produce; pass --unsupported {' '.join(was) or 'with none'}, or delete "
-                             f"{out / 'settings.json'} to start over")
+            raise errors.UsageError(f"{out} holds a folder graded with --unsupported "
+                                    f"{' '.join(was) or '(none)'}, not {' '.join(now) or '(none)'}: a folder "
+                                    f"says once what its system can't produce; pass --unsupported "
+                                    f"{' '.join(was) or 'with none'}, or delete {out / 'settings.json'} to "
+                                    "start over")
         said = said | {"unsupported": now}
     dataset = a.dataset or said.get("dataset") or data.DEFAULT_DATASET
     manifest = a.manifest or said.get("manifest") or data.MANIFEST
@@ -218,8 +220,9 @@ def cmd_check(a: argparse.Namespace) -> int:
     _, pages = data.read_manifest(a.dataset, a.manifest)
     if missing := [f"{p.page_id} {c} {f}" for p in pages for c, f in (("doc_path", p.doc_path),
                    ("gt_path", p.gt_path)) if not f.is_file()]:
-        raise UsageError(f"files the manifest names that don't exist: {counted(len(missing), 'file')}, e.g. "
-                         + "; ".join(missing[:3]))
+        raise errors.UsageError(f"files the manifest names that don't exist: "
+                                f"{errors.counted(len(missing), 'file')}, e.g. "
+                                + "; ".join(missing[:3]))
     scorer.check(pages)
     print(json.dumps({"ok": True, "manifest": a.manifest, "pages": len(pages),
                       "suites": len({p.suite for p in pages}), "inputs": len({p.doc_path for p in pages})}))
@@ -244,39 +247,37 @@ def cmd_providers(a: argparse.Namespace) -> int:
     The options come from the adapter's own `Config` (its fields are the options and their
     defaults), so this can't drift from what the adapter accepts.
     """
-    from rich import box
-    from rich.console import Console
-    from rich.table import Table
+    from rich import box, console, table
 
     from omni_parse_bench import harness
     from omni_parse_bench.harness import registry
 
-    console = Console()
+    out = console.Console()
     if not a.provider:
-        if not console.is_terminal:
+        if not out.is_terminal:
             for name in (*harness.PROVIDERS, *EXAMPLE_MODELS): print(name)
             return 0
-        table = Table(box=box.SIMPLE_HEAD, pad_edge=False, show_edge=False)
-        table.add_column("provider")
-        table.add_column("outputs")
+        sheet = table.Table(box=box.SIMPLE_HEAD, pad_edge=False, show_edge=False)
+        sheet.add_column("provider")
+        sheet.add_column("outputs")
         for name in harness.PROVIDERS:
-            table.add_row(name, ", ".join(sorted(harness.adapter(name).SUPPORTS)))
-        table.add_section()
+            sheet.add_row(name, ", ".join(sorted(harness.adapter(name).SUPPORTS)))
+        sheet.add_section()
         for name in EXAMPLE_MODELS:
-            table.add_row(name, ", ".join(sorted(harness.adapter(name).SUPPORTS)))
-        console.print(table)
+            sheet.add_row(name, ", ".join(sorted(harness.adapter(name).SUPPORTS)))
+        out.print(sheet)
         print("\nmodel ids are examples: any OpenRouter org/model id works.")
         return 0
     config = registry.config_for(a.provider)
-    table = Table(box=box.SIMPLE_HEAD, pad_edge=False, show_edge=False, title=a.provider,
-                  title_justify="left")
-    table.add_column("option")
-    table.add_column("default", overflow="fold")
-    table.add_column("", style="dim", overflow="fold")
+    sheet = table.Table(box=box.SIMPLE_HEAD, pad_edge=False, show_edge=False, title=a.provider,
+                        title_justify="left")
+    sheet.add_column("option")
+    sheet.add_column("default", overflow="fold")
+    sheet.add_column("", style="dim", overflow="fold")
     for f in dataclasses.fields(config):
         value = getattr(config, f.name)
-        table.add_row(f.name, "''" if value == "" else str(value), f.metadata.get("help", ""))
-    console.print(table)
+        sheet.add_row(f.name, "''" if value == "" else str(value), f.metadata.get("help", ""))
+    out.print(sheet)
     first = next((f.name for f in dataclasses.fields(config) if f.name != "model"), None)
     if first:
         options = json.dumps({a.provider: {first: "..."}})
@@ -299,17 +300,19 @@ def cmd_reparse(a: argparse.Namespace) -> int:
 
     for run in a.runs:
         if not (run / "records").is_dir():
-            raise UsageError(f"no records/ in {run}; reparse reads a run folder's records/<page_id>.json")
+            raise errors.UsageError(f"no records/ in {run}; reparse reads a run folder's "
+                                    "records/<page_id>.json")
         # Note: every record read and reparsed before any is rewritten, so a bad one stops nothing half-done.
         paths, done = sorted((run / "records").glob("*.json")), []
         for path in paths:
             try:
                 record = json.loads(path.read_text())
             except json.JSONDecodeError as exc:
-                raise UsageError(f"{path} isn't JSON ({exc}); nothing in this run was rewritten") from None
+                raise errors.UsageError(f"{path} isn't JSON ({exc}); nothing in this run was "
+                                        "rewritten") from None
             if not (isinstance(record, dict) and RECORD <= set(record)):
-                raise UsageError(f"{path} isn't a record opb can reparse (one has {sorted(RECORD)}); nothing "
-                                 "in this run was rewritten")
+                raise errors.UsageError(f"{path} isn't a record opb can reparse (one has {sorted(RECORD)}); "
+                                        "nothing in this run was rewritten")
             new = harness.reparse(record, frozenset(a.add or ()))
             if new["outputs"] != record["outputs"] or new["errors"] != record["errors"]:
                 done.append((path, new))
@@ -317,8 +320,8 @@ def cmd_reparse(a: argparse.Namespace) -> int:
             benchmark.write_json(path, new)
             benchmark.write_json(run / "predictions" / path.name, new["outputs"])
         rebuilt = sum(benchmark.restore(benchmark.Run("", {}, run), path.stem) for path in paths)
-        print(f"{run}: {len(done)} of {counted(len(paths), 'record')} changed, "
-              f"{counted(rebuilt, 'prediction')} rebuilt from "
+        print(f"{run}: {len(done)} of {errors.counted(len(paths), 'record')} changed, "
+              f"{errors.counted(rebuilt, 'prediction')} rebuilt from "
               f"{'its record' if rebuilt == 1 else 'their records'}"
               + ("; regrade it to see them: opb benchmark ... --score-only, or opb grade " + str(run)
                  if done or rebuilt else ""), file=sys.stderr)
@@ -422,10 +425,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     resume = a.cmd == "benchmark"
     try:
         return cmd(a)
-    except UsageError as exc:
+    except errors.UsageError as exc:
         print(f"opb {a.cmd}: {exc}", file=sys.stderr)
         return 1
-    except Stop as exc:
+    except errors.Stop as exc:
         print(f"opb {a.cmd}: {type(exc).__name__}: {exc}"
               + ("; fix it and rerun to resume" if resume else ""), file=sys.stderr)
         return 1

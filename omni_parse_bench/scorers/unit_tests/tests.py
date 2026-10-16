@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from omni_parse_bench import equations, normalize, vocab
-from omni_parse_bench.errors import UsageError
+from omni_parse_bench import errors
 
 from . import runners
 
@@ -66,7 +66,7 @@ _LANGUAGE = re.compile(r"[a-z]{3}")    # ISO 639-3
 _SCRIPT = re.compile(r"[A-Z][a-z]{3}")   # ISO 15924
 
 
-class GoldError(UsageError):
+class GoldError(errors.UsageError):
     """A gold file, or a test in one, that breaks the dataset's rules."""
 
 

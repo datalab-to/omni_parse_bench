@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from omni_parse_bench import data, vocab
-from omni_parse_bench.errors import Stop, UsageError, counted
+from omni_parse_bench import errors
 from omni_parse_bench.scorers import unit_tests as scorer
 
 # Note: calls in flight at one vendor, shared by every run of its adapter. A vendor's rate limit is
@@ -109,9 +109,9 @@ def settled(out: Path, dataset: str | None = None, manifest: str | None = None) 
     for key, now in asked:
         if now and (was := said.get(key)) and was != now:
             held = "a run" if is_run(said) else "predictions graded"
-            raise UsageError(f"{out} holds {held} on {key} {was}, not {now}: a folder holds one dataset and "
-                             f"one manifest; pass --{key} {was}, another folder, or delete "
-                             f"{out / 'settings.json'} to use it with another")
+            raise errors.UsageError(f"{out} holds {held} on {key} {was}, not {now}: a folder holds one "
+                                    f"dataset and one manifest; pass --{key} {was}, another folder, or "
+                                    f"delete {out / 'settings.json'} to use it with another")
     return said
 
 
@@ -134,10 +134,10 @@ def _said(out: Path) -> dict:
     except FileNotFoundError:
         return {}
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise UsageError(f"{path} isn't readable JSON ({exc}); fix it, or remove it to start the folder's "
-                         "settings over") from None
+        raise errors.UsageError(f"{path} isn't readable JSON ({exc}); fix it, or remove it to start the "
+                                "folder's settings over") from None
     if not isinstance(said, dict):
-        raise UsageError(f"{path} holds a JSON {type(said).__name__}; settings.json is an object")
+        raise errors.UsageError(f"{path} holds a JSON {type(said).__name__}; settings.json is an object")
     return said
 
 
@@ -202,23 +202,23 @@ def _retryable(record: dict, output: str) -> bool:
     (`VendorUnreachable`), or a transient HTTP status. A 400, a vendor's failed job, or an answer that
     arrived and couldn't be used (an LLM reply cut at its length, refused, unreadable) is final; one that
     didn't parse is `opb reparse`'s, which costs nothing."""
-    from omni_parse_bench.harness import errors
+    from omni_parse_bench import harness
 
     calls = [c for c in record.get("calls", []) if output in c.get("outputs", ())]
     if not calls: return False
     if not isinstance(failure := calls[-1].get("failure"), dict): return False   # it got an answer
     return (failure.get("class") in ("VendorTimeout", "VendorUnreachable")
-            or failure.get("status") in errors.TRANSIENT_STATUSES)
+            or failure.get("status") in harness.errors.TRANSIENT_STATUSES)
 
 
 def _merged(old: dict, new: dict) -> dict:
     """A record with a later prediction's outputs added: its calls and raw answers follow the old,
     and an output predicted again takes the new outcome, its old error with it. Each call keeps the
     timeout it ran under."""
-    errors = {o: why for o, why in old["errors"].items() if o not in new["outputs"]} | new["errors"]
+    whys = {o: why for o, why in old["errors"].items() if o not in new["outputs"]} | new["errors"]
     calls = [c if "timeout_s" in c else c | {"timeout_s": old.get("timeout_s")} for c in old["calls"]]
     latest = {k: new[k] for k in ("timeout_s", "captured_at") if k in new}
-    return old | latest | {"outputs": old["outputs"] | new["outputs"], "errors": errors,
+    return old | latest | {"outputs": old["outputs"] | new["outputs"], "errors": whys,
                            "calls": calls + new["calls"], "raw": old.get("raw", []) + new.get("raw", [])}
 
 
@@ -260,13 +260,13 @@ def configurations(providers: list[str], options: dict | None = None) -> list[tu
     """Each (provider, options) pair to run: a provider's options may be one dict or a list of them."""
     options = options or {}
     if bad := sorted(set(options) - set(providers)):
-        raise UsageError(f"--options names {bad}, which aren't in --providers")
+        raise errors.UsageError(f"--options names {bad}, which aren't in --providers")
     out = []
     for p in providers:
         o = options.get(p, {})
         if o == []:
-            raise UsageError(f"--options gives {p} an empty list, which is no run; give it a list of option "
-                             "dicts, {} for its defaults, or drop it from --providers")
+            raise errors.UsageError(f"--options gives {p} an empty list, which is no run; give it a list of "
+                                    "option dicts, {} for its defaults, or drop it from --providers")
         out += [(p, x) for x in (o if isinstance(o, list) else [o])]
     return out
 
@@ -290,31 +290,32 @@ def plan(providers: Sequence[str], *, out: str | Path = Path("runs"),
         raise TypeError(f"workers is a number for every adapter, or a mapping of adapter to number, not "
                         f"{workers!r}")
     if isinstance(workers, int) and workers < 0:
-        raise UsageError(f"--workers is {workers}, but it counts calls, so it can't be negative; 0 means "
-                         "each adapter's default")
+        raise errors.UsageError(f"--workers is {workers}, but it counts calls, so it can't be negative; 0 "
+                                "means each adapter's default")
     if isinstance(timeout, bool) or not isinstance(timeout, int | float):
         raise TypeError(f"timeout is seconds, a number, not {timeout!r}")
     if timeout < 0:
-        raise UsageError(f"--timeout is {timeout}, but it is the seconds per call: a positive number, or 0 "
-                         "for the default")
+        raise errors.UsageError(f"--timeout is {timeout}, but it is the seconds per call: a positive number, "
+                                "or 0 for the default")
     runs = tuple(Run(p, o, Path(out) / harness.out_name(p, o)) for p, o in configurations(providers, options))
     # Note: after the runs, whose providers are now resolved, so an adapter a plugin declares is known.
     if isinstance(workers, Mapping): workers = _per_adapter(workers)
     if twice := [r for r, n in collections.Counter(r.out.name for r in runs).items() if n > 1]:
-        raise UsageError(f"run {twice[0]} is asked for more than once: the same provider with the same "
-                         "settings (an option set to its default is the same setting); drop the repeat from "
-                         "--providers or --options")
+        raise errors.UsageError(f"run {twice[0]} is asked for more than once: the same provider with the "
+                                "same settings (an option set to its default is the same setting); drop the "
+                                "repeat from --providers or --options")
     root, every = data.read_manifest(dataset, manifest)
     if not (ps := data.select(every, suites, limit, sample, only)):
         given = [f for f, v in (("--suites", suites), ("--limit", limit), ("--sample", sample),
                                 ("--pages", only is not None)) if v]
-        raise UsageError(f"no pages selected: {' and '.join(given)} chose none of the manifest's "
-                         f"{len(every)} pages")
+        raise errors.UsageError(f"no pages selected: {' and '.join(given)} chose none of the manifest's "
+                                f"{len(every)} pages")
     commit = data.commit(dataset, root)
     for r in runs:
         if score_only and not r.predictions.is_dir():
-            raise UsageError(f"no run at {r.out}: {r.provider} with these settings was never predicted under "
-                             "this --out; check --out and --options, or drop --score-only")
+            raise errors.UsageError(f"no run at {r.out}: {r.provider} with these settings was never "
+                                    "predicted under this --out; check --out and --options, or drop "
+                                    "--score-only")
         said = settled(r.out, str(dataset), manifest)
         if (msg := _another_commit(r, said.get("commit"), commit)) is not None:
             log.warning("%s", msg)
@@ -362,11 +363,12 @@ def _per_adapter(workers: Mapping[str, int]) -> dict[str, int]:
             try:
                 a = harness.resolve(key)
                 hint = f"{key} uses the {a} adapter, whose pool all its runs share; write {{\"{a}\": {n}}}"
-            except UsageError:
+            except errors.UsageError:
                 hint = f"the adapters are {sorted(adapters)}"
-            raise UsageError(f"--workers is per adapter, and {key!r} isn't one: {hint}")
+            raise errors.UsageError(f"--workers is per adapter, and {key!r} isn't one: {hint}")
         if isinstance(n, bool) or not isinstance(n, int) or n < 1:
-            raise UsageError(f"--workers gives {key!r} {n!r}; calls at once is a whole number, 1 or more")
+            raise errors.UsageError(f"--workers gives {key!r} {n!r}; calls at once is a whole number, 1 or "
+                                    "more")
     return dict(workers)
 
 
@@ -418,7 +420,7 @@ def predict_all(p: Plan) -> None:
                 # Note: set here, by the worker that failed, not when the main thread gets to it: the other
                 # workers would otherwise send the pages queued behind it.
                 halt.set()
-                if not isinstance(exc, Stop):
+                if not isinstance(exc, errors.Stop):
                     # Note: `predict` records every failure that is a fact about the page, so this is a bug
                     # in the adapter or in ours; recorded, it would pass as the vendor's.
                     exc.add_note(f"{r.out.name}: raised while predicting {g.page_id} with the "
@@ -475,16 +477,16 @@ def predict_all(p: Plan) -> None:
 def gradable(out: Path) -> None:
     """Refuses a folder grading can't read: one that doesn't exist, or that holds no predictions/."""
     if not out.is_dir():
-        raise UsageError(f"no folder at {out}; pass the folder holding predictions/<page_id>.json")
+        raise errors.UsageError(f"no folder at {out}; pass the folder holding predictions/<page_id>.json")
     if not (out / "predictions").is_dir():
         loose = sorted(f.name for f in out.glob("*.json") if f.name not in ("settings.json", "summary.json"))
         hint = (f"; {out} looks like the predictions/ folder itself: pass its parent, {out.parent}"
                 if out.name == "predictions" else
-                f"; it holds {counted(len(loose), 'JSON file')} (e.g. {loose[0]}): move them into "
+                f"; it holds {errors.counted(len(loose), 'JSON file')} (e.g. {loose[0]}): move them into "
                 f"{out}/predictions/"
                 if loose else "")
-        raise UsageError(f"{out} has no predictions/ folder, so nothing was predicted there; a folder to "
-                         f"grade holds predictions/<page_id>.json{hint}")
+        raise errors.UsageError(f"{out} has no predictions/ folder, so nothing was predicted there; a folder "
+                                f"to grade holds predictions/<page_id>.json{hint}")
 
 
 def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = print, *,
@@ -497,17 +499,18 @@ def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = pri
     its answer is rebuilt from it first (`restore`). In a run (`is_run`), a page never
     attempted (`_tried`) is pending; otherwise a page with no prediction fails, every test of it. A folder
     of your own none of whose files names a page is refused, and a scorer that raises stops the grading:
-    either way nothing is written. docs/API.md has the summary's fields."""
+    either way no scores or summary are written (a lost prediction may already have been rebuilt from
+    its record). docs/API.md has the summary's fields."""
     gradable(run.out)
     said = _said(run.out) if settings is None else settings
     if rebuilt := [g.page_id for g in pages if restore(run, g.page_id)]:
-        log.info("%s: %s rebuilt from %s, e.g. %s", run.out, counted(len(rebuilt), "prediction"),
+        log.info("%s: %s rebuilt from %s, e.g. %s", run.out, errors.counted(len(rebuilt), "prediction"),
                  "its record" if len(rebuilt) == 1 else "their records", rebuilt[:3])
     keeps, listed = is_run(said), _listed(run)
     if not keeps and not listed & {f"{g.page_id}.json" for g in pages}:
-        raise UsageError(f"none of the {counted(len(listed), 'file')} in {run.predictions} names a page of "
-                         f"the {counted(len(pages), 'page')} graded (e.g. {pages[0].page_id}.json): is "
-                         "--dataset right?")
+        raise errors.UsageError(f"none of the {errors.counted(len(listed), 'file')} in {run.predictions} "
+                                f"names a page of the {errors.counted(len(pages), 'page')} graded (e.g. "
+                                f"{pages[0].page_id}.json): is --dataset right?")
     lines, count, calls, unread, keyless = _graded(run, pages, _unsupported(said, run.out), keeps, listed)
     summary = _summary(run, said, lines, count, calls)
     _write_text(run.out / "scores.jsonl", "".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines))
@@ -546,9 +549,9 @@ def _graded(run: Run, pages: Sequence[data.Page], cannot: frozenset[str], keeps:
         try:
             lines += _grade_page(run, pred or {}, g, _tests(g), cannot)
         except Exception as exc:
-            if isinstance(exc, UsageError): raise
+            if isinstance(exc, errors.UsageError): raise
             exc.add_note(f"{run.out.name}: grading page {g.page_id} raised in our scorer, a bug of ours; "
-                         "nothing was written")
+                         "no scores or summary were written")
             raise
     return lines, count, calls, unread, keyless
 
@@ -581,14 +584,15 @@ def _unsupported(said: Mapping[str, Any], out: Path) -> frozenset[str]:
     page asks for fails that output's tests, so leaving out hard pages can't take them out of a score."""
     if (got := said.get("unsupported")) is None:
         if not (out / "settings.json").exists():
-            raise UsageError(f"{out} is graded for the first time, so say which outputs its system can't "
-                             "produce: opb grade --unsupported with them, or with none for none; it is kept "
-                             "for the folder's later gradings")
-        raise UsageError(f"{out} doesn't say which outputs its system can't produce (its settings.json has "
-                         "no \"unsupported\"); pass opb grade --unsupported with them, or with none for none")
+            raise errors.UsageError(f"{out} is graded for the first time, so say which outputs its system "
+                                    "can't produce: opb grade --unsupported with them, or with none for "
+                                    "none; it is kept for the folder's later gradings")
+        raise errors.UsageError(f"{out} doesn't say which outputs its system can't produce (its "
+                                "settings.json has no \"unsupported\"); pass opb grade --unsupported with "
+                                                                    "them, or with none for none")
     if not (isinstance(got, list) and set(got) <= set(vocab.OUTPUT_TYPES)):
-        raise UsageError(f"{out / 'settings.json'}: unsupported must be a list of output types from "
-                         f"{list(vocab.OUTPUT_TYPES)}, not {got!r}")
+        raise errors.UsageError(f"{out / 'settings.json'}: unsupported must be a list of output types from "
+                                f"{list(vocab.OUTPUT_TYPES)}, not {got!r}")
     return frozenset(got)
 
 
@@ -625,7 +629,7 @@ def _closing(s: dict) -> str:
     why = (f" ({s['pending']} pending: a headline needs every page)" if s["pending"]
            else " (a family of tests has none scored)")
     head = f"headline {s['headline']:.3f}" if s["headline"] is not None else "headline —" + why
-    of = counted(s["pages"] + s["pending"], "page")
+    of = errors.counted(s["pages"] + s["pending"], "page")
     return f"{s['run']}: {head}; {s['pages']} of {of} graded, {s['failed']} failed"
 
 
@@ -640,20 +644,21 @@ def _warn_unusable(run: Run, said: Mapping[str, Any], pages: Sequence[data.Page]
     if stray := sorted(n + ("/" if (run.predictions / n).is_dir() else "") for n in listed - ids):
         log.warning("%s: %s in predictions/ named for no page of the manifest, so left out, e.g. %s; a "
                     "prediction is predictions/<page_id>.json, named exactly (case too)",
-                    run.out, counted(len(stray), "file"), stray[:3])
+                    run.out, errors.counted(len(stray), "file"), stray[:3])
     if unread:
         log.warning("%s: %s couldn't be read as a JSON object, so %s graded as failed, e.g. %s", run.out,
-                    counted(len(unread), "prediction"),
+                    errors.counted(len(unread), "prediction"),
                     "its page was" if len(unread) == 1 else "their pages were", unread[:3])
     if keyless:
         k, keys = next(iter(keyless.items()))
         log.warning("%s: %s %s none of the output types %s, so %s graded as failed, e.g. %s holds %s",
-                    run.out, counted(len(keyless), "prediction"), "holds" if len(keyless) == 1 else "hold",
+                    run.out, errors.counted(len(keyless), "prediction"),
+                    "holds" if len(keyless) == 1 else "hold",
                     list(vocab.OUTPUT_TYPES), "its page was" if len(keyless) == 1 else "their pages were", k,
                     keys[:5])
     if len(pages) < len(whole):
         log.warning("%s: graded %s of its manifest's %d, so its summary covers only those; grade_all passes "
-                    "the whole manifest", run.out, counted(len(pages), "page"), len(whole))
+                    "the whole manifest", run.out, errors.counted(len(pages), "page"), len(whole))
 
 
 def _manifest_of(run: Run, said: Mapping[str, Any]) -> tuple[data.Page, ...] | None:
@@ -664,7 +669,7 @@ def _manifest_of(run: Run, said: Mapping[str, Any]) -> tuple[data.Page, ...] | N
     try:
         return data.read_manifest(own["dataset"] + (f"@{own['commit']}" if own.get("commit") else ""),
                                   own["manifest"])[1]
-    except UsageError:
+    except errors.UsageError:
         return None
 
 
@@ -673,7 +678,7 @@ def read_scores(run: Run) -> list[dict]:
     isn't readable JSON is left out, and logged. A folder that doesn't exist is refused: a mistyped path
     isn't a run with no scores."""
     if not run.out.is_dir():
-        raise UsageError(f"no folder at {run.out}; pass a run's folder, which holds scores.jsonl")
+        raise errors.UsageError(f"no folder at {run.out}; pass a run's folder, which holds scores.jsonl")
     path = run.out / "scores.jsonl"
     if not path.exists(): return []
     out = []

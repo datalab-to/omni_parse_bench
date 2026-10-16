@@ -37,12 +37,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-from rich import box
-from rich.console import Console, Group
-from rich.live import Live
-from rich.progress_bar import ProgressBar
-from rich.table import Table
-from rich.text import Text
+from rich import box, console, live, progress_bar, rule, table, text
 
 from omni_parse_bench import benchmark
 
@@ -192,45 +187,45 @@ def format_total(everything: dict[str, Stats]) -> str:
     return "  ".join(parts)
 
 
-def render(stats: dict[str, Stats]) -> Group:
+def render(stats: dict[str, Stats]) -> console.Group:
     """Every provider as one row. Pure, like the `format_*` above it: Stats in, a table out.
 
     Colour carries only what the numbers already say -- red where errors are not zero, green
     where a provider is finished -- so a terminal that strips it loses nothing.
     """
-    table = Table(box=box.SIMPLE_HEAD, pad_edge=False, header_style="dim", expand=False)
+    sheet = table.Table(box=box.SIMPLE_HEAD, pad_edge=False, header_style="dim", expand=False)
     # `fold` wraps a long label; `min_width` stops rich shrinking it to one character.
-    table.add_column("run", overflow="fold", min_width=16)
-    table.add_column("", width=BAR_WIDTH, no_wrap=True)
-    table.add_column("done", justify="right", no_wrap=True)
-    table.add_column("ok", justify="right", no_wrap=True)
-    table.add_column("err", justify="right", no_wrap=True)
-    table.add_column("in flight", justify="right", no_wrap=True)
-    table.add_column("cost", justify="right", no_wrap=True)
-    table.add_column("avg", justify="right", no_wrap=True)
-    table.add_column("dur", justify="right", no_wrap=True)
+    sheet.add_column("run", overflow="fold", min_width=16)
+    sheet.add_column("", width=BAR_WIDTH, no_wrap=True)
+    sheet.add_column("done", justify="right", no_wrap=True)
+    sheet.add_column("ok", justify="right", no_wrap=True)
+    sheet.add_column("err", justify="right", no_wrap=True)
+    sheet.add_column("in flight", justify="right", no_wrap=True)
+    sheet.add_column("cost", justify="right", no_wrap=True)
+    sheet.add_column("avg", justify="right", no_wrap=True)
+    sheet.add_column("dur", justify="right", no_wrap=True)
     for name, s in stats.items():
         if s.total is None:
             # In the bar's column: under `dur`, `waiting` would read as a duration.
-            table.add_row(Text(name, style="dim"), Text("waiting", style="dim"),
+            sheet.add_row(text.Text(name, style="dim"), text.Text("waiting", style="dim"),
                           "", "", "", "", "", "", "")
             continue
         done = s.finished is not None
-        table.add_row(
-            Text(name, style="green" if done else ""),
-            ProgressBar(total=max(s.total, 1), completed=min(s.done, s.total),
-                        width=BAR_WIDTH, complete_style="green" if done else "cyan",
-                        finished_style="green"),
+        sheet.add_row(
+            text.Text(name, style="green" if done else ""),
+            progress_bar.ProgressBar(total=max(s.total, 1), completed=min(s.done, s.total),
+                                     width=BAR_WIDTH, complete_style="green" if done else "cyan",
+                                     finished_style="green"),
             f"{s.done}/{s.total}",
             str(s.ok),
-            Text(str(s.errors), style="red bold" if s.errors else "dim"),
+            text.Text(str(s.errors), style="red bold" if s.errors else "dim"),
             format_flight(s),
             format_money(s),
             format_duration(s.mean_wall) if s.mean_wall is not None else "",
-            Text(format_duration(s.elapsed), style="dim" if done else ""),
+            text.Text(format_duration(s.elapsed), style="dim" if done else ""),
         )
     total = format_total(stats) if len(stats) > 1 else ""
-    return Group(table, Text(total, style="bold")) if total else Group(table)
+    return console.Group(sheet, text.Text(total, style="bold")) if total else console.Group(sheet)
 
 
 class Reporter:
@@ -305,8 +300,8 @@ class Progress:
         self.lock = threading.RLock()
         self._width = max((len(n) for n in self.stats), default=8)
         self._tick = tick
-        self._console: Console | None = None
-        self._live: Live | None = None
+        self._console: console.Console | None = None
+        self._live: live.Live | None = None
         self._saved_handlers: list | None = None
 
     def reporter(self, name: str) -> Reporter:
@@ -351,18 +346,18 @@ class Progress:
         if line:
             log.info("%s", line)
 
-    def _renderable(self) -> Group:
+    def _renderable(self) -> console.Group:
         """What `Live` asks for on every refresh. Under the lock: the providers are writing."""
         with self.lock:
             return render(self.stats)
 
     def __enter__(self) -> Progress:
         if self.live:
-            self._console = Console(file=self.stream, highlight=False)
+            self._console = console.Console(file=self.stream, highlight=False)
             # rich asks for the table on its own refresh thread: one clock, not two.
-            self._live = Live(get_renderable=self._renderable, console=self._console,
-                              refresh_per_second=max(1, int(1 / self._tick)),
-                              redirect_stdout=False, redirect_stderr=False)
+            self._live = live.Live(get_renderable=self._renderable, console=self._console,
+                                   refresh_per_second=max(1, int(1 / self._tick)),
+                                   redirect_stdout=False, redirect_stderr=False)
             self._live.start()
             # Handlers keep the stream they were built with, out of rich's reach: wrap them.
             root = logging.getLogger()
@@ -393,13 +388,13 @@ class _Interleaved(logging.Handler):
         self.progress, self.inner = progress, inner
 
     def emit(self, record: logging.LogRecord) -> None:
-        console = self.progress._console
+        live_console = self.progress._console
         # Only a handler on our stream can overwrite the live region; a file handler is left alone.
-        if console is None or getattr(self.inner, "stream", None) is not self.progress.stream:
+        if live_console is None or getattr(self.inner, "stream", None) is not self.progress.stream:
             self.inner.emit(record)
             return
         with self.progress.lock:
-            console.print(self.inner.format(record), highlight=False, markup=False)
+            live_console.print(self.inner.format(record), highlight=False, markup=False)
 
 
 # The plan, before a benchmark runs: `opb benchmark` shows it, and `benchmark.describe` writes it.
@@ -409,60 +404,50 @@ PLAN_WIDTH = 110
 
 def facts(p: benchmark.Plan):
     """What this invocation is, one labelled row each."""
-    from rich.table import Table
-    from rich.text import Text
-
-    table = Table(box=None, show_header=False, pad_edge=False)
-    table.add_column("", style="dim", no_wrap=True)
-    table.add_column("", overflow="fold")
-    table.add_row("out", str(p.runs[0].out.parent) if p.runs else "")
-    table.add_row("runs", str(len(p.runs)))
-    table.add_row("dataset", p.dataset)
-    table.add_row("pages", str(len(p.pages)))
-    table.add_row("timeout", f"{p.timeout:.0f}s per call")
-    table.add_row("at once", ", ".join(f"{a} {n}" for a, n in benchmark.pools(p).items())
+    sheet = table.Table(box=None, show_header=False, pad_edge=False)
+    sheet.add_column("", style="dim", no_wrap=True)
+    sheet.add_column("", overflow="fold")
+    sheet.add_row("out", str(p.runs[0].out.parent) if p.runs else "")
+    sheet.add_row("runs", str(len(p.runs)))
+    sheet.add_row("dataset", p.dataset)
+    sheet.add_row("pages", str(len(p.pages)))
+    sheet.add_row("timeout", f"{p.timeout:.0f}s per call")
+    sheet.add_row("at once", ", ".join(f"{a} {n}" for a, n in benchmark.pools(p).items())
                   + " calls, shared by an adapter's runs")
     # Note: shown even when false: `score only  false` is what says this will spend money.
     for name, on in (("score only", p.score_only),):
-        table.add_row(name, Text(str(on).lower(), style="bold" if on else "dim"))
-    return table
+        sheet.add_row(name, text.Text(str(on).lower(), style="bold" if on else "dim"))
+    return sheet
 
 
 def plan_view(p: benchmark.Plan):
     """The whole plan as one renderable: each run, its settings, and what it still owes."""
-    from rich import box
-    from rich.console import Group
-    from rich.rule import Rule
-    from rich.table import Table
-    from rich.text import Text
-
     from omni_parse_bench import harness
 
-    table = Table(box=box.ROUNDED, header_style="dim", expand=False)
-    table.add_column("adapter", overflow="fold")
-    table.add_column("run", overflow="fold")
-    table.add_column("settings", overflow="fold")
-    table.add_column("predict", justify="right", no_wrap=True)
-    table.add_column("grade", justify="right", no_wrap=True)
+    sheet = table.Table(box=box.ROUNDED, header_style="dim", expand=False)
+    sheet.add_column("adapter", overflow="fold")
+    sheet.add_column("run", overflow="fold")
+    sheet.add_column("settings", overflow="fold")
+    sheet.add_column("predict", justify="right", no_wrap=True)
+    sheet.add_column("grade", justify="right", no_wrap=True)
     for r in p.runs:
         to_predict, to_grade = benchmark.owed(p, r)
         settings = [f"{k}={v}" for k, v in harness.settings_for(r.provider, r.options).items()]
         cell: list = []
         for n, x in enumerate(settings):
-            if n: cell.append(Rule(style="dim"))
-            cell.append(Text(x, style="cyan"))
-        table.add_row(Text(harness.resolve(r.provider), style="bold"), Text(r.out.name), Group(*cell),
-                      Text(str(to_predict), style="bold" if to_predict else ""),
-                      Text(str(to_grade), style="bold" if to_grade else ""), end_section=True)
-    return Group(Text("benchmark", style="bold"), facts(p), Text(""), table)
+            if n: cell.append(rule.Rule(style="dim"))
+            cell.append(text.Text(x, style="cyan"))
+        sheet.add_row(text.Text(harness.resolve(r.provider), style="bold"), text.Text(r.out.name),
+                      console.Group(*cell),
+                      text.Text(str(to_predict), style="bold" if to_predict else ""),
+                      text.Text(str(to_grade), style="bold" if to_grade else ""), end_section=True)
+    return console.Group(text.Text("benchmark", style="bold"), facts(p), text.Text(""), sheet)
 
 
 def describe(p: benchmark.Plan) -> str:
     """`plan_view` as plain text, for a log that has no colour and no width to ask about."""
     import io
 
-    from rich.console import Console
-
-    console = Console(file=io.StringIO(), width=PLAN_WIDTH, no_color=True, highlight=False)
-    console.print(plan_view(p))
-    return "\n".join(line.rstrip() for line in console.file.getvalue().splitlines())
+    plain = console.Console(file=io.StringIO(), width=PLAN_WIDTH, no_color=True, highlight=False)
+    plain.print(plan_view(p))
+    return "\n".join(line.rstrip() for line in plain.file.getvalue().splitlines())

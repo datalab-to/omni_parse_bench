@@ -29,7 +29,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from omni_parse_bench import vocab
-from omni_parse_bench.errors import UsageError, counted
+from omni_parse_bench import errors
 
 log = logging.getLogger(__name__)
 
@@ -48,13 +48,13 @@ OUTPUTS = frozenset(vocab.READS.values())     # the output types a test can read
 OLD_DATASET = (
     "the dataset at {root} is from before omni-parse-bench 0.1.2: its manifest has no 'outputs' column "
     "(the dataset's commits 1c35a52 and earlier). Use the current dataset:\n"
-    "  - from Hugging Face: drop the @<commit> pin, i.e. --dataset hf://datasets/datalab-to/omni_parse_bench;\n"
-    "  - a downloaded copy: download it again: "
+    "  - from Hugging Face: drop the @<commit> pin, i.e. --dataset "
+    "hf://datasets/datalab-to/omni_parse_bench;\n  - a downloaded copy: download it again: "
     "hf download datalab-to/omni_parse_bench --repo-type dataset --local-dir <folder>; or\n"
     "  - to keep this copy, use the omni-parse-bench made for it: pip install 'omni-parse-bench==0.1.1'")
 
 
-class ManifestError(UsageError):
+class ManifestError(errors.UsageError):
     """A manifest, or a row of one, that breaks the dataset's rules; the message names it and the fix."""
 
 
@@ -86,15 +86,16 @@ def _hf_dataset(dataset: str | Path) -> tuple[str, str | None] | None:
     form = f"{HF_PREFIX}<org>/<name>[@<revision>], e.g. {DEFAULT_DATASET}"
     s = str(dataset)
     if isinstance(dataset, Path) and s.startswith("hf:"):
-        raise UsageError(f"the dataset {s!r} was made a Path, which folds the '//' out of an address. "
-                         f"Pass it as a str: {form}")
+        raise errors.UsageError(f"the dataset {s!r} was made a Path, which folds the '//' out of an address. "
+                                f"Pass it as a str: {form}")
     if s.startswith("hf:") and not s.startswith("hf://"):
-        raise UsageError(f"{s!r} looks like a Hugging Face address with a slash missing. Write it as {form}")
+        raise errors.UsageError(f"{s!r} looks like a Hugging Face address with a slash missing. Write it as "
+                                f"{form}")
     if not s.startswith("hf://"): return None
     org, _, name = s.removeprefix(HF_PREFIX).partition("/")
     name, at, revision = name.partition("@")
     if not s.startswith(HF_PREFIX) or not org or not name or "/" in name or (at and not revision):
-        raise UsageError(f"{s!r} does not name a Hugging Face dataset. Write it as {form}")
+        raise errors.UsageError(f"{s!r} does not name a Hugging Face dataset. Write it as {form}")
     return f"{org}/{name}", revision or None
 
 
@@ -110,8 +111,8 @@ def download_dataset(dataset: str | Path) -> Path:
     if (at := _hf_dataset(dataset)) is None:
         root = Path(dataset).expanduser()
         if not root.is_dir():
-            raise UsageError(f"no dataset folder at {root}; pass --dataset a dataset folder "
-                             f"or {HF_PREFIX}<org>/<name>")
+            raise errors.UsageError(f"no dataset folder at {root}; pass --dataset a dataset folder "
+                                    f"or {HF_PREFIX}<org>/<name>")
         return root
     from huggingface_hub import errors as hf_errors
     from huggingface_hub import snapshot_download
@@ -127,20 +128,20 @@ def download_dataset(dataset: str | Path) -> Path:
                                           max_workers=4))
         except (hf_errors.RepositoryNotFoundError, hf_errors.GatedRepoError,
                 hf_errors.RevisionNotFoundError) as exc:
-            raise UsageError(f"can't read dataset {dataset}: {type(exc).__name__}. Check the repo and "
-                             "revision, and that you're logged in with access (huggingface-cli login)"
-                             ) from None
+            raise errors.UsageError(f"can't read dataset {dataset}: {type(exc).__name__}. Check the repo and "
+                                    "revision, and that you're logged in with access (huggingface-cli login)"
+                                    ) from None
         except (hf_errors.LocalEntryNotFoundError, hf_errors.OfflineModeIsEnabled) as exc:
             # Note: offline by the user's own setting, connecting changes nothing; unsetting it does.
             how = ("HF_HUB_OFFLINE is set; unset it" if os.environ.get("HF_HUB_OFFLINE", "") not in ("", "0")
                    else "the Hub can't be reached; connect")
-            raise UsageError(f"can't read dataset {dataset}: it isn't in the Hugging Face cache, and {how}, "
-                             f"or pass --dataset a folder ({type(exc).__name__})") from None
+            raise errors.UsageError(f"can't read dataset {dataset}: it isn't in the Hugging Face cache, and "
+                                    f"{how}, or pass --dataset a folder ({type(exc).__name__})") from None
         except hf_errors.HfHubHTTPError as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
             if status in (401, 403):
-                raise UsageError(f"can't read dataset {dataset}: HTTP {status}. Log in with access to it "
-                                 "(huggingface-cli login)") from None
+                raise errors.UsageError(f"can't read dataset {dataset}: HTTP {status}. Log in with access to "
+                                        "it (huggingface-cli login)") from None
             if attempt == DOWNLOAD_ATTEMPTS - 1: raise
             log.warning("downloading %s failed (HTTP %s); trying again in %ds", dataset, status,
                         30 * (attempt + 1))
@@ -205,7 +206,7 @@ def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, 
     for p in rows: by.setdefault(p.page_id.casefold(), []).append(p.page_id)
     if twice := [ids for ids in by.values() if len(ids) > 1]:
         raise ManifestError(f"page ids in the manifest more than once (ignoring case, since each names "
-                            f"files): {counted(len(twice), 'id')}, e.g. {twice[:3]}")
+                            f"files): {errors.counted(len(twice), 'id')}, e.g. {twice[:3]}")
     return root, rows
 
 
@@ -221,17 +222,19 @@ def select(pages: Sequence[Page], suites: Iterable[str] | None = None, limit: in
         if isinstance(n, bool) or not isinstance(n, int):
             raise TypeError(f"{name} is a whole number, not {n!r}")
         if n < 0:
-            raise UsageError(f"--{name} is {n}, but it counts pages, so it can't be negative; 0 is no limit")
+            raise errors.UsageError(f"--{name} is {n}, but it counts pages, so it can't be negative; 0 is no "
+                                    "limit")
     rows = tuple(pages)
     known = {r.suite for r in rows}
     if suites is not None and (bad := sorted(suites - known)):
-        raise UsageError(f"unknown suites {bad}; the dataset's suites are {sorted(known)}")
+        raise errors.UsageError(f"unknown suites {bad}; the dataset's suites are {sorted(known)}")
     rows = tuple(r for r in rows if suites is None or r.suite in suites)
     if only is not None:
         if bad := sorted(only - {r.page_id for r in rows}):
             where = " (or its suites)" if suites else ""
-            raise UsageError(f"pages asked for that aren't in the dataset{where}: "
-                             f"{counted(len(bad), 'page')}, e.g. {bad[:3]}; nothing has been run")
+            raise errors.UsageError(f"pages asked for that aren't in the dataset{where}: "
+                                    f"{errors.counted(len(bad), 'page')}, e.g. {bad[:3]}; nothing has been "
+                                    "run")
         rows = tuple(r for r in rows if r.page_id in only)
     if sample and rows:
         by: dict[str, list] = {}
