@@ -112,19 +112,19 @@ class Run(NamedTuple):
 
 
 def prepare(run: Run, dataset: str, timeout: float, manifest: str = data.MANIFEST) -> None:
-    """The run's folder made, and what the run asks written to its settings.json, beside what it already
-    says: provider, settings, dataset (and the commit of a Hugging Face one), manifest, the timeout per call
-    and the outputs its provider can't produce (`unsupported`). What graded it is stamped on its score
-    lines and in summary.json."""
+    """The run's folder made, and what the run asks written to its settings.json, whole: provider,
+    settings, dataset (and the commit of a Hugging Face one), manifest, the timeout per call and the
+    outputs its provider can't produce (`unsupported`). What graded it is stamped on its score lines and
+    in summary.json."""
     from omni_parse_bench import harness
     from omni_parse_bench.harness import registry
 
     root, _ = data.read_manifest(dataset, manifest)
     run.records.mkdir(parents=True, exist_ok=True)
     run.predictions.mkdir(exist_ok=True)
-    commit = {"commit": root.name} if str(dataset).startswith(data.HF_PREFIX) else {}
+    commit = {"commit": root.name} if data._hf_dataset(dataset) is not None else {}
     path = run.out / "settings.json"
-    _write_json(path, (_read_json(path) or {}) | {
+    _write_json(path, {
         "run": run.out.name, "provider": run.provider,
         "settings": harness.settings_for(run.provider, run.options), "dataset": data.dataset_id(dataset),
         **commit, "manifest": manifest, "timeout_s": timeout,
@@ -233,8 +233,9 @@ def plan(providers: list[str], *, out: str | Path = Path("runs"), dataset: str =
                          "settings (an option set to its default is the same setting); drop the repeat from "
                          "--providers or --options")
     root, every = data.read_manifest(dataset, manifest)
-    ps = data.select(every, suites, limit, sample, only)
-    commit = root.name if str(dataset).startswith(data.HF_PREFIX) else None
+    if not (ps := data.select(every, suites, limit, sample, only)):
+        raise ValueError("no pages selected: check --suites, --limit and --pages")
+    commit = root.name if data._hf_dataset(dataset) is not None else None
     ident = data.dataset_id(dataset)
     for r in runs:
         said = _read_json(r.out / "settings.json") or {}
@@ -286,15 +287,16 @@ def _per_adapter(workers: Mapping[str, int]) -> dict[str, int]:
     return dict(workers)
 
 
-def owed(p: Plan, r: Run) -> tuple[int, int]:
-    """How many of the plan's pages this run will predict, and grade, by the rules `predict_all` and
-    `grade_all` follow."""
-    predict = grade = 0
-    for g in p.pages:
-        coming = not p.score_only and bool(needs(r, g, p.retry_failed))
-        predict += coming
-        grade += coming or predicted(r, g.page_id) is not None or recorded(r, g.page_id) is not None
-    return predict, grade
+def owed(p: Plan, run: Run) -> tuple[int, int]:
+    """How many pages the run will predict, and then grade, by the rules `predict_all` and `grade_all`
+    follow: it predicts the plan's pages it still needs, and grades every page of the manifest that will
+    have been attempted (the rest are pending), or every page in a folder without records/."""
+    coming = set() if p.score_only else {g.page_id for g in p.pages if needs(run, g, p.retry_failed)}
+    _, every = data.read_manifest(p.dataset, p.manifest)
+    keeps = not p.score_only or run.records.is_dir()
+    grade = sum(not keeps or g.page_id in coming or predicted(run, g.page_id) is not None
+                or recorded(run, g.page_id) is not None for g in every)
+    return len(coming), grade
 
 
 def describe(p: Plan) -> str:

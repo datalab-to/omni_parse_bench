@@ -52,6 +52,11 @@ Datasets:
   `gold/...`), and `unit_tests.check` no longer refuses a gold file its manifest doesn't name;
 - `record(run, page_id, result)`: the argument is what `harness.predict` returned (it was `new`);
 - `plan` warns when a run made at one commit of its dataset is planned at another, and carries on;
+- `plan` refuses an empty selection;
+- `owed` counts what grading will grade over the whole manifest, as `grade_all` does; it counted
+  only the selected pages;
+- `prepare` writes `settings.json` whole; it merged into what was there;
+- an `hf://` address is checked: `hf://datasets/<org>/<name>[@<revision>]`;
 - a manifest may carry columns of its own: they're kept on `page.extra`, never refused; and
 - `Page` is a frozen dataclass (it was a NamedTuple), with `id`, the page's `page_id`.
 

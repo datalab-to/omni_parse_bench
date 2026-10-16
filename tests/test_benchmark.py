@@ -766,6 +766,28 @@ def test_a_folder_that_doesnt_say_what_it_cannot_produce_is_refused(tmp_path):
         benchmark.grade(benchmark.Run("mine", {}, mine), data.read_manifest(ds)[1], say=QUIET)
 
 
+def test_the_plan_counts_what_grading_will_grade_over_the_whole_manifest(tmp_path, monkeypatch):
+    """--limit chooses what to predict; grading still covers every page, and counts what it will grade."""
+    use(monkeypatch, {"stub": stub()})
+    ds = dataset(tmp_path / "data", n=3)
+    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=ds, limit=1)
+    (run,) = p.runs
+    assert benchmark.owed(p, run) == (1, 1)
+    benchmark.execute(p, say=QUIET)
+    assert benchmark.owed(p._replace(pages=data.read_manifest(ds)[1]), run) == (2, 3)
+    mine = tmp_path / "mine"
+    (mine / "predictions").mkdir(parents=True)
+    assert benchmark.owed(p._replace(runs=(benchmark.Run("mine", {}, mine),), score_only=True),
+                          benchmark.Run("mine", {}, mine)) == (0, 3), "no records/: every page is graded"
+
+
+def test_an_empty_selection_is_refused(tmp_path, monkeypatch):
+    use(monkeypatch, {"stub": stub()})
+    ds = dataset(tmp_path / "data")
+    with pytest.raises(ValueError, match="no pages selected"):
+        benchmark.plan(["stub"], out=tmp_path / "runs", dataset=ds, only=frozenset())
+
+
 def test_a_page_whose_prediction_is_lost_is_predicted_again_not_left_pending(tmp_path, monkeypatch):
     """Grading reads predictions alone, so a record without one would never be graded."""
     calls = []

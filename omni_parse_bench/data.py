@@ -72,6 +72,21 @@ class Page:
         return self.page_id
 
 
+def _hf_dataset(dataset: str | Path) -> tuple[str, str | None] | None:
+    """The repo and revision `dataset` addresses, or None when it is a folder on disk."""
+    form = f"{HF_PREFIX}<org>/<name>[@<revision>], e.g. {DEFAULT_DATASET}"
+    s = str(dataset)
+    if isinstance(dataset, Path) and s.startswith("hf:"):
+        raise ValueError(f"the dataset {s!r} was made a Path, which folds the '//' out of an address. "
+                         f"Pass it as a str: {form}")
+    if not s.startswith("hf://"): return None
+    org, _, name = s.removeprefix(HF_PREFIX).partition("/")
+    name, at, revision = name.partition("@")
+    if not s.startswith(HF_PREFIX) or not org or not name or "/" in name or (at and not revision):
+        raise ValueError(f"{s!r} does not name a Hugging Face dataset. Write it as {form}")
+    return f"{org}/{name}", revision or None
+
+
 def download_dataset(dataset: str | Path) -> Path:
     """A dataset as a local folder: a path as given, or a Hugging Face dataset downloaded whole, at one
     commit, into Hugging Face's cache (so a second call downloads nothing). Its folder's name is that
@@ -81,7 +96,7 @@ def download_dataset(dataset: str | Path) -> Path:
     Fetching each page when it is first predicted would let a `--limit` run download only its pages;
     that is an optimization for later.
     """
-    if not str(dataset).startswith(HF_PREFIX):
+    if (at := _hf_dataset(dataset)) is None:
         root = Path(dataset).expanduser()
         if not root.is_dir():
             raise FileNotFoundError(f"no dataset folder at {root}; pass --dataset a dataset folder "
@@ -90,13 +105,13 @@ def download_dataset(dataset: str | Path) -> Path:
     from huggingface_hub import errors as hf_errors
     from huggingface_hub import snapshot_download
 
-    repo, _, revision = str(dataset).removeprefix(HF_PREFIX).partition("@")
+    repo, revision = at
     # Note: thousands of small files; the Hub drops some requests under that load, and a download
     # picks up where the last left off, so it is simply tried again. A missing repo, revision or
     # access is the same on every attempt, so it fails at once.
     for attempt in range(DOWNLOAD_ATTEMPTS):
         try:
-            return Path(snapshot_download(repo, repo_type="dataset", revision=revision or None,
+            return Path(snapshot_download(repo, repo_type="dataset", revision=revision,
                                           max_workers=4))
         except (hf_errors.RepositoryNotFoundError, hf_errors.GatedRepoError,
                 hf_errors.RevisionNotFoundError) as exc:
@@ -117,7 +132,7 @@ def download_dataset(dataset: str | Path) -> Path:
 
 def dataset_id(dataset: str | Path) -> str:
     """What a run's dataset is, whatever revision: the repo of an `hf://` dataset, or a folder's path."""
-    if str(dataset).startswith(HF_PREFIX): return str(dataset).partition("@")[0]
+    if (at := _hf_dataset(dataset)) is not None: return f"{HF_PREFIX}{at[0]}"
     return str(Path(dataset).expanduser().resolve())
 
 
