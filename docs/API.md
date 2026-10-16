@@ -252,8 +252,8 @@ opb benchmark --providers datalab openai/gpt-5.6-sol --out runs/ --limit 5
 
 It shows the plan (each run, its settings, and how many pages it will predict and grade) and, in a
 terminal, asks before calling any vendor, the question on stderr; `-y` skips the question. With no
-terminal to ask (a pipe, a notebook, CI) it refuses unless given `-y`, since a run costs money; with
-`-y`, or with `--score-only`, which spends nothing, it prints the plan and goes on.
+terminal to ask (a pipe, a notebook, CI) it goes ahead without asking, so a script runs as written;
+with `-y`, or with `--score-only`, which spends nothing, it prints the plan and goes on.
 It prints each run's summary to stdout, by run name, as its summary.json holds it, and each run's
 closing line to stderr: `<run>: headline 0.905; 2937 of 2937 pages graded, 12 failed`, or, while pages
 are pending, `headline — (3 pending: a headline needs every page)`. When pages failed it says that
@@ -304,7 +304,8 @@ That's 2 runs.
 - `--dataset`: a dataset folder, or `hf://datasets/<repo>[@revision]`. The default is ours,
   `hf://datasets/datalab-to/omni_parse_bench`, a private repository, so run `hf auth login`
   first. A Hugging Face dataset is downloaded whole (1.5 GB), once, into Hugging Face's cache;
-- `--manifest`: which of the dataset's manifests, a parquet inside it (default `manifest.parquet`). A
+- `--manifest`: which of the dataset's manifests, a parquet inside it (default `manifest.parquet`), or
+  given whole, `hf://datasets/<org>/<name>[@<revision>]/<path>`, which names its dataset too. A
   dataset may hold others: a sample manifest you make (e.g. `manifests/sample.parquet`), or the same pages with a gold of
   another kind (`gt_path` pointing at `transcripts/` instead of `gold/`), each naming its pages and
   where their gold is. `opb grade`, `opb check` and `opb tests` take it too. A run folder holds one
@@ -314,7 +315,8 @@ That's 2 runs.
 - `--suites`: only these suites;
 - `--limit N`: the first N pages;
 - `--sample N`: N pages spread over every suite, the same ones each time; N larger than the
-  selection runs all of it, and with `--pages` it samples among those pages; and
+  selection runs all of it, and with `--pages` it samples among those pages;
+- `--timeout S`: the seconds one vendor call may take (default 900); `-y` / `--yes` skips the question; and
 - `--pages FILE`: the page ids in a file, one per line (blank lines and `#` comments are skipped). To
   run one tag's pages, see
   [Exploring the tests](#exploring-the-tests).
