@@ -308,7 +308,7 @@ def describe(p: Plan) -> str:
 
 def _write_json(path: Path, obj: Any) -> None:
     """Written whole, then moved into place, so a crash never leaves half a file."""
-    _write_text(path, json.dumps(obj, ensure_ascii=False) + "\n")
+    _write_text(path, json.dumps(obj, ensure_ascii=False, indent=2) + "\n")
 
 
 def _write_text(path: Path, text: str) -> None:
