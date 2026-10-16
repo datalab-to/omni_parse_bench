@@ -265,9 +265,9 @@ def configurations(providers: list[str], options: dict | None = None) -> list[tu
     return out
 
 
-def plan(providers: Sequence[str], *, out: str | Path = Path("runs"), dataset: str = data.DEFAULT_DATASET,
-         manifest: str = data.MANIFEST, suites: Iterable[str] | None = None, limit: int = 0, sample: int = 0,
-         options: dict | None = None,
+def plan(providers: Sequence[str], *, out: str | Path = Path("runs"),
+         dataset: str | Path = data.DEFAULT_DATASET, manifest: str = data.MANIFEST,
+         suites: Iterable[str] | None = None, limit: int = 0, sample: int = 0, options: dict | None = None,
          timeout: float = 0, workers: int | Mapping[str, int] = 0,
          score_only: bool = False, retry_failed: bool = False, only: Iterable[str] | None = None) -> Plan:
     """Every run this invocation makes, checked before any call: a bad provider, option, count or folder
