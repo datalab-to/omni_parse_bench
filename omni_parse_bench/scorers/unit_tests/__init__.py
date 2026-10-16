@@ -12,15 +12,15 @@ and the test are: `page_id`, `suite`, `document`, `test_id`, `test_type`, `outpu
 `derivation`, `tags`, `result` and `why`. It is what a run's scores.jsonl holds, so `summarize` reads
 a scores.jsonl, or any part of one (one tag, one suite), as it is.
 
-A verdict's result is one of four:
+A verdict's result is one of three:
 
     pass          the test passed
     fail          it failed, or its output is missing or malformed (`views.MalformedOutput`)
     unsupported   the provider can't produce the test's output type
-    error         grading raised on a well-formed output: a scorer bug, never the provider's fault
 
-`unsupported` and `error` are left out of a score, so failing on a hard page can never raise one,
-and a scorer bug never lowers one; `summarize` counts each per output type.
+`unsupported` is left out of a score, so leaving out an output can never raise one; `summarize` counts
+it per output type. A test whose run raises on a well-formed output is a bug of ours, never the
+provider's fault, so `score` raises it, naming the test: a score with it left out would be wrong.
 
 An output type's score is the mean over its tests. Beside it, `per_test_type` scores each structure
 a test checks (presence, order, a table cell), and `per_tag` each kind of content (a table, math,
@@ -40,6 +40,7 @@ from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 from omni_parse_bench import views, vocab
+from omni_parse_bench.errors import counted
 
 from . import runners
 from . import tests as _tests
@@ -50,9 +51,9 @@ __all__ = ["GoldError", "Test", "Verdict", "check", "gold", "lines", "runners", 
 if TYPE_CHECKING:
     from omni_parse_bench import data
 
-Result = Literal["pass", "fail", "unsupported", "error"]
+Result = Literal["pass", "fail", "unsupported"]
 Line = Mapping[str, Any]   # a score line (`lines`)
-UNSCORED = ("unsupported", "error")
+UNSCORED = ("unsupported",)
 
 VIEWS: dict[str, Callable[[Any], Any]] = {
     "html": views.html,
@@ -70,6 +71,9 @@ def gold(page: data.Page) -> tuple[_tests.Test, ...]:
     """The page's tests, from its gold file (`page.gt_path`) alone; refuses a page whose manifest `outputs`
     disagree with what its tests read."""
     ts = _tests.read(page.gt_path)
+    if not ts:
+        raise _tests.GoldError(f"page {page.page_id!r}: its gold {page.gt_path} has no tests; give it tests, "
+                              "or drop the page from the manifest")
     if frozenset(page.outputs) != _tests.wants(ts):
         raise _tests.GoldError(f"page {page.page_id!r}: the manifest says it is asked for "
                               f"{list(page.outputs)}, but its tests read {sorted(_tests.wants(ts))}; the "
@@ -87,10 +91,12 @@ def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
     stray."""
     every = tuple(t for p in pages for t in gold(p))
     if twice := [i for i, n in collections.Counter(t.id for t in every).items() if n > 1]:
-        raise _tests.GoldError(f"{len(twice)} test ids are used more than once, e.g. {twice[:3]}")
+        raise _tests.GoldError(f"test ids used more than once, across the dataset: "
+                               f"{counted(len(twice), 'id')}, e.g. {twice[:3]}; each test's id is unique in "
+                               "its dataset")
     if empty := sorted({p.page_id for p in pages} - {t.page_id for t in every}):
-        raise _tests.GoldError(f"{len(empty)} pages have no tests, e.g. {empty[:3]}; remove them or give "
-                               "them tests")
+        raise _tests.GoldError(f"pages with no tests: {counted(len(empty), 'page')}, e.g. {empty[:3]}; "
+                               "remove them or give them tests")
     return every
 
 
@@ -118,21 +124,19 @@ def score(pred: Mapping[str, Any], gold: Sequence[_tests.Test],
         try:
             passed, why = runners.TYPES[t.test_type][1](t.params, v)
         except Exception as e:
-            out.append(Verdict(t.id, "error", f"{type(e).__name__}: {e}"))
-            continue
+            e.add_note(f"while running test {t.id} ({t.test_type}) of page {t.page_id}")
+            raise
         out.append(Verdict(t.id, "pass" if passed else "fail", why))
     return out
 
 
 def _view(output_type: str, value: Any) -> Any:
-    """The output's view; or, when it can't be built, the verdict each of its tests gets: `fail` for
-    an output of the wrong shape (the provider's fault), `error` when building it raised otherwise."""
+    """The output's view; or, when it is of the wrong shape (the provider's fault), the `fail` each of its
+    tests gets. Building it raising otherwise is a bug of ours, raised."""
     try:
         return VIEWS[output_type](value)
     except views.MalformedOutput as e:
         return Verdict("", "fail", f"malformed {output_type} output: {e}")
-    except Exception as e:
-        return Verdict("", "error", f"{type(e).__name__}: {e}")
 
 
 def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.Page) -> list[dict[str, Any]]:
@@ -147,29 +151,28 @@ def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.
 
 def summarize(lines: Iterable[Line]) -> dict[str, Any]:
     """The score lines (from `lines()`, or a scores.jsonl's) summarized: `headline`, the one number to
-    compare runs by (see `_families`), beside `families` and `documents`; then per output type: `score`,
-    the test counts (`tests` scored, `unsupported`, `errors`), `documents`, `per_test_type` and `per_tag`
-    (each `{score, tests, pages, documents}`); then `per_suite`, each suite's `headline` and `score` (its
-    pass rate), and `per_derivation`. Scores are fractions from 0 to 1. An output type with no scored tests
-    is left out."""
+    compare runs by (see `_families`), beside `families` and `documents`; then per output type the lines
+    have: `score`, the test counts (`tests` scored, `unsupported`), `documents`, `per_test_type` and
+    `per_tag` (each `{score, tests, pages, documents}`); then `per_suite`, each suite's `headline` and
+    `score` (its pass rate), and `per_derivation`. Scores are fractions from 0 to 1; an output type none of
+    whose tests was scored (every one unsupported) has `score` None and its `unsupported` count."""
     every = list(lines)
     scored = [(x, x["result"] == "pass") for x in every if x["result"] not in UNSCORED]
     summary: dict[str, Any] = _families(scored, every)
     for output in vocab.OUTPUT_TYPES:
         ys = [(x, ok) for x, ok in scored if x["output_type"] == output]
-        if not ys: continue
+        count = collections.Counter(x["result"] for x in every if x["output_type"] == output)
+        if not count: continue
         groups: dict[str, list[tuple[Line, bool]]] = {}
         for x, ok in ys:
             for g in x["tags"]: groups.setdefault(g, []).append((x, ok))
         per_tag = {g: {"score": _mean(ok for _, ok in zs), "tests": len(zs),
                        "pages": len({x["page_id"] for x, _ in zs}), "documents": _documents(zs)}
                    for g, zs in sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0]))}
-        count = collections.Counter(x["result"] for x in every if x["output_type"] == output)
         summary[output] = {
-            "score": _mean(ok for _, ok in ys),
+            "score": _mean(ok for _, ok in ys) if ys else None,
             "tests": len(ys),
             "unsupported": count["unsupported"],
-            "errors": count["error"],
             "documents": _documents(ys),
             "per_test_type": _means(ys, lambda x: x["test_type"], order=list(runners.TYPES)),
             "per_tag": per_tag,
@@ -185,7 +188,7 @@ def _families(scored: Sequence[tuple[Line, bool]], graded: Sequence[Line]) -> di
     """`headline`, the mean of the families' scores, each family's flat over its scored tests, over the
     families the graded tests are in; `families`, each one's score, tests and documents; and `documents`,
     the source documents the scored tests are from. `headline` is None when a family has no scored test
-    (every one unsupported or an error), since a mean over fewer families isn't the same number."""
+    (every one unsupported), since a mean over fewer families isn't the same number."""
     sizes = collections.Counter(vocab.FAMILIES[x["test_type"]] for x in graded)
     by = collections.defaultdict(list)
     for x, ok in scored: by[vocab.FAMILIES[x["test_type"]]].append((x, ok))

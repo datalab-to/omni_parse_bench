@@ -9,12 +9,12 @@
     opb providers [NAME]
     opb reparse RUN_DIR ...
 
-Results go to stdout as JSON; progress and messages go to stderr (`-q`: messages only). `benchmark`
-shows its plan and waits for a yes unless given `-y`; nothing in the library ever reads stdin.
-`benchmark` and `grade` exit 2 when a test's grading raised in our code, so a scorer bug can't pass
-as a vendor's score. A `UsageError` (what was asked is wrong) or a `Stop` (an account, a key or a
-dependency) is printed as `opb <command>: <what was wrong>` and exits 1; an interrupt exits 130;
-anything else is a bug of ours, and is raised as it is.
+Results go to stdout as JSON; progress and messages go to stderr. `benchmark` shows its plan and waits
+for a yes unless given `-y`; nothing in the library ever reads stdin. A `UsageError` (what was asked is
+wrong) or a `Stop` (an account, a key or a dependency) is printed as `opb <command>: <what was wrong>`
+and exits 1, after a `benchmark` stopped by a `Stop` prints the summaries it wrote; an interrupt exits
+130; anything else, a scorer that raises among them, is a bug of ours, and is raised as it is, with
+nothing written.
 
 `score` needs only the core install; every other command needs an extra (EXTRAS), and on an
 install without it says which to add instead of failing on the first missing import.
@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from omni_parse_bench import benchmark, data, progress, vocab
-from omni_parse_bench.errors import Stop, UsageError
+from omni_parse_bench.errors import Stop, UsageError, counted
 from omni_parse_bench.scorers import unit_tests as scorer
 
 # command -> the extra it needs; `score` needs none.
@@ -47,6 +47,8 @@ def read_object(path: str, flag: str) -> dict:
         got = json.loads(Path(path).read_text())
     except FileNotFoundError:
         raise UsageError(f"{flag} {path}: no such file") from None
+    except IsADirectoryError:
+        raise UsageError(f"{flag} {path} is a folder; pass a JSON file") from None
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise UsageError(f"{flag} {path} isn't JSON: {exc}") from None
     if not isinstance(got, dict):
@@ -113,18 +115,21 @@ def confirm_plan(plan: Any) -> bool:
         return False
 
 
-def _say(a: argparse.Namespace):
-    """Where a grading's closing line and advice go: stderr, or nowhere with `-q`."""
-    return (lambda m: None) if a.quiet else (lambda m: print(m, file=sys.stderr))
+def _say(m: str) -> None:
+    """A grading's closing line, or advice: to stderr, beside the progress."""
+    print(m, file=sys.stderr)
 
 
-def _bugs(a: argparse.Namespace, summaries: dict[str, dict]) -> int:
-    """2, said, when a test's grading raised in our code (a scorer bug, left out of the scores); else 0."""
-    if not (errored := {k: n for k, s in summaries.items() if (n := benchmark.scorer_errors(s))}): return 0
-    print(f"opb {a.cmd}: grading raised in our code, not the vendor's, for {sum(errored.values())} tests ("
-          + ", ".join(f"{k} {n}" for k, n in errored.items())
-          + "); they are left out of the scores: report it with the run's scores.jsonl", file=sys.stderr)
-    return 2
+def _written(p: benchmark.Plan) -> dict[str, dict]:
+    """Each run's summary.json, by run name, as grading wrote it."""
+    return {r.out.name: json.loads((r.out / "summary.json").read_text())
+            for r in p.runs if (r.out / "summary.json").is_file()}
+
+
+def _retryable(p: benchmark.Plan) -> int:
+    """The pages whose failure may not recur, which `--retry-failed` would predict again."""
+    return sum(bool(benchmark.needs(r, g, True)) and not benchmark.needs(r, g)
+               for r in p.runs for g in p.pages)
 
 
 def cmd_score(a: argparse.Namespace) -> int:
@@ -162,13 +167,17 @@ def cmd_benchmark(a: argparse.Namespace) -> int:
     elif not confirm_plan(p):
         print("opb benchmark: nothing run", file=sys.stderr)
         return 1
-    say = _say(a)
-    summaries = benchmark.execute(p, say)
+    try:
+        summaries = benchmark.execute(p, _say)
+    except Stop:
+        # Note: `execute` grades what was predicted before it raises, so every run has its summary.
+        print(json.dumps(_written(p), indent=2, ensure_ascii=False))
+        raise
     print(json.dumps(summaries, indent=2, ensure_ascii=False))   # each run's summary.json, by run name
-    if failed := sum(s["failed"] for s in summaries.values()):
-        say(f"{failed} pages failed: --retry-failed predicts again those whose failure may not recur, and "
-            "opb reparse re-reads answers that arrived")
-    return _bugs(a, summaries)
+    if n := _retryable(p):
+        _say(f"{counted(n, 'page')} failed in a way that may not recur: --retry-failed predicts "
+             f"{'it' if n == 1 else 'them'} again")
+    return 0
 
 
 def cmd_grade(a: argparse.Namespace) -> int:
@@ -180,20 +189,26 @@ def cmd_grade(a: argparse.Namespace) -> int:
     benchmark.gradable(out)   # Note: first, so a mistyped folder is named before a dataset is read.
     said = benchmark.settled(out, a.dataset, a.manifest)
     if a.unsupported is not None:
-        if (out / "records").is_dir():
+        if benchmark.is_run(said):
             raise UsageError(f"{out} is a run, whose adapter says what it can't produce; --unsupported is "
                              "for a folder of your own predictions")
-        said = said | {"unsupported": sorted(set(a.unsupported))}
+        now = sorted(set(a.unsupported))
+        if (was := said.get("unsupported")) is not None and was != now:
+            raise UsageError(f"{out} holds a folder graded with --unsupported {' '.join(was) or '(none)'}, "
+                             f"not {' '.join(now) or '(none)'}: a folder says once what its system can't "
+                             f"produce; pass --unsupported {' '.join(was)}, or delete "
+                             f"{out / 'settings.json'} to start over")
+        said = said | {"unsupported": now}
     dataset = a.dataset or said.get("dataset") or data.DEFAULT_DATASET
     manifest = a.manifest or said.get("manifest") or data.MANIFEST
     _, pages = data.read_manifest(dataset, manifest)
     run = benchmark.Run(said.get("provider", out.name), {}, out)
-    s = benchmark.grade(run, pages, _say(a), settings=said)
-    if not run.records.is_dir():
+    s = benchmark.grade(run, pages, _say, settings=said)
+    if not benchmark.is_run(said):
         # Note: only once grading succeeded, so a failed one leaves the folder as it was.
         benchmark.declare(out, dataset, manifest, said)
     print(json.dumps(s, indent=2, ensure_ascii=False))   # the folder's summary.json
-    return _bugs(a, {out.name: s})
+    return 0
 
 
 def cmd_check(a: argparse.Namespace) -> int:
@@ -203,7 +218,7 @@ def cmd_check(a: argparse.Namespace) -> int:
     _, pages = data.read_manifest(a.dataset, a.manifest)
     if missing := [f"{p.page_id} {c} {f}" for p in pages for c, f in (("doc_path", p.doc_path),
                    ("gt_path", p.gt_path)) if not f.is_file()]:
-        raise UsageError(f"{len(missing)} files the manifest names don't exist, e.g. "
+        raise UsageError(f"files the manifest names that don't exist: {counted(len(missing), 'file')}, e.g. "
                          + "; ".join(missing[:3]))
     scorer.check(pages)
     print(json.dumps({"ok": True, "manifest": a.manifest, "pages": len(pages),
@@ -276,8 +291,9 @@ def cmd_reparse(a: argparse.Namespace) -> int:
     """Read each record's outputs again from its saved answers, with the current adapter code.
 
     Nothing is paid: a parsing fix reaches a finished run this way. With `--add`, outputs the run
-    never asked for are read from its answers too, where they hold them (`harness.reparse`). The run's
-    scores are then out of date until its next grading.
+    never asked for are read from its answers too, where they hold them (`harness.reparse`). A prediction
+    missing or unreadable beside its record is rebuilt from it (`benchmark.restore`). The run's scores are
+    then out of date until its next grading.
     """
     from omni_parse_bench import harness
 
@@ -300,30 +316,27 @@ def cmd_reparse(a: argparse.Namespace) -> int:
         for path, new in done:
             benchmark.write_json(path, new)
             benchmark.write_json(run / "predictions" / path.name, new["outputs"])
-        print(f"{run}: {len(done)} of {len(paths)} records changed"
+        rebuilt = sum(benchmark.restore(benchmark.Run("", {}, run), path.stem) for path in paths)
+        print(f"{run}: {len(done)} of {counted(len(paths), 'record')} changed, "
+              f"{counted(rebuilt, 'prediction')} rebuilt from its record"
               + ("; regrade it to see them: opb benchmark ... --score-only, or opb grade " + str(run)
-                 if done else ""), file=sys.stderr)
+                 if done or rebuilt else ""), file=sys.stderr)
     return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="opb", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("-q", "--quiet", action="store_true", help="progress and messages off; results only")
-    # Note: also after the command (`opb grade x -q`); SUPPRESS so a command's default can't undo it.
-    quiet = argparse.ArgumentParser(add_help=False)
-    quiet.add_argument("-q", "--quiet", action="store_true", default=argparse.SUPPRESS,
-                       help="progress and messages off; results only")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    s = sub.add_parser("score", parents=[quiet],
+    s = sub.add_parser("score",
                        help="grade one page's outputs against its tests: one verdict per test")
     s.add_argument("--pred", required=True, help="the outputs, JSON: {output type: value}")
     s.add_argument("--gold", required=True, help="the page's gold file, gold/<page_id>.json")
     s.add_argument("--unsupported", nargs="*", metavar="OUTPUT", choices=vocab.OUTPUT_TYPES,
                    help="output types the provider can't produce")
 
-    d = sub.add_parser("predict", parents=[quiet],
+    d = sub.add_parser("predict",
                        help="run one page through one provider")
     d.add_argument("--provider", required=True, help="a vendor (opb providers), or an OpenRouter model id")
     d.add_argument("--page", required=True, help="the page, .pdf or .png")
@@ -333,7 +346,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     d.add_argument("--options", metavar="JSON", help="the provider's options, inline JSON or a file")
     d.add_argument("--raw", action="store_true", help="also print the vendor's raw responses")
 
-    b = sub.add_parser("benchmark", parents=[quiet],
+    b = sub.add_parser("benchmark",
                        help="predict and score every page, resumably")
     b.add_argument("--providers", nargs="+", required=True, metavar="NAME")
     b.add_argument("--dataset", default=data.DEFAULT_DATASET,
@@ -359,7 +372,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         "never a 400 or a vendor's answer")
     b.add_argument("-y", "--yes", action="store_true", help="don't ask before calling vendors")
 
-    g = sub.add_parser("grade", parents=[quiet],
+    g = sub.add_parser("grade",
                        help="grade a folder of predictions/<page_id>.json: yours, or a run's")
     g.add_argument("run", help="the folder holding predictions/ (and settings.json)")
     g.add_argument("--dataset", default=None,
@@ -372,27 +385,27 @@ def main(argv: Sequence[str] | None = None) -> int:
                    help="output types your system can't produce, once for the folder (kept in its "
                         "settings.json); their tests are unsupported, not failed")
 
-    ck = sub.add_parser("check", parents=[quiet],
+    ck = sub.add_parser("check",
                         help="whether a dataset is one opb can run: its manifest, files and gold")
     ck.add_argument("--dataset", default=data.DEFAULT_DATASET,
                     help="a dataset folder, or hf://datasets/<repo>[@revision]")
     ck.add_argument("--manifest", default=data.MANIFEST,
                     help="which of the dataset's manifests: its pages, and where their gold is")
 
-    tt = sub.add_parser("tests", parents=[quiet],
+    tt = sub.add_parser("tests",
                         help="every test as a JSON line, with its page's suite and document")
     tt.add_argument("--dataset", default=data.DEFAULT_DATASET,
                     help="a dataset folder, or hf://datasets/<repo>[@revision]")
     tt.add_argument("--manifest", default=data.MANIFEST,
                      help="which of the dataset's manifests: its pages, and where their gold is")
 
-    rp = sub.add_parser("reparse", parents=[quiet],
+    rp = sub.add_parser("reparse",
                         help="read outputs again from saved answers, after a parsing fix")
     rp.add_argument("runs", nargs="+", type=Path, metavar="RUN_DIR")
     rp.add_argument("--add", nargs="+", metavar="OUTPUT",
                     help="also read these outputs from the saved answers")
 
-    pl = sub.add_parser("providers", parents=[quiet],
+    pl = sub.add_parser("providers",
                         help="list the providers and their options")
     pl.add_argument("provider", nargs="?")
 
@@ -401,8 +414,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     handler.setFormatter(logging.Formatter("%(message)s"))
     logging.getLogger().handlers[:] = [handler]
     logging.getLogger().setLevel(logging.WARNING)
-    # Note: with no terminal, progress comes out as the package's log lines, which -q turns off.
-    logging.getLogger(__package__).setLevel(logging.WARNING if a.quiet else logging.INFO)
+    # Note: with no terminal, progress comes out as the package's log lines.
+    logging.getLogger(__package__).setLevel(logging.INFO)
     cmd = {"score": cmd_score, "predict": cmd_predict, "benchmark": cmd_benchmark, "grade": cmd_grade,
            "check": cmd_check, "tests": cmd_tests, "providers": cmd_providers, "reparse": cmd_reparse}[a.cmd]
     resume = a.cmd == "benchmark"

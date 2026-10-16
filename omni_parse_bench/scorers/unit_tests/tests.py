@@ -87,7 +87,9 @@ def read(path: str | Path) -> tuple[Test, ...]:
         doc = json.loads(path.read_text())
     except FileNotFoundError:
         raise GoldError(f"{path.stem}: no gold file at {path}") from None
-    except json.JSONDecodeError as exc:
+    except IsADirectoryError:
+        raise GoldError(f"{path.stem}: {path} is a folder, not a gold file") from None
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise GoldError(f"{path.stem}: its gold file {path} isn't JSON: {exc}") from None
     return parse(path.stem, doc)
 
@@ -189,7 +191,10 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
             case "repeat":
                 if diffs(["content"]) != 0:
                     raise GoldError(f"{where}: repeat counts exact text: max_diffs must be 0")
-                return runners.Repeat(text("content"), **settings)
+                if set(settings) != {"expected_count"}:
+                    raise GoldError(f"{where}: repeat's settings are exactly {{expected_count}}, how many "
+                                    f"times its content appears, not {sorted(settings)}")
+                return runners.Repeat(text("content"), settings["expected_count"])
             case "layout_kind":
                 if set(settings) != {"kind"}:
                     raise GoldError(f"{where}: layout_kind's settings are exactly {{kind}}")

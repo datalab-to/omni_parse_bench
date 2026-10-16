@@ -91,7 +91,7 @@ def test_benchmark_predicts_grades_and_resumes(tmp_path, monkeypatch):
     p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=str(data))
     summaries = benchmark.execute(p, say=lambda s: None)
     (s,) = summaries.values()
-    assert s["html"]["score"] == 1.0 and "blocks" not in s and s["pages"] == 1
+    assert s["html"]["score"] == 1.0 and s.get("blocks", {}).get("score") is None and s["pages"] == 1
     (run,) = p.runs
     assert json.loads((run.predictions / "a-p1.json").read_text()) == {"html": "<p>alpha beta</p>"}
     calls = []

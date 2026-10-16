@@ -12,6 +12,7 @@ environment variable, so every setting that steered a run appears in it.
 from __future__ import annotations
 
 import dataclasses
+import difflib
 import hashlib
 import json
 import re
@@ -170,6 +171,12 @@ def config_for(provider: str, options: dict | None = None) -> Any:
         hints = typing.get_type_hints(config_type)
     except (NameError, TypeError):   # Note: an annotation that doesn't resolve leaves its value unchecked.
         hints = {}
+    fields = [f.name for f in dataclasses.fields(config_type)]
+    if unknown := sorted(set(options) - set(fields)):
+        near = difflib.get_close_matches(unknown[0], fields, n=1)
+        raise UsageError(f"{provider} has no option {unknown[0]!r}"
+                         + (f" (did you mean {near[0]!r}?)" if near else "")
+                         + f"; its options are: {', '.join(fields) or '(none)'}")
     for name, value in options.items():
         if (want := hints.get(name)) in (str, int, float, bool) and not _of(value, want):
             raise UsageError(f"{provider}: option {name} is a {want.__name__}, not {value!r}")
@@ -178,11 +185,9 @@ def config_for(provider: str, options: dict | None = None) -> Any:
     options = {k: float(v) if hints.get(k) is float else v for k, v in options.items()}
     try:
         return config_type(**options)
-    except TypeError as exc:
-        known = ", ".join(f.name for f in dataclasses.fields(config_type)) or "(none)"
-        said = str(exc).rstrip(".")
-        raise UsageError(f"{provider}: {said}{'' if said.endswith('?') else '.'} Its options are: {known}"
-                         ) from None
+    except ValueError as exc:   # Note: an adapter's own check of a value (`__post_init__`).
+        if isinstance(exc, UsageError): raise
+        raise UsageError(f"{provider}: {exc}") from None
 
 
 def _of(value: Any, want: type) -> bool:

@@ -99,29 +99,27 @@ def test_a_malformed_blocks_output_fails(blocks):
     assert v.result == "fail" and v.why.startswith("malformed blocks output")
 
 
-def test_a_runner_raising_on_a_well_formed_output_is_an_error_and_unscored(monkeypatch):
+def test_a_runner_raising_on_a_well_formed_output_is_raised_naming_its_test(monkeypatch):
+    """A bug of ours, never the provider's fault: raised, since a score with the test left out is wrong."""
     def broken(t, v):
         raise KeyError("oops")
     monkeypatch.setitem(runners.TYPES, "present", (runners.Present, broken))
-    vs = score({"html": "<p>alpha</p>"}, TESTS)
-    assert {v.result for v in vs} == {"error"} and vs[0].why == "KeyError: 'oops'"
-    monkeypatch.undo()
-    vs = [v if v.id != "b" else v._replace(result="error", why="KeyError")
-          for v in score({"html": "alpha"}, TESTS)]
-    s = summarize(lines(vs, TESTS))["html"]
-    assert (s["score"], s["tests"], s["errors"], s["unsupported"]) == (1 / 4, 4, 1, 0)
-    assert summarize(lines(score({"html": "alpha"}, TESTS), TESTS))["html"]["errors"] == 0
+    with pytest.raises(KeyError) as e:
+        score({"html": "<p>alpha</p>"}, TESTS)
+    assert TESTS[0].id in " ".join(e.value.__notes__)
 
 
-def test_a_view_raising_on_a_well_formed_output_is_an_error(monkeypatch):
+def test_a_view_raising_on_a_well_formed_output_is_raised(monkeypatch):
     def broken(s):
         raise RecursionError("deep")
     monkeypatch.setitem(scorer.VIEWS, "html", broken)
-    assert {v.result for v in score({"html": "<p>alpha</p>"}, TESTS)} == {"error"}
+    with pytest.raises(RecursionError):
+        score({"html": "<p>alpha</p>"}, TESTS)
 
 
-def test_an_output_type_with_nothing_scored_is_left_out():
-    assert "html" not in summarize(lines(score({}, TESTS, unsupported={"html"}), TESTS))
+def test_an_output_type_with_nothing_scored_says_how_many_were_unsupported():
+    s = summarize(lines(score({}, TESTS, unsupported={"html"}), TESTS))["html"]
+    assert s["score"] is None and s["tests"] == 0 and s["unsupported"] == len(TESTS)
 
 
 def pages_and_tests(documents: int, per: int = 4, test_type: str = "present") -> tuple[list, list]:

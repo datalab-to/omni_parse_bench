@@ -12,22 +12,25 @@ its gold are without the dataset beside it. The functions over a dataset:
     select(pages, ...)           the pages to run: by suite or id, sampled, limited
     dataset_id(dataset)          what a run's dataset is, whatever its revision
     commit(dataset, root)        the commit a Hugging Face dataset was read at; None for a folder
+    normal(manifest)             a manifest's path in its dataset, spelled one way
 
 `dataset` is a folder's path or `hf://datasets/<repo>[@<revision>]`. `read_manifest` reads once per
 process. Checking every test of a dataset is the scorer's, `scorers.unit_tests.check(pages)`.
 """
 from __future__ import annotations
 
-import collections
 import dataclasses
 import functools
+import logging
 import time
 from collections.abc import Iterable, Mapping, Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from omni_parse_bench import vocab
-from omni_parse_bench.errors import UsageError
+from omni_parse_bench.errors import UsageError, counted
+
+log = logging.getLogger(__name__)
 
 HF_PREFIX = "hf://datasets/"
 DEFAULT_DATASET = "hf://datasets/datalab-to/omni_parse_bench"
@@ -115,7 +118,7 @@ def download_dataset(dataset: str | Path) -> Path:
     repo, revision = at
     # Note: thousands of small files; the Hub drops some requests under that load, and a download
     # picks up where the last left off, so it is simply tried again. A missing repo, revision or
-    # access is the same on every attempt, so it fails at once.
+    # access, or no network with nothing cached, is the same on every attempt, so it fails at once.
     for attempt in range(DOWNLOAD_ATTEMPTS):
         try:
             return Path(snapshot_download(repo, repo_type="dataset", revision=revision,
@@ -125,14 +128,22 @@ def download_dataset(dataset: str | Path) -> Path:
             raise UsageError(f"can't read dataset {dataset}: {type(exc).__name__}. Check the repo and "
                              "revision, and that you're logged in with access (huggingface-cli login)"
                              ) from None
+        except (hf_errors.LocalEntryNotFoundError, hf_errors.OfflineModeIsEnabled) as exc:
+            raise UsageError(f"can't read dataset {dataset}: it isn't in the Hugging Face cache, and the Hub "
+                             f"can't be reached ({type(exc).__name__}); connect, or pass --dataset a "
+                             "folder") from None
         except hf_errors.HfHubHTTPError as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
             if status in (401, 403):
                 raise UsageError(f"can't read dataset {dataset}: HTTP {status}. Log in with access to it "
                                  "(huggingface-cli login)") from None
             if attempt == DOWNLOAD_ATTEMPTS - 1: raise
-        except Exception:
+            log.warning("downloading %s failed (HTTP %s); trying again in %ds", dataset, status,
+                        30 * (attempt + 1))
+        except Exception as exc:
             if attempt == DOWNLOAD_ATTEMPTS - 1: raise
+            log.warning("downloading %s failed (%s: %s); trying again in %ds", dataset, type(exc).__name__,
+                        str(exc)[:200], 30 * (attempt + 1))
         time.sleep(30 * (attempt + 1))
     raise AssertionError("unreachable")
 
@@ -141,6 +152,11 @@ def dataset_id(dataset: str | Path) -> str:
     """What a run's dataset is, whatever revision: the repo of an `hf://` dataset, or a folder's path."""
     if (at := _hf_dataset(dataset)) is not None: return f"{HF_PREFIX}{at[0]}"
     return str(Path(dataset).expanduser().resolve())
+
+
+def normal(manifest: str) -> str:
+    """A manifest's path in its dataset, spelled one way: `./manifest.parquet` is `manifest.parquet`."""
+    return PurePosixPath(manifest).as_posix()
 
 
 def commit(dataset: str | Path, root: Path) -> str | None:
@@ -158,6 +174,7 @@ def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, 
     except ImportError:
         raise ImportError("omni-parse-bench reads the manifest with pyarrow: "
                           "pip install 'omni-parse-bench[benchmark]'") from None
+    manifest = normal(manifest)
     if Path(manifest).is_absolute() or ".." in Path(manifest).parts:
         raise ManifestError(f"--manifest {manifest} must be a path inside the dataset, relative to it, e.g. "
                             "manifests/sample.parquet: pass --dataset the dataset's folder, and --manifest "
@@ -180,9 +197,11 @@ def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, 
         raise ManifestError(f"the manifest {manifest} in {root} names no pages")
     # Note: ignoring case, because an id names files, and two ids that differ only in case name one file
     # on a case-insensitive disk (macOS, Windows).
-    if twice := [i for i, n in collections.Counter(p.page_id.casefold() for p in rows).items() if n > 1]:
-        raise ManifestError(f"{len(twice)} page ids are in the manifest more than once (ignoring case), "
-                            f"e.g. {twice[:3]}")
+    by: dict[str, list[str]] = {}
+    for p in rows: by.setdefault(p.page_id.casefold(), []).append(p.page_id)
+    if twice := [ids for ids in by.values() if len(ids) > 1]:
+        raise ManifestError(f"page ids in the manifest more than once (ignoring case, since each names "
+                            f"files): {counted(len(twice), 'id')}, e.g. {twice[:3]}")
     return root, rows
 
 
@@ -206,8 +225,9 @@ def select(pages: Sequence[Page], suites: Iterable[str] | None = None, limit: in
     rows = tuple(r for r in rows if suites is None or r.suite in suites)
     if only is not None:
         if bad := sorted(only - {r.page_id for r in rows}):
-            raise UsageError(f"{len(bad)} of the pages asked for aren't in the dataset"
-                             f"{' (or its suites)' if suites else ''}, e.g. {bad[:3]}; nothing has been run")
+            where = " (or its suites)" if suites else ""
+            raise UsageError(f"pages asked for that aren't in the dataset{where}: "
+                             f"{counted(len(bad), 'page')}, e.g. {bad[:3]}; nothing has been run")
         rows = tuple(r for r in rows if r.page_id in only)
     if sample and rows:
         by: dict[str, list] = {}

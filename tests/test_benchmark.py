@@ -386,16 +386,30 @@ def test_a_renamed_test_is_a_gold_change(tmp_path, monkeypatch):
 
 # 7, 8. The CLI: errors in our code exit 2; scores come with their coverage.
 
-def test_opb_benchmark_exits_2_when_our_code_errored(monkeypatch, capsys):
-    clean = {"html": {"score": 0.9}, "pages": 3, "failed": 0, "pending": 1}
-    for summaries, code in (({"r": clean}, 0), ({"r": clean | {"html": {"score": 0.9, "errors": 2}}}, 2)):
-        monkeypatch.setattr(benchmark, "plan", lambda *a, **k: None)
-        monkeypatch.setattr(benchmark, "describe", lambda p: "")
-        monkeypatch.setattr(benchmark, "execute", lambda p, say, s=summaries: s)
-        assert cli.main(["benchmark", "--providers", "x", "-y"]) == code
-        out, err = capsys.readouterr()
-        assert json.loads(out) == summaries, "each run's summary, as summary.json holds it"
-        assert ("raised in our code" in err) == bool(code)
+def test_opb_benchmark_prints_each_runs_summary(monkeypatch, capsys):
+    summaries = {"r": {"html": {"score": 0.9}, "pages": 3, "failed": 0, "pending": 1}}
+    monkeypatch.setattr(benchmark, "plan", lambda *a, **k: benchmark.Plan((), (), "", "", 1, 0, False))
+    monkeypatch.setattr(benchmark, "describe", lambda p: "")
+    monkeypatch.setattr(benchmark, "execute", lambda p, say: summaries)
+    assert cli.main(["benchmark", "--providers", "x", "-y"]) == 0
+    assert json.loads(capsys.readouterr().out) == summaries, "each run's summary, as summary.json holds it"
+
+
+def test_a_scorer_that_raises_stops_grading_and_writes_nothing(tmp_path, monkeypatch):
+    """A crash in our scorer is a bug of ours: raised, naming the run, the page and the test, never a score
+    with that test left out."""
+    from omni_parse_bench.scorers.unit_tests import runners
+
+    use(monkeypatch, {"stub": stub()})
+    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data"))
+    benchmark.predict_all(p)
+    (run,) = p.runs
+    monkeypatch.setitem(runners.TYPES, "present", (runners.TYPES["present"][0], lambda t, v: 1 / 0))
+    with pytest.raises(ZeroDivisionError) as e:
+        benchmark.grade_all(p, say=QUIET)
+    notes = " ".join(e.value.__notes__)
+    assert "t0" in notes and "a-p0" in notes and run.out.name in notes
+    assert not (run.out / "summary.json").exists() and not (run.out / "scores.jsonl").exists()
 
 
 def test_a_score_is_said_with_its_coverage(tmp_path, monkeypatch):
@@ -773,6 +787,7 @@ def test_a_folder_that_doesnt_say_what_it_cannot_produce_is_refused(tmp_path):
     ds = dataset(tmp_path / "data")
     mine = tmp_path / "mine"
     (mine / "predictions").mkdir(parents=True)
+    (mine / "predictions" / "a-p0.json").write_text(json.dumps({"html": "alpha"}))
     with pytest.raises(ValueError, match="--unsupported"):
         benchmark.grade(benchmark.Run("mine", {}, mine), data.read_manifest(ds)[1], say=QUIET)
 
@@ -799,17 +814,22 @@ def test_an_empty_selection_is_refused(tmp_path, monkeypatch):
         benchmark.plan(["stub"], out=tmp_path / "runs", dataset=ds, only=frozenset())
 
 
-def test_a_page_whose_prediction_is_lost_is_predicted_again_not_left_pending(tmp_path, monkeypatch):
-    """Grading reads predictions alone, so a record without one would never be graded."""
+def test_a_prediction_lost_beside_its_record_is_rebuilt_not_paid_for_again(tmp_path, monkeypatch, capsys):
+    """The record is the source of truth for an answer: a lost or corrupt prediction is written from it."""
     calls = []
     use(monkeypatch, {"stub": stub(call=lambda config: calls.append(1) or contract.Call({"html": "alpha"}))})
-    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data"))
+    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data", n=2))
     benchmark.execute(p, say=QUIET)
     (run,) = p.runs
     (run.predictions / "a-p0.json").unlink()
-    assert benchmark.owed(p, run) == (1, 1)
+    (run.predictions / "a-p1.json").write_text("{not json")
+    assert benchmark.owed(p, run) == (0, 2), "nothing to pay for"
     (s,) = benchmark.execute(p, say=QUIET).values()
-    assert len(calls) == 2 and s["pages"] == 1 and s["pending"] == 0
+    assert len(calls) == 2 and s["pages"] == 2 and s["failed"] == 0
+    assert json.loads((run.predictions / "a-p0.json").read_text()) == {"html": "alpha"}
+    (run.predictions / "a-p0.json").unlink()
+    assert cli.main(["reparse", str(run.out)]) == 0 and "1 prediction rebuilt" in capsys.readouterr().err
+    assert (run.predictions / "a-p0.json").exists()
 
 
 def test_an_adapter_of_your_own_is_filed_and_checked(monkeypatch):
@@ -966,7 +986,7 @@ def test_check_says_whether_a_dataset_can_run(tmp_path, capsys):
                                                    "suites": 1, "inputs": 2}
     (ds / "pages" / "a-p1.pdf").unlink()
     assert cli.main(["check", "--dataset", str(ds)]) == 1
-    assert "1 files the manifest names don't exist" in capsys.readouterr().err
+    assert "don't exist: 1 file" in capsys.readouterr().err
     data.read_manifest.cache_clear()
     (ds / "pages" / "a-p1.pdf").write_bytes(b"%PDF")
     (ds / "gold" / "a-p1.json").write_text("{}")
@@ -1013,8 +1033,8 @@ def test_grade_says_which_predictions_it_could_not_use(tmp_path, caplog):
     with caplog.at_level(logging.WARNING):
         s = benchmark.grade(benchmark.Run("mine", {}, mine), data.read_manifest(ds)[1], say=QUIET)
     assert s["html"]["score"] == pytest.approx(1 / 3), "an extra key is ignored; the page still passes"
-    assert "2 files in predictions/ are named for no page" in caplog.text
-    assert "1 predictions couldn't be read" in caplog.text and "a-p1" in caplog.text
+    assert "2 files in predictions/ named for no page" in caplog.text
+    assert "1 prediction couldn't be read" in caplog.text and "a-p1" in caplog.text
     assert not list(mine.glob("*.tmp")), "both files moved into place"
 
 
@@ -1214,7 +1234,7 @@ def test_an_option_written_two_ways_is_one_run(tmp_path, monkeypatch):
         registry.config_for("stub", {"delay": "0"})
     with pytest.raises(ValueError) as e:
         registry.config_for("stub", {"dely": 1})
-    assert "?." not in str(e.value) and "Its options are: delay" in str(e.value)
+    assert "'dely'" in str(e.value) and "'delay'" in str(e.value) and "__init__" not in str(e.value)
 
 
 def test_failures_are_counted_and_said(tmp_path, monkeypatch):
@@ -1288,7 +1308,7 @@ def test_an_unreadable_settings_json_is_named(tmp_path):
     assert benchmark.settled(tmp_path / "nothing") == {}
 
 
-def test_quiet_keeps_stdout_and_drops_the_closing_line(tmp_path, capsys):
+def test_grade_prints_the_summary_and_a_closing_line(tmp_path, capsys):
     ds = dataset(tmp_path / "data")
     mine = tmp_path / "mine"
     (mine / "predictions").mkdir(parents=True)
@@ -1296,9 +1316,8 @@ def test_quiet_keeps_stdout_and_drops_the_closing_line(tmp_path, capsys):
     assert cli.main(["grade", str(mine), "--dataset", ds, "--unsupported"]) == 0
     loud = capsys.readouterr()
     assert "headline 1.000" in loud.err and json.loads(loud.out)["headline"] == 1.0
-    assert cli.main(["grade", str(mine), "-q"]) == 0
-    quiet = capsys.readouterr()
-    assert quiet.err == "" and json.loads(quiet.out)["headline"] == 1.0
+    with pytest.raises(SystemExit):
+        cli.main(["grade", str(mine), "-q"])
 
 
 def test_an_interrupt_says_resume_only_for_benchmark(monkeypatch, capsys):
@@ -1313,3 +1332,133 @@ def test_the_package_exports_the_scorer_and_the_dataset():
 
     assert {"data", "scorers", "gold", "score", "lines", "summarize", "check", "Verdict"} <= set(opb.__all__)
     assert not hasattr(opb, "__version__"), "the version is the distribution's: importlib.metadata"
+
+
+# 15. Round two: what a user's slip costs is refused, said or rebuilt; never paid for twice.
+
+def own(tmp_path, ds, answers: dict[str, object], name: str = "mine") -> pathlib.Path:
+    """A folder of your own predictions, `answers` by file name."""
+    out = tmp_path / name
+    (out / "predictions").mkdir(parents=True)
+    for f, x in answers.items():
+        (out / "predictions" / f).write_text(x if isinstance(x, str) else json.dumps(x))
+    return out
+
+
+def test_a_grading_that_matches_no_page_is_refused_and_writes_nothing(tmp_path, capsys):
+    ds = dataset(tmp_path / "data")
+    for answers in ({"invoice-p1.json": {"html": "x"}}, {}):
+        mine = own(tmp_path, ds, answers, name=f"mine{len(answers)}")
+        assert cli.main(["grade", str(mine), "--dataset", ds, "--unsupported"]) == 1
+        assert "--dataset" in capsys.readouterr().err
+        assert sorted(f.name for f in mine.iterdir()) == ["predictions"], "nothing written, nothing locked"
+
+
+def test_a_folder_holds_one_unsupported(tmp_path, capsys):
+    ds = dataset(tmp_path / "data", blocks=True)
+    mine = own(tmp_path, ds, {"a-p0.json": {"html": "<p>alpha</p>"}})
+    assert cli.main(["grade", str(mine), "--dataset", ds, "--unsupported", "blocks"]) == 0
+    assert cli.main(["grade", str(mine), "--unsupported", "blocks"]) == 0, "the same, again, is fine"
+    capsys.readouterr()
+    assert cli.main(["grade", str(mine), "--unsupported"]) == 1
+    assert "--unsupported blocks" in capsys.readouterr().err
+    assert json.loads((mine / "settings.json").read_text())["unsupported"] == ["blocks"]
+
+
+def test_a_folder_of_your_own_with_records_is_yours(tmp_path, capsys):
+    """A run is a folder whose settings.json names a provider; records/ alone doesn't make one."""
+    ds = dataset(tmp_path / "data", n=2)
+    mine = own(tmp_path, ds, {"a-p0.json": {"html": "<p>alpha</p>"}})
+    (mine / "records").mkdir()
+    assert cli.main(["grade", str(mine), "--dataset", ds, "--unsupported"]) == 0
+    s = json.loads(capsys.readouterr().out)
+    assert (s["pages"], s["failed"], s["pending"]) == (2, 1, 0), "a page left out of your folder fails"
+
+
+def test_predictions_under_no_output_type_are_said(tmp_path, caplog):
+    ds = dataset(tmp_path / "data")
+    mine = own(tmp_path, ds, {"a-p0.json": {"markdown": "alpha"}})
+    (mine / "settings.json").write_text(json.dumps({"unsupported": []}))
+    with caplog.at_level(logging.WARNING):
+        s = benchmark.grade(benchmark.Run("mine", {}, mine), data.read_manifest(ds)[1], say=QUIET)
+    assert s["failed"] == 1 and "markdown" in caplog.text and "a-p0" in caplog.text
+
+
+def test_grading_part_of_a_folders_manifest_says_so(tmp_path, caplog, monkeypatch):
+    use(monkeypatch, {"stub": stub()})
+    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data", n=3))
+    benchmark.predict_all(p)
+    with caplog.at_level(logging.WARNING):
+        benchmark.grade(p.runs[0], p.pages[:1], say=QUIET)
+    assert "1 page of its manifest's 3" in caplog.text
+
+
+def test_a_stop_stops_the_workers_at_once_and_its_summaries_are_printed(tmp_path, monkeypatch, capsys):
+    calls = []
+
+    def call(config):
+        calls.append(1)
+        return errors.AccountFailure("out of credits") if len(calls) == 2 else contract.Call({"html": "a"})
+    use(monkeypatch, {"stub": stub(call=call)})
+    code = cli.main(["benchmark", "--providers", "stub", "--dataset", dataset(tmp_path / "data", n=4),
+                     "--out", str(tmp_path / "runs"), "--workers", "1", "-y"])
+    out, err = capsys.readouterr()
+    assert code == 1 and len(calls) == 2, "nothing queued is sent after the stop"
+    (s,) = json.loads(out).values()
+    assert (s["pages"], s["pending"], s["headline"]) == (1, 3, None) and "AccountFailure" in err
+
+
+def test_a_dataset_offline_and_uncached_is_refused_at_once(monkeypatch):
+    from huggingface_hub import errors as hf_errors
+    import huggingface_hub
+
+    tries = []
+    def offline(*a, **k):
+        tries.append(1)
+        raise hf_errors.LocalEntryNotFoundError("x")
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", offline)
+    with pytest.raises(ValueError, match="cache"):
+        data.download_dataset("hf://datasets/someone/nowhere@nope")
+    assert len(tries) == 1
+
+
+def test_a_manifest_spelled_another_way_is_the_same_manifest(tmp_path):
+    ds = dataset(tmp_path / "data")
+    mine = own(tmp_path, ds, {"a-p0.json": {"html": "<p>alpha</p>"}})
+    assert cli.main(["grade", str(mine), "--dataset", ds, "--manifest", "./manifest.parquet",
+                     "--unsupported"]) == 0
+    assert json.loads((mine / "settings.json").read_text())["manifest"] == "manifest.parquet"
+    assert cli.main(["grade", str(mine), "--manifest", "manifest.parquet"]) == 0
+
+
+def test_messages_for_files_that_are_folders_and_loose_predictions(tmp_path, capsys):
+    gold_file = tmp_path / "g.json"
+    gold_file.write_text(json.dumps({"tests": []}))
+    assert cli.main(["score", "--pred", str(tmp_path), "--gold", str(gold_file)]) == 1
+    assert "is a folder" in capsys.readouterr().err
+    flat = tmp_path / "flat"
+    flat.mkdir()
+    (flat / "a-p0.json").write_text("{}")
+    assert cli.main(["grade", str(flat)]) == 1
+    assert "flat/predictions" in capsys.readouterr().err
+
+
+def test_ids_differing_only_in_case_show_both_spellings(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    ds = pathlib.Path(dataset(tmp_path / "data"))
+    (row,) = pq.read_table(ds / "manifest.parquet").to_pylist()
+    (ds / "gold" / "A-P0.json").write_text((ds / "gold" / "a-p0.json").read_text())
+    pq.write_table(pa.Table.from_pylist([row, row | {"page_id": "A-P0", "gt_path": "gold/A-P0.json"}]),
+                   ds / "manifest.parquet")
+    with pytest.raises(data.ManifestError) as e:
+        data.read_manifest(ds)
+    assert "a-p0" in str(e.value) and "A-P0" in str(e.value)
+
+
+def test_a_wholly_unsupported_output_keeps_its_count(tmp_path, monkeypatch):
+    use(monkeypatch, {"stub": stub()})
+    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data", blocks=True))
+    (s,) = benchmark.execute(p, say=QUIET).values()
+    assert s["blocks"]["score"] is None and s["blocks"]["unsupported"] == 1

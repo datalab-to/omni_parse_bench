@@ -20,9 +20,9 @@ Modules:
   is wrong) and `Stop` (a run can't go on). `ManifestError` and `GoldError` are `UsageError`s;
   `AccountFailure`, `MissingCredential` and `MissingDependency` are `Stop`s;
 - `benchmark` is the loop. New public functions: `settled` and `declare` (a folder's settings.json,
-  read and checked, and written), `gradable` (refuses a folder grading can't read), `pools` (each
-  adapter's calls at once), `scorer_errors` (tests whose grading raised in our code), `write_json` and
-  `read_scores`;
+  read and checked, and written), `gradable` (refuses a folder grading can't read), `is_run` (whether a
+  folder's settings are a run's), `restore` (a lost prediction rebuilt from its record), `pools` (each
+  adapter's calls at once), `write_json` and `read_scores`;
 - `harness` gains `add_adapter`, loads adapters declared under the entry-point group
   `omni_parse_bench.adapters`, and exports `VendorUnreachable`; `registry.adapter_names()` lists the
   names `--workers` takes; and
@@ -40,8 +40,13 @@ The scorer:
 - `summarize(lines)` needs nothing but the lines, so a `scores.jsonl`, or any part of one, is summarized
   as it is. `headline` is the number (it was a dict), beside `families` and `documents`; `per_suite` is
   one block per suite, its `headline` and `score` (it was the pass rate alone);
-- a gold file that is missing, isn't JSON, isn't an object, has no `tests` list, or holds a test that
-  isn't an object is a `GoldError` naming its page; and
+- a gold file that is missing, a folder, isn't JSON, isn't an object, has no `tests` list or no tests,
+  or holds a test that isn't an object is a `GoldError` naming its page; repeat's settings are exactly
+  `{expected_count}`;
+- a verdict is `pass`, `fail` or `unsupported`: a test whose run raises on a well-formed output is a bug
+  of ours, so `score` raises it, naming the test, and grading stops with nothing written (the `error`
+  verdict, the `errors` count and exit 2 are gone);
+- an output type every test of which is unsupported keeps its block, with `score` null; and
 - the scoring-code digest changes, so every run is graded again once; no provider is called.
 
 Grading:
@@ -52,8 +57,12 @@ Grading:
 - grading is fresh every time: every page is graded again, and `scores.jsonl`, then `summary.json`, are
   written when it finishes; an interrupted grading writes nothing. `--rescore` is gone, and so is the
   refusal of a run graded with another scorer or gold;
-- a page with no prediction is pending only when the run never attempted it (no record, in a folder that
-  keeps `records/`); otherwise every test of it fails, so a page left out of a folder of your own fails;
+- a page with no prediction is pending only when a run never attempted it (no record, in a folder whose
+  settings.json names a provider); otherwise every test of it fails, so a page left out of a folder of
+  your own fails, records/ or not;
+- a folder of your own none of whose files names a page of the manifest is refused, writing nothing, so
+  a forgotten `--dataset` can't grade it against ours; grading fewer pages than the folder's manifest
+  warns that the summary covers only those;
 - while any page is pending, `headline` is null, overall and for each suite with pending pages: a run
   has a headline only once it is finished;
 - summary.json starts with `run`, `provider` and `settings`; it gains `failed` (pages with an output
@@ -61,7 +70,8 @@ Grading:
   `pages_pending` is `pending`; `credits` is null when no call reported any;
 - a prediction is read only under its exact name, case too, so a folder grades the same on every disk;
   any JSON object is a prediction, keys other than output types ignored. Grading warns once about files
-  named for no page and predictions it couldn't read (graded as failed);
+  named for no page, predictions it couldn't read, and predictions holding no output type (both graded
+  as failed);
 - `owed` counts what grading will grade over the whole manifest, by the same rule as `grade`; and
 - score lines carry only the `scorer` stamp; the prediction and gold digests are gone.
 
@@ -69,8 +79,12 @@ Runs and folders:
 
 - a folder holds one dataset and one manifest: `plan` and `opb grade` refuse another, in one wording.
   `opb grade` reads them from the folder's settings.json when not given; a folder of your own gets them
-  there, with `unsupported`, once its first grading succeeds (a failed one writes nothing);
-  `--unsupported` is refused on a run's folder;
+  there, with `unsupported`, once its first grading succeeds (a failed one writes nothing); another
+  `--unsupported` is refused too, and every refusal says the folder's settings.json can be deleted to
+  start over. `--unsupported` is refused on a run's folder; a manifest's path is spelled one way
+  (`./manifest.parquet` is `manifest.parquet`, `data.normal`);
+- the record is the source of truth for an answer: a prediction lost or unreadable beside its record is
+  rebuilt from it, with no call, by `predict_all` and by `opb reparse`;
 - `prepare` writes settings.json whole; `record(run, page_id, result)` takes what `harness.predict`
   returned (it was `new`);
 - `plan` warns when a run made at one commit of its dataset is planned at another, and carries on; it
@@ -78,6 +92,7 @@ Runs and folders:
   negative `timeout` or `workers` (a `workers` of the wrong type is a `TypeError`);
 - `--retry-failed` predicts again a timeout, an outage (`VendorUnreachable`) or a 429, 5xx or 52x; an
   answer that arrived and couldn't be used, with no HTTP status, is no longer retried;
+- a `Stop` stops its adapter's queued pages at once, set by the worker that hit it;
 - `--workers` is keyed by adapter: one of yours by the name it was filed or declared under; an option
   given as a whole number for a float setting is that float, so it names the same run; one of the wrong
   type is refused; and
@@ -97,23 +112,27 @@ Datasets:
   `gt_path` are `Path`s; a manifest's columns of its own are kept on `page.extra`, never refused;
 - `select` reads `suites` and `only` once, so any iterable works, and refuses a bare string;
 - an `hf://` address is checked (`hf://datasets/<org>/<name>[@<revision>]`; `hf:/...` is named as a
-  typo), and a download is tried again up to five times; and
+  typo); a download is tried again up to five times, each retry logged, and one that would fail the
+  same way every time (no access, a missing revision, offline with nothing cached) is refused at once;
+- page ids that differ only in case are named with both spellings; and
 - `unit_tests.check` no longer refuses a gold file its manifest doesn't name.
 
 The command line:
 
 - results go to stdout as JSON: `opb benchmark` and `opb grade` print each run's whole summary (its
-  summary.json; `html` is now `html.score`); the closing line and messages go to stderr, and `-q`, before
-  or after the command, turns them off;
+  summary.json; `html` is now `html.score`), after a `Stop` too; the closing line and messages go to
+  stderr. There is no `-q`;
 - a `UsageError` or a `Stop` prints `opb <command>: <message>` and exits 1 (`benchmark` adds that a
   rerun resumes); Ctrl-C exits 130; anything else is a traceback, a bug of ours. A bad `--workers` is
   one of these, not an argparse error;
-- `opb benchmark` and `opb grade` exit 2, with a warning, when a test's grading raised in our code;
+- the closing hint counts only the pages `--retry-failed` would predict again;
 - `opb benchmark -y`, and `--score-only`, which spends nothing, print the plan and don't ask; a declined
   plan prints `nothing run`;
 - `opb check` (new) says whether a dataset is one opb can run: its manifest, every file it names, and
   every gold; it names the page and column of a missing file;
 - `opb score` names the flag and file of a missing or non-object prediction, and a record passed as
-  one; `opb reparse` refuses a folder without records/ or a file that isn't a record, checks every
-  record before rewriting any, and says to regrade; and
+  one, or a folder; `opb reparse` refuses a folder without records/ or a file that isn't a record,
+  checks every record before rewriting any, rebuilds lost predictions, and says to regrade; an unknown
+  option is named, with the nearest one; a folder of loose `<page_id>.json` files is told to move them
+  into `predictions/`; and
 - a `--pages` file skips blank lines and `#` comments; `--options` says when a path doesn't exist.
