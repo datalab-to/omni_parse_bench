@@ -814,6 +814,37 @@ def test_an_empty_selection_is_refused(tmp_path, monkeypatch):
         benchmark.plan(["stub"], out=tmp_path / "runs", dataset=ds, only=frozenset())
 
 
+def test_grading_rebuilds_a_lost_prediction_from_its_record(tmp_path, monkeypatch, capsys):
+    """Every path that grades (--score-only, opb grade, a subset) scores an answer its record holds."""
+    calls = []
+    use(monkeypatch, {"stub": stub(call=lambda config: calls.append(1) or contract.Call({"html": "alpha"}))})
+    ds = dataset(tmp_path / "data", n=2)
+    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=ds)
+    benchmark.execute(p, say=QUIET)
+    (run,) = p.runs
+    (run.predictions / "a-p1.json").unlink()
+    (s,) = benchmark.execute(p._replace(score_only=True), say=QUIET).values()
+    assert (s["pages"], s["failed"]) == (2, 0) and (run.predictions / "a-p1.json").exists()
+    (run.predictions / "a-p1.json").unlink()
+    assert cli.main(["grade", str(run.out)]) == 0
+    assert json.loads(capsys.readouterr().out)["failed"] == 0 and (run.predictions / "a-p1.json").exists()
+    assert len(calls) == 2, "nothing paid for again"
+
+
+def test_grading_part_of_a_manifest_warns_and_names_no_graded_page_a_stray(tmp_path, capsys):
+    ds = dataset(tmp_path / "data", n=3)
+    mine = tmp_path / "mine"
+    (mine / "predictions").mkdir(parents=True)
+    for i in range(3): (mine / "predictions" / f"a-p{i}.json").write_text(json.dumps({"html": "alpha"}))
+    assert cli.main(["grade", str(mine), "--dataset", ds, "--unsupported"]) == 0
+    capsys.readouterr()
+    run = benchmark.Run("mine", {}, mine)
+    # Note: `opb grade` above set the CLI's handler, so the warnings reach stderr.
+    benchmark.grade(run, data.read_manifest(ds)[1][:1], QUIET, settings={"unsupported": []})
+    said = capsys.readouterr().err
+    assert "covers only those" in said and "named for no page" not in said
+
+
 def test_a_prediction_lost_beside_its_record_is_rebuilt_not_paid_for_again(tmp_path, monkeypatch, capsys):
     """The record is the source of truth for an answer: a lost or corrupt prediction is written from it."""
     calls = []
@@ -1187,7 +1218,8 @@ def test_a_folder_of_yours_keeps_the_dataset_and_manifest_its_first_grading_used
     assert cli.main(["grade", str(mine)]) == 0, "no flags: the folder's own dataset and manifest"
     assert json.loads(capsys.readouterr().out)["pages"] == 1
     assert cli.main(["grade", str(mine), "--manifest", "manifest.parquet"]) == 1
-    assert "holds a run on manifest" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "manifests/one.parquet" in err and "settings.json" in err and "holds a run" not in err
 
 
 def test_a_prediction_is_read_only_under_its_exact_name(tmp_path, caplog):

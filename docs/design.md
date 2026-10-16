@@ -233,7 +233,7 @@ The headline is the mean of the families' scores: text (present, order, repeat),
 family's weight never depends on how many tests it has: sampling more layout lines makes the layout
 score more precise without making layout count more. The families are those the graded tests are
 in, so a subset scores on the families it holds. A system with no scored test in some family (every
-one unsupported or an error) has no headline.
+one unsupported) has no headline.
 
 Each output type also has its own score, the share of its tests passed, with `per_test_type` and
 `per_tag`; the summary also gives `per_suite` and `per_derivation`. Each score also counts the source
@@ -289,12 +289,11 @@ A verdict's result is one of four:
 - `fail`: it failed, its output is missing, or its output is malformed: HTML that isn't a string, or
   a block that isn't `{label, bbox[, text]}` with a label of `views.LABELS` and a box of four numbers
   from 0 to 1. The view raises `views.MalformedOutput` for these, since they are the provider's fault;
-- `unsupported`: the provider can't produce the test's output type; or
-- `error`: grading raised anything else on a well-formed output, a scorer bug. The exception is its
-  `why`.
+- `unsupported`: the provider can't produce the test's output type.
 
-`unsupported` and `error` verdicts are left out of every score, so a scorer bug never lowers one;
-`summarize` counts each per output type (`unsupported`, `errors`).
+`unsupported` verdicts are left out of every score; `summarize` counts them per output type. Grading
+that raises anything else on a well-formed output is a scorer bug: it is raised, naming the page and
+the test, and nothing is written, so a bug never passes as a score.
 
 ## Benchmark
 

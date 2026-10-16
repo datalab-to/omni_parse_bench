@@ -45,7 +45,8 @@ The scorer:
   `{expected_count}`;
 - a verdict is `pass`, `fail` or `unsupported`: a test whose run raises on a well-formed output is a bug
   of ours, so `score` raises it, naming the test, and grading stops with nothing written (the `error`
-  verdict, the `errors` count and exit 2 are gone);
+  verdict, the `errors` count and exit 2 are gone); with several runs, those graded before the
+  crash keep their new files, and `--score-only` grades again after the fix;
 - an output type every test of which is unsupported keeps its block, with `score` null; and
 - the scoring-code digest changes, so every run is graded again once; no provider is called.
 
@@ -80,12 +81,14 @@ Runs and folders:
 
 - a folder holds one dataset and one manifest: `plan` and `opb grade` refuse another, in one wording.
   `opb grade` reads them from the folder's settings.json when not given; a folder of your own gets them
-  there, with `unsupported`, once its first grading succeeds (a failed one writes nothing); another
+  there, with `unsupported` (required on its first grading), once its first grading succeeds (a
+  failed one writes nothing); another
   `--unsupported` is refused too, and every refusal says the folder's settings.json can be deleted to
   start over. `--unsupported` is refused on a run's folder; a manifest's path is spelled one way
   (`./manifest.parquet` is `manifest.parquet`, `data.normal`);
 - the record is the source of truth for an answer: a prediction lost or unreadable beside its record is
-  rebuilt from it, with no call, by `predict_all` and by `opb reparse`;
+  rebuilt from it, with no call, whenever the run is graded (`--score-only` and `opb grade` too) and by
+  `opb reparse`;
 - `prepare` writes settings.json whole; `record(run, page_id, result)` takes what `harness.predict`
   returned (it was `new`);
 - `plan` warns when a run made at one commit of its dataset is planned at another, and carries on; it

@@ -146,7 +146,7 @@ verdicts = unit_tests.score(pred, tests)
 (0.6666666666666666, {'present': 1.0, 'order': 1.0, 'table_cell': 0.0}, {'score': 0.0, 'tests': 1, 'pages': 1, 'documents': 1})
 ```
 
-A verdict is `pass`, `fail`, `unsupported` or `error` with `why` saying what went wrong. `unsupported` and `error` verdicts are left out of every score.
+A verdict is `pass`, `fail` or `unsupported`, with `why` saying what went wrong. `unsupported` verdicts are left out of every score. A test whose grading raises is a bug in our scorer: it is raised, naming the page and the test, not scored.
 
 From the command line:
 

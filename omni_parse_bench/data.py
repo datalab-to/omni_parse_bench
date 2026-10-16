@@ -22,6 +22,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import logging
+import os
 import time
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
@@ -129,9 +130,11 @@ def download_dataset(dataset: str | Path) -> Path:
                              "revision, and that you're logged in with access (huggingface-cli login)"
                              ) from None
         except (hf_errors.LocalEntryNotFoundError, hf_errors.OfflineModeIsEnabled) as exc:
-            raise UsageError(f"can't read dataset {dataset}: it isn't in the Hugging Face cache, and the Hub "
-                             f"can't be reached ({type(exc).__name__}); connect, or pass --dataset a "
-                             "folder") from None
+            # Note: offline by the user's own setting, connecting changes nothing; unsetting it does.
+            how = ("HF_HUB_OFFLINE is set; unset it" if os.environ.get("HF_HUB_OFFLINE", "") not in ("", "0")
+                   else "the Hub can't be reached; connect")
+            raise UsageError(f"can't read dataset {dataset}: it isn't in the Hugging Face cache, and {how}, "
+                             f"or pass --dataset a folder ({type(exc).__name__})") from None
         except hf_errors.HfHubHTTPError as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
             if status in (401, 403):

@@ -108,9 +108,10 @@ def settled(out: Path, dataset: str | None = None, manifest: str | None = None) 
              ("manifest", manifest and data.normal(manifest)))
     for key, now in asked:
         if now and (was := said.get(key)) and was != now:
-            raise UsageError(f"{out} holds a run on {key} {was}, not {now}: a folder holds one dataset and "
+            held = "a run" if is_run(said) else "predictions graded"
+            raise UsageError(f"{out} holds {held} on {key} {was}, not {now}: a folder holds one dataset and "
                              f"one manifest; pass --{key} {was}, another folder, or delete "
-                             f"{out / 'settings.json'} to grade it on another")
+                             f"{out / 'settings.json'} to use it with another")
     return said
 
 
@@ -178,7 +179,7 @@ def needs(run: Run, page: data.Page, retry_failed: bool = False) -> frozenset[st
 
 def restore(run: Run, page_id: str) -> bool:
     """Whether the page's prediction was rebuilt from its record: missing or unreadable beside a record,
-    it is written from the record's outputs, with no call. `predict_all` and `opb reparse` both do this."""
+    it is written from the record's outputs, with no call. `grade` and `opb reparse` both do this."""
     if (rec := recorded(run, page_id)) is None or predicted(run, page_id) is not None: return False
     write_json(run.predictions / f"{page_id}.json", rec["outputs"])
     return True
@@ -317,8 +318,8 @@ def plan(providers: Sequence[str], *, out: str | Path = Path("runs"),
         said = settled(r.out, str(dataset), manifest)
         if (msg := _another_commit(r, said.get("commit"), commit)) is not None:
             log.warning("%s", msg)
-    return Plan(runs, ps, str(dataset), manifest, timeout or harness.DEFAULT_TIMEOUT, workers, score_only,
-                retry_failed)
+    return Plan(runs, ps, str(dataset), data.normal(manifest), timeout or harness.DEFAULT_TIMEOUT, workers,
+                score_only, retry_failed)
 
 
 def _another_commit(r: Run, was: str | None, now: str | None) -> str | None:
@@ -401,8 +402,6 @@ def predict_all(p: Plan) -> None:
 
     def one(r: Run, g: data.Page, bar: progress.Reporter, halt: threading.Event) -> None:
         if stop.is_set() or halt.is_set(): return
-        if restore(r, g.page_id):
-            log.info("%s: rebuilt %s's prediction from its record", r.out.name, g.page_id)
         if not (asked := needs(r, g, p.retry_failed)):
             bar.kept()
             return
@@ -455,7 +454,7 @@ def predict_all(p: Plan) -> None:
             raise
         finally:
             ex.shutdown(wait=True)
-        for x in reporters.values(): x.finish()
+            for x in reporters.values(): x.finish()
 
     failures: list[Exception] = []
     with progress.Progress([r.out.name for r in p.runs]) as bars:
@@ -494,12 +493,16 @@ def grade(run: Run, pages: Sequence[data.Page], say: Callable[[str], None] = pri
     scores.jsonl and summary.json, and return the summary. `settings` is the folder's settings.json as
     `opb grade` will write it once grading succeeds; otherwise it is read from the folder.
 
-    A page's prediction is `predictions/<page_id>.json`, named exactly. In a run (`is_run`), a page never
+    A page's prediction is `predictions/<page_id>.json`, named exactly; one lost beside a record that holds
+    its answer is rebuilt from it first (`restore`). In a run (`is_run`), a page never
     attempted (`_tried`) is pending; otherwise a page with no prediction fails, every test of it. A folder
     of your own none of whose files names a page is refused, and a scorer that raises stops the grading:
     either way nothing is written. docs/API.md has the summary's fields."""
     gradable(run.out)
     said = _said(run.out) if settings is None else settings
+    if rebuilt := [g.page_id for g in pages if restore(run, g.page_id)]:
+        log.info("%s: %s rebuilt from %s, e.g. %s", run.out, counted(len(rebuilt), "prediction"),
+                 "its record" if len(rebuilt) == 1 else "their records", rebuilt[:3])
     keeps, listed = is_run(said), _listed(run)
     if not keeps and not listed & {f"{g.page_id}.json" for g in pages}:
         raise UsageError(f"none of the {counted(len(listed), 'file')} in {run.predictions} names a page of "
@@ -577,6 +580,10 @@ def _unsupported(said: Mapping[str, Any], out: Path) -> frozenset[str]:
     Note: one set for the whole run, never read off a page: a prediction that leaves out an output its
     page asks for fails that output's tests, so leaving out hard pages can't take them out of a score."""
     if (got := said.get("unsupported")) is None:
+        if not (out / "settings.json").exists():
+            raise UsageError(f"{out} is graded for the first time, so say which outputs its system can't "
+                             "produce: opb grade --unsupported with them, or with none for none; it is kept "
+                             "for the folder's later gradings")
         raise UsageError(f"{out} doesn't say which outputs its system can't produce (its settings.json has "
                          "no \"unsupported\"); pass opb grade --unsupported with them, or with none for none")
     if not (isinstance(got, list) and set(got) <= set(vocab.OUTPUT_TYPES)):
@@ -628,29 +635,37 @@ def _warn_unusable(run: Run, said: Mapping[str, Any], pages: Sequence[data.Page]
     that couldn't be read as a JSON object, and those holding no output type (both graded as failed); and a
     grading of fewer pages than the folder's manifest. A naming slip (`<page_id>.pdf.json`, another case, a
     `markdown` key) otherwise shows only as a low score."""
-    ids = {f"{g.page_id}.json" for g in pages}
+    whole = _manifest_of(run, said) or pages
+    ids = {f"{g.page_id}.json" for g in whole}
     if stray := sorted(n + ("/" if (run.predictions / n).is_dir() else "") for n in listed - ids):
         log.warning("%s: %s in predictions/ named for no page of the manifest, so left out, e.g. %s; a "
                     "prediction is predictions/<page_id>.json, named exactly (case too)",
                     run.out, counted(len(stray), "file"), stray[:3])
     if unread:
-        log.warning("%s: %s couldn't be read as a JSON object, so their pages were graded as failed, e.g. %s",
-                    run.out, counted(len(unread), "prediction"), unread[:3])
+        log.warning("%s: %s couldn't be read as a JSON object, so %s graded as failed, e.g. %s", run.out,
+                    counted(len(unread), "prediction"),
+                    "its page was" if len(unread) == 1 else "their pages were", unread[:3])
     if keyless:
         k, keys = next(iter(keyless.items()))
-        log.warning("%s: %s hold none of the output types %s, so their pages were graded as failed, e.g. %s "
-                    "holds %s", run.out, counted(len(keyless), "prediction"), list(vocab.OUTPUT_TYPES), k,
+        log.warning("%s: %s %s none of the output types %s, so %s graded as failed, e.g. %s holds %s",
+                    run.out, counted(len(keyless), "prediction"), "holds" if len(keyless) == 1 else "hold",
+                    list(vocab.OUTPUT_TYPES), "its page was" if len(keyless) == 1 else "their pages were", k,
                     keys[:5])
-    whole = None
-    if said.get("dataset") and said.get("manifest"):
-        try:
-            whole = data.read_manifest(said["dataset"] + (f"@{said['commit']}" if said.get("commit") else ""),
-                                       said["manifest"])[1]
-        except UsageError:
-            pass
-    if whole is not None and len(pages) < len(whole):
+    if len(pages) < len(whole):
         log.warning("%s: graded %s of its manifest's %d, so its summary covers only those; grade_all passes "
                     "the whole manifest", run.out, counted(len(pages), "page"), len(whole))
+
+
+def _manifest_of(run: Run, said: Mapping[str, Any]) -> tuple[data.Page, ...] | None:
+    """The pages of the manifest the folder is graded on, as its own settings.json (or `said`, as it will be
+    written) names it; None when neither names one, or it can't be read."""
+    own = _said(run.out) | {k: v for k, v in said.items() if k in ("dataset", "commit", "manifest")}
+    if not (own.get("dataset") and own.get("manifest")): return None
+    try:
+        return data.read_manifest(own["dataset"] + (f"@{own['commit']}" if own.get("commit") else ""),
+                                  own["manifest"])[1]
+    except UsageError:
+        return None
 
 
 def read_scores(run: Run) -> list[dict]:

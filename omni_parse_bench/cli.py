@@ -196,7 +196,7 @@ def cmd_grade(a: argparse.Namespace) -> int:
         if (was := said.get("unsupported")) is not None and was != now:
             raise UsageError(f"{out} holds a folder graded with --unsupported {' '.join(was) or '(none)'}, "
                              f"not {' '.join(now) or '(none)'}: a folder says once what its system can't "
-                             f"produce; pass --unsupported {' '.join(was)}, or delete "
+                             f"produce; pass --unsupported {' '.join(was) or 'with none'}, or delete "
                              f"{out / 'settings.json'} to start over")
         said = said | {"unsupported": now}
     dataset = a.dataset or said.get("dataset") or data.DEFAULT_DATASET
@@ -318,7 +318,8 @@ def cmd_reparse(a: argparse.Namespace) -> int:
             benchmark.write_json(run / "predictions" / path.name, new["outputs"])
         rebuilt = sum(benchmark.restore(benchmark.Run("", {}, run), path.stem) for path in paths)
         print(f"{run}: {len(done)} of {counted(len(paths), 'record')} changed, "
-              f"{counted(rebuilt, 'prediction')} rebuilt from its record"
+              f"{counted(rebuilt, 'prediction')} rebuilt from "
+              f"{'its record' if rebuilt == 1 else 'their records'}"
               + ("; regrade it to see them: opb benchmark ... --score-only, or opb grade " + str(run)
                  if done or rebuilt else ""), file=sys.stderr)
     return 0

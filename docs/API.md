@@ -74,9 +74,9 @@ The output of `score` is one verdict per test:
  ...]
 ```
 
-`result` is `pass`, `fail`, `unsupported` or `error`, and `why` says what went wrong. `error` is an
-exception raised in the scorer's own code on a well-formed output: it is ours, not the provider's,
-so it is left out of the score like `unsupported`, and counted.
+`result` is `pass`, `fail` or `unsupported`, and `why` says what went wrong. An exception raised in the
+scorer's own code on a well-formed output is ours, not the provider's: it is raised, naming the page
+and the test, not turned into a verdict.
 
 The output of `summarize`:
 
@@ -98,7 +98,7 @@ The output of `summarize`:
 
 - `headline` is the mean of the families' scores (text, tables, layout), over the families the
   verdicts' tests are in, so each family weighs the same however many tests it has. It is null
-  when a family has no scored test, all unsupported or error (a provider with no blocks has no
+  when a family has no scored test, all unsupported (a provider with no blocks has no
   layout score), since a mean over fewer families isn't the same number;
 - each output type has its `score` (the share of its tests passed), `per_test_type` and `per_tag`;
   and
@@ -261,7 +261,9 @@ a `Stop` (an account, a key or a dependency) is printed in one line, `opb benchm
 after a `Stop`, the summaries grading wrote are printed to stdout first. Ctrl-C exits 130 and grades
 nothing. Either way, what was predicted is kept, and the same command resumes. A test whose grading
 raises is a bug of ours, never the provider's fault: grading stops with the traceback, naming the run,
-the page and the test, and writes nothing, since a score with that test left out would be wrong.
+the page and the test, and that run writes nothing, since a score with that test left out would be
+wrong. Runs are graded one after another, so those graded before it keep their new files, each a whole
+grading. Fix the bug, then grade again with `--score-only`.
 
 ### At once
 
@@ -318,7 +320,8 @@ It's resumable, and safe to run twice.
 
 - A page is predicted again only for the outputs its record doesn't hold; an output recorded as
   unsupported is held. The record is the source of truth for an answer: a prediction lost or broken
-  beside its record is rebuilt from the record, with no call (`opb reparse` does the same);
+  beside its record is rebuilt from the record, with no call, whenever the run is graded
+  (`--score-only`, `opb grade` and the grading after predicting; `opb reparse` does the same);
 - a run folder assumes its pages don't change under it: a page with a record is not predicted again,
   and pages are pinned to a dataset commit and never edited in place. To predict again after a
   dataset's pages change, use a new `--out`;
@@ -565,7 +568,8 @@ opb grade mine/ --unsupported blocks      # mine/predictions/<page_id>.json, one
 ```
 
 `--unsupported` names the outputs your system can't produce, once for the folder (`--unsupported` with
-none for none); their tests are `unsupported` rather than failed. The folder's first grading that
+none for none), and a folder's first grading requires it; their tests are `unsupported` rather than
+failed. The folder's first grading that
 succeeds writes `mine/settings.json` with the dataset, the manifest and `unsupported`, so a later
 `opb grade mine/` needs no flags, and another `--dataset`, `--manifest` or `--unsupported` is refused
 (delete `mine/settings.json` to start the folder over); a grading that fails writes nothing. A grading
@@ -669,7 +673,7 @@ Comparing providers on a slice of the tests takes four steps.
    ```
 
    pandas and polars read the same files (`pd.read_json(path, lines=True)`). Keep only `pass` and
-   `fail`, as every score does: `unsupported` and `error` are left out. A run graded by an older
+   `fail`, as every score does: `unsupported` is left out. A run graded by an older
    version has an older line format: grade it again first (`opb benchmark ... --score-only`).
 
 4. Give a slice to `summarize` for the benchmark's own numbers on it. A query's average is the share
@@ -790,5 +794,5 @@ One line per test, in manifest order: its verdict, what the test is, and the sta
 
 - `run` and `provider` name the run (its folder) and its provider; `settings.json` has the rest;
 - `page_id` to `tags` say what the test is (`opb tests` writes the same, its id as `id`);
-- `result` is `pass`, `fail`, `unsupported` or `error`, and `why` says what went wrong; and
+- `result` is `pass`, `fail` or `unsupported`, and `why` says what went wrong; and
 - `scorer` says which scoring code graded the line.
