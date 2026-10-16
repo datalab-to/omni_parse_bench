@@ -4,6 +4,7 @@
     opb predict --provider datalab --page pages/<page_id>.pdf
     opb benchmark --providers datalab openai/gpt-5.6-sol --dataset hf://datasets/datalab-to/omni_parse_bench
     opb grade RUN_DIR [--unsupported blocks]           # a folder of predictions/, yours or a run's
+    opb check --dataset <folder or hf://...>          # is the dataset one opb can run?
     opb tests --dataset <folder or hf://...> > tests.jsonl
     opb providers [NAME]
     opb reparse RUN_DIR ...
@@ -31,7 +32,7 @@ from omni_parse_bench.scorers import unit_tests as scorer
 
 # command -> the extra it needs; `score` needs none.
 EXTRAS = {"predict": "harness", "providers": "harness", "reparse": "harness", "benchmark": "benchmark",
-          "grade": "benchmark", "tests": "benchmark"}
+          "grade": "benchmark", "tests": "benchmark", "check": "benchmark"}
 
 
 
@@ -75,6 +76,37 @@ def cmd_score(a: argparse.Namespace) -> int:
     """What `score` returns: one verdict per test of the page."""
     vs = scorer.score(read_json(a.pred), scorer.tests.read(a.gold), unsupported=set(a.unsupported or ()))
     print(json.dumps([v._asdict() for v in vs], indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_check(a: argparse.Namespace) -> int:
+    """`opb check`: whether a dataset is one opb can run. It checks, stopping at the first problem:
+
+        1. the manifest, as `data.read_manifest` does: the columns page_id, document, suite, doc_path,
+           gt_path and outputs are there; the first five are non-empty strings; each doc_path is a
+           relative path inside the dataset to a .pdf or .png; each gt_path is a relative path inside
+           the dataset named `<page_id>.json`; each outputs is a non-empty list of distinct output
+           types; and page ids are unique, ignoring case;
+        2. every doc_path and gt_path exists as a file; and
+        3. every gold, as `unit_tests.check` does: it is JSON holding only `tests`, a list; each test
+           has exactly the fields a test has, a non-empty id, a known test_type reading its own
+           output_type, a known derivation, known tags, and args and settings of the types its
+           test_type takes; the outputs a page's tests read are its manifest `outputs`; no test id is
+           used twice; and every page has a test.
+
+    It does not open an input (a PDF isn't checked to be a PDF), or run a test against a prediction.
+    The problem goes to stderr, naming its row; a dataset that passes is described on stdout, as JSON,
+    and exits 0."""
+    try:
+        _, pages = data.read_manifest(a.dataset, a.manifest)
+        if missing := [f for p in pages for f in (p.doc_path, p.gt_path) if not Path(f).is_file()]:
+            raise ValueError(f"{len(missing)} files the manifest names don't exist, e.g. {missing[:3]}")
+        scorer.check(pages)
+    except (ValueError, FileNotFoundError) as exc:   # Note: ManifestError and GoldError are ValueErrors.
+        print(f"opb check: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps({"ok": True, "manifest": a.manifest, "pages": len(pages),
+                      "suites": len({p.suite for p in pages}), "inputs": len({p.doc_path for p in pages})}))
     return 0
 
 
@@ -297,6 +329,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     g.add_argument("--suites", nargs="*", metavar="SUITE",
                    help="grade only these suites; otherwise every page, and a page with no prediction fails")
 
+    ck = sub.add_parser("check", help="whether a dataset is one opb can run: its manifest, files and gold")
+    ck.add_argument("--dataset", default=data.DEFAULT_DATASET,
+                    help="a dataset folder, or hf://datasets/<repo>[@revision]")
+    ck.add_argument("--manifest", default=data.MANIFEST,
+                    help="which of the dataset's manifests: its pages, and where their gold is")
+
     tt = sub.add_parser("tests", help="every test as a JSON line, with its page's suite and document")
     tt.add_argument("--dataset", default=data.DEFAULT_DATASET,
                     help="a dataset folder, or hf://datasets/<repo>[@revision]")
@@ -313,7 +351,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     a = ap.parse_args(argv)
     cmd = {"score": cmd_score, "predict": cmd_predict, "benchmark": cmd_benchmark, "grade": cmd_grade,
-           "tests": cmd_tests, "providers": cmd_providers, "reparse": cmd_reparse}[a.cmd]
+           "check": cmd_check, "tests": cmd_tests, "providers": cmd_providers, "reparse": cmd_reparse}[a.cmd]
     try:
         return cmd(a)
     except ImportError as exc:

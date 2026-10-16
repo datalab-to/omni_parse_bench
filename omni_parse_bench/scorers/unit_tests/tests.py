@@ -89,6 +89,9 @@ def parse(page_id: str, doc: Mapping[str, Any]) -> tuple[Test, ...]:
     """A gold file's contents as the page's tests."""
     if unknown := set(doc) - {"tests"}:
         raise GoldError(f"{page_id}: unknown keys {sorted(unknown)}; a gold file holds only 'tests'")
+    if not isinstance(doc.get("tests"), list):
+        raise GoldError(f"{page_id}: a gold file holds 'tests', the list of the page's tests: "
+                        '{"tests": [...]}')
     return tuple(test(page_id, t) for t in doc["tests"])
 
 

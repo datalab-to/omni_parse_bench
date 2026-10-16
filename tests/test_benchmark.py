@@ -922,6 +922,21 @@ def test_a_failure_part_way_is_graded_and_an_interrupt_is_not(tmp_path, monkeypa
     assert (p.runs[0].out / "summary.json").exists() == graded
 
 
+def test_check_says_whether_a_dataset_can_run(tmp_path, capsys):
+    ds = pathlib.Path(dataset(tmp_path / "data", n=2))
+    assert cli.main(["check", "--dataset", str(ds)]) == 0
+    assert json.loads(capsys.readouterr().out) == {"ok": True, "manifest": "manifest.parquet", "pages": 2,
+                                                   "suites": 1, "inputs": 2}
+    (ds / "pages" / "a-p1.pdf").unlink()
+    assert cli.main(["check", "--dataset", str(ds)]) == 1
+    assert "1 files the manifest names don't exist" in capsys.readouterr().err
+    data.read_manifest.cache_clear()
+    (ds / "pages" / "a-p1.pdf").write_bytes(b"%PDF")
+    (ds / "gold" / "a-p1.json").write_text("{}")
+    assert cli.main(["check", "--dataset", str(ds)]) == 1
+    assert "a-p1" in capsys.readouterr().err
+
+
 def test_a_run_planned_at_another_commit_of_its_dataset_warns_and_carries_on(tmp_path):
     r = benchmark.Run("stub", {}, tmp_path / "run")
     assert benchmark._another_commit(r, "abc", "abc") is None

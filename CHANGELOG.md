@@ -56,6 +56,8 @@ Datasets:
 - `execute` grades what was predicted when predicting fails part way, but not when it is interrupted
   (Ctrl-C); `--score-only` grades it then;
 - page ids must be unique ignoring case, since each names files;
+- `opb check` says whether a dataset is one opb can run: its manifest, that every file it names
+  exists, and every gold (`unit_tests.check`). A gold without `tests` is a `GoldError`, naming its page;
 - `owed` counts what grading will grade over the whole manifest, as `grade_all` does; it counted
   only the selected pages;
 - `prepare` writes `settings.json` whole; it merged into what was there;
