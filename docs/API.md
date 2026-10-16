@@ -312,7 +312,9 @@ It's resumable, and safe to run twice.
 - an interrupted grading writes nothing: the last finished grading's files stand.
 
 A run folder holds one dataset: an invocation with another `--dataset` into it is refused. A dataset
-is downloaded at one commit, its pages and gold together.
+is downloaded at one commit, its pages and gold together. An invocation at another commit of the run's
+dataset is warned about and carries on: its predictions are graded against the new commit's gold, which
+is what a gold correction wants; if the pages changed too, pass another `--out`.
 
 `--score-only` predicts nothing, and grades. `--retry-failed` predicts again
 the outputs whose failure may not recur: a timeout, an outage, a 429 or 5xx (Cloudflare's 520 to 524
