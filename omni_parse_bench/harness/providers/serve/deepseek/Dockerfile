@@ -1,7 +1,7 @@
 # DeepSeek-OCR-2 as its repository runs it: its own vLLM 0.8.5 setup (V0 engine, the repository's model
 # code), wrapped by server.py in one HTTP route. The adapter is providers/deepseek_ocr.py:
 #
-#     docker build -t opb-deepseek omni_parse_bench/harness/providers/oss/deepseek
+#     docker build -t opb-deepseek omni_parse_bench/harness/providers/serve/deepseek
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-deepseek
 #     opb benchmark --providers deepseek-ocr --options '{"deepseek-ocr": {"base_url": "http://localhost:8001"}}'
 #

@@ -1,7 +1,7 @@
-"""LightOnOCR-3 (lightonai/LightOnOCR-3-4B, -0.8B), served from providers/oss/lighton/ on any GPU host.
+"""LightOnOCR-3 (lightonai/LightOnOCR-3-4B, -0.8B), served from providers/serve/lighton/ on any GPU host.
 
 Run as LightOn runs it for its own benchmark (github.com/lightonai/LightOnOCR at 36755d4, its
-`lightonocr` client and benchmarks/ocr_bench). Steps 1 to 4 run on the server (oss/lighton/server.py);
+`lightonocr` client and benchmarks/ocr_bench). Steps 1 to 4 run on the server (serve/lighton/server.py);
 step 5 runs here, with no vendor code.
 
 How a page is processed:
@@ -41,7 +41,7 @@ Differences from the vendor:
 `model` names the model the server serves (its MODEL), so a run's name tells the two sizes apart; an
 answer from another model is refused.
 
-    docker build -t opb-lighton omni_parse_bench/harness/providers/oss/lighton
+    docker build -t opb-lighton omni_parse_bench/harness/providers/serve/lighton
     docker run --gpus all -p 8001:8001 opb-lighton
     opb predict --provider lightonocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -82,7 +82,7 @@ _PLACEHOLDER = re.compile(r"^!\[([a-z_]+)\+?\]\((-?[\d.]+),(-?[\d.]+),(-?[\d.]+)
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the LightOnOCR-3 server (oss/lighton/) answers, the model it serves, and its sampling (the
+    """Where the LightOnOCR-3 server (serve/lighton/) answers, the model it serves, and its sampling (the
     client's for LightOnOCR-3 by default, temperature as its benchmark sets it)."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})

@@ -2,7 +2,7 @@
 # Its client reads a page with one chat call and no code of the vendor's, so opb asks vLLM directly
 # (providers/nanonets.py):
 #
-#     docker build -t opb-nanonets omni_parse_bench/harness/providers/oss/nanonets
+#     docker build -t opb-nanonets omni_parse_bench/harness/providers/serve/nanonets
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-nanonets
 #     opb benchmark --providers nanonets-ocr --options '{"nanonets-ocr": {"base_url": "http://localhost:8001"}}'
 #

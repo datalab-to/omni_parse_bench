@@ -1,9 +1,9 @@
-"""PaddleOCR-VL-1.6 (PaddlePaddle/PaddleOCR-VL-1.6), served from providers/oss/paddleocr_vl/ on any GPU host.
+"""PaddleOCR-VL-1.6 (PaddlePaddle/PaddleOCR-VL-1.6), served from providers/serve/paddleocr_vl/ on a GPU host.
 
 Run as PaddleOCR's own pipeline runs it (`paddleocr.PaddleOCRVL`, pipeline_version v1.6, paddleocr 3.7.0,
 the VLM through its `vllm-server` backend). PaddleOCR-VL is a pipeline, not one model: its layout model
 (PP-DocLayoutV3) finds the page's blocks in reading order, and its 0.9B VLM, served by vLLM, reads each
-one. Steps 1 to 4 run on the server (oss/paddleocr_vl/server.py); step 5 runs here, with no vendor code.
+one. Steps 1 to 4 run on the server (serve/paddleocr_vl/server.py); step 5 runs here, with no vendor code.
 
 How a page is processed:
 
@@ -29,7 +29,7 @@ Differences from the vendor:
   - the layout model runs on the CPU (the vendor recommends a GPU, mainly for speed); and
   - each page has the benchmark's 900 s.
 
-    docker build -t opb-paddleocr_vl omni_parse_bench/harness/providers/oss/paddleocr_vl
+    docker build -t opb-paddleocr_vl omni_parse_bench/harness/providers/serve/paddleocr_vl
     docker run --gpus all -p 8001:8001 opb-paddleocr_vl
     opb predict --provider paddleocr-vl --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -64,7 +64,7 @@ _TAG = re.compile(r"<[^>]+>")
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the PaddleOCR-VL server (oss/paddleocr_vl/) answers, and the DPI a PDF is loaded at (the
+    """Where the PaddleOCR-VL server (serve/paddleocr_vl/) answers, and the DPI a PDF is loaded at (the
     pipeline's, PDF_RENDER_SCALE 2.0, by default)."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})

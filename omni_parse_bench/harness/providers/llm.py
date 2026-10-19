@@ -19,7 +19,7 @@ Another endpoint is selected with the `base_url` option, so the record says whic
 answered. Auth: OPENROUTER_API_KEY (or OPENAI_API_KEY) for OpenRouter; for any other endpoint
 OPB_ENDPOINT_KEY if set, else none.
 
-The open OCR models are providers of their own (providers/oss/); `chat`, `answer` and the small
+The open OCR models are providers of their own (providers/serve/); `chat`, `answer` and the small
 helpers below are what they share with this adapter.
 
     opb predict --provider openai/gpt-5.6-sol --page page.pdf
@@ -251,7 +251,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
 
 def key(base_url: str) -> str:
     """The key for an endpoint. Each key goes only to its own endpoint, so the OpenRouter key never
-    reaches an opb model server (providers/oss/)."""
+    reaches an opb model server (providers/serve/)."""
     if base_url != DEFAULT_BASE_URL:
         return os.environ.get("OPB_ENDPOINT_KEY", "EMPTY")
     if not (got := os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY")):

@@ -1,7 +1,7 @@
-"""GLM-OCR (zai-org/GLM-OCR), through its SDK's self-hosted pipeline, served from providers/oss/glm_ocr/.
+"""GLM-OCR (zai-org/GLM-OCR), through its SDK's self-hosted pipeline, served from providers/serve/glm_ocr/.
 
 Run as its SDK documents it (github.com/zai-org/GLM-OCR, "Self-host with vLLM / SGLang" and "SDK Server",
-`glmocr[selfhosted,server]` 0.1.5). Steps 1 to 4 run on the server (oss/glm_ocr/server.py); step 5
+`glmocr[selfhosted,server]` 0.1.5). Steps 1 to 4 run on the server (serve/glm_ocr/server.py); step 5
 runs here, with no vendor code.
 
 How a page is processed:
@@ -33,7 +33,7 @@ Differences from the vendor:
     answer says which config read it (`sdk_config`); and
   - each page has the benchmark's 900 s.
 
-    docker build -t opb-glm_ocr omni_parse_bench/harness/providers/oss/glm_ocr
+    docker build -t opb-glm_ocr omni_parse_bench/harness/providers/serve/glm_ocr
     docker run --gpus all -p 8001:8001 opb-glm_ocr
     opb predict --provider glm-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -69,7 +69,7 @@ _TAG = re.compile(r"<[^>]+>")
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the GLM-OCR server (oss/glm_ocr/) answers."""
+    """Where the GLM-OCR server (serve/glm_ocr/) answers."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
 

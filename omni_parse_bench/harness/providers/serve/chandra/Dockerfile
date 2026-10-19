@@ -1,7 +1,7 @@
 # chandra-ocr-2 as the public chandra-ocr package runs it, behind one port: vLLM serves the model,
 # server.py runs the package's steps around it (start.sh). The adapter is providers/chandra_ocr.py:
 #
-#     docker build -t opb-chandra omni_parse_bench/harness/providers/oss/chandra
+#     docker build -t opb-chandra omni_parse_bench/harness/providers/serve/chandra
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-chandra
 #     opb benchmark --providers chandra-ocr --options '{"chandra-ocr": {"base_url": "http://localhost:8001"}}'
 #

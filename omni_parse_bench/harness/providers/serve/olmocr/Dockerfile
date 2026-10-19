@@ -1,7 +1,7 @@
 # olmOCR 2 as its pipeline runs it, behind one port: vLLM serves the model, server.py runs each page
 # through the pipeline's own process_page (start.sh). The adapter is providers/olmocr.py:
 #
-#     docker build -t opb-olmocr omni_parse_bench/harness/providers/oss/olmocr
+#     docker build -t opb-olmocr omni_parse_bench/harness/providers/serve/olmocr
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-olmocr
 #     opb benchmark --providers olmocr --options '{"olmocr": {"base_url": "http://localhost:8001"}}'
 #

@@ -1,7 +1,7 @@
-"""chandra-ocr-2 (datalab-to/chandra-ocr-2), served from providers/oss/chandra/ on any GPU host.
+"""chandra-ocr-2 (datalab-to/chandra-ocr-2), served from providers/serve/chandra/ on any GPU host.
 
 Run as the public `chandra-ocr` package runs it (github.com/datalab-to/chandra at d4f7467). Steps 1 to 4
-run on the server (oss/chandra/server.py); step 5 runs here, with no vendor code.
+run on the server (serve/chandra/server.py); step 5 runs here, with no vendor code.
 
 How a page is processed:
 
@@ -32,7 +32,7 @@ Differences from the vendor:
   - picture contents are alt text, as for every system; and
   - each page has the benchmark's 900 s.
 
-    docker build -t opb-chandra omni_parse_bench/harness/providers/oss/chandra
+    docker build -t opb-chandra omni_parse_bench/harness/providers/serve/chandra
     docker run --gpus all -p 8001:8001 opb-chandra
     opb predict --provider chandra-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -68,7 +68,7 @@ PICTURES = ("Image", "Figure", "Picture", "Diagram", "Chemical-Block")
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the chandra-ocr-2 server (oss/chandra/) answers, and the sampling of its first attempt (the
+    """Where the chandra-ocr-2 server (serve/chandra/) answers, and the sampling of its first attempt (the
     package's by default; a retry follows the package's schedule)."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
@@ -83,7 +83,6 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
     """One call answers both outputs."""
     if not wants: return []
     sent = {"weights": WEIGHTS, "prompt": "ocr_layout", "settings": http.settings(config),
-            "server": "oss/chandra",
             "page": "the file, loaded as its benchmark loads one, then scale_to_fit",
             "retries": "package: on a repeat or an error, temperature +0.2 (max 0.8), top_p 0.95"}
     return [contract.Request(frozenset(wants) & SUPPORTS, sent)]

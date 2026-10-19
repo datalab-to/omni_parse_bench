@@ -1,7 +1,7 @@
-"""Infinity-Parser2 (infly/Infinity-Parser2-Pro, -Flash), served from providers/oss/infinity/ on any GPU host.
+"""Infinity-Parser2 (infly/Infinity-Parser2-Pro, -Flash), served from providers/serve/infinity/ on a GPU host.
 
 Run as the vendor's `infinity_parser2` SDK (0.4.0, github.com/infly-ai/INF-MLLM) runs it through its
-vLLM backends. Steps 1 to 4 run on the server (oss/infinity/server.py); step 5 runs here, with no vendor
+vLLM backends. Steps 1 to 4 run on the server (serve/infinity/server.py); step 5 runs here, with no vendor
 code.
 
 How a page is processed:
@@ -34,7 +34,7 @@ Differences from the vendor:
 `model` names the model the server serves (its MODEL), so a run's name tells Pro and Flash apart; an
 answer from another model is refused.
 
-    docker build -t opb-infinity omni_parse_bench/harness/providers/oss/infinity
+    docker build -t opb-infinity omni_parse_bench/harness/providers/serve/infinity
     docker run --gpus all -p 8001:8001 opb-infinity
     opb predict --provider infinity-parser2 --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -67,7 +67,7 @@ LABELS = {
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the Infinity-Parser2 server (oss/infinity/) answers, the model it serves, and its sampling
+    """Where the Infinity-Parser2 server (serve/infinity/) answers, the model it serves, and its sampling
     (the SDK's by default)."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})

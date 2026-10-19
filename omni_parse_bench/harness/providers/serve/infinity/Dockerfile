@@ -2,7 +2,7 @@
 # asks it as the `infinity_parser2` SDK's vLLM backends do and reads the reply with the SDK's own
 # post-processing (start.sh). The adapter is providers/infinity.py:
 #
-#     docker build -t opb-infinity omni_parse_bench/harness/providers/oss/infinity
+#     docker build -t opb-infinity omni_parse_bench/harness/providers/serve/infinity
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-infinity
 #     opb benchmark --providers infinity-parser2 --options '{"infinity-parser2": {"base_url": "http://localhost:8001"}}'
 #

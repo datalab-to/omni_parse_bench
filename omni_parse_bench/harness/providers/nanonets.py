@@ -1,4 +1,4 @@
-"""Nanonets-OCR2-3B (nanonets/Nanonets-OCR2-3B), served by vLLM from providers/oss/nanonets/ on any GPU host.
+"""Nanonets-OCR2-3B (nanonets/Nanonets-OCR2-3B), served by vLLM from providers/serve/nanonets/ on a GPU host.
 
 Run as its model card runs it (huggingface.co/nanonets/Nanonets-OCR2-3B, "Using vLLM"). Its vendor
 offers only the model, with no code of its own around it, so every step runs here, asking vLLM
@@ -25,7 +25,7 @@ Differences from the vendor:
 
   - each page has the benchmark's 900 s.
 
-    docker build -t opb-nanonets omni_parse_bench/harness/providers/oss/nanonets
+    docker build -t opb-nanonets omni_parse_bench/harness/providers/serve/nanonets
     docker run --gpus all -p 8001:8001 opb-nanonets
     opb predict --provider nanonets-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -60,7 +60,7 @@ _UNWRAP = re.compile(r"</?(?:watermark|page_number|signature)>", re.I)
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the server (oss/nanonets/) answers (its chat endpoint is vLLM's, under /v1), and its
+    """Where the server (serve/nanonets/) answers (its chat endpoint is vLLM's, under /v1), and its
     sampling (the model card's by default; top_p, which it leaves unset, at vLLM's 1.0)."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})

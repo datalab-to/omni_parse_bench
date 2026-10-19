@@ -2,7 +2,7 @@
 
 Each fixture in fixtures/open_weights/ is one answer from the October 2026 runs (the record's `raw`,
 trimmed of fields no adapter reads), with the provider and options of the run. No adapter imports
-its vendor's code (that runs on the model's server, providers/oss/), so every fixture is read here.
+its vendor's code (that runs on the model's server, providers/serve/), so every fixture is read here.
 """
 from __future__ import annotations
 

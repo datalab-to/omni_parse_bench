@@ -1,7 +1,7 @@
-"""dots.mocr (rednote-hilab/dots.mocr), served from providers/oss/dots/ on any GPU host.
+"""dots.mocr (rednote-hilab/dots.mocr), served from providers/serve/dots/ on any GPU host.
 
 Run as its repository's parser, `DotsMOCRParser`, runs it (github.com/rednote-hilab/dots.mocr at
-23f3e56). Steps 1 to 4 run on the server (oss/dots/server.py); step 5 runs here, with no vendor code.
+23f3e56). Steps 1 to 4 run on the server (serve/dots/server.py); step 5 runs here, with no vendor code.
 
 How a page is processed:
 
@@ -28,7 +28,7 @@ Differences from the vendor:
   - headers and footers are kept, as the parser's `.md` keeps them; and
   - each page has the benchmark's 900 s.
 
-    docker build -t opb-dots omni_parse_bench/harness/providers/oss/dots
+    docker build -t opb-dots omni_parse_bench/harness/providers/serve/dots
     docker run --gpus all -p 8001:8001 opb-dots
     opb predict --provider dots-mocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -55,7 +55,7 @@ LABELS = {
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the dots.mocr server (oss/dots/) answers, and its sampling (the parser's by default)."""
+    """Where the dots.mocr server (serve/dots/) answers, and its sampling (the parser's by default)."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
     temperature: float = 0.1
@@ -66,7 +66,7 @@ class Config:
 
 def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
     """One call answers every output."""
-    return [contract.Request(wants, {"model": MODEL, "server": "oss/dots", "settings": http.settings(config),
+    return [contract.Request(wants, {"model": MODEL, "settings": http.settings(config),
                                      "page": "the file, loaded by its parser"})]
 
 

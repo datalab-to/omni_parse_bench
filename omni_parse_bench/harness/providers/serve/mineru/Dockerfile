@@ -2,7 +2,7 @@
 # MinerU's logits processor, server.py runs the client's two-step extraction against it (start.sh). The
 # adapter is providers/mineru.py:
 #
-#     docker build -t opb-mineru omni_parse_bench/harness/providers/oss/mineru
+#     docker build -t opb-mineru omni_parse_bench/harness/providers/serve/mineru
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-mineru
 #     opb benchmark --providers mineru --options '{"mineru": {"base_url": "http://localhost:8001"}}'
 #

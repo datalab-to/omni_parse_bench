@@ -2,7 +2,7 @@
 # as the repository's client does, with its streaming early stop and its post-processing (start.sh).
 # The adapter is providers/hunyuan.py:
 #
-#     docker build -t opb-hunyuan omni_parse_bench/harness/providers/oss/hunyuan
+#     docker build -t opb-hunyuan omni_parse_bench/harness/providers/serve/hunyuan
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-hunyuan
 #     opb benchmark --providers hunyuan-ocr --options '{"hunyuan-ocr": {"base_url": "http://localhost:8001"}}'
 #

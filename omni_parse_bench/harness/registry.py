@@ -39,7 +39,7 @@ ADAPTERS = {
     "azure": azure,
     "mistral": mistral,
     "tesseract": tesseract,
-    # Open models, each served from its folder in providers/oss/: the vendor's own code on a server of
+    # Open models, each served from its folder in providers/serve/: the vendor's own code on a server of
     # ours, or vLLM alone where the vendor offers only the model.
     "chandra-ocr": chandra_ocr,
     "deepseek-ocr": deepseek_ocr,

@@ -1,7 +1,7 @@
-"""Surya OCR 2 (datalab-to/surya-ocr-2), served from providers/oss/surya/ on any GPU host.
+"""Surya OCR 2 (datalab-to/surya-ocr-2), served from providers/serve/surya/ on any GPU host.
 
 Run as the public `surya-ocr` package (0.22.1) runs it with its `surya_ocr` command. Steps 1 to 4 run on
-the server (oss/surya/server.py); step 5 runs here, with no vendor code.
+the server (serve/surya/server.py); step 5 runs here, with no vendor code.
 
 How a page is processed:
 
@@ -28,7 +28,7 @@ Differences from the vendor:
     benchmarking); and
   - each page has the benchmark's 900 s.
 
-    docker build -t opb-surya omni_parse_bench/harness/providers/oss/surya
+    docker build -t opb-surya omni_parse_bench/harness/providers/serve/surya
     docker run --gpus all -p 8001:8001 opb-surya
     opb predict --provider surya-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -59,7 +59,7 @@ _TAG = re.compile(r"<[^>]+>")
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the Surya OCR 2 server (oss/surya/) answers, and the DPI a PDF is loaded at (the
+    """Where the Surya OCR 2 server (serve/surya/) answers, and the DPI a PDF is loaded at (the
     `surya_ocr` command's, IMAGE_DPI_HIGHRES, by default)."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})

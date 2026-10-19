@@ -1,8 +1,8 @@
-"""DeepSeek-OCR-2 (deepseek-ai/DeepSeek-OCR-2), served from providers/oss/deepseek/ on any GPU host.
+"""DeepSeek-OCR-2 (deepseek-ai/DeepSeek-OCR-2), served from providers/serve/deepseek/ on any GPU host.
 
 Run as its repository runs it (github.com/deepseek-ai/DeepSeek-OCR-2 at 2f3699e, DeepSeek-OCR2-vllm),
 which it does only as batch scripts; the server wraps that engine in one route. Steps 1 to 4 run on the
-server (oss/deepseek/server.py); step 5 runs here, with no vendor code.
+server (serve/deepseek/server.py); step 5 runs here, with no vendor code.
 
 How a page is processed:
 
@@ -29,7 +29,7 @@ Differences from the vendor:
 
   - each page has the benchmark's 900 s.
 
-    docker build -t opb-deepseek omni_parse_bench/harness/providers/oss/deepseek
+    docker build -t opb-deepseek omni_parse_bench/harness/providers/serve/deepseek
     docker run --gpus all -p 8001:8001 opb-deepseek
     opb predict --provider deepseek-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -69,7 +69,7 @@ LABELS = {
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the DeepSeek-OCR-2 server (oss/deepseek/) answers, and its sampling (the repository's
+    """Where the DeepSeek-OCR-2 server (serve/deepseek/) answers, and its sampling (the repository's
     scripts' by default; top_p, which they leave unset, at vLLM's 1.0)."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})

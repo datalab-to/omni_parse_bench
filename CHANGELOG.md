@@ -151,3 +151,10 @@ The command line:
   given to the command line may start with a UTF-8 byte-order mark; an option of NaN or infinity is
   refused; `--workers` takes 0 for one adapter as its default; and `opb score --pred` given a gold file
   says so.
+
+Providers:
+
+- the open models' servers are in `providers/serve/<model>/` (was `providers/oss/<model>/`), so an image
+  is built with `docker build -t opb-<model> omni_parse_bench/harness/providers/serve/<model>`; and
+- a request no longer records the server folder it goes to: `dots`, `unlimited`, `chandra_ocr`,
+  `indra_ocr` and `olmocr` sent `"server": "oss/<model>"`, so those five name new runs.
