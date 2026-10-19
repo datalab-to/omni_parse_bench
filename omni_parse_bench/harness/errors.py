@@ -1,11 +1,5 @@
-"""How a call fails, and whether a retry can fix it.
-
-`VendorError` and its subclasses are about one page: `predict` records them. Transience is
-read off the HTTP status, never matched in a message.
-
-`AccountFailure`, `MissingCredential` and `MissingDependency` are identical for every page,
-so they are raised past the runner, never recorded: a recorded failure is a settled answer that
-no resume re-attempts. Each is a `Stop`.
+"""How a call to a system fails, and whether a retry can fix it: the core's errors, with what opb's adapters
+add. `AccountFailure`, `MissingCredential` and `MissingDependency` are the core's; each stops the run.
 """
 from __future__ import annotations
 
@@ -13,10 +7,12 @@ import contextlib
 from collections.abc import Iterator
 from typing import Any
 
-from omni_parse_bench import errors as base_errors
+from omni_bench_core import errors as core
 
-# Note: 520-524 are Cloudflare's: the origin behind it didn't answer, as a 502 or 504 would say.
-TRANSIENT_STATUSES = frozenset({429, 500, 502, 503, 504, 520, 521, 522, 523, 524})
+TRANSIENT_STATUSES = core.TRANSIENT_STATUSES
+AccountFailure = core.AccountFailure
+MissingCredential = core.MissingCredential
+MissingDependency = core.MissingDependency
 
 
 def unread(exc: Exception) -> str:
@@ -24,60 +20,40 @@ def unread(exc: Exception) -> str:
     return f"the adapter couldn't read the answer: {type(exc).__name__}: {exc}"[:300]
 
 
-class VendorError(RuntimeError):
-    """The call was made and did not produce its outputs. `status` decides a retry."""
+class VendorError(core.VendorError):
+    """A call was made and did not produce its outputs. `status` decides whether a retry is worth it.
 
-    def __init__(self, message: str, *, status: int | None = None, body: str | None = None,
-                 raw: Any = None, cost: Any = None, job_id: str | None = None):
-        super().__init__(message)
-        self.status = status
-        self.body = body
-        # Note: what the vendor did return, when it returned something: kept in the record, so a
-        # paid answer is never thrown away and its cost is counted.
-        self.raw, self.cost, self.job_id = raw, cost, job_id
+    A system can answer and still fail, such as a job that finished with an error. The answer it returned
+    (`raw`) becomes the error's `body`, and what it cost becomes its `cost`, so the core keeps both in the
+    row's record and a paid answer is never thrown away. It also carries the system's job id (`job_id`), so a
+    job that outlives its call can be found.
+    """
 
-    @property
-    def transient(self) -> bool:
-        return self.status in TRANSIENT_STATUSES
+    def __init__(self, message: str, *, status: int | None = None, body: Any = None, raw: Any = None,
+                 cost: Any = None, sent: Any = None, job_id: str | None = None):
+        super().__init__(message, status=status, body=body if body is not None else raw, sent=sent, cost=cost,
+                         job_id=job_id)
+        self.raw = raw
 
 
 @contextlib.contextmanager
 def job(job_id: str | None) -> Iterator[None]:
-    """A `VendorError` raised inside carries `job_id`, so a job that outlives its call can be found."""
+    """Makes a `VendorError` raised inside carry `job_id`, so a job that outlives its call can be found. It
+    takes the core's `VendorError` too, which `adapter.reading` raises."""
     try:
         yield
-    except VendorError as exc:
+    except core.VendorError as exc:
         exc.job_id = exc.job_id or job_id
         raise
 
 
-class VendorUnreachable(VendorError):
-    """The request didn't reach the vendor or its answer didn't come back: a network fault, the
-    same for every vendor, so always worth another attempt."""
+class VendorUnreachable(VendorError, core.VendorUnreachable):
+    """The request didn't reach the system, or its answer didn't come back.
 
-    @property
-    def transient(self) -> bool:
-        return True
+    As in the core, it is not retried within the call: a failed poll can leave a paid job running, and asking
+    again from the start would pay for it twice. A later run with `--retry-failed` tries the page again."""
 
 
-class VendorTimeout(VendorError):
-    """The uniform budget ran out while the vendor was still working.
-
-    Never transient: a retry spends another full budget on a page known to exceed it.
-    """
-
-    @property
-    def transient(self) -> bool:
-        return False
-
-
-class AccountFailure(base_errors.Stop):
-    """The account cannot pay (credit ceiling, expired subscription). Stops the run."""
-
-
-class MissingCredential(base_errors.Stop):
-    """A vendor's API key is not in the environment."""
-
-
-class MissingDependency(ImportError, base_errors.Stop):
-    """An adapter could not import its SDK."""
+class VendorTimeout(VendorError, core.VendorTimeout):
+    """The time ran out while the system was still working. It is never retried within a call, because a
+    retry would spend another full budget on a page we know takes longer."""

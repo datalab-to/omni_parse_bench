@@ -1,21 +1,6 @@
 """chandra-ocr-2's server: steps 1 to 4 of providers/chandra_ocr.py, with the `chandra-ocr` package's code.
 
-The package's file loading, `scale_to_fit`, prompt, retry rule and `parse_html`, around the vLLM serving
-the model; how a page is processed is set out step by step in the adapter's docstring. `parse_html`
-reads each top-level block on its own, so the adapter can treat picture blocks its own way;
-concatenated, the blocks are the package's page, but for the names it gives images (a hash of the HTML
-it was given).
-
-    GET  /health    200 once up
-    POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
-                    "settings": {"temperature", "top_p", "max_tokens" (the first attempt's), "dpi",
-                    "max_retries"}}
-                    -> {"completion": the kept chat completion, "attempts", "usage": summed over
-                    attempts, "blocks": [{"label", "raw": the block's inner HTML as the model wrote it,
-                    "html": parse_html of the block}], "vendor": {"chandra-ocr": its commit}}
-
-With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image,
-beside the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
+`Handler` says what the server answers and how it runs.
 """
 from __future__ import annotations
 
@@ -32,18 +17,17 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import httpx
 from bs4 import BeautifulSoup
-from PIL import Image
-
 from chandra.input import load_image, load_pdf_images
 from chandra.model.util import detect_repeat_token, scale_to_fit
 from chandra.output import parse_html
 from chandra.prompts import PROMPT_MAPPING
+from PIL import Image
 
 VLLM = os.environ.get("VLLM_URL", "http://127.0.0.1:8000/v1")
 MODEL = os.environ.get("VLLM_MODEL", "chandra")
 TIMEOUT_S = 900.0
 KEY = os.environ.get("OPB_ENDPOINT_KEY")
-# Note: every request sets these, from the adapter's Config (the vendor's values by default).
+# Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = ("temperature", "top_p", "max_tokens", "dpi", "max_retries")
 # Note: the vendor's renderer (pdfium, PyMuPDF) isn't thread-safe, and its own tools load one page at a
 # time; requests arrive on many threads, so pages load one at a time here too.
@@ -133,6 +117,23 @@ def settings(body: dict) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    """The package's file loading, `scale_to_fit`, prompt, retry rule and `parse_html`, around the vLLM
+    serving the model; how a page is processed is set out step by step in the adapter's docstring.
+    `parse_html` reads each top-level block on its own, so the adapter can treat picture blocks its own
+    way; concatenated, the blocks are the package's page, but for the names it gives images (a hash of the
+    HTML it was given).
+
+        GET  /health    200 once up
+        POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
+                        "settings": {"temperature", "top_p", "max_tokens" (the first attempt's), "dpi",
+                        "max_retries"}}
+                        -> {"completion": the kept chat completion, "attempts", "usage": summed over
+                        attempts, "blocks": [{"label", "raw": the block's inner HTML as the model wrote it,
+                        "html": parse_html of the block}], "vendor": {"chandra-ocr": its commit}}
+
+    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image,
+    beside the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
+    """
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 

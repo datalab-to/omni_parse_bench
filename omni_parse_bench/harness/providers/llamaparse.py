@@ -1,22 +1,6 @@
 """LlamaParse adapter (v2 API): upload the page with its configuration, poll, read the result.
 
-One call produces both outputs:
-
-- `html` is LlamaParse's page `header`, its page markdown and its page `footer`, in that order.
-  The markdown leaves out what LlamaParse typed page header and footer, and returns them beside it
-  in those fields of the same page, so they go back where a header and a footer sit; and
-- `blocks` are its items' boxes. An item (text, heading, table, image, header, footer, ...) can
-  have several boxes, each with a finer layout label (form, paragraph_title, table, image, ...)
-  and the span of the item's text it covers. A box's label is looked up in `BOX_LABELS`; a box
-  with no label takes its item's type from `ITEM_LABELS`. Items nest (a list's items, the lines of
-  a header), each level with its own boxes, and every level is read.
-
-Tables are asked for as html. The tier is `agentic_plus`, LlamaParse's most accurate. Cost comes
-back in LlamaParse credits (`job.usage.credits`).
-
-Auth: LLAMA_CLOUD_API_KEY.
-
-    opb predict --provider llamaparse --page page.pdf --options '{"tier": "agentic"}'
+The adapter is `LlamaParse`; its docstring says how a page is processed, and how to serve and run it.
 """
 from __future__ import annotations
 
@@ -26,11 +10,14 @@ import os
 import re
 import time
 from pathlib import Path
+from typing import Any, ClassVar
 
 import httpx
+from omni_bench_core import adapter
 
 from ... import markdown
 from .. import budget, contract, errors, layout
+from ..adapter import PageAdapter
 
 DEFAULT_BASE_URL = "https://api.cloud.llamaindex.ai"
 SUPPORTS = frozenset({"html", "blocks"})
@@ -51,8 +38,27 @@ TERMINAL = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """What llamaparse can be asked."""
+class LlamaParse(PageAdapter):
+    """The llamaparse adapter. Its fields are what llamaparse can be asked.
+
+    One call produces both outputs:
+
+    - `html` is LlamaParse's page `header`, its page markdown and its page `footer`, in that order.
+      The markdown leaves out what LlamaParse typed page header and footer, and returns them beside it
+      in those fields of the same page, so they go back where a header and a footer sit; and
+    - `blocks` are its items' boxes. An item (text, heading, table, image, header, footer, ...) can
+      have several boxes, each with a finer layout label (form, paragraph_title, table, image, ...)
+      and the span of the item's text it covers. A box's label is looked up in `BOX_LABELS`; a box
+      with no label takes its item's type from `ITEM_LABELS`. Items nest (a list's items, the lines of
+      a header), each level with its own boxes, and every level is read.
+
+    Tables are asked for as html. The tier is `agentic_plus`, LlamaParse's most accurate. Cost comes
+    back in LlamaParse credits (`job.usage.credits`).
+
+    Auth: LLAMA_CLOUD_API_KEY.
+
+        opb run --providers llamaparse --options '{"llamaparse": {"tier": "agentic"}}' --sample 20
+    """
 
     tier: str = dataclasses.field(
         default="agentic_plus",
@@ -62,8 +68,21 @@ class Config:
     base_url: str = DEFAULT_BASE_URL
     poll_interval: float = 3.0
 
+    name: ClassVar[str] = "llamaparse"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    workers: ClassVar[int] = 3
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: LlamaParse) -> list[contract.Request]:
     """One call for every output; html puts back the headers and footers the page markdown leaves out."""
     # Note: without disable_cache LlamaParse returns an earlier job for a file it has seen, so a rerun
     # measures neither this parse nor its time; the other vendors parse every page afresh.
@@ -100,9 +119,9 @@ def items(xs: list[dict] | None) -> list[dict]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
-         config: Config | None = None) -> contract.Call:
+         config: LlamaParse | None = None) -> contract.Call:
     """Upload the page with its configuration, poll until it is done, return the result and cost."""
-    config = config or Config()
+    config = config or LlamaParse()
     key = os.environ.get("LLAMA_CLOUD_API_KEY")
     if not key:
         raise errors.MissingCredential("LLAMA_CLOUD_API_KEY is not set")
@@ -115,7 +134,9 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         r = client.post(f"{base_url}/api/v2/parse/upload", data={"configuration": json.dumps(configuration)},
                         files={"file": (contract.upload_name(page), page.read_bytes(), media)},
                         timeout=deadline.timeout(300))
-        if r.status_code != 200 or not (job_id := r.json().get("id")):
+        with adapter.reading("the job's id"):
+            job_id = contract.json_object(r).get("id") if r.status_code == 200 else None
+        if not job_id:
             raise errors.VendorError(f"upload HTTP {r.status_code}: {r.text[:300]}",
                                      status=r.status_code, body=r.text)
         retry = budget.PollRetry(deadline)
@@ -131,13 +152,16 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                     if retry.again(r.status_code): continue
                     raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}",
                                              status=r.status_code, body=r.text)
-                retry.ok()
+                retry.reset()
                 polls += 1
-                job = r.json().get("job") or r.json()
+                with adapter.reading("the job's status"):
+                    got = contract.json_object(r)
+                    job = got.get("job") or got
+                    if not isinstance(job, dict): raise ValueError(f"the job is a JSON {type(job).__name__}")
                 if job.get("status") in TERMINAL: break
                 time.sleep(min(config.poll_interval, deadline.remaining()))
-            if job["status"] != "COMPLETED":
-                raise errors.VendorError(f"job {job['status']}: {str(job.get('error_message'))[:300]}",
+            if job.get("status") != "COMPLETED":
+                raise errors.VendorError(f"job {job.get('status')}: {str(job.get('error_message'))[:300]}",
                                          status=200, raw={"job": job}, cost=_cost({"job": job}, job))
             # Note: the result is fetched with the same retry as the polls, since failing here would
             # re-run, and re-pay for, a job that is done.
@@ -153,7 +177,8 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                 if retry.again(r.status_code): continue
                 raise errors.VendorError(f"result HTTP {r.status_code}: {r.text[:300]}",
                                          status=r.status_code, body=r.text)
-    body = r.json()
+    with adapter.reading("the job's result"):
+        body = contract.json_object(r)
     # Note: the last poll's job is kept beside the result: usage can be set on one and null on the other.
     body["poll_job"] = job
     return contract.Call(body, cost=_cost(body, job), job_id=job_id)
@@ -166,7 +191,7 @@ def _cost(body: dict, job: dict) -> contract.Cost:
     return contract.Cost.in_credits(credits, "job.usage.credits")
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: LlamaParse | None = None) -> tuple[dict, dict]:
     """The outputs in a result: header, markdown and footer as html, and blocks."""
     pages = [p for p in (raw.get("markdown") or {}).get("pages") or [] if p.get("page_number", 1) == 1]
     items = [p for p in (raw.get("items") or {}).get("pages") or [] if p.get("page_number", 1) == 1]

@@ -1,23 +1,6 @@
 """Mistral OCR adapter: one POST /v1/ocr, answered in the same response.
 
-One call produces both outputs. Mistral returns each page as markdown, with tables (asked for
-as html) and images left as placeholders (`[tbl-0.html](tbl-0.html)`, `![img-0.jpeg](img-0.jpeg)`)
-whose content is in the page's `tables` and `images`; asked to, it moves the page's header and
-footer out of the markdown into `header` and `footer`; and it returns paragraph-level `blocks`, each
-typed (text, title, table, image, header, footer, ...) with a box in the page's pixels. So:
-
-- `html` is the header, the markdown and the footer, joined in that order, tables put in place of
-  their placeholders; the request's `sent` says so; and
-- `blocks` are its blocks, their text with tags removed as for every vendor.
-
-Images are found but not sent back (`include_image_base64` off): their pixels are no page text, and
-their placeholders (`![img-0.jpeg](img-0.jpeg)`) are taken out of the markdown, while their regions
-stay in the blocks. (`image_limit` 0 would drop those regions too.) Mistral states pages
-processed, not a cost, so the cost is unknown.
-
-Auth: MISTRAL_API_KEY.
-
-    opb predict --provider mistral --page page.pdf
+The adapter is `Mistral`; its docstring says how a page is processed, and how to serve and run it.
 """
 from __future__ import annotations
 
@@ -26,11 +9,14 @@ import dataclasses
 import os
 import re
 from pathlib import Path
+from typing import Any, ClassVar
 
 import httpx
+from omni_bench_core import adapter
 
 from ... import markdown
 from .. import budget, contract, errors, layout
+from ..adapter import PageAdapter
 
 DEFAULT_BASE_URL = "https://api.mistral.ai"
 SUPPORTS = frozenset({"html", "blocks"})
@@ -47,15 +33,47 @@ _IMAGE = re.compile(r"!\[(img-\d+\.\w+)\]\(\1\)")
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """What mistral can be asked."""
+class Mistral(PageAdapter):
+    """The mistral adapter. Its fields are what mistral can be asked.
+
+    One call produces both outputs. Mistral returns each page as markdown, with tables (asked for
+    as html) and images left as placeholders (`[tbl-0.html](tbl-0.html)`, `![img-0.jpeg](img-0.jpeg)`)
+    whose content is in the page's `tables` and `images`; asked to, it moves the page's header and
+    footer out of the markdown into `header` and `footer`; and it returns paragraph-level `blocks`, each
+    typed (text, title, table, image, header, footer, ...) with a box in the page's pixels. So:
+
+    - `html` is the header, the markdown and the footer, joined in that order, tables put in place of
+      their placeholders; the request's `sent` says so; and
+    - `blocks` are its blocks, their text with tags removed as for every vendor.
+
+    Images are found but not sent back (`include_image_base64` off): their pixels are no page text, and
+    their placeholders (`![img-0.jpeg](img-0.jpeg)`) are taken out of the markdown, while their regions
+    stay in the blocks. (`image_limit` 0 would drop those regions too.) Mistral states pages
+    processed, not a cost, so the cost is unknown.
+
+    Auth: MISTRAL_API_KEY.
+
+        opb run --providers mistral --sample 20
+    """
 
     # Note: a dated model, not mistral-ocr-latest, so a run records the model it used.
     model: str = dataclasses.field(default="mistral-ocr-4-1", metadata={"help": "Mistral's OCR model"})
     base_url: str = DEFAULT_BASE_URL
 
+    name: ClassVar[str] = "mistral"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: Mistral) -> list[contract.Request]:
     """One call for every output: the header and footer come apart, and are put back for html."""
     sent = {"model": config.model, "table_format": "html", "extract_header": True, "extract_footer": True,
             "include_blocks": True, "include_image_base64": False}
@@ -65,9 +83,9 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
-         config: Config | None = None) -> contract.Call:
+         config: Mistral | None = None) -> contract.Call:
     """Send the page inline, return the OCR response."""
-    config = config or Config()
+    config = config or Mistral()
     key = os.environ.get("MISTRAL_API_KEY")
     if not key:
         raise errors.MissingCredential("MISTRAL_API_KEY is not set")
@@ -84,7 +102,9 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         raise errors.VendorTimeout(f"no answer within the call's {deadline.total:.0f} s") from None
     if r.status_code != 200:
         raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}", status=r.status_code, body=r.text)
-    return contract.Call(r.json(), cost=contract.Cost())
+    with adapter.reading("the OCR response"):
+        body = contract.json_object(r)
+    return contract.Call(body, cost=contract.Cost())
 
 
 def page_markdown(page: dict) -> str:
@@ -108,7 +128,7 @@ def layout_blocks(page: dict) -> list[dict]:
     return out
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: Mistral | None = None) -> tuple[dict, dict]:
     """The outputs in an OCR response: the page with its header and footer, and its blocks."""
     if not (pages := raw.get("pages")):
         raise errors.VendorError(f"no pages in the answer: {str(raw)[:300]}", status=200)

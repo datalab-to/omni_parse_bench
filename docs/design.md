@@ -200,14 +200,13 @@ suite and document are its page's.
 ## Predict
 
 ```python
-predict(provider, page, wants=None, timeout=…, **options) -> record   # page: a .pdf or .png
+omni_bench_core.adapter.predict(system, harness.Input(page, wants)) -> record   # page: a .pdf or .png
 ```
 
 The benchmark asks a provider only for what a page's tests read: the page's `outputs` in the
-manifest, the `output_type` of every test on it (`tests.wants`), less what its record already holds,
-are the `wants` it calls `predict` with. The record holds
-the outputs, an error per output that failed or is unsupported, each call (what was sent, its cost
-and time) and the vendor's raw answers; [API.md](./API.md) shows one.
+manifest, among the outputs being graded, are the `wants`. The record holds the outputs, the error
+when the page failed, each call's answer as received (what was sent and the raw answer), and the
+cost and time.
 
 ## Score
 
@@ -216,9 +215,9 @@ The scorer is `scorers/unit_tests`, a package that owns the shape of its gold: w
 
 ```python
 gold(page) -> tests                              # the page's tests, from its gold file, checked
-score(pred, gold, unsupported=()) -> [Verdict(id, result, why)]
+score(pred, gold) -> [Verdict(id, result, why)]
 lines(verdicts, tests, page) -> [score line]     # each verdict beside its page and its test
-summarize(lines) -> summary                      # over score lines: these, or a run's scores.jsonl
+summarize(lines) -> summary                      # over test lines; a run's scores.jsonl holds them per page
 check(pages) -> tests                            # every test of a dataset, and the dataset as a whole
 ```
 
@@ -232,8 +231,8 @@ The headline is the mean of the families' scores: text (present, order, repeat),
 (`vocab.FAMILIES` maps every test type to one). Weighting by family rather than by test means a
 family's weight never depends on how many tests it has: sampling more layout lines makes the layout
 score more precise without making layout count more. The families are those the graded tests are
-in, so a subset scores on the families it holds. A system with no scored test in some family (every
-one unsupported) has no headline.
+in, so a subset scores on the families it holds. A page whose call failed counts as 0: the headline
+is the families' score over the graded pages, times the share of pages graded (the omni-bench-core rule).
 
 Each output type also has its own score, the share of its tests passed, with `per_test_type` and
 `per_tag`; the summary also gives `per_suite` and `per_derivation`. Each score also counts the source
@@ -283,33 +282,36 @@ A test runs in four steps:
 Constants sit at the top of the runner module (`TABLE_MIN_RATIO`, `MIN_PLACE_COVER`), and are part of
 the test type, not of any test.
 
-A verdict's result is one of four:
+A verdict's result is one of two:
 
-- `pass`: the test passed;
+- `pass`: the test passed; or
 - `fail`: it failed, its output is missing, or its output is malformed: HTML that isn't a string, or
   a block that isn't `{label, bbox[, text]}` with a label of `views.LABELS` and a box of four numbers
-  from 0 to 1. The view raises `views.MalformedOutput` for these, since they are the provider's fault;
-- `unsupported`: the provider can't produce the test's output type.
+  from 0 to 1. The view raises `views.MalformedOutput` for these, since they are the provider's fault.
 
-`unsupported` verdicts are left out of every score; `summarize` counts them per output type. Grading
-that raises anything else on a well-formed output is a scorer bug: it is raised, naming the page and
-the test, and no scores or summary are written, so a bug never passes as a score.
+A system that can't produce an output is graded without that output's tests (`UnitTests(outputs=...)`,
+`opb run --outputs html`), never with them counted as failed. Grading that raises anything else on a
+well-formed output is a scorer bug: it is raised, naming the page and the test, and no scores or summary
+are written, so a bug never passes as a score.
 
 ## Benchmark
 
-[What a benchmark writes](./API.md#what-a-benchmark-writes) describes a run's files: settings.json,
-records/, predictions/, scores.jsonl and summary.json.
+A benchmark is an omni-bench-core `Benchmark` (`benchmark.default()`): the `Parse` task, the dataset and
+`UnitTests`. omni-bench-core plans, predicts, resumes and grades, and writes a run's files: settings.json,
+records/, predictions/, and the scorer's folder with scores.jsonl, summary.json and details/.
 
 ## Package
 
 ```
 omni_parse_bench/
-  __init__.py     data, scorers, and the scorer's score, lines, summarize and Verdict
+  __init__.py     data, scorers, and the scorer's UnitTests, score, lines, summarize and Verdict
   data.py         the dataset: downloading it, reading its manifest into pages, choosing pages to run
   scorers/
-    unit_tests/   the scorer: gold, check, score, lines, summarize
+    unit_tests/   the scorer: UnitTests, and gold, check, score, lines, summarize
       tests.py    what a unit test is: a gold file read into typed, checked tests
       runners.py  one parameter tuple and one runner per test type, and the TYPES registry
+      compare.py  one page: every test run against its outputs (score, Verdict)
+      unit_tests.py  a dataset: gold, check, lines, summarize, and UnitTests
   vocab.py        the closed vocabularies: output types, derivations, families, what each test type reads, tags
   views.py        what a runner reads: views.Html (the HTML, its text and seen views), views.Block
   normalize.py    fold and squeeze, the comparison normal form both sides go through
@@ -318,17 +320,17 @@ omni_parse_bench/
   katex/          KaTeX (MIT), run in an embedded V8 (mini-racer)
   markdown.py     markdown → HTML, the one converter the harness runs on every provider's markdown
   harness/        producing predictions:
-    contract.py   the adapter protocol (Config, SUPPORTS, requests, call, parse) and Request/Call/Cost
+    adapter.py    PageAdapter: an omni-bench-core adapter for one page (SUPPORTS, requests, send, parse)
+    contract.py   Request, Call and Cost: one call and its answer
     errors.py     how a call fails, and whether a retry can fix it
-    budget.py     one call's share of the clock
+    budget.py     one page's share of the clock
     layout.py     a vendor's layout blocks as the `blocks` output
     raster.py     a PDF page as an image
-    registry.py   which adapter, at what settings, under what run name
-    page.py       predict: one page, one vendor
+    registry.py   which adapter a provider name means, made from options
     providers/    one module per vendor (docs/providers.md)
-  benchmark.py    Plan / Run: predict every page, resumably, then grade into scores and a summary
-  progress.py     the live table while a benchmark runs
-  cli.py          opb score | predict | benchmark | tests | providers | reparse
+  task.py         the Parse task: a page in, its html and layout blocks out
+  benchmark.py    the benchmark: the Parse task on a dataset, graded by UnitTests
+  cli.py          opb run | grade | score | predict | check | tests | providers
 tests/            including test_dataset.py, the dataset's invariants
 docs/
 ```

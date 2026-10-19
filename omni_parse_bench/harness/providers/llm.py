@@ -1,30 +1,6 @@
 """Single-shot LLM parsing: the page image goes to the model, one call per output.
 
-Used for vision-language models (GPT, Claude, ...) through any OpenAI-compatible endpoint. The
-published runs use OpenRouter, which returns billed cost (`usage.cost`) rather than only a token
-count. Every model gets the same prompts:
-
-    html      transcribe the page as HTML, keeping everything printed on it
-    blocks    the page's layout blocks, one JSON object per line, boxes on a 0-1000 grid as
-              [ymin, xmin, ymax, xmax]
-
-A reply that is markdown rather than HTML is converted by `markdown.to_html`, the same converter
-every provider's markdown goes through. A reply that doesn't parse is asked for again.
-
-No sampling setting is sent: each model runs at its own default temperature and reasoning, as every
-vendor runs at its own settings (Google, for one, advises against lowering Gemini 3's temperature,
-which can make it loop). The page image is sent at high detail, so no endpoint downscales it.
-
-Another endpoint is selected with the `base_url` option, so the record says which endpoint
-answered. Auth: OPENROUTER_API_KEY (or OPENAI_API_KEY) for OpenRouter; for any other endpoint
-OPB_ENDPOINT_KEY if set, else none.
-
-The open OCR models are providers of their own (providers/serve/); `chat`, `answer` and the small
-helpers below are what they share with this adapter.
-
-    opb predict --provider openai/gpt-5.6-sol --page page.pdf
-
-The model is the provider name; `--options {"model": ...}` is refused.
+The adapter is `LLM`; its docstring says how a page is processed, and how to serve and run it.
 """
 from __future__ import annotations
 
@@ -39,11 +15,15 @@ import re
 import time
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, ClassVar
 
 import openai
+from omni_bench_core import adapter
+from omni_bench_core import errors as core_errors
 
 from ... import markdown
 from .. import budget, contract, errors, layout, raster
+from ..adapter import PageAdapter
 
 SUPPORTS = frozenset({"html", "blocks"})
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
@@ -86,16 +66,61 @@ LABELS = {k: k for k in ("heading", "page_furniture", "text", "list", "caption",
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """What a raw-model leg can be asked. `model` has no default: it IS the provider name."""
+class LLM(PageAdapter):
+    """What a raw-model leg can be asked. `model` has no default, because it is the provider name.
+
+    Used for vision-language models (GPT, Claude, ...) through any OpenAI-compatible endpoint. The
+    published runs use OpenRouter, which returns billed cost (`usage.cost`) rather than only a token
+    count. Every model gets the same prompts:
+
+        html      transcribe the page as HTML, keeping everything printed on it
+        blocks    the page's layout blocks, one JSON object per line, boxes on a 0-1000 grid as
+                  [ymin, xmin, ymax, xmax]
+
+    A reply that is markdown rather than HTML is converted by `markdown.to_html`, the same converter
+    every provider's markdown goes through. A reply that doesn't parse is asked for again.
+
+    No sampling setting is sent: each model runs at its own default temperature and reasoning, as every
+    vendor runs at its own settings (Google, for one, advises against lowering Gemini 3's temperature,
+    which can make it loop). The page image is sent at high detail, so no endpoint downscales it.
+
+    Another endpoint is selected with the `base_url` option, so the record says which endpoint
+    answered. Auth: OPENROUTER_API_KEY (or OPENAI_API_KEY) for OpenRouter; for any other endpoint
+    OPB_ENDPOINT_KEY if set, else none.
+
+    The open OCR models are providers of their own (providers/serve/); `chat`, `answer` and the small
+    helpers below are what they share with this adapter.
+
+        opb run --providers openai/gpt-5.6-sol --sample 20
+
+    The model is the provider name; `--options {"model": ...}` is refused.
+    """
 
     model: str = dataclasses.field(metadata={"help": "an OpenRouter org/model id"})
     max_output_tokens: int = 32000
     base_url: str = DEFAULT_BASE_URL
     attempts: int = 3
 
+    name: ClassVar[str] = "llm"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    @property
+    def provider(self) -> str:
+        """The model id: one adapter stands for every model behind the endpoint, so the model names the
+        run."""
+        return self.model
+
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: LLM) -> list[contract.Request]:
     """One call per output, each with its own prompt."""
     # Note: the prompt's digest is part of what was sent, so a changed prompt is a different run.
     sha = lambda o: hashlib.sha256(PROMPTS[o].encode()).hexdigest()[:12]  # noqa: E731
@@ -209,7 +234,7 @@ def _cost(usage: dict) -> contract.Cost:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
-         config: Config) -> contract.Call:
+         config: LLM) -> contract.Call:
     """One completion for one output, asked again only for an answer that isn't usable.
 
     Only a reply that finished (`stop`) and parses is kept. One cut off by an error is asked again,
@@ -233,20 +258,22 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         deadline.check(f"after {attempt} attempt(s) that produced no usable answer")
         ask = {"model": config.model, "messages": messages, "max_tokens": config.max_output_tokens, **usage}
         body = last = chat(config.base_url, ask, deadline, spent)
-        spent.append(_cost(body.get("usage") or {}))
-        finish = ((body.get("choices") or [{}])[0]).get("finish_reason")
+        with adapter.reading("the reply's usage and finish reason"):
+            spent.append(_cost(body.get("usage") or {}))
+            finish = ((body.get("choices") or [{}])[0]).get("finish_reason")
         if finish == "length":
             raise errors.VendorError(f"the reply hit max_output_tokens ({config.max_output_tokens})",
-                                     status=200, raw=body, cost=contract.total(spent), job_id=body.get("id"))
+                                     status=200, raw=body, cost=contract.Cost.total(spent),
+                                     job_id=body.get("id"))
         if finish == "content_filter":
             raise errors.VendorError("the provider refused the page (content_filter)", status=200, raw=body,
-                                     cost=contract.total(spent), job_id=body.get("id"))
+                                     cost=contract.Cost.total(spent), job_id=body.get("id"))
         cut = cut or finish != "stop"
         if finish == "stop" and _usable(body, output):
-            return contract.Call(body, cost=contract.total(spent), job_id=body.get("id"))
+            return contract.Call(body, cost=contract.Cost.total(spent), job_id=body.get("id"))
     raise errors.VendorError(f"no usable {output} after {config.attempts} attempts"
                              + (" (a reply was cut off by an error)" if cut else ""),
-                             status=200, raw=last, cost=contract.total(spent))
+                             status=200, raw=last, cost=contract.Cost.total(spent))
 
 
 def key(base_url: str) -> str:
@@ -269,13 +296,13 @@ def chat(base_url: str, body: dict, deadline: budget.Budget, spent: Sequence[con
         return client.chat.completions.create(**body, timeout=max(1.0, deadline.remaining())).model_dump()
     except openai.APITimeoutError:
         raise errors.VendorTimeout(f"no answer within {deadline.total:.0f} s",
-                                   cost=contract.total(list(spent))) from None
+                                   cost=contract.Cost.total(list(spent))) from None
     except openai.APIStatusError as exc:
         raise errors.VendorError(f"HTTP {exc.status_code}: {str(exc)[:300]}", status=exc.status_code,
-                                 body=str(exc.body), cost=contract.total(list(spent))) from None
+                                 body=str(exc.body), cost=contract.Cost.total(list(spent))) from None
     except openai.APIConnectionError as exc:
         raise errors.VendorUnreachable(f"connection failed: {exc}"[:300],
-                                       cost=contract.total(list(spent))) from None
+                                       cost=contract.Cost.total(list(spent))) from None
 
 
 def image_part(png: bytes) -> dict:
@@ -300,18 +327,20 @@ def content(body: dict) -> str:
 def tokens(bodies: list[dict]) -> contract.Cost:
     """The tokens of several chat completions, summed where any states them."""
     usages = [b.get("usage") or {} for b in bodies]
-    return contract.total([contract.Cost(tokens_in=u.get("prompt_tokens"),
+    return contract.Cost.total([contract.Cost(tokens_in=u.get("prompt_tokens"),
                                          tokens_out=u.get("completion_tokens")) for u in usages])
 
 
 def _usable(body: dict, output: str) -> bool:
+    """Whether the reply holds a usable `output`. A reply that can't be read doesn't, so it is asked again."""
     try:
-        return bool(parse(body, contract.Request(frozenset({output}), {}), None)[0].get(output))
-    except errors.VendorError:
+        with adapter.reading("the reply"):
+            return bool(parse(body, contract.Request(frozenset({output}), {}), None)[0].get(output))
+    except core_errors.VendorError:
         return False
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: LLM | None = None) -> tuple[dict, dict]:
     """The one output in a finished reply: its text as HTML (`as_html`) or as blocks (`as_blocks`)."""
     (output,) = request.outputs
     choice = (raw.get("choices") or [{}])[0]

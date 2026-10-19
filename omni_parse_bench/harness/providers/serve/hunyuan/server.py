@@ -1,19 +1,6 @@
 """HunyuanOCR-1.5's server: steps 3 and 4 of providers/hunyuan.py, with its repository's client code.
 
-Its client's request, streaming early stop and post-processing, around the vLLM serving the model; how a
-page is processed is set out step by step in the adapter's docstring. The repository takes images only,
-so this takes the page as an image file. The client's utilities are imported from the repository, which the
-image clones (inference/ on PYTHONPATH).
-
-    GET  /health    200 once up
-    POST /parse     {"page": base64 image file, "suffix", "settings": {"task": "layout_parse" or
-                    "doc_parse", "temperature", "top_p", "max_tokens", "repetition_penalty",
-                    "min_repeats": the early stop's}}
-                    -> {"text": the cleaned reply, "early_stopped", "task",
-                    "vendor": {"HunyuanOCR": its commit}}
-
-With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image,
-beside the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
+`Handler` says what the server answers and how it runs.
 """
 from __future__ import annotations
 
@@ -25,7 +12,6 @@ import subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import openai
-
 from inference.utils import output_utils, tasks
 
 VLLM = os.environ.get("VLLM_URL", "http://127.0.0.1:8000/v1")
@@ -35,7 +21,7 @@ REPO = "/opt/hunyuan"
 COMMIT = subprocess.run(["git", "-C", REPO, "rev-parse", "HEAD"], capture_output=True,
                         text=True).stdout.strip()
 SAMPLING = ("temperature", "top_p", "max_tokens")
-# Note: every request sets these, from the adapter's Config (the vendor's values by default).
+# Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = SAMPLING + ("task", "repetition_penalty", "min_repeats")
 CLIENT = openai.OpenAI(api_key="EMPTY", base_url=VLLM, timeout=TIMEOUT_S, max_retries=0)
 
@@ -66,6 +52,21 @@ def settings(body: dict) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    """Its client's request, streaming early stop and post-processing, around the vLLM serving the model; how
+    a page is processed is set out step by step in the adapter's docstring. The repository takes images
+    only, so this takes the page as an image file. The client's utilities are imported from the
+    repository, which the image clones (inference/ on PYTHONPATH).
+
+        GET  /health    200 once up
+        POST /parse     {"page": base64 image file, "suffix", "settings": {"task": "layout_parse" or
+                        "doc_parse", "temperature", "top_p", "max_tokens", "repetition_penalty",
+                        "min_repeats": the early stop's}}
+                        -> {"text": the cleaned reply, "early_stopped", "task",
+                        "vendor": {"HunyuanOCR": its commit}}
+
+    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image,
+    beside the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
+    """
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 

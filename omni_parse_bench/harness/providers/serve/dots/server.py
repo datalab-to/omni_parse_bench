@@ -1,17 +1,6 @@
 """dots.mocr's server: steps 1 to 4 of providers/dots.py, with its repository's own parser code.
 
-What `DotsMOCRParser` does per page (github.com/rednote-hilab/dots.mocr at 23f3e56), around the vLLM
-serving the model; how a page is processed is set out step by step in the adapter's docstring.
-
-    GET  /health    200 once up
-    POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
-                    "settings": {"temperature", "top_p", "max_tokens", "dpi"}}
-                    -> {"cells": [{bbox, category, text}] or null, "markdown", "image_size": [w, h] of
-                    the page as loaded, "completion": the model's chat completion, "vendor"}
-
-Boxes are in the pixels of the page as loaded (`image_size`). With OPB_ENDPOINT_KEY set, a request needs
-it as its bearer token. It runs in this folder's image, beside the vLLM serving the model (start.sh);
-the Dockerfile says how to build and run it.
+`Handler` says what the server answers and how it runs.
 """
 from __future__ import annotations
 
@@ -26,14 +15,13 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import httpx
-from PIL import Image
-
 from dots_mocr.utils import doc_utils, format_transformer, image_utils, layout_utils, prompts
+from PIL import Image
 
 MODE = "prompt_layout_all_en"
 PLACEHOLDER = "<|img|><|imgpad|><|endofimg|>"
 SAMPLING = ("temperature", "top_p", "max_tokens")
-# Note: every request sets these, from the adapter's Config (the vendor's values by default).
+# Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = SAMPLING + ("dpi",)
 VLLM = os.environ.get("VLLM_URL", "http://127.0.0.1:8000/v1")
 MODEL = os.environ.get("VLLM_MODEL", "rednote-hilab/dots.mocr")
@@ -121,6 +109,19 @@ def settings(body: dict) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    """What `DotsMOCRParser` does per page (github.com/rednote-hilab/dots.mocr at 23f3e56), around the vLLM
+    serving the model; how a page is processed is set out step by step in the adapter's docstring.
+
+        GET  /health    200 once up
+        POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
+                        "settings": {"temperature", "top_p", "max_tokens", "dpi"}}
+                        -> {"cells": [{bbox, category, text}] or null, "markdown", "image_size": [w, h] of
+                        the page as loaded, "completion": the model's chat completion, "vendor"}
+
+    Boxes are in the pixels of the page as loaded (`image_size`). With OPB_ENDPOINT_KEY set, a request needs
+    it as its bearer token. It runs in this folder's image, beside the vLLM serving the model (start.sh);
+    the Dockerfile says how to build and run it.
+    """
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 

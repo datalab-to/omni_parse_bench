@@ -1,18 +1,10 @@
-"""One runner per test type, and the registry that maps a test's `test_type` to it.
+"""One runner per test type, and the registry that maps a test's `test_type` to it (`TYPES`).
 
 A test type is the structure a test checks (`present`: the content is found; `order`: found before;
-`table_cell`: found in a cell, under its headings). How content is found depends on its kind, not on
-the test type: `found` compares a `Text` within its edits, a `Number` digit for digit, and `Latex` by
-what it renders. A test type is a NamedTuple of parameters and a runner, a pure function of the
-parameters and one output's view, returning whether the test passed and, if not, why:
-
-    present(Present(Text("Total due", max_diffs=1)), views.html("<p>Total due: 40</p>"))
-    # -> (True, "")
-
+`table_cell`: found in a cell, under its headings). It is a NamedTuple of parameters and a runner, a pure
+function of the parameters and one output's view, returning whether the test passed and, if not, why.
 HTML test types read a `views.Html`; layout test types read a tuple of `views.Block`s. A test type's
 constants (a threshold, a fill ratio) are module constants here, never parameters.
-
-Text is compared only after `normalize.fold`, on both sides. `TYPES` is the registry.
 """
 from __future__ import annotations
 
@@ -63,7 +55,15 @@ Arg = Text | Number | Latex
 def found(a: Arg, v: views.Html) -> Mark:
     """Whether one piece of content is in the output, compared as its kind says: text within its
     `max_diffs` edits; a number digit for digit (`_number_found`); LaTeX by what it renders, or by its
-    plain text when plain text writes it without loss (`_latex_found`)."""
+    plain text when plain text writes it without loss (`_latex_found`).
+
+    How content is found depends on its kind, not on the test type: a `Text` is compared within its edits, a
+    `Number` digit for digit, and `Latex` by what it renders. Text is compared only after `normalize.fold`, on
+    both sides.
+
+        present(Present(Text("Total due", max_diffs=1)), views.html("<p>Total due: 40</p>"))
+        # -> (True, "")
+    """
     if isinstance(a, Number): return _number_found(a.number, v)
     if isinstance(a, Latex): return _latex_found(a.latex, v)
     ok, r, thr = contains(a.text, v.text, a.max_diffs)

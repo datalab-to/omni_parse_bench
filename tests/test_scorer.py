@@ -1,15 +1,15 @@
 """score and summarize: the four results, the score per output type, tag and test type, the documents."""
 from __future__ import annotations
 
-import pytest
-
 import dataclasses
 
+import pytest
+
 from omni_parse_bench import data, score, summarize, views
-from omni_parse_bench.scorers.unit_tests import tests as gold
 from omni_parse_bench.scorers import unit_tests as scorer
-from omni_parse_bench.scorers.unit_tests import runners
 from omni_parse_bench.scorers.unit_tests import lines as _lines
+from omni_parse_bench.scorers.unit_tests import runners
+from omni_parse_bench.scorers.unit_tests import tests as gold
 
 PAGE = data.Page("p", "d", "s", "pages/p.pdf", "gold/p.json", ("html",))
 
@@ -46,15 +46,15 @@ def test_results():
     assert vs == {"a": "pass", "b": "pass", "c": "fail", "d": "fail", "m": "fail"}
 
 
-def test_missing_output_fails_and_unsupported_output_is_excluded():
+def test_a_missing_output_fails_its_tests():
     assert {v.result for v in score({"html": None}, TESTS[:4])} == {"fail"}
-    assert {v.result for v in score({}, TESTS[:4], unsupported={"html"})} == {"unsupported"}
+    assert {v.result for v in score({}, TESTS[:4])} == {"fail"}
 
 
 def test_score_is_the_mean_of_tests_and_each_tag_scores_its_own():
     s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS))["html"]
     assert s["score"] == 2 / 5
-    assert (s["tests"], s["unsupported"]) == (5, 0)
+    assert s["tests"] == 5
     assert s["per_tag"]["eng"] == {"score": 2 / 3, "tests": 3, "pages": 1, "documents": 1}
     assert s["per_tag"]["table"] == {"score": 0.0, "tests": 1, "pages": 1, "documents": 1}
     assert s["per_tag"]["math"] == {"score": 0.0, "tests": 1, "pages": 1, "documents": 1}
@@ -112,14 +112,9 @@ def test_a_runner_raising_on_a_well_formed_output_is_raised_naming_its_test(monk
 def test_a_view_raising_on_a_well_formed_output_is_raised(monkeypatch):
     def broken(s):
         raise RecursionError("deep")
-    monkeypatch.setitem(scorer.VIEWS, "html", broken)
+    monkeypatch.setitem(scorer.compare.VIEWS, "html", broken)
     with pytest.raises(RecursionError):
         score({"html": "<p>alpha</p>"}, TESTS)
-
-
-def test_an_output_type_with_nothing_scored_says_how_many_were_unsupported():
-    s = summarize(lines(score({}, TESTS, unsupported={"html"}), TESTS))["html"]
-    assert s["score"] is None and s["tests"] == 0 and s["unsupported"] == len(TESTS)
 
 
 def pages_and_tests(documents: int, per: int = 4, test_type: str = "present") -> tuple[list, list]:
@@ -166,9 +161,3 @@ def test_headline_is_the_mean_of_the_graded_families():
     assert h["headline"] == (2 / 3 + 0) / 2   # each family weighs the same, however many tests it has
     only_text = summarize(lines(score({"html": "<p>alpha beta</p>"}, tests[:3]), tests))
     assert set(only_text["families"]) == {"text"}   # a family with no verdicts isn't in it
-
-
-def test_headline_is_none_when_a_family_is_all_unsupported():
-    tests = on_one_page({"id": "a", "test_type": "present", "tags": [], "args": text("alpha")})
-    assert summarize(lines(score({}, tests, unsupported={"html"}), tests))["headline"] is None
-

@@ -1,29 +1,22 @@
 """Tesseract: plain OCR with no model of the page beyond its characters, the benchmark's floor.
 
-A PDF page is rendered at `render_dpi` (pypdfium2); an image is read as it is. Tesseract first
-detects the page's script itself (`--psm 0`) and then reads it with that script's model, English
-when it detects none: it is told nothing about the page, as a tool with no metadata would be. Its
-answer is plain text, written as html inside <pre>, escaped, and nothing else is done to it.
-
-No layout blocks. It runs locally, costs
-nothing and needs no key, only the `tesseract` binary with its script models:
-
-    brew install tesseract tesseract-lang     # or: apt install tesseract-ocr tesseract-ocr-script-*
-
-    opb predict --provider tesseract --page page.pdf
+The adapter is `Tesseract`; its docstring says how a page is processed, and how to serve and run it.
 """
 from __future__ import annotations
 
 import dataclasses
 import functools
 import html as _html
+import os
 import re
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Any, ClassVar
 
 from .. import budget, contract, errors, raster
+from ..adapter import PageAdapter
 
 SUPPORTS = frozenset({"html"})
 # Tesseract's script names, as its detection prints them, to its script models.
@@ -38,24 +31,50 @@ _SCRIPT = re.compile(r"Script: (\w+)")
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """What tesseract can be asked."""
+class Tesseract(PageAdapter):
+    """The tesseract adapter. Its fields are what tesseract can be asked.
+
+    A PDF page is rendered at `render_dpi` (pypdfium2); an image is read as it is. Tesseract first
+    detects the page's script itself (`--psm 0`) and then reads it with that script's model, English
+    when it detects none: it is told nothing about the page, as a tool with no metadata would be. Its
+    answer is plain text, written as html inside <pre>, escaped, and nothing else is done to it.
+
+    No layout blocks. It runs locally, costs
+    nothing and needs no key, only the `tesseract` binary with its script models:
+
+        brew install tesseract tesseract-lang     # or: apt install tesseract-ocr tesseract-ocr-script-*
+
+        opb run --providers tesseract --sample 20
+    """
 
     render_dpi: int = dataclasses.field(default=300,
                                         metadata={"help": "a PDF page is rendered at this resolution"})
     model: str = dataclasses.field(default="auto", metadata={
         "help": "auto detects the page's script and uses its model; or a Tesseract model, e.g. eng"})
 
+    name: ClassVar[str] = "tesseract"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    workers: ClassVar[int] = min(8, os.cpu_count() or 1)
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: Tesseract) -> list[contract.Request]:
     """One call, for html."""
     return [contract.Request(wants & SUPPORTS, {"render_dpi": config.render_dpi, "model": config.model})]
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
-         config: Config | None = None) -> contract.Call:
+         config: Tesseract | None = None) -> contract.Call:
     """Read the page; the answer is its text, the script detected and the model used."""
-    config = config or Config()
+    config = config or Tesseract()
     if not shutil.which("tesseract"):
         raise errors.MissingDependency("tesseract isn't installed: brew install tesseract tesseract-lang")
     deadline = budget.Budget(timeout)
@@ -72,7 +91,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
     return contract.Call({"text": text, "script": script, "model": model, "version": version()})
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: Tesseract | None = None) -> tuple[dict, dict]:
     """The text as html: escaped, inside <pre>."""
     h = "<pre>" + _html.escape(raw["text"]) + "</pre>"
     return {o: h for o in request.outputs}, {}

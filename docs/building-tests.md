@@ -231,9 +231,9 @@ derivation is `model_panel`.
    the structure (publisher XML, form fields, pages you authored) over readings of the image.
 3. For each fact, pick the test type, fill its roles from the source, pick each arg's kind, and set
    the settings.
-4. Check the dataset with `unit_tests.check(data.read_manifest(folder)[1])` (or
-   `opb tests --dataset <folder>`). It rejects args with the
-   wrong keys, roles a type doesn't allow, kinds a role can't compare, values outside the vocabulary
+4. Check the dataset with `opb check --dataset <folder>`, or in Python with
+   `unit_tests.check(data.read_manifest(folder)[1])`. It rejects args with the wrong keys, roles a type
+   doesn't allow, kinds a role can't compare, values outside the vocabulary
    (a tag must be a vocabulary tag, a language code or a script code), and a `max_diffs` that would
    let any output pass. Fix or drop what it rejects.
 5. Tag the new tests from the page and its sources, as [`tagging.md`](./tagging.md) describes, never

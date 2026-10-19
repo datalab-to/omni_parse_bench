@@ -1,58 +1,19 @@
-"""Producing predictions: everything that is not the scorer.
+"""Producing predictions: opb's adapters, one per parsing system (`pip install 'omni-parse-bench[harness]'`).
 
-The core object is an adapter: a module in `providers/` with five names, stated by
-`contract.Adapter`:
-
-    Config      what the vendor can be asked
-    SUPPORTS    the output types it can produce
-    requests    (wants, config) -> [Request]: the calls that produce the wanted outputs
-    call        (page, request, *, timeout, config) -> Call; raises its failures
-    parse       (raw, request, config) -> (outputs, errors): what a saved answer holds
-
-`predict` composes them for one page under uniform rules and returns the outputs with their
-evidence: what each call was sent, the vendor's raw responses, the reported costs and the settings.
-The evidence is kept so a parser bug is fixed by re-reading files, not by paying for every call
-again.
-
-    contract.py      `Adapter`, and the `Request`/`Call`/`Cost` it deals in
+    adapter.py       `PageAdapter`, the base class of every adapter; its docstring says how to write one
+    contract.py      `Request`, `Call` and `Cost`: one call to a system and its answer
     errors.py        how a call fails, and whether a retry can fix it
-    budget.py        one call's share of the clock
-    layout.py        a vendor's layout blocks as the `blocks` output
-    raster.py        a PDF page as an image, for vendors that take images
-    registry.py      which adapter, at what settings, filed under what name
-    page.py          `predict`: one page, one vendor
-    providers/       one module per vendor
-
-Orchestration (which pages, in what order, how many at once) is left to the caller;
-`omni_parse_bench/benchmark.py` is one such loop. The scorer never imports this package.
-
-    pip install 'omni-parse-bench[harness]'
+    budget.py        one page's share of the clock
+    layout.py        a system's layout blocks as the `blocks` output
+    raster.py        a PDF page as an image, for systems that take images
+    http.py          a JSON POST to a model server
+    registry.py      which adapter a provider name means, made from a config's options
+    providers/       one module per system
 """
-from __future__ import annotations
+# Note: the registry first: it checks, once, that the adapters' packages are installed.
+from .registry import ADAPTERS, PROVIDERS, adapter_class, system  # isort: skip
+from .adapter import Input, PageAdapter
+from .contract import Call, Cost, Request
 
-from .contract import Adapter, Call, Cost, Request
-from .errors import (AccountFailure, MissingCredential, MissingDependency, VendorError, VendorTimeout,
-                     VendorUnreachable)
-
-# Note: vendor SDKs are checked once, here, so a missing extra fails at import with one message
-# naming it, not hours into a run.
-try:
-    from .page import predict, reparse
-    from .registry import DEFAULT_TIMEOUT, PROVIDERS, adapter, add_adapter, out_name, resolve, settings_for
-except ImportError as exc:
-    # Only a missing or incompatible SDK is fixed by installing the extra; a broken import of
-    # our own must surface as itself.
-    if (exc.name or "").startswith(__name__.split(".")[0]):
-        raise
-    raise MissingDependency(
-        f"the harness could not import what the vendor adapters need:\n"
-        f"    {exc}\n"
-        f"    pip install 'omni-parse-bench[harness]'"
-    ) from None
-
-__all__ = [
-    "predict", "reparse", "adapter", "add_adapter", "Adapter", "Request", "Call", "Cost",
-    "VendorError", "VendorTimeout", "VendorUnreachable", "AccountFailure", "MissingCredential",
-    "MissingDependency",
-    "PROVIDERS", "DEFAULT_TIMEOUT", "settings_for", "resolve", "out_name",
-]
+__all__ = ["ADAPTERS", "Call", "Cost", "Input", "PROVIDERS", "PageAdapter", "Request",
+           "adapter_class", "system"]

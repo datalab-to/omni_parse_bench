@@ -3,7 +3,7 @@
 #
 #     docker build -t opb-dots omni_parse_bench/harness/providers/serve/dots
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-dots
-#     opb benchmark --providers dots-mocr --options '{"dots-mocr": {"base_url": "http://localhost:8001"}}'
+#     opb run --providers dots-mocr --options '{"dots-mocr": {"base_url": "http://localhost:8001"}}'
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set
 # OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb sends it.

@@ -3,7 +3,7 @@
 #
 #     docker build -t opb-chandra omni_parse_bench/harness/providers/serve/chandra
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-chandra
-#     opb benchmark --providers chandra-ocr --options '{"chandra-ocr": {"base_url": "http://localhost:8001"}}'
+#     opb run --providers chandra-ocr --options '{"chandra-ocr": {"base_url": "http://localhost:8001"}}'
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set
 # OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb sends it.

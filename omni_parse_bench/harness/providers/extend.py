@@ -1,26 +1,6 @@
 """Extend adapter: upload the page, POST /parse_runs, poll /parse_runs/<id>.
 
-One call produces both outputs. Extend returns the page as a chunk whose content is its typed
-blocks joined (text, heading, section_heading, header, footer, page_number, table, figure,
-key_value, formula, barcode, ...), each block with a box in the page's pixels. So:
-
-- `html` is Extend's page content, as it returns it; and
-- `blocks` are the blocks, their text with tags removed as for every vendor.
-
-Figures: Extend writes a generated description of each figure as a `<caption>` inside its
-`<figure>` (on 10 figure pages every one was a description, none a printed caption), and has no
-switch to turn only that off. No vendor is sent free-text instructions, so it is translated, not
-dropped: each such caption becomes an image's alt text in its place, where every vendor's image
-descriptions are, and the scorer treats it as it treats theirs.
-Tables are asked for as html. Extend's agentic passes are on, as Reducto's are: a vision model
-corrects low-confidence OCR and handwriting (`blockOptions.text.agentic`) and table structure
-(`blockOptions.tables.agentic`), each off by default and billed where it triggers; an image page
-is converted to PDF at `imageConversionQuality` high (default medium). Cost comes back in Extend
-credits (`usage.credits`). A run that fails with an outage code (`OUTAGES`) is retried as a 5xx is.
-
-Auth: EXTEND_API_KEY, and EXTEND_WORKSPACE_ID when the key spans several workspaces.
-
-    opb predict --provider extend --page page.pdf --options '{"engine": "parse_light"}'
+The adapter is `Extend`; its docstring says how a page is processed, and how to serve and run it.
 """
 from __future__ import annotations
 
@@ -30,11 +10,14 @@ import os
 import re
 import time
 from pathlib import Path
+from typing import Any, ClassVar
 
 import httpx
+from omni_bench_core import adapter
 
 from ... import markdown
 from .. import budget, contract, errors, layout
+from ..adapter import PageAdapter
 
 DEFAULT_BASE_URL = "https://api.extend.ai"
 API_VERSION = "2026-02-09"
@@ -56,8 +39,31 @@ OUTAGES = frozenset({"INTERNAL_ERROR", "OCR_ERROR"})
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """What extend can be asked."""
+class Extend(PageAdapter):
+    """The extend adapter. Its fields are what extend can be asked.
+
+    One call produces both outputs. Extend returns the page as a chunk whose content is its typed
+    blocks joined (text, heading, section_heading, header, footer, page_number, table, figure,
+    key_value, formula, barcode, ...), each block with a box in the page's pixels. So:
+
+    - `html` is Extend's page content, as it returns it; and
+    - `blocks` are the blocks, their text with tags removed as for every vendor.
+
+    Figures: Extend writes a generated description of each figure as a `<caption>` inside its
+    `<figure>` (on 10 figure pages every one was a description, none a printed caption), and has no
+    switch to turn only that off. No vendor is sent free-text instructions, so it is translated, not
+    dropped: each such caption becomes an image's alt text in its place, where every vendor's image
+    descriptions are, and the scorer treats it as it treats theirs.
+    Tables are asked for as html. Extend's agentic passes are on, as Reducto's are: a vision model
+    corrects low-confidence OCR and handwriting (`blockOptions.text.agentic`) and table structure
+    (`blockOptions.tables.agentic`), each off by default and billed where it triggers; an image page
+    is converted to PDF at `imageConversionQuality` high (default medium). Cost comes back in Extend
+    credits (`usage.credits`). A run that fails with an outage code (`OUTAGES`) is retried as a 5xx is.
+
+    Auth: EXTEND_API_KEY, and EXTEND_WORKSPACE_ID when the key spans several workspaces.
+
+        opb run --providers extend --options '{"extend": {"engine": "parse_light"}}' --sample 20
+    """
 
     engine: str = dataclasses.field(
         default="parse_performance",
@@ -79,8 +85,20 @@ class Config:
     base_url: str = DEFAULT_BASE_URL
     poll_interval: float = 3.0
 
+    name: ClassVar[str] = "extend"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: Extend) -> list[contract.Request]:
     """One call for every output."""
     blocks = {"text": {"agentic": {"enabled": config.agentic_text}},
               "tables": {"targetFormat": "html", "agentic": {"enabled": config.agentic_tables}},
@@ -134,9 +152,9 @@ def layout_blocks(blocks: list[dict], turned: int = 0) -> list[dict]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
-         config: Config | None = None) -> contract.Call:
+         config: Extend | None = None) -> contract.Call:
     """Upload the page, start the parse run, poll until it is done, return the finished run."""
-    config = config or Config()
+    config = config or Extend()
     key = os.environ.get("EXTEND_API_KEY")
     if not key:
         raise errors.MissingCredential("EXTEND_API_KEY is not set")
@@ -149,12 +167,16 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         media = MEDIA.get(page.suffix.lower(), "application/pdf")
         upload = {"file": (contract.upload_name(page), page.read_bytes(), media)}
         r = client.post(f"{base_url}/files/upload", files=upload, timeout=deadline.timeout(300))
-        if r.status_code != 200 or not (file_id := r.json().get("id")):
+        with adapter.reading("the uploaded file's id"):
+            file_id = contract.json_object(r).get("id") if r.status_code == 200 else None
+        if not file_id:
             raise errors.VendorError(f"upload HTTP {r.status_code}: {r.text[:300]}",
                                      status=r.status_code, body=r.text)
         r = client.post(f"{base_url}/parse_runs", json={"file": {"id": file_id}, **request.sent},
                         timeout=deadline.timeout(120))
-        if r.status_code != 200 or not (run_id := r.json().get("id")):
+        with adapter.reading("the parse run's id"):
+            run_id = contract.json_object(r).get("id") if r.status_code == 200 else None
+        if not run_id:
             raise errors.VendorError(f"parse_runs HTTP {r.status_code}: {r.text[:300]}",
                                      status=r.status_code, body=r.text)
         retry = budget.PollRetry(deadline)
@@ -170,9 +192,10 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                     if retry.again(r.status_code): continue
                     raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}",
                                              status=r.status_code, body=r.text)
-                retry.ok()
+                retry.reset()
                 polls += 1
-                run = r.json()
+                with adapter.reading("the parse run's status"):
+                    run = contract.json_object(r)
                 if str(run.get("status", "")).upper() in TERMINAL: break
                 time.sleep(min(config.poll_interval, deadline.remaining()))
             cost = contract.Cost.in_credits((run.get("usage") or {}).get("credits"), "usage.credits")
@@ -186,7 +209,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
     return contract.Call(run, cost=cost, job_id=run_id)
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: Extend | None = None) -> tuple[dict, dict]:
     """The outputs in a processed run: its content as html, and its blocks."""
     chunks = (raw.get("output") or {}).get("chunks")
     if chunks is None:

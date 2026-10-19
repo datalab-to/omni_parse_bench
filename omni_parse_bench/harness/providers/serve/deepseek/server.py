@@ -1,27 +1,15 @@
 """DeepSeek-OCR-2's server: steps 1 to 4 of providers/deepseek_ocr.py, on its repository's own vLLM path.
 
-The engine, model registration, image processor, logits processor and sampling are the vendor's
-(github.com/deepseek-ai/DeepSeek-OCR-2 at 2f3699e, DeepSeek-OCR2-master/DeepSeek-OCR2-vllm): the
-engine arguments of run_dpsk_ocr2_eval_batch.py on the AsyncLLMEngine of run_dpsk_ocr2_image.py. The
-repository runs it only as batch scripts; the transport is ours. How a page is processed is set out
-step by step in the adapter's docstring.
-
-    GET  /health    200 once the engine is up
-    POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
-                    "settings": {"temperature", "top_p", "max_tokens", "dpi", "ngram_size", "window_size"}}
-                    -> {"raw", "tokens", "finish_reason", "prompt", "vendor": {"DeepSeek-OCR-2": its commit}}
-
-With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image
-(start.sh); the Dockerfile says how to build and run it.
+`parse` says what the server answers and how it runs.
 """
 import argparse
 import asyncio
 import base64
 import io
 import os
-import threading
 import subprocess
 import sys
+import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -31,15 +19,14 @@ sys.path.insert(0, VENDOR)
 os.chdir(VENDOR)
 
 from aiohttp import web  # noqa: E402
+from config import CROP_MODE, MAX_CONCURRENCY, MODEL_PATH, NUM_WORKERS, PROMPT  # noqa: E402
+from deepseek_ocr2 import DeepseekOCR2ForCausalLM  # noqa: E402
 from PIL import Image, ImageOps  # noqa: E402
+from process.image_process import DeepseekOCR2Processor  # noqa: E402
+from process.ngram_norepeat import NoRepeatNGramLogitsProcessor  # noqa: E402
 from vllm import AsyncLLMEngine, SamplingParams  # noqa: E402
 from vllm.engine.arg_utils import AsyncEngineArgs  # noqa: E402
 from vllm.model_executor.models.registry import ModelRegistry  # noqa: E402
-
-from config import CROP_MODE, MAX_CONCURRENCY, MODEL_PATH, NUM_WORKERS, PROMPT  # noqa: E402
-from deepseek_ocr2 import DeepseekOCR2ForCausalLM  # noqa: E402
-from process.image_process import DeepseekOCR2Processor  # noqa: E402
-from process.ngram_norepeat import NoRepeatNGramLogitsProcessor  # noqa: E402
 
 ModelRegistry.register_model("DeepseekOCR2ForCausalLM", DeepseekOCR2ForCausalLM)
 
@@ -50,7 +37,7 @@ LOAD = threading.Lock()
 COMMIT = subprocess.run(["git", "-C", "/opt/dsocr2", "rev-parse", "HEAD"], capture_output=True,
                         text=True).stdout.strip() or None
 # run_dpsk_ocr2_eval_batch.py: LLM(...) arguments and SamplingParams, verbatim, but for the values the
-# request sets (the adapter's Config, the script's by default)
+# request sets (the adapter's options, the script's by default)
 ENGINE = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(
     model=MODEL_PATH,
     hf_overrides={"architectures": ["DeepseekOCR2ForCausalLM"]},
@@ -64,7 +51,7 @@ ENGINE = AsyncLLMEngine.from_engine_args(AsyncEngineArgs(
     gpu_memory_utilization=0.7,
 ))
 SAMPLING = ("temperature", "top_p", "max_tokens")
-# Note: every request sets these, from the adapter's Config (the vendor's values by default).
+# Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = SAMPLING + ("dpi", "ngram_size", "window_size")
 
 
@@ -120,6 +107,22 @@ def settings(body: dict) -> dict:
 
 
 async def parse(request: web.Request) -> web.Response:
+    """The engine, model registration, image processor, logits processor and sampling are the vendor's
+    (github.com/deepseek-ai/DeepSeek-OCR-2 at 2f3699e, DeepSeek-OCR2-master/DeepSeek-OCR2-vllm): the
+    engine arguments of run_dpsk_ocr2_eval_batch.py on the AsyncLLMEngine of run_dpsk_ocr2_image.py. The
+    repository runs it only as batch scripts; the transport is ours. How a page is processed is set out
+    step by step in the adapter's docstring.
+
+        GET  /health    200 once the engine is up
+        POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
+                        "settings": {"temperature", "top_p", "max_tokens", "dpi", "ngram_size",
+                                     "window_size"}}
+                        -> {"raw", "tokens", "finish_reason", "prompt",
+                            "vendor": {"DeepSeek-OCR-2": its commit}}
+
+    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image
+    (start.sh); the Dockerfile says how to build and run it.
+    """
     if KEY and request.headers.get("Authorization") != f"Bearer {KEY}":
         return web.json_response({"error": "a bearer token (OPB_ENDPOINT_KEY) is needed"}, status=401)
     body = await request.json()

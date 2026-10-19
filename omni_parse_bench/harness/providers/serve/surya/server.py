@@ -1,15 +1,6 @@
 """Surya OCR 2's server: steps 1 to 4 of providers/surya_ocr.py, with the `surya-ocr` package's code.
 
-What the package's `surya_ocr` command does per page, around the vLLM serving the model; how a page is
-processed is set out step by step in the adapter's docstring.
-
-    GET  /health    200 once up
-    POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's, "settings": {"dpi"}}
-                    -> the package's result for the page (its `model_dump`), with "vendor": the
-                    surya-ocr version
-
-With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image,
-beside the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
+`Handler` says what the server answers and how it runs.
 """
 from __future__ import annotations
 
@@ -23,13 +14,12 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from PIL import Image
-
 from surya.inference import SuryaInferenceManager
 from surya.input.load import load_from_file
 from surya.recognition import RecognitionPredictor
 
 KEY = os.environ.get("OPB_ENDPOINT_KEY")
-# Note: every request sets these, from the adapter's Config (the vendor's values by default).
+# Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = ("dpi",)
 # Note: the vendor's renderer (pdfium, PyMuPDF) isn't thread-safe, and its own tools load one page at a
 # time; requests arrive on many threads, so pages load one at a time here too.
@@ -75,6 +65,17 @@ def settings(body: dict) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    """What the package's `surya_ocr` command does per page, around the vLLM serving the model; how a page is
+    processed is set out step by step in the adapter's docstring.
+
+        GET  /health    200 once up
+        POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's, "settings": {"dpi"}}
+                        -> the package's result for the page (its `model_dump`), with "vendor": the
+                        surya-ocr version
+
+    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image,
+    beside the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
+    """
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 

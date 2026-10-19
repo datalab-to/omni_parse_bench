@@ -1,17 +1,20 @@
 # Providers
 
 How each vendor becomes an adapter in `omni_parse_bench/harness/providers/`: one module per vendor,
-with five names (`contract.Adapter`):
+each defining one `PageAdapter` class (`harness/adapter.py`), the omni-bench-core core's `Adapter` for one
+page. The class has:
 
-- `Config`: its options;
+- its fields: the vendor's options;
 - `SUPPORTS`: the output types it can produce;
-- `requests(wants, config)`: the calls a page needs;
-- `call(page, request, *, timeout, config)`: make one call and return the vendor's answer as
-  received, with its cost; and
-- `parse(raw, request, config)`: read the outputs from an answer.
+- `requests(wants)`: the calls a page needs;
+- `send(page, request, *, timeout)`: make one call and return the vendor's answer as received, with
+  its cost; and
+- `parse(raw, request)`: read the outputs from an answer.
 
+`PageAdapter` turns these into the core's `call` and `read`: `call` makes every request for a page
+within the page's one time budget and keeps each answer, and `read` parses each saved answer.
 `registry.ADAPTERS` lists the vendors and the open-weight models with adapters of their own; any
-model id goes to `llm.py`.
+model id goes to `llm.LLM`.
 
 1. [The two outputs, and how an adapter produces them](#the-two-outputs-and-how-an-adapter-produces-them): html and blocks, and the format changes an adapter may make;
 2. [Block labels](#block-labels): each vendor's block types, mapped onto the labels;
@@ -45,20 +48,20 @@ adapter makes are format changes, and each is checked to lose nothing:
   Extend's and Reducto's are listed here;
 - blocks go through `layout.block` (the box in the vendor's frame, divided by the frame) and
   `layout.label` (the vendor's block type onto `views.LABELS`);
-- a vendor with no typed layout doesn't support `blocks`, and those tests score unsupported for it
-  rather than fail;
+- a vendor with no typed layout doesn't support `blocks`. It is never asked for them, and a run that
+  grades blocks refuses it before any call: grade it with `--outputs html`;
 - every vendor gets the same retries: a transient failure (a rate limit, a 5xx, a dropped
-  connection) is tried 4 times with backoff, within the same timeout per call. A model's reply that
-  is cut off by an error or doesn't parse is asked again within the call, up to 3 times. A page a
-  vendor still doesn't answer scores 0 on every test that reads the missing output, whatever the
-  cause: answering is part of what a product does. A failure that is
-  ours (an adapter that can't read an answer) counts as 0 like any other missing output until the
-  adapter is fixed and `opb reparse` reads the answer again; and
+  connection) is tried 4 times with backoff, the whole page again, within the same time per page. A
+  model's reply that is cut off by an error or doesn't parse is asked again within the call, up to 3
+  times. A page a vendor still doesn't answer counts as 0, whatever the cause: answering is part of
+  what a product does. A failure that is ours (an adapter that can't read an answer) counts as 0 like
+  any other missing output until the adapter is fixed and `Benchmark.reread(run)` reads the answer
+  again; and
 - cost is what the response states, else `Cost()` (unknown). Credits go in `credits`, never
   converted to dollars.
 
 Each vendor's request and response shapes below are from its documentation and are confirmed with
-one live call per adapter (`opb predict --raw`) before a run.
+one live call per adapter (`opb predict --provider <name> --page <file> --raw`) before a run.
 
 ## Block labels
 
@@ -267,7 +270,7 @@ that deploys it on any GPU host, and opb then benchmarks it from anywhere, point
 
     docker build -t opb-dots omni_parse_bench/harness/providers/serve/dots
     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-dots
-    opb benchmark --providers dots-mocr --options '{"dots-mocr": {"base_url": "http://<host>:8001"}}'
+    opb run --providers dots-mocr --options '{"dots-mocr": {"base_url": "http://<host>:8001"}}'
 
 A folder holds:
 
@@ -499,8 +502,8 @@ Indra OCR (`providers/indra_ocr.py`):
 
 ## Every adapter: fetch, then parse
 
-`call` returns the vendor's answer as received, and `parse` reads the outputs from it. Every answer
-is saved in the run's records (`raw`), even when parsing it fails, and a paid failure keeps its
-answer, cost and job id. So a parsing fix reaches a finished run with `opb reparse RUN_DIR`, and
-never needs the vendor again. `--retry-failed` predicts again only the outputs whose failure may
-not recur: a timeout, an outage, a 429 or 5xx, or no HTTP status; never a 400 or a vendor's answer.
+`send` returns the vendor's answer as received, and `parse` reads the outputs from it. Every answer
+is saved in the run's records (`raw`), even when parsing it fails. So a parsing fix reaches a finished
+run with `Benchmark.reread(run)`, and never needs the vendor again. `--retry-failed` predicts again only
+the pages whose failure may not recur: a timeout, an outage, a 429 or 5xx; never a 400 or a vendor's
+answer.

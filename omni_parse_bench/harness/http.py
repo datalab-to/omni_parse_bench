@@ -13,8 +13,9 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from omni_bench_core import adapter
 
-from . import budget, errors
+from . import budget, contract, errors
 
 
 def page(path: Path) -> dict:
@@ -24,10 +25,10 @@ def page(path: Path) -> dict:
 
 
 def settings(config: Any, *local: str) -> dict:
-    """An open model's `Config` as its server takes it: every field but where the server is (`base_url`),
-    the model it serves (`model`, checked against its answer) and those the adapter applies itself
-    (`local`). Each defaults to the vendor's value; any other value is a non-default configuration and
-    gets its own run name."""
+    """An open model adapter's options as its server takes them: every field but where the server is
+    (`base_url`), the model it serves (`model`, checked against its answer) and those the adapter applies
+    itself (`local`). Each defaults to the vendor's value; any other value is another configuration, and
+    gets its own run folder."""
     out = {f.name: getattr(config, f.name) for f in dataclasses.fields(config)}
     return {k: v for k, v in out.items() if k not in ("base_url", "model", *local)}
 
@@ -52,4 +53,5 @@ def post(url: str, body: dict, deadline: budget.Budget, key: str | None = None) 
         raise errors.VendorUnreachable(f"connection failed: {exc}"[:300]) from None
     if r.status_code != 200:
         raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}", status=r.status_code, body=r.text)
-    return r.json()
+    with adapter.reading("the server's answer"):
+        return contract.json_object(r)

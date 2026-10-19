@@ -1,31 +1,7 @@
-"""The gold: a page's tests, read from its gold file and checked. Which pages there are, and where their
-gold files are, is `data`'s; reading one page's tests is the scorer's `gold(page)`, built on `read`.
+"""The gold: a page's tests, read from its gold file and checked (`read`).
 
-A test says what structure it checks (`test_type`), in which output (`output_type`), on what content
-(`args`), with what else its runner needs (`settings`); how its claim was established (`derivation`);
-and what its content is (`tags`, which grading never reads):
-
-    {"id": "p11_PMC12397559.1_t0_head_17_2", "test_type": "table_cell", "output_type": "html",
-     "derivation": "publisher_markup", "tags": ["table", "multi_column"],
-     "args": {"cell": {"text": "32 (40.0)", "max_diffs": 0},
-              "headings": [{"text": "No. (%)", "max_diffs": 0}]},
-     "settings": {}}
-
-`args` maps each role of the test type to one arg, or a list of them. An arg is exactly one of
-`{"text", "max_diffs"}`, `{"number"}` or `{"latex"}`: its kind, which says how it is compared. A
-`Test` also names its page, the gold file it came from. `read` reads one gold file, each test's args
-and settings into its runner's parameters:
-
-    tests = read("dataset/gold/<page_id>.json")   # one page's tests
-    tests[0].test_type          # "present"
-    tests[0].params             # runners.Present(content=runners.Text(text="...", max_diffs=1))
-    by_page(tests)              # tests by page id
-
-A test with a missing, unknown or misspelt field, an arg of a kind its role can't compare, a parameter
-that doesn't match its type (an empty string counts as a mismatch), a max_diffs that isn't fewer than
-its folded text's characters (it would pass on any output), LaTeX that KaTeX can't render or that
-renders to nothing (it would fail, or pass, on any output), or a value outside the vocabulary raises
-`GoldError` naming it. `data` raises it too, for a manifest row that breaks the dataset's rules.
+Which pages there are, and where their gold files are, is `data`'s; reading one page's tests is the
+scorer's `gold(page)`, built on `read`.
 """
 from __future__ import annotations
 
@@ -39,8 +15,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from omni_parse_bench import equations, normalize, vocab
-from omni_parse_bench import errors
+from omni_parse_bench import equations, errors, normalize, vocab
 
 from . import runners
 
@@ -67,10 +42,31 @@ _SCRIPT = re.compile(r"[A-Z][a-z]{3}")   # ISO 15924
 
 
 class GoldError(errors.UsageError):
-    """A gold file, or a test in one, that breaks the dataset's rules."""
+    """A gold file, or a test in one, that breaks the dataset's rules.
+
+    It is raised for a test with a missing, unknown or misspelt field; an arg of a kind its role can't
+    compare; a parameter that doesn't match its type (an empty string counts as a mismatch); a max_diffs that
+    isn't fewer than its folded text's characters (it would pass on any output); LaTeX that KaTeX can't render
+    or that renders to nothing (it would fail, or pass, on any output); or a value outside the vocabulary.
+    `data` raises it too, for a manifest row that breaks the dataset's rules.
+    """
 
 
 class Test(NamedTuple):
+    """A test says what structure it checks (`test_type`), in which output (`output_type`), on what content
+    (`args`), with what else its runner needs (`settings`); how its claim was established (`derivation`);
+    and what its content is (`tags`, which grading never reads):
+
+        {"id": "p11_PMC12397559.1_t0_head_17_2", "test_type": "table_cell", "output_type": "html",
+         "derivation": "publisher_markup", "tags": ["table", "multi_column"],
+         "args": {"cell": {"text": "32 (40.0)", "max_diffs": 0},
+                  "headings": [{"text": "No. (%)", "max_diffs": 0}]},
+         "settings": {}}
+
+    `args` maps each role of the test type to one arg, or a list of them. An arg is exactly one of
+    `{"text", "max_diffs"}`, `{"number"}` or `{"latex"}`: its kind, which says how it is compared. A `Test`
+    also names its page, the gold file it came from.
+    """
     id: str
     page_id: str    # the page whose gold file holds it
     test_type: str
@@ -81,7 +77,13 @@ class Test(NamedTuple):
 
 
 def read(path: str | Path) -> tuple[Test, ...]:
-    """One gold file's tests; its name is the page's id."""
+    """One gold file's tests; its name is the page's id.
+
+    tests = read("dataset/gold/<page_id>.json")   # one page's tests
+    tests[0].test_type          # "present"
+    tests[0].params             # runners.Present(content=runners.Text(text="...", max_diffs=1))
+    by_page(tests)              # tests by page id
+    """
     path = Path(path)
     try:
         doc = json.loads(path.read_text())

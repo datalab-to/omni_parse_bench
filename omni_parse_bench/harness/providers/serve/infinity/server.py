@@ -1,17 +1,6 @@
 """Infinity-Parser2's server: steps 1 to 4 of providers/infinity.py, with its `infinity_parser2` SDK's code.
 
-The SDK's file loading, image encoding, prompt and reading, around the vLLM serving the model; how a
-page is processed is set out step by step in the adapter's docstring.
-
-    GET  /health    200 once up
-    POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
-                    "settings": {"temperature", "top_p", "max_tokens", "dpi", "min_pixels", "max_pixels"}}
-                    -> {"completion": the model's chat completion, "json": the reply as the SDK reads
-                    it, "markdown": the page, "model", "vendor"}; an empty reply gives no "json" or
-                    "markdown"
-
-With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image,
-beside the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
+`Handler` says what the server answers and how it runs.
 """
 from __future__ import annotations
 
@@ -25,18 +14,20 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import httpx
-from PIL import Image
-
 from infinity_parser2.prompts import PROMPT_DOC2JSON
 from infinity_parser2.utils.image import encode_image_to_base64, load_image
 from infinity_parser2.utils.pdf import convert_pdf_to_images
-from infinity_parser2.utils.utils import (convert_json_to_markdown, extract_json_content,
-                                          truncate_last_incomplete_element)
+from infinity_parser2.utils.utils import (
+    convert_json_to_markdown,
+    extract_json_content,
+    truncate_last_incomplete_element,
+)
+from PIL import Image
 
 VLLM = os.environ.get("VLLM_URL", "http://127.0.0.1:8000/v1")
 MODEL = os.environ.get("MODEL", "infly/Infinity-Parser2-Pro")
 SAMPLING = ("temperature", "top_p", "max_tokens")
-# Note: every request sets these, from the adapter's Config (the vendor's values by default).
+# Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = SAMPLING + ("dpi", "min_pixels", "max_pixels")
 TIMEOUT_S = 900.0
 KEY = os.environ.get("OPB_ENDPOINT_KEY")
@@ -88,6 +79,19 @@ def settings(body: dict) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    """The SDK's file loading, image encoding, prompt and reading, around the vLLM serving the model; how a
+    page is processed is set out step by step in the adapter's docstring.
+
+        GET  /health    200 once up
+        POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
+                        "settings": {"temperature", "top_p", "max_tokens", "dpi", "min_pixels", "max_pixels"}}
+                        -> {"completion": the model's chat completion, "json": the reply as the SDK reads
+                        it, "markdown": the page, "model", "vendor"}; an empty reply gives no "json" or
+                        "markdown"
+
+    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image,
+    beside the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
+    """
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 

@@ -1,23 +1,6 @@
 """Azure Content Understanding adapter: the prebuilt layout analyzer, POST :analyzeBinary, poll.
 
-One call produces both outputs. Azure returns the page as markdown, tables as html, with page
-headers, footers and page numbers written in place as comments (`<!-- PageHeader: ... -->`), which
-a reader never sees. So:
-
-- `html` is that markdown with those comments unwrapped into their text, where Azure put them: the
-  header is in Azure's document, marked as one, and the unwrapping moves and rebuilds nothing; and
-- `blocks` are its paragraphs (with their `role`: title, sectionHeading, pageHeader, pageFooter,
-  pageNumber, footnote, or none), tables and figures. A paragraph inside a table's span is a cell's
-  text, already in the table's block, and is left out.
-
-Boxes come as `source`, `D(page,x1,y1,...,x4,y4)`, in the page's unit (inches for a PDF). Azure
-states pages used, not a cost, so the cost is unknown.
-
-Auth: AZURE_CU_KEY. The resource is the `endpoint` option, not an environment variable: it
-decides where the page is analyzed, so it is a setting the run records.
-
-    opb predict --provider azure --page page.pdf \
-        --options '{"endpoint": "https://<resource>.services.ai.azure.com"}'
+The adapter is `Azure`; its docstring says how a page is processed, and how to serve and run it.
 """
 from __future__ import annotations
 
@@ -26,11 +9,14 @@ import os
 import re
 import time
 from pathlib import Path
+from typing import Any, ClassVar
 
 import httpx
+from omni_bench_core import adapter
 
 from ... import markdown
 from .. import budget, contract, errors, layout
+from ..adapter import PageAdapter
 
 API_VERSION = "2025-11-01"
 SUPPORTS = frozenset({"html", "blocks"})
@@ -48,11 +34,30 @@ TERMINAL = frozenset({"succeeded", "failed", "canceled", "cancelled"})
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """What azure can be asked.
+class Azure(PageAdapter):
+    """The azure adapter. Its fields are what azure can be asked.
 
     `endpoint` has no default to give, since every Azure resource has its own; it is empty here, so
-    a `Config` can be built (`opb providers`, a run's name), and `call` refuses it.
+    a `Azure` can be built (`opb providers`, a run's name), and `call` refuses it.
+
+    One call produces both outputs. Azure returns the page as markdown, tables as html, with page
+    headers, footers and page numbers written in place as comments (`<!-- PageHeader: ... -->`), which
+    a reader never sees. So:
+
+    - `html` is that markdown with those comments unwrapped into their text, where Azure put them: the
+      header is in Azure's document, marked as one, and the unwrapping moves and rebuilds nothing; and
+    - `blocks` are its paragraphs (with their `role`: title, sectionHeading, pageHeader, pageFooter,
+      pageNumber, footnote, or none), tables and figures. A paragraph inside a table's span is a cell's
+      text, already in the table's block, and is left out.
+
+    Boxes come as `source`, `D(page,x1,y1,...,x4,y4)`, in the page's unit (inches for a PDF). Azure
+    states pages used, not a cost, so the cost is unknown.
+
+    Auth: AZURE_CU_KEY. The resource is the `endpoint` option, not an environment variable: it
+    decides where the page is analyzed, so it is a setting the run records.
+
+        opb run --providers azure --sample 20 \
+            --options '{"azure": {"endpoint": "https://<resource>.services.ai.azure.com"}}'
     """
 
     endpoint: str = dataclasses.field(
@@ -65,8 +70,21 @@ class Config:
     def __post_init__(self):
         object.__setattr__(self, "endpoint", self.endpoint.rstrip("/"))
 
+    name: ClassVar[str] = "azure"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    workers: ClassVar[int] = 3
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: Azure) -> list[contract.Request]:
     """One call for every output: headers are comments in Azure's markdown, unwrapped for html."""
     sent = {"analyzer": config.analyzer, "api_version": config.api_version}
     if "html" in wants:
@@ -110,9 +128,9 @@ def layout_blocks(content: dict) -> list[dict]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
-         config: Config | None = None) -> contract.Call:
+         config: Azure | None = None) -> contract.Call:
     """Analyze the page, poll until it is done, return the analysis."""
-    config = config or Config()
+    config = config or Azure()
     key = os.environ.get("AZURE_CU_KEY")
     if not key or not config.endpoint:
         raise errors.MissingCredential(
@@ -129,7 +147,8 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         if r.status_code >= 400 or not (op := r.headers.get("Operation-Location")):
             raise errors.VendorError(f"analyze HTTP {r.status_code}: {r.text[:300]}",
                                      status=r.status_code, body=r.text)
-        job_id = r.json().get("id")
+        with adapter.reading("the analysis's id"):
+            job_id = contract.json_object(r).get("id")
         retry = budget.PollRetry(deadline)
         with errors.job(job_id):
             while True:
@@ -143,18 +162,19 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                     if retry.again(r.status_code): continue
                     raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}",
                                              status=r.status_code, body=r.text)
-                retry.ok()
+                retry.reset()
                 polls += 1
-                body = r.json()
+                with adapter.reading("the analysis's status"):
+                    body = contract.json_object(r)
                 if str(body.get("status")).lower() in TERMINAL: break
                 time.sleep(min(config.poll_interval, deadline.remaining()))
-            if str(body["status"]).lower() != "succeeded":
-                raise errors.VendorError(f"analysis {body['status']}: {str(body.get('error'))[:300]}",
+            if str(body.get("status")).lower() != "succeeded":
+                raise errors.VendorError(f"analysis {body.get('status')}: {str(body.get('error'))[:300]}",
                                          status=200, raw=body)
     return contract.Call(body, cost=contract.Cost(), job_id=job_id)
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: Azure | None = None) -> tuple[dict, dict]:
     """The outputs in a finished analysis: markdown with header comments unwrapped, and blocks."""
     contents = (raw.get("result") or {}).get("contents") or []
     if not contents:

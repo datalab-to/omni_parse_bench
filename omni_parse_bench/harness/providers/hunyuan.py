@@ -1,46 +1,6 @@
 """HunyuanOCR-1.5 (tencent/HunyuanOCR), served from providers/serve/hunyuan/ on any GPU host.
 
-Run as its repository's client runs it (github.com/Tencent-Hunyuan/HunyuanOCR at 1ef4179,
-inference/vLLM/infer_vllm_client.py). Steps 3 and 4 run on the server (serve/hunyuan/server.py); steps 1
-and 5 run here, with no vendor code.
-
-How a page is processed:
-
-  1. Input loading        the LLM adapter's PNG, its long edge at most 2048 px: the repository takes
-                          images only, so the page is rendered as for every model without a renderer of
-                          its own.
-  2. Image preprocessing  the model's own image processor, in vLLM (up to about 4.2M pixels).
-  3. Model inference      the vendor's validated setup: vLLM 0.18.1 on Python 3.10, the weights at
-                          revision 47644ecc with the repository's previous config.json (revision
-                          3d3cbc9e; the current one targets transformers 5 and doesn't load correctly
-                          in vLLM 0.18.1). An empty system message, then the page image and the
-                          task's prompt from inference/utils/tasks.py; temperature 0, top_p 1, top_k
-                          -1, repetition_penalty 1.08, special tokens skipped, at most 32768 tokens;
-                          streamed, with the client's tail-repetition early stop (`infer_stream`).
-  4. Vendor output parsing  the client's `clean_repeated_substrings`; for `doc_parse`, its
-                          `normalize_doc_parse_markdown`.
-  5. Mapping to opb outputs  the `layout_parse` reply is a JSON list of `{layout_type, bbox, text}`,
-                          boxes as points on a 0-1000 grid: html is the items' texts in order, a
-                          picture's text as the image's alt text; blocks are the items, each label from
-                          LABELS.
-
-`task` picks the client's task type: `layout_parse` (full-page parsing with layout analysis: the task
-that reads the whole page and gives blocks; the default) or `doc_parse` (full-page parsing, page headers
-and footers left out by its prompt; html only).
-
-Differences from the vendor:
-
-  - `layout_parse`, not the `doc_parse` Tencent scores document parsing with: `doc_parse` drops headers
-    and footers and gives no boxes, and the benchmark scores both;
-  - the vLLM 0.18.1 setup, which Tencent now lists as archived but validated (its unified environment,
-    vLLM 0.25.1 on CUDA 13, is verified to align); and
-  - each page has the benchmark's 900 s.
-
-    docker build -t opb-hunyuan omni_parse_bench/harness/providers/serve/hunyuan
-    docker run --gpus all -p 8001:8001 opb-hunyuan
-    opb predict --provider hunyuan-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
-
-OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
+The adapter is `Hunyuan`; its docstring says how a page is processed, and how to serve and run it.
 """
 from __future__ import annotations
 
@@ -49,9 +9,11 @@ import dataclasses
 import json
 import re
 from pathlib import Path
+from typing import Any, ClassVar
 
 from ... import markdown
 from .. import contract, errors, http, layout
+from ..adapter import PageAdapter
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -60,11 +22,55 @@ TASKS = ("layout_parse", "doc_parse")
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
+class Hunyuan(PageAdapter):
     """Where the HunyuanOCR server (serve/hunyuan/) answers, the client's task, and its sampling (the
-    client's by default)."""
+    client's by default).
 
-    base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
+    Run as its repository's client runs it (github.com/Tencent-Hunyuan/HunyuanOCR at 1ef4179,
+    inference/vLLM/infer_vllm_client.py). Steps 3 and 4 run on the server (serve/hunyuan/server.py); steps 1
+    and 5 run here, with no vendor code.
+
+    How a page is processed:
+
+      1. Input loading        the LLM adapter's PNG, its long edge at most 2048 px: the repository takes
+                              images only, so the page is rendered as for every model without a renderer of
+                              its own.
+      2. Image preprocessing  the model's own image processor, in vLLM (up to about 4.2M pixels).
+      3. Model inference      the vendor's validated setup: vLLM 0.18.1 on Python 3.10, the weights at
+                              revision 47644ecc with the repository's previous config.json (revision
+                              3d3cbc9e; the current one targets transformers 5 and doesn't load correctly
+                              in vLLM 0.18.1). An empty system message, then the page image and the
+                              task's prompt from inference/utils/tasks.py; temperature 0, top_p 1, top_k
+                              -1, repetition_penalty 1.08, special tokens skipped, at most 32768 tokens;
+                              streamed, with the client's tail-repetition early stop (`infer_stream`).
+      4. Vendor output parsing  the client's `clean_repeated_substrings`; for `doc_parse`, its
+                              `normalize_doc_parse_markdown`.
+      5. Mapping to opb outputs  the `layout_parse` reply is a JSON list of `{layout_type, bbox, text}`,
+                              boxes as points on a 0-1000 grid: html is the items' texts in order, a
+                              picture's text as the image's alt text; blocks are the items, each label from
+                              LABELS.
+
+    `task` picks the client's task type: `layout_parse` (full-page parsing with layout analysis: the task
+    that reads the whole page and gives blocks; the default) or `doc_parse` (full-page parsing, page headers
+    and footers left out by its prompt; html only).
+
+    Differences from the vendor:
+
+      - `layout_parse`, not the `doc_parse` Tencent scores document parsing with: `doc_parse` drops headers
+        and footers and gives no boxes, and the benchmark scores both;
+      - the vLLM 0.18.1 setup, which Tencent now lists as archived but validated (its unified environment,
+        vLLM 0.25.1 on CUDA 13, is verified to align); and
+      - each page has the benchmark's 900 s.
+
+        docker build -t opb-hunyuan omni_parse_bench/harness/providers/serve/hunyuan
+        docker run --gpus all -p 8001:8001 opb-hunyuan
+        opb run --providers hunyuan-ocr --sample 20 \\
+            --options '{"hunyuan-ocr": {"base_url": "http://localhost:8001"}}'
+
+    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
+    """
+
+    base_url: str = "http://127.0.0.1:8001"
     task: str = dataclasses.field(default="layout_parse", metadata={"choices": list(TASKS)})
     temperature: float = 0.0
     top_p: float = 1.0
@@ -77,8 +83,20 @@ class Config:
         if self.task not in TASKS:
             raise ValueError(f"task must be one of {TASKS}, not {self.task!r}")
 
+    name: ClassVar[str] = "hunyuan-ocr"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: Hunyuan) -> list[contract.Request]:
     """One call answers every output; `doc_parse` gives no blocks."""
     if not wants: return []
     sent = {"weights": WEIGHTS, "settings": http.settings(config), "top_k": -1,
@@ -88,7 +106,7 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
     return [contract.Request(frozenset(wants) & supports, sent)]
 
 
-def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
+def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Hunyuan) -> contract.Call:
     # Note: the repository takes images only, so the page goes as opb's PNG, in the body every server takes.
     body = {"page": base64.b64encode(llm.image(page, config.long_edge)).decode("ascii"), "suffix": ".png",
             "settings": http.settings(config, "long_edge")}
@@ -161,7 +179,7 @@ def blocks(said: str) -> list[dict]:
     return out
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: Hunyuan | None = None) -> tuple[dict, dict]:
     """The client's text as the page and as blocks. A label LABELS lacks fails the blocks only."""
     text = raw["text"] or ""
     outputs, errs = {}, {}

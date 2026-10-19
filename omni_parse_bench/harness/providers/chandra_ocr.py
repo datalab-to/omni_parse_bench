@@ -1,51 +1,19 @@
 """chandra-ocr-2 (datalab-to/chandra-ocr-2), served from providers/serve/chandra/ on any GPU host.
 
-Run as the public `chandra-ocr` package runs it (github.com/datalab-to/chandra at d4f7467). Steps 1 to 4
-run on the server (serve/chandra/server.py); step 5 runs here, with no vendor code.
-
-How a page is processed:
-
-  1. Input loading        opb sends the page file. A PDF is loaded as the package's olmOCR-bench
-                          script loads one: `load_pdf_images` at 300 DPI ("300 recommended"), its
-                          form fields flattened into the page. An image file goes through
-                          `load_image`, which enlarges it until its shorter side is 1536 px.
-  2. Image preprocessing  `scale_to_fit`: the area capped at 3072 x 2048 px, the sides rounded to
-                          the model's 28 px grid.
-  3. Model inference      vLLM with the flags of the package's own launcher (scripts/vllm.py at
-                          --gpu h100), the `ocr_layout` prompt after the image, temperature 0,
-                          top_p 0.1, at most 12384 tokens. A reply that repeats itself, errors or is
-                          cut at the token limit is asked again, up to 6 times, temperature 0.2
-                          higher each time (at most 0.8), top_p 0.95.
-  4. Vendor output parsing  the reply is block HTML, one top-level <div data-label data-bbox> per
-                          block, boxes on a 0-1000 grid; the package's `parse_html` reads each block,
-                          headers and footers kept. A reply cut on every attempt is read as it is.
-  5. Mapping to opb outputs  html is the blocks' readings in order, except that a picture block
-                          (PICTURES) becomes an image whose alt text is its contents (the model's
-                          description, a chart's data, a diagram's mermaid): a model's account of a
-                          picture is not page text (docs/providers.md). blocks are the top-level
-                          divs, each label from LABELS, its box divided by 1000.
-
-Differences from the vendor:
-
-  - headers and footers are kept (the package drops them by default; the benchmark scores the whole
-    page for every system);
-  - picture contents are alt text, as for every system; and
-  - each page has the benchmark's 900 s.
-
-    docker build -t opb-chandra omni_parse_bench/harness/providers/serve/chandra
-    docker run --gpus all -p 8001:8001 opb-chandra
-    opb predict --provider chandra-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
-
-OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
+The adapter is `ChandraOcr`; its docstring says how a page is processed, and how to serve and run it.
 """
 from __future__ import annotations
 
 import dataclasses
 import re
 from pathlib import Path
+from typing import Any, ClassVar
+
+from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
+from ..adapter import PageAdapter
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -67,19 +35,71 @@ PICTURES = ("Image", "Figure", "Picture", "Diagram", "Chemical-Block")
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
+class ChandraOcr(PageAdapter):
     """Where the chandra-ocr-2 server (serve/chandra/) answers, and the sampling of its first attempt (the
-    package's by default; a retry follows the package's schedule)."""
+    package's by default; a retry follows the package's schedule).
 
-    base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
+    Run as the public `chandra-ocr` package runs it (github.com/datalab-to/chandra at d4f7467). Steps 1 to 4
+    run on the server (serve/chandra/server.py); step 5 runs here, with no vendor code.
+
+    How a page is processed:
+
+      1. Input loading        opb sends the page file. A PDF is loaded as the package's olmOCR-bench
+                              script loads one: `load_pdf_images` at 300 DPI ("300 recommended"), its
+                              form fields flattened into the page. An image file goes through
+                              `load_image`, which enlarges it until its shorter side is 1536 px.
+      2. Image preprocessing  `scale_to_fit`: the area capped at 3072 x 2048 px, the sides rounded to
+                              the model's 28 px grid.
+      3. Model inference      vLLM with the flags of the package's own launcher (scripts/vllm.py at
+                              --gpu h100), the `ocr_layout` prompt after the image, temperature 0,
+                              top_p 0.1, at most 12384 tokens. A reply that repeats itself, errors or is
+                              cut at the token limit is asked again, up to 6 times, temperature 0.2
+                              higher each time (at most 0.8), top_p 0.95.
+      4. Vendor output parsing  the reply is block HTML, one top-level <div data-label data-bbox> per
+                              block, boxes on a 0-1000 grid; the package's `parse_html` reads each block,
+                              headers and footers kept. A reply cut on every attempt is read as it is.
+      5. Mapping to opb outputs  html is the blocks' readings in order, except that a picture block
+                              (PICTURES) becomes an image whose alt text is its contents (the model's
+                              description, a chart's data, a diagram's mermaid): a model's account of a
+                              picture is not page text (docs/providers.md). blocks are the top-level
+                              divs, each label from LABELS, its box divided by 1000.
+
+    Differences from the vendor:
+
+      - headers and footers are kept (the package drops them by default; the benchmark scores the whole
+        page for every system);
+      - picture contents are alt text, as for every system; and
+      - each page has the benchmark's 900 s.
+
+        docker build -t opb-chandra omni_parse_bench/harness/providers/serve/chandra
+        docker run --gpus all -p 8001:8001 opb-chandra
+        opb run --providers chandra-ocr --sample 20 \\
+            --options '{"chandra-ocr": {"base_url": "http://localhost:8001"}}'
+
+    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
+    """
+
+    base_url: str = "http://127.0.0.1:8001"
     temperature: float = 0.0
     top_p: float = 0.1
     max_tokens: int = 12384
     dpi: int = 300
     max_retries: int = 6
 
+    name: ClassVar[str] = "chandra-ocr"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: ChandraOcr) -> list[contract.Request]:
     """One call answers both outputs."""
     if not wants: return []
     sent = {"weights": WEIGHTS, "prompt": "ocr_layout", "settings": http.settings(config),
@@ -88,12 +108,15 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
     return [contract.Request(frozenset(wants) & SUPPORTS, sent)]
 
 
-def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
+def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
+         config: ChandraOcr) -> contract.Call:
     raw = http.parse(config, page, timeout)
-    usage = raw.get("usage") or {}
-    cost = contract.Cost(tokens_in=usage.get("prompt_tokens"), tokens_out=usage.get("completion_tokens"))
+    with adapter.reading("the server's answer"):
+        usage = raw.get("usage") or {}
+        cost = contract.Cost(tokens_in=usage.get("prompt_tokens"), tokens_out=usage.get("completion_tokens"))
+        job_id = raw["completion"].get("id")
     # Note: a reply cut at the token limit on every attempt is kept and read, as the package reads it.
-    return contract.Call(raw, cost=cost, job_id=raw["completion"].get("id"))
+    return contract.Call(raw, cost=cost, job_id=job_id)
 
 
 def blocks(html: str) -> list[dict]:
@@ -119,7 +142,7 @@ def picture(block: dict) -> str:
     return markdown.alt(" ".join(filter(None, [img.get("alt", "") if img else "", block["raw"]])))
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: ChandraOcr | None = None) -> tuple[dict, dict]:
     """The page from the server's blocks, pictures as alt text; the blocks from the reply. A label
     LABELS lacks fails the blocks only."""
     said = llm.content(raw["completion"])

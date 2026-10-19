@@ -1,17 +1,6 @@
 """PaddleOCR-VL's server: steps 1 to 4 of providers/paddleocr_vl.py, with its own pipeline.
 
-PaddleOCR's `PaddleOCRVL` pipeline (pipeline_version v1.6, the VLM through its vllm-server backend),
-beside the VLM's vLLM server; how a page is processed is set out step by step in the adapter's
-docstring. One pipeline per uvicorn worker, reading one page at a time.
-
-    GET  /health    {"ready": true} once the pipeline is loaded
-    POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's, "settings": {"dpi"}}
-                    -> the pipeline's result for the page (`parsing_res_list`: each block's label, box
-                    in the pixels of the page as loaded, and content), "width" and "height" of that
-                    page, its markdown with every block kept, and "vendor": the package versions
-
-With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image
-(start.sh); the Dockerfile says how to build and run it.
+`parse` says what the server answers and how it runs.
 """
 from __future__ import annotations
 
@@ -58,7 +47,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 class Settings(BaseModel):
-    """Every request sets these, from the adapter's Config (the vendor's values by default)."""
+    """Every request sets these, from the adapter's options (the vendor's values by default)."""
 
     model_config = ConfigDict(extra="forbid")
     dpi: int
@@ -103,6 +92,19 @@ def health() -> dict:
 
 @app.post("/parse")
 def parse(page: Page, authorization: str | None = Header(default=None)) -> dict:
+    """PaddleOCR's `PaddleOCRVL` pipeline (pipeline_version v1.6, the VLM through its vllm-server backend),
+    beside the VLM's vLLM server; how a page is processed is set out step by step in the adapter's
+    docstring. One pipeline per uvicorn worker, reading one page at a time.
+
+        GET  /health    {"ready": true} once the pipeline is loaded
+        POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's, "settings": {"dpi"}}
+                        -> the pipeline's result for the page (`parsing_res_list`: each block's label, box
+                        in the pixels of the page as loaded, and content), "width" and "height" of that
+                        page, its markdown with every block kept, and "vendor": the package versions
+
+    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image
+    (start.sh); the Dockerfile says how to build and run it.
+    """
     if KEY and authorization != f"Bearer {KEY}":
         raise HTTPException(401, "a bearer token (OPB_ENDPOINT_KEY) is needed")
     with tempfile.NamedTemporaryFile(suffix=page.suffix) as f:

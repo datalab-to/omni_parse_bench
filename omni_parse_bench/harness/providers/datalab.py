@@ -1,15 +1,6 @@
 """Datalab API adapter: POST /api/v1/convert, then poll for the result.
 
-`mode` selects the tier (`fast`, `balanced`, `accurate`). One call produces `html` and `blocks`
-together (`output_format=html,chunks`), with page headers and footers kept (the API's own switches
-`additional_config.keep_pageheader_in_output` and `keep_pagefooter_in_output`).
-
-Blocks come from the chunks output: each block's `block_type`, its `bbox` in the page's frame
-(`page_info`), and its text. Cost comes back in cents (`cost_breakdown`) and is converted once.
-
-Auth: DATALAB_API_KEY.
-
-    opb predict --provider datalab --page page.pdf --options '{"mode": "balanced"}'
+The adapter is `Datalab`; its docstring says how a page is processed, and how to serve and run it.
 """
 from __future__ import annotations
 
@@ -19,10 +10,13 @@ import os
 import re
 import time
 from pathlib import Path
+from typing import Any, ClassVar
 
 import httpx
+from omni_bench_core import adapter
 
 from .. import budget, contract, errors, layout
+from ..adapter import PageAdapter
 
 DEFAULT_BASE_URL = "https://www.datalab.to"
 SUPPORTS = frozenset({"html", "blocks"})
@@ -40,8 +34,20 @@ MEDIA = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", "
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """What datalab can be asked."""
+class Datalab(PageAdapter):
+    """The datalab adapter. Its fields are what datalab can be asked.
+
+    `mode` selects the tier (`fast`, `balanced`, `accurate`). One call produces `html` and `blocks`
+    together (`output_format=html,chunks`), with page headers and footers kept (the API's own switches
+    `additional_config.keep_pageheader_in_output` and `keep_pagefooter_in_output`).
+
+    Blocks come from the chunks output: each block's `block_type`, its `bbox` in the page's frame
+    (`page_info`), and its text. Cost comes back in cents (`cost_breakdown`) and is converted once.
+
+    Auth: DATALAB_API_KEY.
+
+        opb run --providers datalab --options '{"datalab": {"mode": "balanced"}}' --sample 20
+    """
 
     mode: str = dataclasses.field(
         default="accurate",
@@ -50,8 +56,21 @@ class Config:
     base_url: str = DEFAULT_BASE_URL
     poll_interval: float = 2.0
 
+    name: ClassVar[str] = "datalab"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    workers: ClassVar[int] = 10
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: Datalab) -> list[contract.Request]:
     """One call for html and blocks, with headers kept."""
     if not wants: return []
     formats = ",".join(f for o, f in (("html", "html"), ("blocks", "chunks")) if o in wants)
@@ -84,9 +103,9 @@ def blocks(chunks: dict) -> list[dict]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
-         config: Config | None = None) -> contract.Call:
+         config: Datalab | None = None) -> contract.Call:
     """POST the page, poll until it is done, return the finished conversion and its cost."""
-    config = config or Config()
+    config = config or Datalab()
     key = os.environ.get("DATALAB_API_KEY")
     if not key:
         raise errors.MissingCredential("DATALAB_API_KEY is not set")
@@ -104,8 +123,8 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         if resp.status_code != 200:
             raise errors.VendorError(f"HTTP {resp.status_code}: {resp.text[:300]}",
                                      status=resp.status_code, body=resp.text)
-        submitted = resp.json()
-        request_id = submitted.get("request_id")
+        with adapter.reading("the request's id"):
+            request_id = contract.json_object(resp).get("request_id")
         if not request_id:
             raise errors.VendorError(f"no request_id in the response: {resp.text[:200]}",
                                      status=resp.status_code, body=resp.text)
@@ -123,9 +142,10 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                     if retry.again(r.status_code): continue
                     raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}",
                                              status=r.status_code, body=r.text)
-                retry.ok()
+                retry.reset()
                 polls += 1
-                body = r.json()
+                with adapter.reading("the conversion's status"):
+                    body = contract.json_object(r)
                 if body.get("status") == "complete":
                     if not body.get("success", True):
                         raise errors.VendorError(f"vendor reported failure: {str(body.get('error'))[:300]}",
@@ -137,7 +157,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                 time.sleep(min(config.poll_interval, deadline.remaining()))
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: Datalab | None = None) -> tuple[dict, dict]:
     """The outputs in a completed conversion: its html, and its chunks as blocks."""
     outputs, errs = {}, {}
     for o in request.outputs:

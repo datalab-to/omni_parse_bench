@@ -3,10 +3,11 @@ name = "omni-parse-bench"
 version = "1.0.0rc1"
 description = "A document-parsing benchmark: yes/no tests on single pages, graded against a provider's outputs."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Datalab" }]
 dependencies = [
+    "omni-bench-core",            # the shared core: tasks, adapters, scorers, runs and the loop over them
     "beautifulsoup4>=4.12",  # table structure
     "fuzzysearch>=0.7",      # positional near-matches for order tests
     "mini-racer>=0.12",      # an embedded V8 that runs KaTeX, which equations are compared by
@@ -22,7 +23,6 @@ harness = [
     "openai>=1.0",
     "pypdfium2>=4.30",
     "pillow>=10.0",
-    "rich>=13.0",
 ]
 # Running the published benchmark end to end: fetch the dataset and read its manifest.
 benchmark = [
@@ -51,12 +51,15 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["omni_parse_bench"]
 
+[tool.uv.sources]
+omni-bench-core = { path = "../../omni-bench-core", editable = true }
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 110
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "UP"]

@@ -1,45 +1,17 @@
 """MinerU2.5-Pro (opendatalab/MinerU2.5-Pro-2605-1.2B), served from providers/serve/mineru/ on any GPU host.
 
-Run as its model card and client run it (github.com/opendatalab/mineru-vl-utils 2.0.7, `MinerUClient`
-with the `http-client` backend), the page rendered as MinerU renders one. Steps 1 to 4 run on the server
-(serve/mineru/server.py); step 5 runs here, with no vendor code.
-
-How a page is processed:
-
-  1. Input loading        opb sends the page file. A PDF is rendered by MinerU's docvortex package
-                          (`load_images_from_pdf_core`, 0.5.16): 200 DPI, its long edge at most 3500 px.
-                          An image file is opened as it is (MinerU's own path for an image file is not
-                          traced here).
-  2. Image preprocessing  the client's: layout detection on a 1036 x 1036 copy of the page, then each
-                          block cropped from the page as loaded.
-  3. Model inference      vLLM 0.21.0 with MinerU's logits processor (`MinerULogitsProcessor`, for the
-                          client's no-repeat n-gram setting); the client's `two_step_extract`, layout
-                          first, then each block's content from its crop, at its default prompts and
-                          sampling. Image analysis stays off (the model card's default).
-  4. Vendor output parsing  the client's blocks `{type, bbox, angle, content}`, boxes from 0 to 1, and
-                          its `json2md` over them: truncated paragraphs merged, headers and footers kept,
-                          images left out.
-  5. Mapping to opb outputs  html is that markdown through `markdown.to_html`; blocks are the list, each
-                          type mapped by LABELS.
-
-Differences from the vendor:
-
-  - each page has the benchmark's 900 s.
-
-    docker build -t opb-mineru omni_parse_bench/harness/providers/serve/mineru
-    docker run --gpus all -p 8001:8001 opb-mineru
-    opb predict --provider mineru --page page.pdf --options '{"base_url": "http://localhost:8001"}'
-
-OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
+The adapter is `MinerU`; its docstring says how a page is processed, and how to serve and run it.
 """
 from __future__ import annotations
 
 import dataclasses
 import re
 from pathlib import Path
+from typing import Any, ClassVar
 
 from ... import markdown
 from .. import contract, errors, http, layout
+from ..adapter import PageAdapter
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "opendatalab/MinerU2.5-Pro-2605-1.2B"
@@ -65,13 +37,58 @@ _TAG = re.compile(r"<[^>]+>")
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """Where the MinerU2.5-Pro server (serve/mineru/) answers."""
+class MinerU(PageAdapter):
+    """Where the MinerU2.5-Pro server (serve/mineru/) answers.
 
-    base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
+    Run as its model card and client run it (github.com/opendatalab/mineru-vl-utils 2.0.7, `MinerUClient`
+    with the `http-client` backend), the page rendered as MinerU renders one. Steps 1 to 4 run on the server
+    (serve/mineru/server.py); step 5 runs here, with no vendor code.
+
+    How a page is processed:
+
+      1. Input loading        opb sends the page file. A PDF is rendered by MinerU's docvortex package
+                              (`load_images_from_pdf_core`, 0.5.16): 200 DPI, its long edge at most 3500 px.
+                              An image file is opened as it is (MinerU's own path for an image file is not
+                              traced here).
+      2. Image preprocessing  the client's: layout detection on a 1036 x 1036 copy of the page, then each
+                              block cropped from the page as loaded.
+      3. Model inference      vLLM 0.21.0 with MinerU's logits processor (`MinerULogitsProcessor`, for the
+                              client's no-repeat n-gram setting); the client's `two_step_extract`, layout
+                              first, then each block's content from its crop, at its default prompts and
+                              sampling. Image analysis stays off (the model card's default).
+      4. Vendor output parsing  the client's blocks `{type, bbox, angle, content}`, boxes from 0 to 1, and
+                              its `json2md` over them: truncated paragraphs merged, headers and footers kept,
+                              images left out.
+      5. Mapping to opb outputs  html is that markdown through `markdown.to_html`; blocks are the list, each
+                              type mapped by LABELS.
+
+    Differences from the vendor:
+
+      - each page has the benchmark's 900 s.
+
+        docker build -t opb-mineru omni_parse_bench/harness/providers/serve/mineru
+        docker run --gpus all -p 8001:8001 opb-mineru
+        opb run --providers mineru --options '{"mineru": {"base_url": "http://localhost:8001"}}' --sample 20
+
+    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
+    """
+
+    base_url: str = "http://127.0.0.1:8001"
+
+    name: ClassVar[str] = "mineru"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
 
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+def requests(wants: frozenset[str], config: MinerU) -> list[contract.Request]:
     """One two-step extraction answers both outputs."""
     if not wants: return []
     sent = {"weights": WEIGHTS, "client": CLIENT, "method": "two_step_extract", "image_analysis": False,
@@ -80,11 +97,11 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
     return [contract.Request(frozenset(wants) & SUPPORTS, sent)]
 
 
-def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
+def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: MinerU) -> contract.Call:
     return contract.Call(http.parse(config, page, timeout, body=http.page(page)))
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: MinerU | None = None) -> tuple[dict, dict]:
     """The page from the client's `json2md`; the blocks with their labels. A block type LABELS lacks
     fails the blocks only: the page's text doesn't depend on how its blocks are labelled."""
     outputs, errs = {}, {}

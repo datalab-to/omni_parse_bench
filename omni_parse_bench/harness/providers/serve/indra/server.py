@@ -1,21 +1,6 @@
 """Indra OCR's server: steps 1 to 4 of providers/indra_ocr.py, with the `indra-ocr` package's code.
 
-What the package's `indra-ocr` command does per page: its `Converter` reads the file, the PDF's text
-layer where it passes the package's checks and OCR elsewhere, and writes the page's markdown and layout
-blocks. As the package's own `convert_many` runs, each page is read by one single-threaded worker process
-of a pool, one worker per core; how a page is processed is set out step by step in the adapter's
-docstring.
-
-    GET  /health    200 once up
-    POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
-                     "settings": {"mode", "math", "dpi", "furniture"}}
-                    -> the page's markdown, text, blocks, source, note, rotation, skew and timings,
-                    "image_size": the page as read [width, height] in pixels before any turn, and
-                    "vendor": the indra-ocr version and the models' repository and revision
-
-The models are the ones the package names (its models.py), downloaded once when it starts, as the package
-downloads them. With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. The Dockerfile says how
-to build and run it.
+`Handler` says what the server answers and how it runs.
 """
 from __future__ import annotations
 
@@ -32,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 KEY = os.environ.get("OPB_ENDPOINT_KEY")
-# Note: every request sets these, from the adapter's Config (the vendor's values by default).
+# Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = ("mode", "math", "dpi", "furniture")
 _converters: dict = {}
 
@@ -91,6 +76,23 @@ def settings(body: dict) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    """What the package's `indra-ocr` command does per page: its `Converter` reads the file, the PDF's text
+    layer where it passes the package's checks and OCR elsewhere, and writes the page's markdown and layout
+    blocks. As the package's own `convert_many` runs, each page is read by one single-threaded worker process
+    of a pool, one worker per core; how a page is processed is set out step by step in the adapter's
+    docstring.
+
+        GET  /health    200 once up
+        POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
+                         "settings": {"mode", "math", "dpi", "furniture"}}
+                        -> the page's markdown, text, blocks, source, note, rotation, skew and timings,
+                        "image_size": the page as read [width, height] in pixels before any turn, and
+                        "vendor": the indra-ocr version and the models' repository and revision
+
+    The models are the ones the package names (its models.py), downloaded once when it starts, as the package
+    downloads them. With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. The Dockerfile says how
+    to build and run it.
+    """
     pool: ProcessPoolExecutor
     vendor: dict
 

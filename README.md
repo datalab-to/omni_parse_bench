@@ -60,19 +60,31 @@ uv pip install 'omni-parse-bench[benchmark]'    # + dataset access, to run the b
 With `[benchmark]` installed, run vendors on the dataset (5 pages here):
 
 ```bash
-opb benchmark --out runs/ --limit 5 --providers datalab openai/gpt-5.6-sol
+opb run --out runs/ --limit 5 --providers datalab openai/gpt-5.6-sol
 ```
 
 It shows the plan and asks before calling any vendor; with no terminal to ask (a pipe, a notebook, CI) it goes ahead without asking, so a script runs as written. A run is resumable. Each setting of a provider is its own run. For example here we have two:
 
 ```bash
-opb benchmark --out runs/ --limit 5 --providers datalab \
+opb run --out runs/ --limit 5 --providers datalab \
   --options '{"datalab": [{"mode": "balanced"}, {"mode": "accurate"}]}'
 ```
 
 `--dataset` picks the dataset: a folder, or `hf://datasets/<repo>[@revision]` (ours by default).
-`--suites`, `--sample` and `--pages` choose pages. [`docs/API.md`](./docs/API.md#benchmark) has
-every option.
+`--suites`, `--sample` and `--pages` choose pages. `--outputs html` asks for and grades html alone, for a
+system that draws no layout blocks; a system that can't produce an output being graded is refused before
+any call. `opb run --help` has every option.
+
+In Python, the same run is:
+
+```python
+from omni_parse_bench import benchmark, harness
+
+b = benchmark.default()                        # the published dataset, every output graded
+b.run([harness.system("datalab", {"mode": "balanced"})], out="runs", limit=5)
+```
+
+The loop (planning, predicting, resuming, grading) is [omni-bench-core](https://github.com/datalab-to/omni-bench)'s.
 
 ## Score
 
@@ -146,7 +158,7 @@ verdicts = unit_tests.score(pred, tests)
 (0.6666666666666666, {'present': 1.0, 'order': 1.0, 'table_cell': 0.0}, {'score': 0.0, 'tests': 1, 'pages': 1, 'documents': 1})
 ```
 
-A verdict is `pass`, `fail` or `unsupported`, with `why` saying what went wrong. `unsupported` verdicts are left out of every score. A test whose grading raises is a bug in our scorer: it is raised, naming the page and the test, not scored.
+A verdict is `pass` or `fail`, with `why` saying what went wrong. A test whose output is missing fails. A test whose grading raises is a bug in our scorer: it is raised, naming the page and the test, not scored.
 
 From the command line:
 
@@ -157,34 +169,42 @@ opb score --pred outputs.json --gold gold/<page_id>.json
 It prints the verdicts. 
 
 A score is a number over many pages: `summarize` in your code, or
-`summary.json` from `opb benchmark`. 
+`summary.json` from `opb run`.
 
-To grade predictions you brought on the benchmark see [Grading your own predictions](./docs/API.md#grading-your-own-predictions).
+To grade predictions you brought, put them in `mine/predictions/<page_id>.json` and run `opb grade mine/`.
 
 ## Predict
 
 With `[harness]` installed, predict with our provider adapters:
 
 ```python
+from pathlib import Path
+
+from omni_bench_core import adapter
 from omni_parse_bench import harness
 from omni_parse_bench.scorers import unit_tests
 
-record = harness.predict("datalab", "pages/<page_id>.pdf", {"html", "blocks"}, mode="balanced")
-record["outputs"]       # {"html": "...", "blocks": [...]}
-record["errors"]        # {output: why} for anything that failed
-record["calls"]         # what was sent, cost, wall time
+system = harness.system("datalab", {"mode": "balanced"})
+record = adapter.predict(system, harness.Input(Path("pages/<page_id>.pdf"), frozenset({"html", "blocks"})))
+record["output"]        # {"html": "...", "blocks": [...]}
+record["error"]         # why the page failed, or None
+record["cost"]          # what it cost, its wall time and attempts
 
-unit_tests.score(record["outputs"], unit_tests.tests.read("gold/<page_id>.json"))
+unit_tests.score(record["output"], unit_tests.tests.read("gold/<page_id>.json"))
 ```
 
 From the command line:
 
 ```bash
 opb predict --provider openai/gpt-5.6-sol --page pages/<page_id>.pdf --wants html
-opb providers        # every provider, and its options
+opb providers        # every provider, and its outputs
+opb providers datalab   # one provider's options
 ```
 
-Every provider gets the same timeout per call and its most accurate settings by default. 
+To check a dataset, or to list its tests as JSON lines for querying: `opb check --dataset <folder>` and
+`opb tests --dataset <folder> > tests.jsonl` ([docs/API.md](./docs/API.md#the-dataset)).
+
+Every provider gets the same time per page and its most accurate settings by default. 
 
 ## Documentation
 

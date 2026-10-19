@@ -18,9 +18,9 @@ from typing import Any
 import pytest
 
 from omni_parse_bench import data, equations, tables, views
-from omni_parse_bench.scorers.unit_tests import tests as gold
 from omni_parse_bench.scorers import unit_tests as scorer
 from omni_parse_bench.scorers.unit_tests import runners
+from omni_parse_bench.scorers.unit_tests import tests as gold
 
 FIXTURE = Path(__file__).parent / "fixtures" / "invariants"
 DATASET = Path(os.environ.get("OPB_DATASET", "")).expanduser()

@@ -1,18 +1,6 @@
 """Unlimited-OCR's server: steps 1, 3 and 4 of providers/unlimited.py, with its repository's code and recipe.
 
-The page loaded as its own pipeline loads one (github.com/baidu/Unlimited-OCR at 92ad94b, infer.py, MIT;
-imported from the clone in the image), then asked as its vLLM recipe asks it, of the vLLM serving the
-model; how a page is processed is set out step by step in the adapter's docstring.
-
-    GET  /health    200 once up
-    POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
-                    "settings": {"temperature", "top_p", "max_tokens", "dpi", "ngram_size",
-                    "window_size"}}
-                    -> {"completion": the model's chat completion, "model",
-                    "vendor": {"Unlimited": its commit}}
-
-With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image, beside
-the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
+`Handler` says what the server answers and how it runs.
 """
 from __future__ import annotations
 
@@ -26,7 +14,6 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import httpx
-
 import infer
 
 VLLM = os.environ.get("VLLM_URL", "http://127.0.0.1:8000/v1")
@@ -34,7 +21,7 @@ MODEL = "baidu/Unlimited-OCR"
 # The vLLM recipe's request (recipes.vllm.ai/baidu/Unlimited-OCR): the prompt before the image.
 PROMPT = "<image>document parsing."
 SAMPLING = ("temperature", "top_p", "max_tokens")
-# Note: every request sets these, from the adapter's Config (the vendor's values by default).
+# Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = SAMPLING + ("dpi", "ngram_size", "window_size")
 TIMEOUT_S = 900.0
 KEY = os.environ.get("OPB_ENDPOINT_KEY")
@@ -77,6 +64,20 @@ def settings(body: dict) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    """The page loaded as its own pipeline loads one (github.com/baidu/Unlimited-OCR at 92ad94b, infer.py,
+    MIT; imported from the clone in the image), then asked as its vLLM recipe asks it, of the vLLM serving
+    the model; how a page is processed is set out step by step in the adapter's docstring.
+
+        GET  /health    200 once up
+        POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
+                        "settings": {"temperature", "top_p", "max_tokens", "dpi", "ngram_size",
+                        "window_size"}}
+                        -> {"completion": the model's chat completion, "model",
+                        "vendor": {"Unlimited": its commit}}
+
+    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image, beside
+    the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
+    """
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 

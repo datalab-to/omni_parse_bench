@@ -1,35 +1,6 @@
 """Nanonets-OCR2-3B (nanonets/Nanonets-OCR2-3B), served by vLLM from providers/serve/nanonets/ on a GPU host.
 
-Run as its model card runs it (huggingface.co/nanonets/Nanonets-OCR2-3B, "Using vLLM"). Its vendor
-offers only the model, with no code of its own around it, so every step runs here, asking vLLM
-directly.
-
-How a page is processed:
-
-  1. Input loading        the LLM adapter's PNG, its long edge at most 2048 px: the model card documents
-                          image input only, so the page is rendered as for every model without a
-                          renderer of its own.
-  2. Image preprocessing  the model's own image processor, in vLLM.
-  3. Model inference      `vllm serve` with no other flags, as the card does; the page image, then its
-                          documented prompt, temperature 0, repetition penalty 1.0 (its tip for complex
-                          tables; vLLM would otherwise apply the 1.05 of its generation_config.json),
-                          at most 15000 tokens; asked once.
-  4. Vendor output parsing  none: the reply is markdown with tables as HTML, and the model's own tags:
-                          an image's description or caption in `<img>...</img>`, `<watermark>`,
-                          `<page_number>` and `<signature>`.
-  5. Mapping to opb outputs  html is the page through `markdown.to_html`, a figure description as the
-                          image's alt text and the other tags unwrapped to their text. The model draws
-                          no layout: `html` only.
-
-Differences from the vendor:
-
-  - each page has the benchmark's 900 s.
-
-    docker build -t opb-nanonets omni_parse_bench/harness/providers/serve/nanonets
-    docker run --gpus all -p 8001:8001 opb-nanonets
-    opb predict --provider nanonets-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
-
-OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
+The adapter is `Nanonets`; its docstring says how a page is processed, and how to serve and run it.
 """
 from __future__ import annotations
 
@@ -38,9 +9,11 @@ import hashlib
 import html as _html
 import re
 from pathlib import Path
+from typing import Any, ClassVar
 
 from ... import markdown
 from .. import budget, contract, errors, http
+from ..adapter import PageAdapter
 from . import llm
 
 SUPPORTS = frozenset({"html"})
@@ -59,11 +32,44 @@ _UNWRAP = re.compile(r"</?(?:watermark|page_number|signature)>", re.I)
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
+class Nanonets(PageAdapter):
     """Where the server (serve/nanonets/) answers (its chat endpoint is vLLM's, under /v1), and its
-    sampling (the model card's by default; top_p, which it leaves unset, at vLLM's 1.0)."""
+    sampling (the model card's by default; top_p, which it leaves unset, at vLLM's 1.0).
 
-    base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
+    Run as its model card runs it (huggingface.co/nanonets/Nanonets-OCR2-3B, "Using vLLM"). Its vendor
+    offers only the model, with no code of its own around it, so every step runs here, asking vLLM
+    directly.
+
+    How a page is processed:
+
+      1. Input loading        the LLM adapter's PNG, its long edge at most 2048 px: the model card documents
+                              image input only, so the page is rendered as for every model without a
+                              renderer of its own.
+      2. Image preprocessing  the model's own image processor, in vLLM.
+      3. Model inference      `vllm serve` with no other flags, as the card does; the page image, then its
+                              documented prompt, temperature 0, repetition penalty 1.0 (its tip for complex
+                              tables; vLLM would otherwise apply the 1.05 of its generation_config.json),
+                              at most 15000 tokens; asked once.
+      4. Vendor output parsing  none: the reply is markdown with tables as HTML, and the model's own tags:
+                              an image's description or caption in `<img>...</img>`, `<watermark>`,
+                              `<page_number>` and `<signature>`.
+      5. Mapping to opb outputs  html is the page through `markdown.to_html`, a figure description as the
+                              image's alt text and the other tags unwrapped to their text. The model draws
+                              no layout: `html` only.
+
+    Differences from the vendor:
+
+      - each page has the benchmark's 900 s.
+
+        docker build -t opb-nanonets omni_parse_bench/harness/providers/serve/nanonets
+        docker run --gpus all -p 8001:8001 opb-nanonets
+        opb run --providers nanonets-ocr --sample 20 \\
+            --options '{"nanonets-ocr": {"base_url": "http://localhost:8001"}}'
+
+    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
+    """
+
+    base_url: str = "http://127.0.0.1:8001"
     temperature: float = 0.0
     top_p: float = 1.0
     max_tokens: int = 15000
@@ -72,8 +78,20 @@ class Config:
     repetition_penalty: float = 1.0
     long_edge: int = llm.LONG_EDGE
 
+    name: ClassVar[str] = "nanonets-ocr"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: Nanonets) -> list[contract.Request]:
     """One call, for the page as markdown; the model draws no layout."""
     if "html" not in wants: return []
     sent = {"model": MODEL, "prompt_sha": hashlib.sha256(PROMPT.encode()).hexdigest()[:12],
@@ -82,7 +100,7 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
     return [contract.Request(frozenset({"html"}), sent)]
 
 
-def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
+def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Nanonets) -> contract.Call:
     content = [llm.image_part(llm.image(page, config.long_edge)), {"type": "text", "text": PROMPT}]
     body = {"model": MODEL, "messages": [{"role": "user", "content": content}],
             "temperature": config.temperature, "top_p": config.top_p, "max_tokens": config.max_tokens,
@@ -97,7 +115,7 @@ def page(said: str) -> str:
     return _UNWRAP.sub("", said)
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: Nanonets | None = None) -> tuple[dict, dict]:
     text = llm.content(raw)
     if not text.strip():
         raise errors.VendorError("the reply is empty", status=200)

@@ -1,25 +1,6 @@
 """GLM-OCR's SDK servers behind one route: each page goes to a free one.
 
-The SDK (github.com/zai-org/GLM-OCR, `glmocr[selfhosted,server]` 0.1.5) self-hosts as its README
-documents: `python -m glmocr.server` runs PP-DocLayoutV3 layout detection, recognises each region with
-the model (vLLM on localhost:8000, chosen by the GLMOCR_* environment), and formats the page. One SDK
-server reads one page at a time, so this starts GLM_SERVERS of them (12) on ports 5002, 5003, ...,
-and gives each one page at a time; pages still run in parallel.
-
-Every setting is the SDK's default config.yaml but its port, and, with GLM_SDK_CONFIG=keep (the
-default here), one more: the default abandons the regions it labels header, footer, number, footnote,
-aside_text, reference and header/footer images, so they would be in neither output. The benchmark
-scores the whole page, headers and footers included, for every system, so `keep` reads those regions:
-the text ones as text, the header and footer images as images. `default` runs the SDK as it ships.
-
-    GET  /health                       200 once every SDK server is up
-    POST /parse                        {"page": base64 file, "suffix": ".pdf" or the image's}
-                                       -> the SDK's answer (`markdown_result`, `json_result`), with
-                                       "sdk_config" and "vendor" (the SDK version) added; 503 when the SDK
-                                       failed to read a region, which it would leave out silently
-
-With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It exits when an SDK server does.
-It runs in this folder's image (start.sh); the Dockerfile says how to build and run it.
+`Handler` says what the server answers and how it runs.
 """
 from __future__ import annotations
 
@@ -37,10 +18,9 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import glmocr
 import httpx
 import yaml
-
-import glmocr
 
 SERVERS = int(os.environ.get("GLM_SERVERS", "12"))
 SDK_CONFIG = os.environ.get("GLM_SDK_CONFIG", "keep")
@@ -139,6 +119,27 @@ def parse(data: bytes, suffix: str) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    """The SDK (github.com/zai-org/GLM-OCR, `glmocr[selfhosted,server]` 0.1.5) self-hosts as its README
+    documents: `python -m glmocr.server` runs PP-DocLayoutV3 layout detection, recognises each region with
+    the model (vLLM on localhost:8000, chosen by the GLMOCR_* environment), and formats the page. One SDK
+    server reads one page at a time, so this starts GLM_SERVERS of them (12) on ports 5002, 5003, ...,
+    and gives each one page at a time; pages still run in parallel.
+
+    Every setting is the SDK's default config.yaml but its port, and, with GLM_SDK_CONFIG=keep (the
+    default here), one more: the default abandons the regions it labels header, footer, number, footnote,
+    aside_text, reference and header/footer images, so they would be in neither output. The benchmark
+    scores the whole page, headers and footers included, for every system, so `keep` reads those regions:
+    the text ones as text, the header and footer images as images. `default` runs the SDK as it ships.
+
+        GET  /health                       200 once every SDK server is up
+        POST /parse                        {"page": base64 file, "suffix": ".pdf" or the image's}
+                                           -> the SDK's answer (`markdown_result`, `json_result`), with
+                                           "sdk_config" and "vendor" (the SDK version) added; 503 when the SDK
+                                           failed to read a region, which it would leave out silently
+
+    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It exits when an SDK server does.
+    It runs in this folder's image (start.sh); the Dockerfile says how to build and run it.
+    """
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 

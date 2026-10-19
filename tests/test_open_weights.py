@@ -1,4 +1,4 @@
-"""The open models' providers read real saved answers and send their Config's sampling.
+"""The open models' providers read real saved answers and send their options' sampling.
 
 Each fixture in fixtures/open_weights/ is one answer from the October 2026 runs (the record's `raw`,
 trimmed of fields no adapter reads), with the provider and options of the run. No adapter imports
@@ -10,9 +10,10 @@ import json
 from pathlib import Path
 
 import pytest
+from omni_bench_core import adapter as core
 
-from omni_parse_bench import views
-from omni_parse_bench.harness import contract, errors, registry
+from omni_parse_bench import harness, views
+from omni_parse_bench.harness import contract, errors
 
 HERE = Path(__file__).parent / "fixtures" / "open_weights"
 FIXTURES = sorted(HERE.glob("*.json"))
@@ -21,11 +22,10 @@ FIXTURES = sorted(HERE.glob("*.json"))
 def _read(fixture: Path, outputs: frozenset[str] | None = None) -> tuple[dict, dict, dict]:
     """A fixture's answer read by its provider, for the outputs its request asked for."""
     fx = json.loads(fixture.read_text())
-    api = registry.adapter(fx["provider"])
-    config = registry.config_for(fx["provider"], fx["options"])
-    (asked,) = api.requests(outputs or api.SUPPORTS, config)
+    api = harness.system(fx["provider"], fx["options"])
+    (asked,) = api.requests(outputs or api.SUPPORTS)
     sent = fx["sent"] if fx["sent"] is not None else asked.sent
-    outs, errs = api.parse(fx["raw"], contract.Request(asked.outputs, sent), config)
+    outs, errs = api.parse(fx["raw"], contract.Request(asked.outputs, sent))
     return fx, outs, errs
 
 
@@ -41,7 +41,7 @@ def test_a_saved_answer_gives_every_output_its_adapter_supports(fixture):
 def test_every_open_weight_fixture_names_a_known_provider():
     for p in FIXTURES:
         fx = json.loads(p.read_text())
-        registry.config_for(fx["provider"], fx["options"])
+        harness.system(fx["provider"], fx["options"])
 
 
 def test_a_chandra_picture_description_is_alt_text_not_page_text():
@@ -55,7 +55,7 @@ def test_a_chandra_picture_description_is_alt_text_not_page_text():
 def test_a_chandra_diagram_is_alt_text_not_page_text_nor_dropped():
     from omni_parse_bench.harness.providers import chandra_ocr
 
-    request = chandra_ocr.requests(frozenset({"html"}), chandra_ocr.Config())[0]
+    request = chandra_ocr.ChandraOcr().requests(frozenset({"html"}))[0]
     raw = {"completion": {"choices": [{"message": {"content": "..."}, "finish_reason": "stop"}]},
            "blocks": [{"label": "Text", "raw": "Intro", "html": "<p>Intro</p>"},
                       {"label": "Diagram", "raw": "<p>Model Series</p>", "html": "<p>Model Series</p>"}]}
@@ -80,7 +80,7 @@ def test_an_unknown_label_fails_the_blocks_only():
 
     reply = ("<|det|>text [0, 0, 500, 100]<|/det|>Kept\n"
              "<|det|>no_such_label [0, 100, 500, 200]<|/det|>Also kept")
-    request = unlimited.requests(frozenset({"html", "blocks"}), unlimited.Config())[0]
+    request = unlimited.UnlimitedOcr().requests(frozenset({"html", "blocks"}))[0]
     raw = {"completion": {"choices": [{"message": {"content": reply}, "finish_reason": "stop"}]}}
     outs, errs = unlimited.parse(raw, request)
     assert "Also kept" in views.text(outs["html"]) and "blocks" in errs and "blocks" not in outs
@@ -90,7 +90,7 @@ def test_an_infinity_reply_cut_at_the_token_limit_keeps_its_complete_elements():
     """The server reads a cut reply up to its last complete element, as the SDK does; the adapter keeps it."""
     from omni_parse_bench.harness.providers import infinity
 
-    request = infinity.requests(frozenset({"html", "blocks"}), infinity.Config())[0]
+    request = infinity.Infinity().requests(frozenset({"html", "blocks"}))[0]
     raw = {"completion": {"choices": [{"message": {"content": "..."}, "finish_reason": "length"}]},
            "json": '[{"bbox": [0, 0, 500, 100], "category": "text", "text": "Whole"}]', "markdown": "Whole"}
     outs, errs = infinity.parse(raw, request)
@@ -101,31 +101,35 @@ def test_a_reply_cut_at_the_token_limit_is_read_as_it_is():
     """As the vendor's own client reads it; a reply that stopped for another reason fails."""
     from omni_parse_bench.harness.providers import nanonets
 
-    request = nanonets.requests(frozenset({"html"}), nanonets.Config())[0]
+    request = nanonets.Nanonets().requests(frozenset({"html"}))[0]
     cut = {"choices": [{"message": {"content": "text"}, "finish_reason": "length"}]}
     assert "text" in nanonets.parse(cut, request)[0]["html"]
     with pytest.raises(errors.VendorError):
         nanonets.parse({"choices": [{"message": {"content": "text"}, "finish_reason": "abort"}]}, request)
 
 
-def test_a_model_without_layout_has_its_blocks_recorded_unsupported(tmp_path, monkeypatch):
-    """Nanonets reads html only, so a run that wants blocks records them unsupported, not failed."""
-    from omni_parse_bench.harness import page
+def test_a_model_without_layout_is_never_asked_for_blocks(tmp_path, monkeypatch):
+    """Nanonets reads html only, so a page that wants blocks too is asked for html alone."""
     from omni_parse_bench.harness.providers import llm
 
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
     monkeypatch.setattr(llm, "image", lambda *a: b"png")
     monkeypatch.setattr(llm, "chat", lambda *a, **k: {"choices": [{"message": {"content": "# Title"},
                                                                    "finish_reason": "stop"}]})
-    record = page.predict("nanonets-ocr", pdf, {"html", "blocks"})
-    assert record["errors"] == {"blocks": "unsupported"} and "Title" in views.text(record["outputs"]["html"])
+    record = core.predict(harness.system("nanonets-ocr"), harness.Input(pdf, frozenset({"html", "blocks"})))
+    assert list(record["output"]) == ["html"] and "Title" in views.text(record["output"]["html"])
 
 
-def test_the_published_llm_run_names_are_unchanged():
-    # Note: the published runs' names; a field added to llm.Config would change them.
-    assert registry.out_name("openai/gpt-5.6-sol") == "openai__gpt-5.6-sol-86e872e5"
+def test_an_llm_run_is_named_after_its_model():
+    name = harness.system("openai/gpt-5.6-sol").folder_name
+    assert name.startswith("openai__gpt-5.6-sol-") and name != harness.system("openai/gpt-5.5").folder_name
 
 
+def _adapter(mod):
+    """The adapter class a provider module defines."""
+    return next(v for v in vars(mod).values()
+                if isinstance(v, type) and issubclass(v, harness.PageAdapter)
+                and v.__module__ == mod.__name__)
 
 
 def _changed(config):
@@ -140,7 +144,7 @@ def _changed(config):
 @pytest.mark.parametrize("name", ["chandra_ocr", "deepseek_ocr", "dots", "hunyuan", "infinity", "lighton",
                                   "olmocr", "paddleocr_vl", "surya_ocr", "unlimited"])
 def test_a_server_gets_every_setting_from_the_config(name, tmp_path, monkeypatch):
-    """The server holds no setting of its own: the adapter sends its Config's, so an option changes it,
+    """The server holds no setting of its own: the adapter sends its options, so an option changes it,
     and the request records it, so the run is named for it."""
     import importlib
 
@@ -149,13 +153,14 @@ def test_a_server_gets_every_setting_from_the_config(name, tmp_path, monkeypatch
     from omni_parse_bench.harness import http
 
     mod = importlib.import_module(f"omni_parse_bench.harness.providers.{name}")
-    config = _changed(mod.Config())
+    config = _changed(_adapter(mod)())
     got = {}
     answer = {"completion": {}, "model": getattr(config, "model", None)}
     monkeypatch.setattr(http, "post", lambda url, body, *a, **k: got.update(body) or answer)
     Image.new("RGB", (64, 64), "white").save(page := tmp_path / "p.png")
     mod.call(page, mod.requests(mod.SUPPORTS, config)[0], config=config)
-    assert got["settings"] == http.settings(config, "long_edge") != http.settings(mod.Config(), "long_edge")
+    default = http.settings(_adapter(mod)(), "long_edge")
+    assert got["settings"] == http.settings(config, "long_edge") != default
     assert mod.requests(mod.SUPPORTS, config)[0].sent["settings"] == http.settings(config)
 
 
@@ -164,7 +169,7 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
 
     from omni_parse_bench.harness.providers import llm, nanonets
 
-    config = _changed(nanonets.Config())
+    config = _changed(nanonets.Nanonets())
     got = {}
     monkeypatch.setattr(llm, "chat", lambda url, body, *a, **k: got.update(body) or {})
     Image.new("RGB", (64, 64), "white").save(page := tmp_path / "p.png")
@@ -177,11 +182,9 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
 @pytest.mark.parametrize("provider", ["chandra-ocr", "deepseek-ocr", "dots-mocr", "glm-ocr", "hunyuan-ocr",
                                       "infinity-parser2", "lightonocr", "mineru", "nanonets-ocr", "olmocr",
                                       "paddleocr-vl", "surya-ocr", "unlimited-ocr"])
-def test_a_served_model_run_is_named_without_its_server_address(provider):
-    """A server's address is new each time it starts, so a resumed run keeps its name; a setting still
-    names its own run."""
-    a = registry.out_name(provider, {"base_url": "https://one.example"})
-    b = registry.out_name(provider, {"base_url": "https://two.example"})
-    assert a == b == registry.out_name(provider)
-    knob = "max_tokens" if "max_tokens" in registry.settings_for(provider) else None
-    if knob: assert registry.out_name(provider, {knob: 7}) != a
+def test_a_served_model_run_is_named_by_every_option(provider):
+    """Every option names the run, the server's address included: a new address is a new run folder."""
+    name = lambda **o: harness.system(provider, o).folder_name  # noqa: E731
+    a = name()
+    assert name(base_url="https://one.example") != a
+    if "max_tokens" in harness.system(provider).options(): assert name(max_tokens=7) != a
