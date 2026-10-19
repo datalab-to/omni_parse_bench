@@ -1,8 +1,8 @@
-"""Unlimited-OCR (baidu/Unlimited-OCR), served from providers/oss/unlimited/ on any GPU host.
+"""Unlimited-OCR (baidu/Unlimited-OCR), served from providers/serve/unlimited/ on any GPU host.
 
 Run as its vLLM recipe runs it (recipes.vllm.ai/baidu/Unlimited-OCR), the page loaded as its own pipeline
 loads one (github.com/baidu/Unlimited-OCR at 92ad94b, infer.py). Steps 1, 3 and 4 run on the server
-(oss/unlimited/server.py); steps 2 and 5 run in vLLM and here.
+(serve/unlimited/server.py); steps 2 and 5 run in vLLM and here.
 
 How a page is processed:
 
@@ -28,7 +28,7 @@ Differences from the vendor:
     context, and this is that less room for the prompt; and
   - each page has the benchmark's 900 s.
 
-    docker build -t opb-unlimited omni_parse_bench/harness/providers/oss/unlimited
+    docker build -t opb-unlimited omni_parse_bench/harness/providers/serve/unlimited
     docker run --gpus all -p 8001:8001 opb-unlimited
     opb predict --provider unlimited-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -66,7 +66,7 @@ LABELS = {
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the Unlimited-OCR server (oss/unlimited/) answers, and its sampling (the recipe's by
+    """Where the Unlimited-OCR server (serve/unlimited/) answers, and its sampling (the recipe's by
     default; top_p, which it leaves unset, at vLLM's 1.0)."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
@@ -83,7 +83,6 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
     if not wants: return []
     sha = hashlib.sha256(PROMPT.encode()).hexdigest()[:12]
     sent = {"model": MODEL, "prompt": PROMPT, "prompt_sha": sha, "settings": http.settings(config),
-            "server": "oss/unlimited",
             "page": "the file, loaded as its pipeline loads one"}
     return [contract.Request(frozenset(wants) & SUPPORTS, sent)]
 

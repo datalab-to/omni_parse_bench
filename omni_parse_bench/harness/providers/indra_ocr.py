@@ -1,7 +1,7 @@
-"""Indra OCR (datalab-to/indra-ocr), served from providers/oss/indra/ on any host; it needs no GPU.
+"""Indra OCR (datalab-to/indra-ocr), served from providers/serve/indra/ on any host; it needs no GPU.
 
 Run as the `indra-ocr` package (0.3.2) runs it with its `indra-ocr` command, with the models it names.
-Steps 1 to 4 run on the server (oss/indra/server.py); step 5 runs here, with no vendor code.
+Steps 1 to 4 run on the server (serve/indra/server.py); step 5 runs here, with no vendor code.
 
 How a page is processed:
 
@@ -30,7 +30,7 @@ Differences from the vendor:
     default), as every other adapter keeps them; and
   - each page has the benchmark's 900 s.
 
-    docker build -t opb-indra omni_parse_bench/harness/providers/oss/indra
+    docker build -t opb-indra omni_parse_bench/harness/providers/serve/indra
     docker run -p 8001:8001 opb-indra
     opb predict --provider indra-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -58,7 +58,7 @@ LABELS = {
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the Indra OCR server (oss/indra/) answers, and how its Converter reads a page (the
+    """Where the Indra OCR server (serve/indra/) answers, and how its Converter reads a page (the
     package's defaults, but math read as LaTeX and headers and footers kept)."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
@@ -74,7 +74,7 @@ class Config:
 def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
     """One call answers both outputs."""
     if not wants: return []
-    sent = {"package": PACKAGE, "server": "oss/indra", "settings": http.settings(config),
+    sent = {"package": PACKAGE, "settings": http.settings(config),
             "page": "the file, read by its Converter"}
     return [contract.Request(frozenset(wants) & SUPPORTS, sent)]
 

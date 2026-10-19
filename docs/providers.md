@@ -203,7 +203,7 @@ ending in `+` continues the block before it and is read without the `+`):
 | `llamaparse` | /api/v2/parse/upload, poll, expand=markdown,items,usage | html, blocks | header and footer fields beside the markdown, put back | LLAMA_CLOUD_API_KEY |
 | `azure` | Content Understanding, prebuilt-layout | html, blocks | comments in its markdown, unwrapped | AZURE_CU_KEY, and the `endpoint` option |
 | `mistral` | /v1/ocr (mistral-ocr-4-1) | html, blocks | header and footer fields beside the markdown, put back | MISTRAL_API_KEY |
-| a served open-weight model (see Open-weight models) | its oss/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2: html) | kept: vendor defaults that leave them out turned off | OPB_ENDPOINT_KEY, when the server has one |
+| a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2: html) | kept: vendor defaults that leave them out turned off | OPB_ENDPOINT_KEY, when the server has one |
 | `tesseract` | the local `tesseract` binary, no model of the page | html | kept: it has no notion of them | none |
 
 A vendor's tiers are runs of their own: `--options '{"datalab": [{"mode": "balanced"}, {"mode":
@@ -262,10 +262,10 @@ Per vendor:
 
 ## Serving an open model
 
-Serving and benchmarking are separate. Each open model has a folder, `omni_parse_bench/harness/providers/oss/<model>/`,
+Serving and benchmarking are separate. Each open model has a folder, `omni_parse_bench/harness/providers/serve/<model>/`,
 that deploys it on any GPU host, and opb then benchmarks it from anywhere, pointed at its URL:
 
-    docker build -t opb-dots omni_parse_bench/harness/providers/oss/dots
+    docker build -t opb-dots omni_parse_bench/harness/providers/serve/dots
     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-dots
     opb benchmark --providers dots-mocr --options '{"dots-mocr": {"base_url": "http://<host>:8001"}}'
 
@@ -300,7 +300,7 @@ once than it reads at once, for the same reason.
 
 Each model runs with the defaults its vendor recommends; each adapter's docstring lists where it differs.
 
-| model | provider | oss/ | outputs |
+| model | provider | serve/ | outputs |
 | --- | --- | --- | --- |
 | LightOnOCR-3 (4B, 0.8B) | `lightonocr` (`model`) | `lighton` | html, blocks |
 | dots.mocr | `dots-mocr` | `dots` | html, blocks |

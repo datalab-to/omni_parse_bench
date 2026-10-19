@@ -1,7 +1,7 @@
 """A JSON POST within a call's time budget, its failures mapped to the harness's errors.
 
 For a server that answers one route with JSON: a vendor's pipeline or its own engine behind one
-endpoint, as every opb model server (providers/oss/) answers `/parse` (`parse`). A chat endpoint is
+endpoint, as every opb model server (providers/serve/) answers `/parse` (`parse`). A chat endpoint is
 `providers.llm.chat`.
 """
 from __future__ import annotations
@@ -18,7 +18,7 @@ from . import budget, errors
 
 
 def page(path: Path) -> dict:
-    """The page file as an opb model server takes it (providers/oss/): its bytes and its suffix, for the
+    """The page file as an opb model server takes it (providers/serve/): its bytes and its suffix, for the
     vendor's own code to load as it loads a PDF or an image."""
     return {"page": base64.b64encode(path.read_bytes()).decode("ascii"), "suffix": path.suffix.lower()}
 

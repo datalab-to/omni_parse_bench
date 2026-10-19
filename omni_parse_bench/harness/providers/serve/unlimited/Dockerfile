@@ -2,7 +2,7 @@
 # serves the model, server.py loads the page as its repository's pipeline does and asks it (start.sh).
 # The adapter is providers/unlimited.py:
 #
-#     docker build -t opb-unlimited omni_parse_bench/harness/providers/oss/unlimited
+#     docker build -t opb-unlimited omni_parse_bench/harness/providers/serve/unlimited
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-unlimited
 #     opb benchmark --providers unlimited-ocr --options '{"unlimited-ocr": {"base_url": "http://localhost:8001"}}'
 #

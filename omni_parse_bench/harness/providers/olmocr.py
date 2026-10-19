@@ -1,7 +1,7 @@
-"""olmOCR 2 (allenai/olmOCR-2-7B-1025-FP8), served from providers/oss/olmocr/ on any GPU host.
+"""olmOCR 2 (allenai/olmOCR-2-7B-1025-FP8), served from providers/serve/olmocr/ on any GPU host.
 
 Run as its own pipeline runs it (github.com/allenai/olmocr at f7cfe4c, olmocr/pipeline.py): each page
-goes through the pipeline's own `process_page`. Steps 1 to 4 run on the server (oss/olmocr/server.py);
+goes through the pipeline's own `process_page`. Steps 1 to 4 run on the server (serve/olmocr/server.py);
 step 5 runs here, with no vendor code.
 
 How a page is processed:
@@ -31,7 +31,7 @@ Differences from the vendor:
     it launched reports an empty queue, a count this server can't see; and
   - each page has the benchmark's 900 s.
 
-    docker build -t opb-olmocr omni_parse_bench/harness/providers/oss/olmocr
+    docker build -t opb-olmocr omni_parse_bench/harness/providers/serve/olmocr
     docker run --gpus all -p 8001:8001 opb-olmocr
     opb predict --provider olmocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -51,7 +51,7 @@ WEIGHTS = "allenai/olmOCR-2-7B-1025-FP8"
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the olmOCR 2 server (oss/olmocr/) answers, and the pipeline's arguments it sets (its
+    """Where the olmOCR 2 server (serve/olmocr/) answers, and the pipeline's arguments it sets (its
     defaults by default)."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
@@ -63,7 +63,7 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
     """One call: the page as markdown."""
     if not wants: return []
     sent = {"weights": WEIGHTS, "pipeline": "olmocr f7cfe4c, process_page", "settings": http.settings(config),
-            "server": "oss/olmocr", "page": "the file, rendered by the pipeline (pdftoppm)"}
+            "page": "the file, rendered by the pipeline (pdftoppm)"}
     return [contract.Request(frozenset(wants) & SUPPORTS, sent)]
 
 

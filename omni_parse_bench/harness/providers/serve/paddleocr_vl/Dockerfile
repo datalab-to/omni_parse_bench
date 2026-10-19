@@ -2,7 +2,7 @@
 # PaddleOCR's own page pipeline (layout model, then the VLM per block) around it (start.sh). The
 # adapter is providers/paddleocr_vl.py:
 #
-#     docker build -t opb-paddleocr_vl omni_parse_bench/harness/providers/oss/paddleocr_vl
+#     docker build -t opb-paddleocr_vl omni_parse_bench/harness/providers/serve/paddleocr_vl
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-paddleocr_vl
 #     opb benchmark --providers paddleocr-vl --options '{"paddleocr-vl": {"base_url": "http://localhost:8001"}}'
 #

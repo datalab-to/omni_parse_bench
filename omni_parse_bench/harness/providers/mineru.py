@@ -1,8 +1,8 @@
-"""MinerU2.5-Pro (opendatalab/MinerU2.5-Pro-2605-1.2B), served from providers/oss/mineru/ on any GPU host.
+"""MinerU2.5-Pro (opendatalab/MinerU2.5-Pro-2605-1.2B), served from providers/serve/mineru/ on any GPU host.
 
 Run as its model card and client run it (github.com/opendatalab/mineru-vl-utils 2.0.7, `MinerUClient`
 with the `http-client` backend), the page rendered as MinerU renders one. Steps 1 to 4 run on the server
-(oss/mineru/server.py); step 5 runs here, with no vendor code.
+(serve/mineru/server.py); step 5 runs here, with no vendor code.
 
 How a page is processed:
 
@@ -26,7 +26,7 @@ Differences from the vendor:
 
   - each page has the benchmark's 900 s.
 
-    docker build -t opb-mineru omni_parse_bench/harness/providers/oss/mineru
+    docker build -t opb-mineru omni_parse_bench/harness/providers/serve/mineru
     docker run --gpus all -p 8001:8001 opb-mineru
     opb predict --provider mineru --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -66,7 +66,7 @@ _TAG = re.compile(r"<[^>]+>")
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the MinerU2.5-Pro server (oss/mineru/) answers."""
+    """Where the MinerU2.5-Pro server (serve/mineru/) answers."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
 

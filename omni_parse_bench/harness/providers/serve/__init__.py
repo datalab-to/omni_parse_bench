@@ -12,7 +12,7 @@ A model whose vendor offers only the model, with no code of its own around it, h
 port is vLLM's /v1, and its adapter asks it directly. Either way, deploying is building
 and running the folder's image, then pointing opb at it:
 
-    docker build -t opb-<model> omni_parse_bench/harness/providers/oss/<model>
+    docker build -t opb-<model> omni_parse_bench/harness/providers/serve/<model>
     docker run --gpus all -p 8001:8001 opb-<model>
     opb benchmark --providers <provider> --options '{"<provider>": {"base_url": "http://<host>:8001"}}'
 

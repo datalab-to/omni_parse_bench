@@ -1,7 +1,7 @@
-"""HunyuanOCR-1.5 (tencent/HunyuanOCR), served from providers/oss/hunyuan/ on any GPU host.
+"""HunyuanOCR-1.5 (tencent/HunyuanOCR), served from providers/serve/hunyuan/ on any GPU host.
 
 Run as its repository's client runs it (github.com/Tencent-Hunyuan/HunyuanOCR at 1ef4179,
-inference/vLLM/infer_vllm_client.py). Steps 3 and 4 run on the server (oss/hunyuan/server.py); steps 1
+inference/vLLM/infer_vllm_client.py). Steps 3 and 4 run on the server (serve/hunyuan/server.py); steps 1
 and 5 run here, with no vendor code.
 
 How a page is processed:
@@ -36,7 +36,7 @@ Differences from the vendor:
     vLLM 0.25.1 on CUDA 13, is verified to align); and
   - each page has the benchmark's 900 s.
 
-    docker build -t opb-hunyuan omni_parse_bench/harness/providers/oss/hunyuan
+    docker build -t opb-hunyuan omni_parse_bench/harness/providers/serve/hunyuan
     docker run --gpus all -p 8001:8001 opb-hunyuan
     opb predict --provider hunyuan-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
 
@@ -61,7 +61,7 @@ TASKS = ("layout_parse", "doc_parse")
 
 @dataclasses.dataclass(frozen=True)
 class Config:
-    """Where the HunyuanOCR server (oss/hunyuan/) answers, the client's task, and its sampling (the
+    """Where the HunyuanOCR server (serve/hunyuan/) answers, the client's task, and its sampling (the
     client's by default)."""
 
     base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})

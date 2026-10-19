@@ -2,7 +2,7 @@
 # asks it as the `lightonocr` client does and applies the client's repair of the reply (start.sh). The
 # adapter is providers/lighton.py:
 #
-#     docker build -t opb-lighton omni_parse_bench/harness/providers/oss/lighton
+#     docker build -t opb-lighton omni_parse_bench/harness/providers/serve/lighton
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-lighton
 #     opb benchmark --providers lightonocr --options '{"lightonocr": {"base_url": "http://localhost:8001"}}'
 #
