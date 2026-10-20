@@ -293,7 +293,8 @@ nothing into it but the scorer's results. A folder none of whose files names a p
 Grading reports only a finished run. A page with no answer and no recorded failure (never predicted, or
 with no file in a folder of your own) makes grading refuse, naming the pages. Finish them (run the same
 `opb run` command again, or add the files), or grade with `--partial` (`partial=True`): those pages count
-as 0, and the summary lists them, `"partial": {"no_answer": [...], "not_scored": [...]}`.
+as 0, and the summary counts them, `"partial": {"no_answer": 7, "not_scored": 0, "e.g.": [...]}`; each is a
+failed line in scores.jsonl.
 
 To grade another way, write your own scorer and pass it to `omni_bench_core.benchmark.Benchmark` beside
 `UnitTests`: [omni-bench-core's OVERVIEW](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#scorer) shows how.

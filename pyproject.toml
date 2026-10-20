@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Datalab" }]
 dependencies = [
-    "omni-bench-core>=0.4,<0.5",  # the shared core: tasks, adapters, scorers, runs and the loop over them
+    "omni-bench-core>=0.5,<0.6",  # the shared core: tasks, adapters, scorers, runs and the loop over them
     "beautifulsoup4>=4.12",  # table structure
     "fuzzysearch>=0.7",      # positional near-matches for order tests
     "mini-racer>=0.12",      # an embedded V8 that runs KaTeX, which equations are compared by
@@ -28,7 +28,7 @@ harness = [
 # the dataset (the core's [hub] extra, so the two never disagree on its version).
 benchmark = [
     "omni-parse-bench[harness]",
-    "omni-bench-core[hub]>=0.4,<0.5",
+    "omni-bench-core[hub]>=0.5,<0.6",
 ]
 dev = [
     "omni-parse-bench[benchmark]",

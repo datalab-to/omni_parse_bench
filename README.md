@@ -178,7 +178,7 @@ opb grade runs/datalab-1a2b3c4d --partial  # an unfinished run, its missing page
 
 A run is graded only when it is finished: every page it chose has an answer or a recorded failure.
 Otherwise `opb grade` refuses and names the pages; run the same `opb run` command again to finish them, or
-grade with `--partial`, which counts them as 0 and lists them in the summary under `partial`. A folder of
+grade with `--partial`, which counts them as 0 and says how many in the summary under `partial`. A folder of
 your own is graded over the whole manifest, and a missing prediction is refused the same way.
 
 Every test of a page is graded. Each run's grading is written to `<run>/unit_tests-<digest>/`:

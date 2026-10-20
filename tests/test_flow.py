@@ -142,7 +142,8 @@ def test_an_unfinished_run_is_refused_unless_graded_partial(tmp_path, capsys):
     assert "isn't finished" in err and "a-p2" in err and "--partial" in err, err
     assert cli.main(["grade", str(run), "--partial"]) == 0
     [s] = json.loads(capsys.readouterr().out)["scorers"].values()
-    assert s["partial"] == {"no_answer": ["a-p2"], "not_scored": []} and s["headline"] == 0.5 * 2 / 3, s
+    assert s["partial"] == {"no_answer": 1, "not_scored": 0, "e.g.": ["a-p2"]}, s
+    assert s["headline"] == 0.5 * 2 / 3, s
 
 
 def test_opb_grade_grades_a_folder_of_your_own(tmp_path, capsys):
