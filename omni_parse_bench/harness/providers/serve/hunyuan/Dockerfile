@@ -4,7 +4,7 @@
 #
 #     docker build -t opb-hunyuan omni_parse_bench/harness/providers/serve/hunyuan
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-hunyuan
-#     opb run --providers hunyuan-ocr --options '{"hunyuan-ocr": {"base_url": "http://localhost:8001"}}'
+#     opb run --system hunyuan-ocr --options '{"base_url": "http://localhost:8001"}'
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set
 # OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb sends it. The repository's

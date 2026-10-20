@@ -24,4 +24,4 @@ class Budget(adapter.Budget):
     def check(self, what: str) -> None:
         """Raises `VendorTimeout` if the time is up. `what` says what was still being waited for."""
         if self.expired():
-            raise errors.VendorTimeout(f"timed out at the uniform {self.total:.0f}s limit; {what}")
+            raise errors.VendorTimeout(f"timed out at the uniform {self.total:g} s limit; {what}")

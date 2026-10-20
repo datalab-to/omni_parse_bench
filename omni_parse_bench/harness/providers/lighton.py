@@ -87,8 +87,8 @@ class LightOn(PageAdapter):
 
         docker build -t opb-lighton omni_parse_bench/harness/providers/serve/lighton
         docker run --gpus all -p 8001:8001 opb-lighton
-        opb run --providers lightonocr --sample 20 \\
-            --options '{"lightonocr": {"base_url": "http://localhost:8001"}}'
+        opb run --system lightonocr --sample 20 \\
+            --options '{"base_url": "http://localhost:8001"}'
 
     OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
@@ -103,6 +103,8 @@ class LightOn(PageAdapter):
 
     name: ClassVar[str] = "lightonocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "lighton"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

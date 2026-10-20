@@ -39,12 +39,16 @@ class Tesseract(PageAdapter):
     when it detects none: it is told nothing about the page, as a tool with no metadata would be. Its
     answer is plain text, written as html inside <pre>, escaped, and nothing else is done to it.
 
-    No layout blocks. It runs locally, costs
-    nothing and needs no key, only the `tesseract` binary with its script models:
+    No layout blocks, so its layout family is 0; its text and tables families say how it reads. It runs
+    locally, costs nothing (each record says `usd` 0.0) and needs no key, only the `tesseract` binary with
+    its script models:
 
         brew install tesseract tesseract-lang     # or: apt install tesseract-ocr tesseract-ocr-script-*
 
-        opb run --providers tesseract --sample 20
+        opb run --system tesseract --sample 20
+
+    A tesseract that exits with an error fails the page (a `VendorError` with its stderr), and one that runs
+    past the page's time is a `VendorTimeout`.
     """
 
     render_dpi: int = dataclasses.field(default=300,
@@ -88,7 +92,8 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
             script = detect(image, deadline)
             model = SCRIPTS.get(script, FALLBACK)
         text = run(["tesseract", str(image), "-", "-l", model], deadline).stdout
-    return contract.Call({"text": text, "script": script, "model": model, "version": version()})
+    return contract.Call({"text": text, "script": script, "model": model, "version": version()},
+                         cost=contract.Cost(usd=0.0))
 
 
 def parse(raw: dict, request: contract.Request, config: Tesseract | None = None) -> tuple[dict, dict]:
@@ -104,10 +109,13 @@ def detect(image: Path, deadline: budget.Budget) -> str | None:
 
 
 def run(cmd: list[str], deadline: budget.Budget, check: bool = True) -> subprocess.CompletedProcess:
+    """Runs tesseract within the page's time. Its output is decoded with `errors="replace"`, because it can
+    print bytes that aren't UTF-8 (seen with TMPDIR unset), and that is no reason to lose the page."""
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=max(1.0, deadline.remaining()))
+        out = subprocess.run(cmd, capture_output=True, text=True, errors="replace",
+                             timeout=max(1.0, deadline.remaining()))
     except subprocess.TimeoutExpired:
-        raise errors.VendorTimeout(f"tesseract ran past the call's {deadline.total:.0f} s") from None
+        raise errors.VendorTimeout(f"tesseract ran past the call's {deadline.total:g} s") from None
     if check and out.returncode != 0:
         raise errors.VendorError(f"tesseract exited {out.returncode}: {out.stderr[:300]}", status=None)
     return out
@@ -116,5 +124,6 @@ def run(cmd: list[str], deadline: budget.Budget, check: bool = True) -> subproce
 @functools.cache
 def version() -> str:
     """Tesseract's version line, recorded with each answer."""
-    out = subprocess.run(["tesseract", "--version"], capture_output=True, text=True, timeout=60).stdout
+    out = subprocess.run(["tesseract", "--version"], capture_output=True, text=True, errors="replace",
+                         timeout=60).stdout
     return out.split("\n")[0].strip()

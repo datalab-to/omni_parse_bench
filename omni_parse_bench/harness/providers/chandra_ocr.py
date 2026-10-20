@@ -73,8 +73,8 @@ class ChandraOcr(PageAdapter):
 
         docker build -t opb-chandra omni_parse_bench/harness/providers/serve/chandra
         docker run --gpus all -p 8001:8001 opb-chandra
-        opb run --providers chandra-ocr --sample 20 \\
-            --options '{"chandra-ocr": {"base_url": "http://localhost:8001"}}'
+        opb run --system chandra-ocr --sample 20 \\
+            --options '{"base_url": "http://localhost:8001"}'
 
     OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
@@ -88,6 +88,8 @@ class ChandraOcr(PageAdapter):
 
     name: ClassVar[str] = "chandra-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "chandra"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

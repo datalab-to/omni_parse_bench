@@ -4,7 +4,7 @@
 #
 #     docker build -t opb-indra omni_parse_bench/harness/providers/serve/indra
 #     docker run -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-indra
-#     opb run --providers indra-ocr --options '{"indra-ocr": {"base_url": "http://localhost:8001"}}'
+#     opb run --system indra-ocr --options '{"base_url": "http://localhost:8001"}'
 #
 # The models the package names download when it starts, into HF_HOME; mount a cache there to keep them.
 # Each worker loads its own models (the math models too, math being on by default): where memory is short,

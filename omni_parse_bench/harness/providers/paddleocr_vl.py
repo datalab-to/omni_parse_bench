@@ -67,8 +67,8 @@ class PaddleOcrVl(PageAdapter):
 
         docker build -t opb-paddleocr_vl omni_parse_bench/harness/providers/serve/paddleocr_vl
         docker run --gpus all -p 8001:8001 opb-paddleocr_vl
-        opb run --providers paddleocr-vl --sample 20 \\
-            --options '{"paddleocr-vl": {"base_url": "http://localhost:8001"}}'
+        opb run --system paddleocr-vl --sample 20 \\
+            --options '{"base_url": "http://localhost:8001"}'
 
     OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
@@ -78,6 +78,8 @@ class PaddleOcrVl(PageAdapter):
 
     name: ClassVar[str] = "paddleocr-vl"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "paddleocr_vl"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

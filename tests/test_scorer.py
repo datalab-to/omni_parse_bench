@@ -1,4 +1,5 @@
-"""score and summarize: the four results, the score per output type, tag and test type, the documents."""
+"""score and summarize: the results, the families and their documents, the headline, and what a page's line
+and details hold."""
 from __future__ import annotations
 
 import dataclasses
@@ -51,21 +52,47 @@ def test_a_missing_output_fails_its_tests():
     assert {v.result for v in score({}, TESTS[:4])} == {"fail"}
 
 
-def test_score_is_the_mean_of_tests_and_each_tag_scores_its_own():
-    s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS))["html"]
-    assert s["score"] == 2 / 5
-    assert s["tests"] == 5
-    assert s["per_tag"]["eng"] == {"score": 2 / 3, "tests": 3, "pages": 1, "documents": 1}
-    assert s["per_tag"]["table"] == {"score": 0.0, "tests": 1, "pages": 1, "documents": 1}
-    assert s["per_tag"]["math"] == {"score": 0.0, "tests": 1, "pages": 1, "documents": 1}
-    assert s["per_test_type"] == {"present": 2 / 5}
+def test_the_summary_is_the_headline_and_the_families_alone():
+    s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS))
+    assert s == {"headline": 2 / 5, "families": {"text": {"score": 2 / 5, "tests": 5, "documents": 1}}}
+
+
+def test_a_slice_of_test_lines_is_summarized_the_same_way():
+    """Any other breakdown, such as one tag, is the same summary over the lines selected."""
+    eng = [x for x in lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS) if "eng" in x["tags"]]
+    assert summarize(eng)["families"]["text"] == {"score": 2 / 3, "tests": 3, "documents": 1}
 
 
 def test_scores_are_floats_even_when_every_test_agrees():
     s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS[:2]), TESTS))
-    assert type(s["html"]["score"]) is float and type(s["html"]["per_test_type"]["present"]) is float
-    assert type(s["html"]["per_tag"]["eng"]["score"]) is float
-    assert type(s["headline"]) is float and type(s["per_derivation"]["authored"]) is float
+    assert type(s["headline"]) is float and type(s["families"]["text"]["score"]) is float
+
+
+def test_a_pages_line_holds_its_counts_and_its_details_every_verdict():
+    s = scorer.UnitTests().score({"html": "<p>alpha beta</p>"}, TESTS)
+    assert s.result == {"tests": 5, "passed": 2, "per_family": {"text": {"tests": 5, "passed": 2}}}
+    assert s.details[2] == {"test_id": "c", "test_type": "present", "output_type": "html",
+                            "derivation": "authored", "tags": ["eng", "table"], "result": "fail",
+                            "why": s.details[2]["why"]}
+
+
+def test_unit_tests_names_its_headline():
+    assert scorer.UnitTests.headline_field == "the mean of the families' scores"
+
+
+def test_the_families_come_in_a_fixed_order_whatever_the_order_met():
+    tests = on_one_page(
+        {"id": "k", "test_type": "layout_kind", "output_type": "blocks", "tags": [],
+         "args": {"content": {"text": "x", "max_diffs": 0, "place": [[0.1, 0.1, 0.5, 0.2]]}},
+         "settings": {"kind": "text"}},
+        {"id": "k2", "test_type": "layout_kind", "output_type": "blocks", "tags": [],
+         "args": {"content": {"text": "y", "max_diffs": 0, "place": [[0.1, 0.3, 0.5, 0.4]]}},
+         "settings": {"kind": "text"}},
+        {"id": "t", "test_type": "table_cell", "tags": [], "args": {"cell": {"text": "1", "max_diffs": 0}}},
+        {"id": "a", "test_type": "present", "tags": [], "args": text("alpha")},
+    )
+    s = summarize(lines(score({"html": "<p>alpha</p>"}, tests), tests))
+    assert list(s["families"]) == ["text", "tables", "layout"]
 
 
 @pytest.mark.parametrize("output, why", [
@@ -136,11 +163,9 @@ def half(tests: list, per: int = 4) -> list:
 def test_each_score_counts_the_documents_its_tests_are_from():
     pages, tests = pages_and_tests(9)
     s = summarize(lines(half(tests), tests, pages))
-    assert s["html"]["documents"] == s["html"]["per_tag"]["table"]["documents"] == 9
-    assert s["documents"] == 9 and s["families"]["text"]["documents"] == 9
+    assert s["families"]["text"]["documents"] == 9
     one = [dataclasses.replace(p, document="d") for p in pages]
-    assert summarize(lines(half(tests), tests, one))["html"]["documents"] == 1
-    assert "interval" not in s["html"]
+    assert summarize(lines(half(tests), tests, one))["families"]["text"]["documents"] == 1
 
 
 def test_every_test_type_has_a_family():

@@ -62,7 +62,7 @@ class Extend(PageAdapter):
 
     Auth: EXTEND_API_KEY, and EXTEND_WORKSPACE_ID when the key spans several workspaces.
 
-        opb run --providers extend --options '{"extend": {"engine": "parse_light"}}' --sample 20
+        opb run --system extend --options '{"engine": "parse_light"}' --sample 20
     """
 
     engine: str = dataclasses.field(
@@ -87,6 +87,8 @@ class Extend(PageAdapter):
 
     name: ClassVar[str] = "extend"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    keys: ClassVar[tuple[str, ...]] = ("EXTEND_API_KEY",)
+    ENV: ClassVar[str] = "EXTEND_WORKSPACE_ID, when the key spans several workspaces"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)
@@ -155,9 +157,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: Extend | None = None) -> contract.Call:
     """Upload the page, start the parse run, poll until it is done, return the finished run."""
     config = config or Extend()
-    key = os.environ.get("EXTEND_API_KEY")
-    if not key:
-        raise errors.MissingCredential("EXTEND_API_KEY is not set")
+    key = errors.key("EXTEND_API_KEY", "extend")
     headers = {"Authorization": f"Bearer {key}", "x-extend-api-version": config.api_version}
     if workspace := os.environ.get("EXTEND_WORKSPACE_ID"): headers["x-extend-workspace-id"] = workspace
     deadline = budget.Budget(timeout)

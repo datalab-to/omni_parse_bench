@@ -64,19 +64,21 @@ class Hunyuan(PageAdapter):
 
         docker build -t opb-hunyuan omni_parse_bench/harness/providers/serve/hunyuan
         docker run --gpus all -p 8001:8001 opb-hunyuan
-        opb run --providers hunyuan-ocr --sample 20 \\
-            --options '{"hunyuan-ocr": {"base_url": "http://localhost:8001"}}'
+        opb run --system hunyuan-ocr --sample 20 \\
+            --options '{"base_url": "http://localhost:8001"}'
 
     OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"
-    task: str = dataclasses.field(default="layout_parse", metadata={"choices": list(TASKS)})
+    task: str = dataclasses.field(default="layout_parse", metadata={
+        "choices": list(TASKS), "help": "the client's task type: layout_parse (with blocks) or doc_parse"})
     temperature: float = 0.0
     top_p: float = 1.0
     max_tokens: int = 32768
     repetition_penalty: float = 1.08
-    min_repeats: int = 8
+    min_repeats: int = dataclasses.field(default=8, metadata={
+        "help": "how many repeats of the reply's tail stop the stream early (the client's infer_stream)"})
     long_edge: int = llm.LONG_EDGE
 
     def __post_init__(self):
@@ -85,6 +87,8 @@ class Hunyuan(PageAdapter):
 
     name: ClassVar[str] = "hunyuan-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "hunyuan"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

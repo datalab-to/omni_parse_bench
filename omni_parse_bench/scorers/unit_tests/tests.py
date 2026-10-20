@@ -23,8 +23,8 @@ FIELDS = ("id", "test_type", "output_type", "derivation", "tags", "args", "setti
 KINDS = {"text": ("text", "max_diffs"), "number": ("number",), "latex": ("latex",)}
 OPTIONAL = {"text": ("place",)}     # fields an arg of that kind may have
 RELATIONS = ("up", "down", "left", "right", "top_heading", "left_heading")
-# The roles of each test type's args, the content it compares.
-ROLES = {
+# The roles of each test type's args, the content it compares. Not `vocab.ROLES`, which are tags.
+ARG_ROLES = {
     "present": ("content",),
     "order": ("before", "after"),
     "repeat": ("content",),
@@ -34,7 +34,7 @@ ROLES = {
 LISTS = frozenset({"headings", "row_groups"})   # roles that take a list of args
 REQUIRED = {"present": ("content",), "order": ("before", "after"), "repeat": ("content",),
             "table_cell": ("cell",), "layout_kind": ("content",)}
-assert set(ROLES) == set(REQUIRED) == set(runners.TYPES) == set(vocab.READS) == set(vocab.FAMILIES)
+assert set(ARG_ROLES) == set(REQUIRED) == set(runners.TYPES) == set(vocab.READS) == set(vocab.FAMILIES)
 
 
 _LANGUAGE = re.compile(r"[a-z]{3}")    # ISO 639-3
@@ -162,7 +162,7 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
     """The runner's parameters from a test's args and settings."""
     if not isinstance(args, dict) or not isinstance(settings, dict):
         raise GoldError(f"{where}: args and settings must be objects")
-    roles = ROLES[test_type]
+    roles = ARG_ROLES[test_type]
     if unknown := [r for r in args if r not in roles]:
         raise GoldError(f"{where}: {test_type} has no role {unknown}; its roles: {list(roles)}")
     if missing := [r for r in REQUIRED[test_type] if r not in args]:

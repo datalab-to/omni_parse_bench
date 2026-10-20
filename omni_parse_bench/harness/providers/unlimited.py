@@ -71,8 +71,8 @@ class UnlimitedOcr(PageAdapter):
 
         docker build -t opb-unlimited omni_parse_bench/harness/providers/serve/unlimited
         docker run --gpus all -p 8001:8001 opb-unlimited
-        opb run --providers unlimited-ocr --sample 20 \\
-            --options '{"unlimited-ocr": {"base_url": "http://localhost:8001"}}'
+        opb run --system unlimited-ocr --sample 20 \\
+            --options '{"base_url": "http://localhost:8001"}'
 
     OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
@@ -87,6 +87,8 @@ class UnlimitedOcr(PageAdapter):
 
     name: ClassVar[str] = "unlimited-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "unlimited"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

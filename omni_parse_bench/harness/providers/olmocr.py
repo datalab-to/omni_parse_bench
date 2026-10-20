@@ -54,17 +54,22 @@ class OlmOcr(PageAdapter):
 
         docker build -t opb-olmocr omni_parse_bench/harness/providers/serve/olmocr
         docker run --gpus all -p 8001:8001 opb-olmocr
-        opb run --providers olmocr --options '{"olmocr": {"base_url": "http://localhost:8001"}}' --sample 20
+        opb run --system olmocr --sample 20 \\
+            --options '{"base_url": "http://localhost:8001"}'
 
     OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"
-    target_longest_image_dim: int = 1288
-    max_page_retries: int = 8
+    target_longest_image_dim: int = dataclasses.field(default=1288, metadata={
+        "help": "the rendered page's long edge, in pixels (the pipeline's --target_longest_image_dim)"})
+    max_page_retries: int = dataclasses.field(default=8, metadata={
+        "help": "how many attempts a page gets before the pipeline gives up (its --max_page_retries)"})
 
     name: ClassVar[str] = "olmocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "olmocr"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

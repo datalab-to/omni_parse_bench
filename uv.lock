@@ -382,22 +382,25 @@ wheels = [
 
 [[package]]
 name = "omni-bench-core"
-version = "0.1.0"
-source = { editable = "../../omni-bench-core" }
+version = "0.3.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyarrow" },
+    { name = "rich" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/61/34/00d2d07828905f707fcf3aa32db4b4536e12f3e9442e45681342b652d3b9/omni_bench_core-0.3.1.tar.gz", hash = "sha256:5548d8e12a671a9a11f9c6fb4bd2431c5214413c562d86296baedd881c9866fe", size = 59964, upload-time = "2026-10-20T18:59:59.644Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cb/57/5d5297f5e0fd8f823adab8e685ed915a958669e23402e089ac8c77435d47/omni_bench_core-0.3.1-py3-none-any.whl", hash = "sha256:7b32a438ae9abe485d91c057bb574b1bbe7cdb6796b876a226e5e93a6ef5b816", size = 49854, upload-time = "2026-10-20T18:59:58.349Z" },
 ]
 
-[package.metadata]
-requires-dist = [
-    { name = "huggingface-hub", marker = "extra == 'hub'", specifier = ">=0.24" },
-    { name = "pyarrow", specifier = ">=15" },
+[package.optional-dependencies]
+hub = [
+    { name = "huggingface-hub" },
 ]
-provides-extras = ["hub"]
 
 [[package]]
 name = "omni-parse-bench"
-version = "1.0.0rc1"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -411,20 +414,18 @@ dependencies = [
 [package.optional-dependencies]
 benchmark = [
     { name = "httpx" },
-    { name = "huggingface-hub" },
     { name = "markdown-it-py" },
+    { name = "omni-bench-core", extra = ["hub"] },
     { name = "openai" },
     { name = "pillow" },
-    { name = "pyarrow" },
     { name = "pypdfium2" },
 ]
 dev = [
     { name = "httpx" },
-    { name = "huggingface-hub" },
     { name = "markdown-it-py" },
+    { name = "omni-bench-core", extra = ["hub"] },
     { name = "openai" },
     { name = "pillow" },
-    { name = "pyarrow" },
     { name = "pypdfium2" },
     { name = "pytest" },
     { name = "ruff" },
@@ -442,15 +443,14 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12" },
     { name = "fuzzysearch", specifier = ">=0.7" },
     { name = "httpx", marker = "extra == 'harness'", specifier = ">=0.27" },
-    { name = "huggingface-hub", marker = "extra == 'benchmark'", specifier = ">=0.23" },
     { name = "markdown-it-py", marker = "extra == 'harness'", specifier = ">=3.0" },
     { name = "mini-racer", specifier = ">=0.12" },
-    { name = "omni-bench-core", editable = "../../omni-bench-core" },
+    { name = "omni-bench-core", specifier = ">=0.3.1,<0.4" },
+    { name = "omni-bench-core", extras = ["hub"], marker = "extra == 'benchmark'", specifier = ">=0.3.1,<0.4" },
     { name = "omni-parse-bench", extras = ["benchmark"], marker = "extra == 'dev'" },
     { name = "omni-parse-bench", extras = ["harness"], marker = "extra == 'benchmark'" },
     { name = "openai", marker = "extra == 'harness'", specifier = ">=1.0" },
     { name = "pillow", marker = "extra == 'harness'", specifier = ">=10.0" },
-    { name = "pyarrow", marker = "extra == 'benchmark'", specifier = ">=15.0.0" },
     { name = "pylatexenc", specifier = ">=2.10" },
     { name = "pypdfium2", marker = "extra == 'harness'", specifier = ">=4.30" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
@@ -888,6 +888,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/92/7d/943a04a134a5d333c00d3a77169226defef5e081be9219a765afc176dda0/rapidfuzz-3.14.6-cp315-cp315t-win32.whl", hash = "sha256:15da2b258908eb38853c1a6a58a1d09d9aad9c721e03a68c8ba691cd31dff739", size = 1974478, upload-time = "2026-08-30T21:45:25.475Z" },
     { url = "https://files.pythonhosted.org/packages/21/0e/8356ca3e190e2bcced9b80e374d95b0925c4716b51e65720a55399983f41/rapidfuzz-3.14.6-cp315-cp315t-win_amd64.whl", hash = "sha256:3d502769263318690d4f6638b08483979d1b88cdc7c6f087482eea935fde4031", size = 1823286, upload-time = "2026-08-30T21:45:28.368Z" },
     { url = "https://files.pythonhosted.org/packages/fb/04/a0b0e6324b6384d1ab40feb4d16400af3b3101d38cbd15957edd9d17cbe0/rapidfuzz-3.14.6-cp315-cp315t-win_arm64.whl", hash = "sha256:07c7aa0b1e4b9999a54f9e73317d6743ff85442c8ef7b7fbbe6b190fd37d9e75", size = 1243815, upload-time = "2026-08-30T21:45:31.187Z" },
+]
+
+[[package]]
+name = "rich"
+version = "15.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown-it-py" },
+    { name = "pygments" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz", hash = "sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36", size = 230680, upload-time = "2026-04-12T08:24:00.75Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/82/3b/64d4899d73f91ba49a8c18a8ff3f0ea8f1c1d75481760df8c68ef5235bf5/rich-15.0.0-py3-none-any.whl", hash = "sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb", size = 310654, upload-time = "2026-04-12T08:24:02.83Z" },
 ]
 
 [[package]]

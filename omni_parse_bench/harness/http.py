@@ -17,6 +17,8 @@ from omni_bench_core import adapter
 
 from . import budget, contract, errors
 
+ENDPOINT_KEY = "OPB_ENDPOINT_KEY, if set, is sent to the model server as its bearer token"
+
 
 def page(path: Path) -> dict:
     """The page file as an opb model server takes it (providers/serve/): its bytes and its suffix, for the
@@ -48,8 +50,9 @@ def post(url: str, body: dict, deadline: budget.Budget, key: str | None = None) 
     try:
         r = httpx.post(url, json=body, headers=headers, timeout=max(1.0, deadline.remaining()))
     except httpx.TimeoutException:
-        raise errors.VendorTimeout(f"no answer within {deadline.total:.0f} s") from None
+        raise errors.VendorTimeout(f"no answer within {deadline.total:g} s") from None
     except httpx.TransportError as exc:
+        if errors.refused(exc): raise errors.NoServer(url) from None
         raise errors.VendorUnreachable(f"connection failed: {exc}"[:300]) from None
     if r.status_code != 200:
         raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}", status=r.status_code, body=r.text)

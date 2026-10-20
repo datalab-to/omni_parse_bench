@@ -1,45 +1,52 @@
 """A dataset's unit tests: each page's tests read and checked (`gold`, `check`), each page's verdicts as test
-lines (`lines`), every test line summarized (`summarize`), and `UnitTests`, the scorer as omni-bench-core
-grades a run.
+lines (`lines`), test lines summarized (`summarize`), and `UnitTests`, the scorer as omni-bench-core grades a
+run.
 """
 from __future__ import annotations
 
 import collections
 import dataclasses
 import statistics
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, ClassVar
 
 from omni_bench_core import scorer
 
 from omni_parse_bench import data, errors, vocab
 
-from . import compare, runners
+from . import compare
 from . import tests as _tests
 from .compare import Verdict
 
 Line = Mapping[str, Any]   # a test line (`lines`)
+HEADLINE = "the mean of the families' scores"
 
 
 @dataclasses.dataclass(frozen=True)
 class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, Any]]):
     """Omni Parse Bench's scorer: each page's yes/no tests, run against its outputs.
 
-    `outputs` chooses which outputs are graded: only the tests that read one of them are run. Grade a system
-    that can't produce layout blocks with `UnitTests(outputs=("html",))`, and compare it with others graded
-    the same way.
+    Every test of a page is graded. A test on an output the system didn't produce (one it can't, or one it
+    failed to give) fails as "no <output> output", so a system that produces html alone scores 0 on the layout
+    family, and its text and tables families say how it reads.
 
-    Each page's line holds its counts (`tests`, `passed`) and its verdicts without their reasons
-    (`verdicts`), so `summarize` can group the tests by family, type, tag and derivation. The reasons are the
-    page's details. A page whose call failed counts as 0 by the core's rule: the headline is the families'
-    score over the graded pages, times the share of pages graded."""
+    The summary holds the headline and `families`: each family's score (its tests' pass rate), tests and
+    source documents (`summarize`), in the order text, tables, layout. The headline is the mean of the
+    families' scores over the scored pages; the core then multiplies it by coverage, so a page whose call
+    failed counts as 0, and a run where every page failed has headline 0.
+
+    Each page's line in scores.jsonl holds its counts: `tests`, `passed`, and `per_family`, each family's
+    `tests` and `passed`. Each test's verdict is in the page's details (`details/<page_id>.jsonl`), as a test
+    line (`lines`): `page_id`, `suite`, `document`, `test_id`, `test_type`, `output_type`, `derivation`,
+    `tags`, `result` and `why`. So `summarize` reads details lines, and any other breakdown (by tag, test
+    type, suite or derivation) is `summarize` of a slice of them."""
 
     name: ClassVar[str] = "unit_tests"
-    outputs: tuple[str, ...] = vocab.OUTPUT_TYPES
+    headline_field: ClassVar[str] = HEADLINE
 
     def gold(self, row: data.Page) -> tuple[_tests.Test, ...]:
-        """The page's tests that read one of `outputs`."""
-        return tuple(t for t in gold(row) if t.output_type in self.outputs)
+        """The page's tests."""
+        return gold(row)
 
     def prediction(self, output: Any) -> Mapping[str, Any]:
         if not isinstance(output, dict):
@@ -49,18 +56,33 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     def score(self, pred: Mapping[str, Any], tests: Sequence[_tests.Test]) -> scorer.Score:
         vs = compare.score(pred, tests)
         by_id = {t.id: t for t in tests}
-        verdicts = [{"test_id": v.id, "test_type": (t := by_id[v.id]).test_type, "output_type": t.output_type,
-                     "derivation": t.derivation, "tags": list(t.tags), "result": v.result} for v in vs]
-        result = {"tests": len(vs), "passed": sum(v.result == "pass" for v in vs), "verdicts": verdicts}
-        return scorer.Score(result, [{"test_id": v.id, "result": v.result, "why": v.why} for v in vs])
+        per_family: dict[str, dict[str, int]] = {}
+        for v in vs:
+            c = per_family.setdefault(vocab.FAMILIES[by_id[v.id].test_type], {"tests": 0, "passed": 0})
+            c["tests"] += 1
+            c["passed"] += v.result == "pass"
+        result = {"tests": len(vs), "passed": sum(v.result == "pass" for v in vs), "per_family": per_family}
+        return scorer.Score(result, [{"test_id": v.id, "test_type": (t := by_id[v.id]).test_type,
+                                      "output_type": t.output_type, "derivation": t.derivation,
+                                      "tags": list(t.tags), "result": v.result, "why": v.why} for v in vs])
+
+    def score_all(self, rows: Sequence[data.Page], preds: Sequence[Mapping[str, Any]],
+                  golds: Sequence[Sequence[_tests.Test]]) -> list[scorer.Score]:
+        """The core's, with each detail line on its page (`page_id`, `suite`, `document`), so a page's details
+        are test lines that `summarize` reads."""
+        out = []
+        for r, x in zip(rows, super().score_all(rows, preds, golds), strict=True):
+            on = {"page_id": r.page_id, "suite": r.suite, "document": r.document}
+            out.append(x if x.details is None else x._replace(details=[on | d for d in x.details]))
+        return out
 
     def row_fields(self, row: data.Page) -> dict[str, Any]:
         return {"document": row.document}
 
     def summarize(self, lines: Sequence[Line]) -> dict[str, Any]:
-        """`summarize` of the test lines of every scored page."""
-        return summarize({"page_id": x["id"], "suite": x["suite"], "document": x["row"]["document"], **v}
-                         for x in scorer.scored(lines) for v in x["verdicts"])
+        """The headline and `families`, over every scored page's counts."""
+        return _summary((f, x["row"]["document"], c["passed"], c["tests"])
+                        for x in scorer.scored(lines) for f, c in x["per_family"].items())
 
     def check_gold(self, rows: Sequence[data.Page]) -> None:
         """Every page's tests read and checked (`check`), before any call."""
@@ -101,12 +123,12 @@ def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
 
 
 def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.Page) -> list[dict[str, Any]]:
-    """Each verdict of `page` as a score line: the page it's on, then what its test is (looked up by id in
+    """Each verdict of `page` as a test line: the page it's on, then what its test is (looked up by id in
     `tests`), then the verdict.
 
     A test line is one test's verdict beside what the page and the test are: `page_id`, `suite`, `document`,
     `test_id`, `test_type`, `output_type`, `derivation`, `tags`, `result` and `why`. `summarize` reads any
-    number of them.
+    number of them, and a slice of them (one tag, one suite) is summarized the same way.
     """
     by_id = {t.id: t for t in tests}
     on = {"page_id": page.page_id, "suite": page.suite, "document": page.document}
@@ -116,89 +138,32 @@ def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.
 
 
 def summarize(lines: Iterable[Line]) -> dict[str, Any]:
-    """The test lines (from `lines()`) summarized. It holds:
+    """The test lines (from `lines()`) summarized: the benchmark's summary of a run, on any set of tests.
 
-    - `headline`, the one number to compare runs by (see `_families`), beside `families` and `documents`;
-    - per output type the lines have: `score`, `tests`, `documents`, `per_test_type` and `per_tag` (each
-      `{score, tests, pages, documents}`); and
-    - `per_suite`, each suite's `headline` and `score` (its pass rate), and `per_derivation`.
+    It holds `headline`, the mean of the families' scores, and `families`: each family's `score` (the share
+    of its tests passed), `tests` and `documents` (how many source documents its tests are from). Scores are
+    fractions from 0 to 1, and the headline is None when there are no tests.
 
-    Scores are fractions from 0 to 1.
-
-    An output type's score is the mean over its tests. Beside it, `per_test_type` scores each structure a test
-    checks (presence, order, a table cell), and `per_tag` each kind of content (a table, math, handwriting, a
-    script, a language), with its test and page counts. A test counts toward every tag it has, so the tags
-    overlap and their scores don't average to the score: a reader who wants a mix of tags (table and degraded)
-    selects those tests and scores them, never combines rows.
-
-    Each score gets its `documents` count: how many source documents its tests are from. A document's tests
-    pass or fail together (one misread table fails all its cells; a page's image copy is the same page), so a
-    score over a few documents says less than its test count suggests.
+    The headline is a mean over families, each family's score flat over its tests, so how many tests a family
+    has never sets its weight. A document's tests pass or fail together (one misread table fails all its
+    cells), so a score over a few documents says less than its test count suggests: `documents` says how
+    many.
     """
-    every = list(lines)
-    scored = [(x, x["result"] == "pass") for x in every]
-    summary: dict[str, Any] = _families(scored, every)
-    for output in vocab.OUTPUT_TYPES:
-        ys = [(x, ok) for x, ok in scored if x["output_type"] == output]
-        if not ys: continue
-        groups: dict[str, list[tuple[Line, bool]]] = {}
-        for x, ok in ys:
-            for g in x["tags"]: groups.setdefault(g, []).append((x, ok))
-        per_tag = {g: {"score": _mean(ok for _, ok in zs), "tests": len(zs),
-                       "pages": len({x["page_id"] for x, _ in zs}), "documents": _documents(zs)}
-                   for g, zs in sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0]))}
-        summary[output] = {
-            "score": _mean(ok for _, ok in ys),
-            "tests": len(ys),
-            "documents": _documents(ys),
-            "per_test_type": _means(ys, lambda x: x["test_type"], order=list(runners.TYPES)),
-            "per_tag": per_tag,
-        }
-    by_suite: dict[str, list[Line]] = collections.defaultdict(list)
-    for x in every: by_suite[x["suite"]].append(x)
-    summary["per_suite"] = {k: _suite(xs) for k, xs in sorted(by_suite.items())}
-    summary["per_derivation"] = _means(scored, lambda x: x["derivation"], order=list(vocab.DERIVATIONS))
-    return summary
+    return _summary((vocab.FAMILIES[x["test_type"]], x["document"], int(x["result"] == "pass"), 1)
+                    for x in lines)
 
 
-def _families(scored: Sequence[tuple[Line, bool]], graded: Sequence[Line]) -> dict[str, Any]:
-    """`headline`, the mean of the families' scores, each family's flat over its scored tests, over the
-    families the graded tests are in; `families`, each one's score, tests and documents; and `documents`,
-    the source documents the scored tests are from. `headline` is None when a family has no scored test,
-    since a mean over fewer families isn't the same number."""
-    sizes = collections.Counter(vocab.FAMILIES[x["test_type"]] for x in graded)
-    by = collections.defaultdict(list)
-    for x, ok in scored: by[vocab.FAMILIES[x["test_type"]]].append((x, ok))
-    families = {f: {"score": _mean(ok for _, ok in by[f]) if by[f] else None, "tests": len(by[f]),
-                    "documents": _documents(by[f])}
-                for f, _ in sorted(sizes.items(), key=lambda kv: -kv[1])}
-    complete = bool(families) and all(x["score"] is not None for x in families.values())
-    return {"headline": _mean(x["score"] for x in families.values()) if complete else None,
-            "families": families, "documents": _documents(scored)}
-
-
-def _suite(graded: Sequence[Line]) -> dict[str, Any]:
-    """One suite's `headline` (`_families` over its lines) and `score`, its pass rate."""
-    scored = [(x, x["result"] == "pass") for x in graded]
-    return {"headline": _families(scored, graded)["headline"],
-            "score": _mean(ok for _, ok in scored) if scored else None}
-
-
-def _documents(xs: Sequence[tuple[Line, bool]]) -> int:
-    """The source documents the lines are from."""
-    return len({x["document"] for x, _ in xs})
-
-
-def _mean(xs: Iterable[bool | float]) -> float:
-    """The mean as a float: `statistics.mean` of bools is an int when they all agree."""
-    return float(statistics.mean(xs))
-
-
-def _means(xs: Sequence[tuple[Line, bool]], key: Callable[[Line], str],
-           order: Sequence[str] | None = None) -> dict[str, float]:
-    """The pass rate per key, in `order` when given, else sorted."""
-    groups: dict[str, list[bool]] = {}
-    for x, ok in xs:
-        groups.setdefault(key(x), []).append(ok)
-    keys = [k for k in order if k in groups] if order else sorted(groups)
-    return {k: _mean(groups[k]) for k in keys}
+def _summary(counts: Iterable[tuple[str, str, int, int]]) -> dict[str, Any]:
+    """`headline` and `families` from (family, document, passed, tests) counts, the families in
+    `vocab.FAMILY_ORDER`."""
+    tests: collections.Counter[str] = collections.Counter()
+    passed: collections.Counter[str] = collections.Counter()
+    documents: dict[str, set[str]] = collections.defaultdict(set)
+    for f, d, k, n in counts:
+        tests[f] += n
+        passed[f] += k
+        documents[f].add(d)
+    families = {f: {"score": passed[f] / n, "tests": n, "documents": len(documents[f])}
+                for f in vocab.FAMILY_ORDER if (n := tests[f])}
+    return {"headline": float(statistics.fmean(x["score"] for x in families.values())) if families else None,
+            "families": families}

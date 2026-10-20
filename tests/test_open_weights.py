@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from omni_bench_core import adapter as core
+from omni_bench_core import run as runs
 
 from omni_parse_bench import harness, views
 from omni_parse_bench.harness import contract, errors
@@ -120,9 +121,14 @@ def test_a_model_without_layout_is_never_asked_for_blocks(tmp_path, monkeypatch)
     assert list(record["output"]) == ["html"] and "Title" in views.text(record["output"]["html"])
 
 
+def folder(provider: str, **options) -> str:
+    """The run folder's name of `provider` at `options`, on one question."""
+    return runs.folder_name(harness.system(provider, options), {"dataset": "d", "task": "parse"})
+
+
 def test_an_llm_run_is_named_after_its_model():
-    name = harness.system("openai/gpt-5.6-sol").folder_name
-    assert name.startswith("openai__gpt-5.6-sol-") and name != harness.system("openai/gpt-5.5").folder_name
+    name = folder("openai/gpt-5.6-sol")
+    assert name.startswith("openai__gpt-5.6-sol-") and name != folder("openai/gpt-5.5")
 
 
 def _adapter(mod):
@@ -184,7 +190,33 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
                                       "paddleocr-vl", "surya-ocr", "unlimited-ocr"])
 def test_a_served_model_run_is_named_by_every_option(provider):
     """Every option names the run, the server's address included: a new address is a new run folder."""
-    name = lambda **o: harness.system(provider, o).folder_name  # noqa: E731
-    a = name()
-    assert name(base_url="https://one.example") != a
-    if "max_tokens" in harness.system(provider).options(): assert name(max_tokens=7) != a
+    a = folder(provider)
+    assert folder(provider, base_url="https://one.example") != a
+    if "max_tokens" in harness.system(provider).options(): assert folder(provider, max_tokens=7) != a
+
+
+@pytest.mark.parametrize("provider", ["chandra-ocr", "nanonets-ocr"])
+def test_a_server_that_refuses_the_connection_stops_the_run(provider, tmp_path):
+    """Nothing listening at base_url is the same for every page: the run stops and says how to start the
+    server, instead of recording each page as a failure."""
+    import socket
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]   # Note: closed on leaving, so nothing listens there.
+    from PIL import Image
+
+    Image.new("RGB", (64, 64), "white").save(pdf := tmp_path / "p.png")
+    api = harness.system(provider, {"base_url": f"http://127.0.0.1:{port}"})
+    with pytest.raises(errors.NoServer, match=rf"no server at http://127.0.0.1:{port}") as e:
+        core.predict(api, harness.Input(pdf, frozenset({"html"})))
+    assert f"providers/serve/{api.SERVE}" in str(e.value) and provider in str(e.value)
+
+
+def test_every_served_model_says_where_its_server_is():
+    for name in harness.PROVIDERS:
+        c = harness.adapter_class(name)
+        if getattr(c(), "base_url", "").startswith("http://127.0.0.1"):
+            serve = Path(harness.__file__).parent / "providers" / "serve"
+            assert c.SERVE and (serve / c.SERVE).is_dir(), name
+            assert not c.keys and "OPB_ENDPOINT_KEY" in c.ENV

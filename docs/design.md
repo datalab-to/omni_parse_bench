@@ -74,8 +74,8 @@ a merged label.
 
 A `layout_kind` test's kind is one of `views.LABELS`; the dataset tests `text` (1,427), `table`
 (598) and `heading` (378). Each adapter maps its vendor's block types onto the labels
-([providers.md](./providers.md)); `form` is a form field or a key-value pair, or a region of them,
-which Reducto, Extend and LlamaParse give as key-value types ([providers.md](./providers.md#block-labels)).
+([providers.md](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/providers.md)); `form` is a form field or a key-value pair, or a region of them,
+which Reducto, Extend and LlamaParse give as key-value types ([providers.md](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/providers.md#block-labels)).
 For a `text` test, a block labelled `list` or `form` passes too
 (`runners.AS_TEXT`): a list item or a key-value field is running text, and vendors differ in whether
 they give such a line a block of its own, which the test doesn't ask about.
@@ -90,9 +90,9 @@ A test's tags say what the content it checks is (`vocab.TAG_DEFINITIONS` defines
   Unicode, and its language (an ISO 639-3 code, such as `eng`), from a language identifier or, when
   that is unsure, the model panel.
 
-A test has every tag of every piece of content it compares (each a *span*). Tags overlap, so they
-select tests and are scored one by one (`per_tag`), never averaged into a score.
-[`tagging.md`](./tagging.md) says how they were made.
+A test has every tag of every piece of content it compares (each a span). Tags overlap, so they
+select tests and are scored one tag at a time (summarize the tests of one tag), never averaged into a score.
+[`tagging.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/tagging.md) says how they were made.
 
 ### Derivations
 
@@ -200,13 +200,16 @@ suite and document are its page's.
 ## Predict
 
 ```python
-omni_bench_core.adapter.predict(system, harness.Input(page, wants)) -> record   # page: a .pdf or .png
+omni_bench_core.adapter.predict(system, task.Input(page, wants)) -> record   # page: a .pdf or .png
 ```
 
 The benchmark asks a provider only for what a page's tests read: the page's `outputs` in the
-manifest, among the outputs being graded, are the `wants`. The record holds the outputs, the error
+manifest are the `wants`, and the adapter asks its system for those it can produce (`SUPPORTS`). A page
+that wants none of them is not sent: its answer holds no outputs, with no call, no cost and no error.
+There is no task-level or scorer-level choice of outputs. The record holds the outputs, the error
 when the page failed, each call's answer as received (what was sent and the raw answer), and the
-cost and time.
+cost and time. An answer that arrives but can't be read is recorded as a `ReadError` that counts 0,
+keeping the raw answer, so it is read again after a fix without a new call (`opb reread`).
 
 ## Score
 
@@ -217,7 +220,7 @@ The scorer is `scorers/unit_tests`, a package that owns the shape of its gold: w
 gold(page) -> tests                              # the page's tests, from its gold file, checked
 score(pred, gold) -> [Verdict(id, result, why)]
 lines(verdicts, tests, page) -> [score line]     # each verdict beside its page and its test
-summarize(lines) -> summary                      # over test lines; a run's scores.jsonl holds them per page
+summarize(lines) -> summary                      # over test lines: the headline and the families
 check(pages) -> tests                            # every test of a dataset, and the dataset as a whole
 ```
 
@@ -231,12 +234,18 @@ The headline is the mean of the families' scores: text (present, order, repeat),
 (`vocab.FAMILIES` maps every test type to one). Weighting by family rather than by test means a
 family's weight never depends on how many tests it has: sampling more layout lines makes the layout
 score more precise without making layout count more. The families are those the graded tests are
-in, so a subset scores on the families it holds. A page whose call failed counts as 0: the headline
-is the families' score over the graded pages, times the share of pages graded (the omni-bench-core rule).
+in, so a subset scores on the families it holds, and the summary lists them in a fixed order: text,
+tables, layout (`vocab.FAMILY_ORDER`). A page whose call failed counts as 0: the headline
+is the families' score over the scored pages, times the share of pages that didn't fail (`coverage`, the
+omni-bench-core rule), so a run where every page failed has headline 0. The summary's `headline_is` says
+so: "the mean of the families' scores × coverage".
 
-Each output type also has its own score, the share of its tests passed, with `per_test_type` and
-`per_tag`; the summary also gives `per_suite` and `per_derivation`. Each score also counts the source
-documents its tests are from (`documents`), read off its lines. A document's tests
+The summary holds the headline and the families alone. Any other breakdown (by output type, test type,
+tag, suite or derivation) is computed from each test's verdict, kept in the run's
+`details/<page_id>.jsonl` as a test line (its page, suite, document, test type, tags and derivation), and
+from `opb tests`
+([API.md](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/API.md#a-slice-of-the-benchmark)): it is the same summary over the tests selected.
+Each family also counts the source documents its tests are from (`documents`), read off its lines. A document's tests
 pass or fail together: one misread table fails all its cells, a page's image copy is the same page,
 and a form's blank, filled and scanned copies are one form. The manifest's `document` column
 records each page's document, set once when the page is added. So a score over few documents says less
@@ -276,8 +285,8 @@ A test runs in four steps:
   words count wherever an output writes them, and a description never costs;
 - Mark: `runner(params, view)` returns `(passed, why)`. A runner is a pure function of its
   parameters and one output's value: it never reads a file, and never sees another output; and
-- File: `summarize` groups the verdict by the test's output type, test type, tags and derivation,
-  and its page's suite.
+- File: the page's verdicts are counted per family on its line of `scores.jsonl`, for `summarize`, and
+  written whole, with each test's type, tags and derivation, to the page's details.
 
 Constants sit at the top of the runner module (`TABLE_MIN_RATIO`, `MIN_PLACE_COVER`), and are part of
 the test type, not of any test.
@@ -289,8 +298,10 @@ A verdict's result is one of two:
   a block that isn't `{label, bbox[, text]}` with a label of `views.LABELS` and a box of four numbers
   from 0 to 1. The view raises `views.MalformedOutput` for these, since they are the provider's fault.
 
-A system that can't produce an output is graded without that output's tests (`UnitTests(outputs=...)`,
-`opb run --outputs html`), never with them counted as failed. Grading that raises anything else on a
+A system that can't produce an output is graded on every test: that output's tests fail as "no <output>
+output", and the page isn't counted as failed. The families map onto outputs (html: text and tables;
+blocks: layout), so an html-only system shows a layout family of 0, and its text and tables families say
+how it reads. Grading that raises anything else on a
 well-formed output is a scorer bug: it is raised, naming the page and the test, and no scores or summary
 are written, so a bug never passes as a score.
 
@@ -299,6 +310,11 @@ are written, so a bug never passes as a score.
 A benchmark is an omni-bench-core `Benchmark` (`benchmark.default()`): the `Parse` task, the dataset and
 `UnitTests`. omni-bench-core plans, predicts, resumes and grades, and writes a run's files: settings.json,
 records/, predictions/, and the scorer's folder with scores.jsonl, summary.json and details/.
+
+A run is one system, and its folder answers one exact question, named for it: the system and its options, the dataset,
+the manifest, the task and the pages chosen. What happens in each case (a failed page, a missing key, a model server that isn't running, an
+unfinished run) is the core's three rules: see [omni-bench-core's "The rules"](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules).
+Comparing systems is one run per system with the same choice of pages, so each is graded on the same pages.
 
 ## Package
 
@@ -320,20 +336,23 @@ omni_parse_bench/
   katex/          KaTeX (MIT), run in an embedded V8 (mini-racer)
   markdown.py     markdown → HTML, the one converter the harness runs on every provider's markdown
   harness/        producing predictions:
-    adapter.py    PageAdapter: an omni-bench-core adapter for one page (SUPPORTS, requests, send, parse)
+    adapter.py    PageAdapter: an omni-bench-core adapter for one page (SUPPORTS, keys, requests, send,
+                  parse), and the help of options many adapters share
     contract.py   Request, Call and Cost: one call and its answer
-    errors.py     how a call fails, and whether a retry can fix it
+    errors.py     how a call fails, whether a retry can fix it, and NoServer, a model server not running
     budget.py     one page's share of the clock
     layout.py     a vendor's layout blocks as the `blocks` output
     raster.py     a PDF page as an image
     registry.py   which adapter a provider name means, made from options
     providers/    one module per vendor (docs/providers.md)
-  task.py         the Parse task: a page in, its html and layout blocks out
+  task.py         the Parse task, and Input: a page in, its html and layout blocks out
   benchmark.py    the benchmark: the Parse task on a dataset, graded by UnitTests
-  cli.py          opb run | grade | score | predict | check | tests | providers
+  cli.py          opb run | grade | score | predict | check | tests | systems
 tests/            including test_dataset.py, the dataset's invariants
 docs/
 ```
 
-Extras: the base install is the scorer; `[harness]` adds the adapters; `[benchmark]` adds Hugging
-Face, pyarrow (which `data.read_manifest` needs) and the run orchestration.
+Extras: the base install scores, and grades and checks a dataset folder (it includes omni-bench-core,
+with pyarrow, which `data.read_manifest` needs); `[harness]` adds the adapters' packages (httpx, openai,
+markdown-it-py, pypdfium2, pillow); `[benchmark]` adds both the harness and the Hugging Face client
+(omni-bench-core's `[hub]` extra), which downloading the published dataset needs.

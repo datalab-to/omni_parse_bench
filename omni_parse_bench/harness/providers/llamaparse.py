@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
 import re
 import time
 from pathlib import Path
@@ -57,7 +56,7 @@ class LlamaParse(PageAdapter):
 
     Auth: LLAMA_CLOUD_API_KEY.
 
-        opb run --providers llamaparse --options '{"llamaparse": {"tier": "agentic"}}' --sample 20
+        opb run --system llamaparse --options '{"tier": "agentic"}' --sample 20
     """
 
     tier: str = dataclasses.field(
@@ -70,6 +69,7 @@ class LlamaParse(PageAdapter):
 
     name: ClassVar[str] = "llamaparse"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    keys: ClassVar[tuple[str, ...]] = ("LLAMA_CLOUD_API_KEY",)
     workers: ClassVar[int] = 3
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
@@ -122,9 +122,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: LlamaParse | None = None) -> contract.Call:
     """Upload the page with its configuration, poll until it is done, return the result and cost."""
     config = config or LlamaParse()
-    key = os.environ.get("LLAMA_CLOUD_API_KEY")
-    if not key:
-        raise errors.MissingCredential("LLAMA_CLOUD_API_KEY is not set")
+    key = errors.key("LLAMA_CLOUD_API_KEY", "llamaparse")
     deadline = budget.Budget(timeout)
     base_url = config.base_url.rstrip("/")
     configuration = {k: v for k, v in request.sent.items() if k != "derived"}

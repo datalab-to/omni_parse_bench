@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import dataclasses
 import html
-import os
 import re
 import time
 from pathlib import Path
@@ -59,7 +58,7 @@ class Reducto(PageAdapter):
 
     Auth: REDUCTO_API_KEY.
 
-        opb run --providers reducto --options '{"reducto": {"model": "legacy"}}' --sample 20
+        opb run --system reducto --options '{"model": "legacy"}' --sample 20
     """
 
     model: str = dataclasses.field(
@@ -79,6 +78,7 @@ class Reducto(PageAdapter):
 
     name: ClassVar[str] = "reducto"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    keys: ClassVar[tuple[str, ...]] = ("REDUCTO_API_KEY",)
     workers: ClassVar[int] = 3
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
@@ -136,9 +136,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: Reducto | None = None) -> contract.Call:
     """Upload the page, submit the parse, poll until it is done, return the finished job."""
     config = config or Reducto()
-    key = os.environ.get("REDUCTO_API_KEY")
-    if not key:
-        raise errors.MissingCredential("REDUCTO_API_KEY is not set")
+    key = errors.key("REDUCTO_API_KEY", "reducto")
     deadline = budget.Budget(timeout)
     base_url = config.base_url.rstrip("/")
     polls = 0

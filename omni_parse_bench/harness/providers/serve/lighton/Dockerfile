@@ -4,7 +4,7 @@
 #
 #     docker build -t opb-lighton omni_parse_bench/harness/providers/serve/lighton
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-lighton
-#     opb run --providers lightonocr --options '{"lightonocr": {"base_url": "http://localhost:8001"}}'
+#     opb run --system lightonocr --options '{"base_url": "http://localhost:8001"}'
 #
 # MODEL picks the model (docker run -e MODEL=lightonai/LightOnOCR-3-0.8B; the 4B by default), and opb's
 # `model` option names the same one. The weights download when it starts, into HF_HOME; mount a cache

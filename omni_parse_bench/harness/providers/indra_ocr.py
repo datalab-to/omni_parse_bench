@@ -61,8 +61,8 @@ class IndraOcr(PageAdapter):
 
         docker build -t opb-indra omni_parse_bench/harness/providers/serve/indra
         docker run -p 8001:8001 opb-indra
-        opb run --providers indra-ocr --sample 20 \\
-            --options '{"indra-ocr": {"base_url": "http://localhost:8001"}}'
+        opb run --system indra-ocr --sample 20 \\
+            --options '{"base_url": "http://localhost:8001"}'
 
     OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
@@ -78,6 +78,8 @@ class IndraOcr(PageAdapter):
 
     name: ClassVar[str] = "indra-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "indra"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

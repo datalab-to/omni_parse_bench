@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import base64
 import dataclasses
-import os
 import re
 from pathlib import Path
 from typing import Any, ClassVar
@@ -53,7 +52,7 @@ class Mistral(PageAdapter):
 
     Auth: MISTRAL_API_KEY.
 
-        opb run --providers mistral --sample 20
+        opb run --system mistral --sample 20
     """
 
     # Note: a dated model, not mistral-ocr-latest, so a run records the model it used.
@@ -62,6 +61,7 @@ class Mistral(PageAdapter):
 
     name: ClassVar[str] = "mistral"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    keys: ClassVar[tuple[str, ...]] = ("MISTRAL_API_KEY",)
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)
@@ -86,9 +86,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: Mistral | None = None) -> contract.Call:
     """Send the page inline, return the OCR response."""
     config = config or Mistral()
-    key = os.environ.get("MISTRAL_API_KEY")
-    if not key:
-        raise errors.MissingCredential("MISTRAL_API_KEY is not set")
+    key = errors.key("MISTRAL_API_KEY", "mistral")
     deadline = budget.Budget(timeout)
     media = MEDIA.get(page.suffix.lower(), "application/pdf")
     url = f"data:{media};base64,{base64.b64encode(page.read_bytes()).decode()}"
@@ -99,7 +97,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         r = httpx.post(f"{config.base_url.rstrip('/')}/v1/ocr", json=body,
                        headers={"Authorization": f"Bearer {key}"}, timeout=max(1.0, deadline.remaining()))
     except httpx.TimeoutException:
-        raise errors.VendorTimeout(f"no answer within the call's {deadline.total:.0f} s") from None
+        raise errors.VendorTimeout(f"no answer within the call's {deadline.total:g} s") from None
     if r.status_code != 200:
         raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}", status=r.status_code, body=r.text)
     with adapter.reading("the OCR response"):

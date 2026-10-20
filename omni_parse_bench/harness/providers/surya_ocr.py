@@ -62,8 +62,8 @@ class SuryaOcr(PageAdapter):
 
         docker build -t opb-surya omni_parse_bench/harness/providers/serve/surya
         docker run --gpus all -p 8001:8001 opb-surya
-        opb run --providers surya-ocr --sample 20 \\
-            --options '{"surya-ocr": {"base_url": "http://localhost:8001"}}'
+        opb run --system surya-ocr --sample 20 \\
+            --options '{"base_url": "http://localhost:8001"}'
 
     OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
@@ -73,6 +73,8 @@ class SuryaOcr(PageAdapter):
 
     name: ClassVar[str] = "surya-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "surya"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

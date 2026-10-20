@@ -30,6 +30,8 @@ FAMILIES = {
     "table_cell": "tables",
     "layout_kind": "layout",
 }
+# The families in the order a summary lists them, so two runs' summaries read alike.
+FAMILY_ORDER = tuple(dict.fromkeys(FAMILIES.values()))
 
 # The tags: what the content a test checks is. Each definition is
 # the one text the tagger, the docs and test builders share; tag prompts are filled from it.
@@ -121,3 +123,4 @@ ANSWERS = {"table": ("in_table", "not_in_table"), "math": ("math", "not_math"),
            "tiny": ("tiny", "not_tiny"), "rotated": ("rotated", "not_rotated"),
            "handwriting": ("handwritten", "not_handwritten"), "degraded": ("degraded", "not_degraded")}
 assert set(ANSWERS) == set(YES_NO)
+

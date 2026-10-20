@@ -2,7 +2,7 @@
 
     adapter.py       `PageAdapter`, the base class of every adapter; its docstring says how to write one
     contract.py      `Request`, `Call` and `Cost`: one call to a system and its answer
-    errors.py        how a call fails, and whether a retry can fix it
+    errors.py        how a call fails, whether a retry can fix it, and a model server that isn't running
     budget.py        one page's share of the clock
     layout.py        a system's layout blocks as the `blocks` output
     raster.py        a PDF page as an image, for systems that take images
@@ -12,7 +12,9 @@
 """
 # Note: the registry first: it checks, once, that the adapters' packages are installed.
 from .registry import ADAPTERS, PROVIDERS, adapter_class, system  # isort: skip
-from .adapter import Input, PageAdapter
+from omni_parse_bench.task import Input
+
+from .adapter import PageAdapter
 from .contract import Call, Cost, Request
 
 __all__ = ["ADAPTERS", "Call", "Cost", "Input", "PROVIDERS", "PageAdapter", "Request",

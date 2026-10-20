@@ -71,7 +71,7 @@ class GlmOcr(PageAdapter):
 
         docker build -t opb-glm_ocr omni_parse_bench/harness/providers/serve/glm_ocr
         docker run --gpus all -p 8001:8001 opb-glm_ocr
-        opb run --providers glm-ocr --options '{"glm-ocr": {"base_url": "http://localhost:8001"}}' --sample 20
+        opb run --system glm-ocr --options '{"base_url": "http://localhost:8001"}' --sample 20
 
     OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
@@ -80,6 +80,8 @@ class GlmOcr(PageAdapter):
 
     name: ClassVar[str] = "glm-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "glm_ocr"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

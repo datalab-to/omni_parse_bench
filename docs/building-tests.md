@@ -1,8 +1,8 @@
 # How tests are built
 
 What a test is made of, who decides each part and from what evidence, and how to add tests.
-[`design.md`](./design.md) is the full specification of each test type, and
-[`tagging.md`](./tagging.md) describes how tags are assigned.
+[`design.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/design.md) is the full specification of each test type, and
+[`tagging.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/tagging.md) describes how tags are assigned.
 
 1. [The mental model](#the-mental-model): what a test checks, and what its tags say;
 2. [Terms](#terms): the words used for a test's parts;
@@ -42,7 +42,8 @@ first.
 - arg: one piece of gold content the test compares with the output, such as a sentence, a number,
   an equation or a table cell's text;
 - arg role: the part an arg plays in its test's check: `content`, `before`, `after`, `cell`,
-  `top_heading`, and so on. The test type fixes which roles exist (`gold.ROLES`);
+  `top_heading`, and so on. The test type fixes which roles exist (`scorers.unit_tests.tests.ARG_ROLES`;
+  not `vocab.ROLES`, which are the role tags, such as `heading`);
 - arg kind: how an arg is compared. An arg holds exactly one of three keys, `text`, `number` or
   `latex`, and the key is the kind. A `text` arg may also hold `place`, a box per line on the page;
 - settings: values that configure the check as a whole (`expected_count`, or `kind` for a
@@ -190,7 +191,7 @@ The tags are then checked against what the test claims: every arg of a `table_ce
 table, and a `latex` arg must not be tagged non-math. A disagreement goes to a person, who decides
 whether the tag or the test is wrong, so a role that puts text in a table where there is none is
 caught.
-[`tagging.md`](./tagging.md) has the method.
+[`tagging.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/tagging.md) has the method.
 
 ## The suites
 
@@ -236,5 +237,5 @@ derivation is `model_panel`.
    doesn't allow, kinds a role can't compare, values outside the vocabulary
    (a tag must be a vocabulary tag, a language code or a script code), and a `max_diffs` that would
    let any output pass. Fix or drop what it rejects.
-5. Tag the new tests from the page and its sources, as [`tagging.md`](./tagging.md) describes, never
+5. Tag the new tests from the page and its sources, as [`tagging.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/tagging.md) describes, never
    from what the test claims.

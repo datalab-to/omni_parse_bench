@@ -68,7 +68,7 @@ ANSWER = {0: lambda: contract.Call({"html": "<p>alpha beta</p>"}, cost=contract.
 def test_opb_providers_lists_an_adapters_options(capsys):
     from omni_parse_bench import cli
 
-    assert cli.main(["providers", "datalab"]) == 0
+    assert cli.main(["systems", "datalab"]) == 0
     assert "datalab" in capsys.readouterr().out
 
 
@@ -78,6 +78,40 @@ def test_tesseract_writes_its_text_as_escaped_html():
     outs, errs = tesseract.parse({"text": "a < b & c"}, r[0])
     assert outs == {"html": "<pre>a &lt; b &amp; c</pre>"}
     assert errs == {}
+
+
+def test_tesseract_output_that_isnt_utf8_is_decoded_not_a_crash():
+    import sys
+
+    from omni_parse_bench.harness import budget
+
+    bad = ("import sys; sys.stdout.buffer.write(b'ok \\xff'); sys.stderr.buffer.write(b'no \\xfe'); "
+           "sys.exit(1)")
+    clock = budget.Budget(60)
+    assert tesseract.run([sys.executable, "-c", bad], clock, check=False).stdout == "ok \ufffd"
+    with pytest.raises(errors.VendorError, match="tesseract exited 1: no \ufffd"):
+        tesseract.run([sys.executable, "-c", bad], clock)
+
+
+def test_tesseract_is_free_and_says_so(monkeypatch, tmp_path):
+    import subprocess
+
+    monkeypatch.setattr(tesseract.shutil, "which", lambda _: "/bin/tesseract")
+    answered = lambda cmd, deadline, check=True: subprocess.CompletedProcess(cmd, 0, "hi", "")  # noqa: E731
+    monkeypatch.setattr(tesseract, "run", answered)
+    monkeypatch.setattr(tesseract, "version", lambda: "tesseract 5")
+    [r] = tesseract.Tesseract(model="eng").requests(frozenset({"html"}))
+    got = tesseract.call(tmp_path / "p.png", r, config=tesseract.Tesseract(model="eng"))
+    assert got.cost.usd == 0.0 and got.raw["text"] == "hi"
+
+
+def test_a_timeout_is_printed_with_its_decimals():
+    from omni_parse_bench.harness import budget
+
+    clock = budget.Budget(0.1)
+    while not clock.expired(): pass
+    with pytest.raises(errors.VendorTimeout, match="uniform 0.1 s limit"):
+        clock.check("the job")
 
 
 def test_mistral_puts_tables_in_place_and_headers_back():
@@ -120,6 +154,41 @@ def test_a_saved_answer_is_read_again_without_a_call(tmp_path):
     r = core.predict(Stub(), x)
     assert r["output"] == {"html": "<p>alpha beta</p>"} and r["cost"]["usd"] == 0.01
     assert core.reread(Stub(), x, r | {"output": None})["output"] == r["output"]
+
+
+def test_a_parse_that_raises_is_recorded_as_a_read_error_keeping_the_answer(tmp_path, monkeypatch):
+    """Not a page scored 0 with no error: the record says what failed, and keeps the answer to read again."""
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    monkeypatch.setitem(ANSWER, 0, lambda: contract.Call({"text": "alpha"}))
+    r = core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
+    assert r["output"] is None and r["error"]["type"] == "ReadError" and "KeyError" in r["error"]["message"]
+    assert r["raw"][0]["raw"] == {"text": "alpha"}
+
+
+@pytest.mark.parametrize("name, key", [("datalab", "DATALAB_API_KEY"), ("reducto", "REDUCTO_API_KEY"),
+                                       ("extend", "EXTEND_API_KEY"), ("llamaparse", "LLAMA_CLOUD_API_KEY"),
+                                       ("azure", "AZURE_CU_KEY"), ("mistral", "MISTRAL_API_KEY"),
+                                       ("openai/gpt-5.6-sol", "OPENROUTER_API_KEY")])
+def test_every_vendor_declares_its_key(name, key, monkeypatch):
+    for k in (key, "OPENAI_API_KEY"): monkeypatch.delenv(k, raising=False)
+    assert harness.system(name).missing_keys() == [key]
+    monkeypatch.setenv(key, "x")
+    assert harness.system(name).missing_keys() == []
+
+
+def test_an_llm_needs_no_openrouter_key_elsewhere_or_with_an_openai_key(monkeypatch):
+    for k in ("OPENROUTER_API_KEY", "OPENAI_API_KEY"): monkeypatch.delenv(k, raising=False)
+    assert harness.system("openai/gpt-5.6-sol", {"base_url": "http://localhost:8000/v1"}).missing_keys() == []
+    monkeypatch.setenv("OPENAI_API_KEY", "x")
+    assert harness.system("openai/gpt-5.6-sol").missing_keys() == []
+
+
+def test_an_option_without_help_of_its_own_has_the_shared_help():
+    from omni_parse_bench.harness import adapter
+
+    for name in (*harness.PROVIDERS, "openai/gpt-5.6-sol"):
+        for f in dataclasses.fields(harness.adapter_class(name)):
+            assert adapter.option_help(f), (name, f.name)
 
 
 def test_an_llm_reply_cut_off_every_time_is_asked_for_attempts_times_only(tmp_path, monkeypatch):

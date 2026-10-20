@@ -4,7 +4,7 @@
 #
 #     docker build -t opb-nanonets omni_parse_bench/harness/providers/serve/nanonets
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-nanonets
-#     opb run --providers nanonets-ocr --options '{"nanonets-ocr": {"base_url": "http://localhost:8001"}}'
+#     opb run --system nanonets-ocr --options '{"base_url": "http://localhost:8001"}'
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set
 # OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb sends it.

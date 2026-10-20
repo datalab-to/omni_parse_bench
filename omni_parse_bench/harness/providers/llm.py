@@ -91,18 +91,28 @@ class LLM(PageAdapter):
     The open OCR models are providers of their own (providers/serve/); `chat`, `answer` and the small
     helpers below are what they share with this adapter.
 
-        opb run --providers openai/gpt-5.6-sol --sample 20
+        opb run --system openai/gpt-5.6-sol --sample 20
 
     The model is the provider name; `--options {"model": ...}` is refused.
     """
 
     model: str = dataclasses.field(metadata={"help": "an OpenRouter org/model id"})
-    max_output_tokens: int = 32000
+    max_output_tokens: int = dataclasses.field(default=32000, metadata={
+        "help": "the most tokens the model may write for one output; a reply cut there fails the page"})
     base_url: str = DEFAULT_BASE_URL
-    attempts: int = 3
+    attempts: int = dataclasses.field(default=3, metadata={
+        "help": "how many times one output is asked for when a reply is unusable (it doesn't parse)"})
 
     name: ClassVar[str] = "llm"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    keys: ClassVar[tuple[str, ...]] = ("OPENROUTER_API_KEY",)
+    ENV: ClassVar[str] = ("OPENAI_API_KEY can stand in for OPENROUTER_API_KEY; with another base_url, no key "
+                          "is needed, and OPB_ENDPOINT_KEY, if set, is sent as the endpoint's bearer token")
+
+    def missing_keys(self) -> list[str]:
+        """None for an endpoint other than OpenRouter, or when OPENAI_API_KEY stands in for its key."""
+        if self.base_url != DEFAULT_BASE_URL or os.environ.get("OPENAI_API_KEY"): return []
+        return super().missing_keys()
 
     @property
     def provider(self) -> str:
@@ -282,7 +292,8 @@ def key(base_url: str) -> str:
     if base_url != DEFAULT_BASE_URL:
         return os.environ.get("OPB_ENDPOINT_KEY", "EMPTY")
     if not (got := os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY")):
-        raise errors.MissingCredential("OPENROUTER_API_KEY (or OPENAI_API_KEY) must be set")
+        raise errors.MissingCredential("an OpenRouter model needs OPENROUTER_API_KEY, which is not set: "
+                                       "export OPENROUTER_API_KEY=... (or OPENAI_API_KEY=...), then rerun")
     return got
 
 
@@ -295,12 +306,13 @@ def chat(base_url: str, body: dict, deadline: budget.Budget, spent: Sequence[con
     try:
         return client.chat.completions.create(**body, timeout=max(1.0, deadline.remaining())).model_dump()
     except openai.APITimeoutError:
-        raise errors.VendorTimeout(f"no answer within {deadline.total:.0f} s",
+        raise errors.VendorTimeout(f"no answer within {deadline.total:g} s",
                                    cost=contract.Cost.total(list(spent))) from None
     except openai.APIStatusError as exc:
         raise errors.VendorError(f"HTTP {exc.status_code}: {str(exc)[:300]}", status=exc.status_code,
                                  body=str(exc.body), cost=contract.Cost.total(list(spent))) from None
     except openai.APIConnectionError as exc:
+        if errors.refused(exc): raise errors.NoServer(base_url) from None
         raise errors.VendorUnreachable(f"connection failed: {exc}"[:300],
                                        cost=contract.Cost.total(list(spent))) from None
 

@@ -72,8 +72,8 @@ class Infinity(PageAdapter):
 
         docker build -t opb-infinity omni_parse_bench/harness/providers/serve/infinity
         docker run --gpus all -p 8001:8001 opb-infinity
-        opb run --providers infinity-parser2 --sample 20 \\
-            --options '{"infinity-parser2": {"base_url": "http://localhost:8001"}}'
+        opb run --system infinity-parser2 --sample 20 \\
+            --options '{"base_url": "http://localhost:8001"}'
 
     OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
@@ -89,6 +89,8 @@ class Infinity(PageAdapter):
 
     name: ClassVar[str] = "infinity-parser2"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "infinity"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

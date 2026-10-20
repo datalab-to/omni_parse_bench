@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
 import re
 import time
 from pathlib import Path
@@ -46,7 +45,7 @@ class Datalab(PageAdapter):
 
     Auth: DATALAB_API_KEY.
 
-        opb run --providers datalab --options '{"datalab": {"mode": "balanced"}}' --sample 20
+        opb run --system datalab --options '{"mode": "balanced"}' --sample 20
     """
 
     mode: str = dataclasses.field(
@@ -58,6 +57,7 @@ class Datalab(PageAdapter):
 
     name: ClassVar[str] = "datalab"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    keys: ClassVar[tuple[str, ...]] = ("DATALAB_API_KEY",)
     workers: ClassVar[int] = 10
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
@@ -106,9 +106,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: Datalab | None = None) -> contract.Call:
     """POST the page, poll until it is done, return the finished conversion and its cost."""
     config = config or Datalab()
-    key = os.environ.get("DATALAB_API_KEY")
-    if not key:
-        raise errors.MissingCredential("DATALAB_API_KEY is not set")
+    key = errors.key("DATALAB_API_KEY", "datalab")
     deadline = budget.Budget(timeout)
     base_url = config.base_url.rstrip("/")
     form = {k: json.dumps(v) if isinstance(v, dict) else str(v).lower() if isinstance(v, bool) else str(v)

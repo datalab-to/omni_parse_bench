@@ -94,7 +94,7 @@ def adapter_class(provider: str) -> type[PageAdapter]:
             exc.add_note(f"while loading adapter {provider!r} from package {ep.dist.name!r}")
             raise
     if provider not in ADAPTERS:
-        raise errors.UsageError(f"unknown provider {provider!r}. Known: {', '.join(PROVIDERS)}. Any "
+        raise errors.UsageError(f"unknown system {provider!r}. Known: {', '.join(PROVIDERS)}. Any "
                                 "OpenRouter model id also works, e.g. openai/gpt-5.6-sol")
     return ADAPTERS[provider]
 

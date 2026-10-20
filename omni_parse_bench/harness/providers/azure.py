@@ -5,7 +5,6 @@ The adapter is `Azure`; its docstring says how a page is processed, and how to s
 from __future__ import annotations
 
 import dataclasses
-import os
 import re
 import time
 from pathlib import Path
@@ -38,7 +37,7 @@ class Azure(PageAdapter):
     """The azure adapter. Its fields are what azure can be asked.
 
     `endpoint` has no default to give, since every Azure resource has its own; it is empty here, so
-    a `Azure` can be built (`opb providers`, a run's name), and `call` refuses it.
+    a `Azure` can be built (`opb systems`, a run's name), and `call` refuses it.
 
     One call produces both outputs. Azure returns the page as markdown, tables as html, with page
     headers, footers and page numbers written in place as comments (`<!-- PageHeader: ... -->`), which
@@ -56,8 +55,8 @@ class Azure(PageAdapter):
     Auth: AZURE_CU_KEY. The resource is the `endpoint` option, not an environment variable: it
     decides where the page is analyzed, so it is a setting the run records.
 
-        opb run --providers azure --sample 20 \
-            --options '{"azure": {"endpoint": "https://<resource>.services.ai.azure.com"}}'
+        opb run --system azure --sample 20 \
+            --options '{"endpoint": "https://<resource>.services.ai.azure.com"}'
     """
 
     endpoint: str = dataclasses.field(
@@ -72,6 +71,7 @@ class Azure(PageAdapter):
 
     name: ClassVar[str] = "azure"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    keys: ClassVar[tuple[str, ...]] = ("AZURE_CU_KEY",)
     workers: ClassVar[int] = 3
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
@@ -131,11 +131,11 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: Azure | None = None) -> contract.Call:
     """Analyze the page, poll until it is done, return the analysis."""
     config = config or Azure()
-    key = os.environ.get("AZURE_CU_KEY")
-    if not key or not config.endpoint:
+    key = errors.key("AZURE_CU_KEY", "azure")
+    if not config.endpoint:
         raise errors.MissingCredential(
-            "azure needs AZURE_CU_KEY in the environment and its resource in the options: "
-            """--options '{"azure": {"endpoint": "https://<resource>.services.ai.azure.com"}}'""")
+            "azure needs its resource, which is an option, not an environment variable: "
+            """--options '{"endpoint": "https://<resource>.services.ai.azure.com"}'""")
     deadline = budget.Budget(timeout)
     url = (f"{config.endpoint}/contentunderstanding/analyzers/{config.analyzer}:analyzeBinary"
            f"?api-version={config.api_version}")

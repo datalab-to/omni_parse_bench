@@ -71,8 +71,8 @@ class DeepseekOcr(PageAdapter):
 
         docker build -t opb-deepseek omni_parse_bench/harness/providers/serve/deepseek
         docker run --gpus all -p 8001:8001 opb-deepseek
-        opb run --providers deepseek-ocr --sample 20 \\
-            --options '{"deepseek-ocr": {"base_url": "http://localhost:8001"}}'
+        opb run --system deepseek-ocr --sample 20 \\
+            --options '{"base_url": "http://localhost:8001"}'
 
     OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
@@ -87,6 +87,8 @@ class DeepseekOcr(PageAdapter):
 
     name: ClassVar[str] = "deepseek-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "deepseek"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

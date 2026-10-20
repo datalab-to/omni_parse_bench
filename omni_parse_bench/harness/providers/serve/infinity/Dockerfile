@@ -4,7 +4,7 @@
 #
 #     docker build -t opb-infinity omni_parse_bench/harness/providers/serve/infinity
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-infinity
-#     opb run --providers infinity-parser2 --options '{"infinity-parser2": {"base_url": "http://localhost:8001"}}'
+#     opb run --system infinity-parser2 --options '{"base_url": "http://localhost:8001"}'
 #
 # MODEL picks the model (docker run -e MODEL=infly/Infinity-Parser2-Flash; Pro by default, which needs
 # two GPUs), and opb's `model` option names the same one. The weights download when it starts, into
