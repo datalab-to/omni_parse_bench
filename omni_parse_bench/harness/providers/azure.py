@@ -133,9 +133,9 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
     config = config or Azure()
     key = errors.key("AZURE_CU_KEY", "azure")
     if not config.endpoint:
-        raise errors.MissingCredential(
-            "azure needs its resource, which is an option, not an environment variable: "
-            """--options '{"endpoint": "https://<resource>.services.ai.azure.com"}'""")
+        raise ValueError(
+"azure needs its resource, which is an option, not an environment variable: "
+"""--options '{"endpoint": "https://<resource>.services.ai.azure.com"}'""")
     deadline = budget.Budget(timeout)
     url = (f"{config.endpoint}/contentunderstanding/analyzers/{config.analyzer}:analyzeBinary"
            f"?api-version={config.api_version}")

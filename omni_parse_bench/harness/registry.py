@@ -12,9 +12,7 @@ from typing import Any
 
 from omni_bench_core import adapter as core
 
-from omni_parse_bench import errors
 
-from .errors import MissingDependency
 
 # Note: we check the systems' packages once, here, so a missing extra fails at import with one message naming
 # it, not hours into a run.
@@ -49,8 +47,9 @@ except ImportError as exc:
     # own must surface as itself.
     if (exc.name or "").startswith(__name__.split(".")[0]):
         raise
-    raise MissingDependency(f"the harness could not import what the adapters need:\n    {exc}\n"
-                            "    pip install 'omni-parse-bench[harness]'") from None
+    exc.add_note("the harness could not import what the adapters need: "
+                 "pip install 'omni-parse-bench[harness]'")
+    raise
 
 MODEL_SEPARATOR = "/"
 ENTRY_POINT_GROUP = "omni_parse_bench.adapters"
@@ -94,8 +93,8 @@ def adapter_class(provider: str) -> type[PageAdapter]:
             exc.add_note(f"while loading adapter {provider!r} from package {ep.dist.name!r}")
             raise
     if provider not in ADAPTERS:
-        raise errors.UsageError(f"unknown system {provider!r}. Known: {', '.join(PROVIDERS)}. Any "
-                                "OpenRouter model id also works, e.g. openai/gpt-5.6-sol")
+        raise ValueError(f"unknown system {provider!r}. Known: {', '.join(PROVIDERS)}. Any "
+                         "OpenRouter model id also works, e.g. openai/gpt-5.6-sol")
     return ADAPTERS[provider]
 
 
@@ -105,12 +104,12 @@ def system(provider: str, options: dict[str, Any] | None = None) -> PageAdapter:
     options = dict(options or {})
     if MODEL_SEPARATOR in provider:
         if "model" in options:
-            raise errors.UsageError(f"{provider}: `model` is the provider name, not an option, so a run is "
-                                    "never filed under a model it did not use. Run the one you want: "
-                                    f"{options['model']}")
+            raise ValueError(f"{provider}: `model` is the provider name, not an option, so a run is "
+                             "never filed under a model it did not use. Run the one you want: "
+                             f"{options['model']}")
         options["model"] = provider
     try:
         return core.configure(adapter_class(provider), options)
-    except ValueError as exc:   # Note: an adapter's own check of a value (`__post_init__`).
-        if isinstance(exc, errors.UsageError): raise
-        raise errors.UsageError(f"{provider}: {exc}") from None
+    except ValueError as exc:   # Note: the core's check of an option, or the adapter's own (`__post_init__`).
+        exc.add_note(f"in the options of {provider}")
+        raise

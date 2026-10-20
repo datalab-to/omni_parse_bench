@@ -127,7 +127,7 @@ gold/<page_id>.json    the page's tests
 |---|---|---|
 | `page_id` | `realdoc_pdfs-0103655f_docs_finance_2-p1` | the key; the files carry it |
 | `document` | `realdoc_pdfs:0103655f_docs_finance_2` | the source document: a page's copies and siblings share one, since their tests pass or fail together |
-| `suite` | `realdoc_pdfs` | where the page came from; its license is in `licenses/`. `--suites` filters on it |
+| `suite` | `realdoc_pdfs` | where the page came from; its license is in `licenses/` |
 | `doc_path` | `pages/<page_id>.pdf` | the input: a path inside the dataset, named `<page_id>.pdf` or `.png` |
 | `gt_path` | `gold/<page_id>.json` | the tests: a path inside the dataset, named `<page_id>.json` |
 | `outputs` | `["html", "blocks"]` | what to predict for the page: the output types its tests read, so planning a run reads the manifest alone. Made from the gold when the dataset is published, and checked against it whenever the gold is read; a manifest from before the column has it read from the gold |
@@ -241,8 +241,9 @@ score more precise without making layout count more. The families are those the 
 in, so a subset scores on the families it holds, and the summary lists them in a fixed order: text,
 tables, layout (`vocab.FAMILY_ORDER`). A page whose call failed counts as 0: the headline
 is the families' score over the scored pages, times the share of pages that didn't fail (`coverage`, the
-omni-bench-core rule), so a run where every page failed has headline 0. The summary's `headline_is` says
-so: "the mean of the families' scores × coverage".
+omni-bench-core rule), so a run where every page failed has headline 0. The families and their mean are
+kept under the summary's `scored`, over the scored pages only; the top `headline` is `scored.headline ×
+coverage`.
 
 The summary holds the headline and the families alone. Any other breakdown (by output type, test type,
 tag, suite or derivation) is computed from each test's verdict, kept in the run's
@@ -345,7 +346,7 @@ omni_parse_bench/
     adapter.py    PageAdapter: an omni-bench-core adapter for one page (SUPPORTS, keys, requests, send,
                   parse), and the help of options many adapters share
     contract.py   Request, Call and Cost: one call and its answer
-    errors.py     how a call fails, whether a retry can fix it, and NoServer, a model server not running
+    errors.py     how a call fails, whether a retry can fix it, and the note for a model server not running
     budget.py     one page's share of the clock
     layout.py     a vendor's layout blocks as the `blocks` output
     raster.py     a PDF page as an image

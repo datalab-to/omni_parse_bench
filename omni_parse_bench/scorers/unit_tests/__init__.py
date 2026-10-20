@@ -8,8 +8,8 @@
 """
 from . import compare, runners, tests
 from .compare import Verdict, score
-from .tests import GoldError, Test
+from .tests import Test
 from .unit_tests import UnitTests, check, gold, lines, summarize
 
-__all__ = ["GoldError", "Test", "UnitTests", "Verdict", "check", "compare", "gold", "lines", "runners",
+__all__ = ["Test", "UnitTests", "Verdict", "check", "compare", "gold", "lines", "runners",
            "score", "summarize", "tests"]

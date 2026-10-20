@@ -80,7 +80,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
     """Read the page; the answer is its text, the script detected and the model used."""
     config = config or Tesseract()
     if not shutil.which("tesseract"):
-        raise errors.MissingDependency("tesseract isn't installed: brew install tesseract tesseract-lang")
+        raise FileNotFoundError("tesseract isn't installed: brew install tesseract tesseract-lang")
     deadline = budget.Budget(timeout)
     with tempfile.TemporaryDirectory() as tmp:
         image = page

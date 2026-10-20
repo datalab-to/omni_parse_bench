@@ -10,8 +10,8 @@
     opb tests --dataset <folder or hf://...> > tests.jsonl         # every test as a JSON line
     opb systems [NAME]                                             # the systems, or one's options
 
-A run is one system: to run several, run one command per system, with the same --sample (or --limit, --only,
---suites). `opb run` given several systems runs nothing, and prints those commands.
+A run is one system: to run several, run one command per system, with the same --sample (or --limit or
+--only). `opb run` given several systems runs nothing, and prints those commands.
 """
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def renamed(a: argparse.Namespace) -> None:
         if getattr(a, old, None) in (None, False): continue
         deprecated(old_flag, new_flag)
         if getattr(a, new, None) not in (None, False):
-            raise errors.UsageError(f"{old_flag} is the old name of {new_flag}; give {new_flag} only")
+            raise ValueError(f"{old_flag} is the old name of {new_flag}; give {new_flag} only")
         setattr(a, new, getattr(a, old))
 
 
@@ -96,14 +96,14 @@ def read_object(path: str, flag: str) -> dict:
     try:
         got = json.loads(Path(path).read_text(encoding="utf-8-sig"))
     except FileNotFoundError:
-        raise errors.UsageError(f"{flag} {path}: no such file") from None
+        raise ValueError(f"{flag} {path}: no such file") from None
     except IsADirectoryError:
-        raise errors.UsageError(f"{flag} {path} is a folder; pass a JSON file") from None
+        raise ValueError(f"{flag} {path} is a folder; pass a JSON file") from None
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise errors.UsageError(f"{flag} {path} isn't JSON: {exc}") from None
+        raise ValueError(f"{flag} {path} isn't JSON: {exc}") from None
     if not isinstance(got, dict):
         kind = "null" if got is None else type(got).__name__
-        raise errors.UsageError(f"{flag} {path} holds a JSON {kind}; it must be a JSON object")
+        raise ValueError(f"{flag} {path} holds a JSON {kind}; it must be a JSON object")
     return got
 
 
@@ -114,13 +114,13 @@ def read_json(value: str | None, flag: str) -> Any:
     try:
         return json.loads(Path(value).read_text(encoding="utf-8-sig") if is_file else value)
     except json.JSONDecodeError as e:
-        raise errors.UsageError(f"{flag} {value!r} is neither JSON nor a JSON file: {e}") from None
+        raise ValueError(f"{flag} {value!r} is neither JSON nor a JSON file: {e}") from None
 
 
 def read_ids(path: Path, flag: str) -> frozenset[str]:
     """A file of ids, one per line; blank lines and `#` comments are skipped."""
     if not path.is_file():
-        raise errors.UsageError(f"{flag} {path}: no such file; it holds ids, one per line")
+        raise ValueError(f"{flag} {path}: no such file; it holds ids, one per line")
     return frozenset(x for line in path.read_text(encoding="utf-8-sig").splitlines()
                      if (x := line.split("#", 1)[0].strip()))
 
@@ -134,9 +134,9 @@ def bare(name: str, options: Any) -> Any:
         return options
     if list(options) == [name]: return options[name]
     if others := [k for k in options if k != name and (k in harness.ADAPTERS or "/" in k)]:
-        raise errors.UsageError(f"--options is keyed by {', '.join(others)}, but this command runs {name}: "
-                                f"give {name}'s options alone, as {{\"<option>\": <value>}} or "
-                                f"{{\"{name}\": {{...}}}}")
+        raise ValueError(f"--options is keyed by {', '.join(others)}, but this command runs {name}: "
+                         f"give {name}'s options alone, as {{\"<option>\": <value>}} or "
+                         f"{{\"{name}\": {{...}}}}")
     return options
 
 
@@ -166,21 +166,21 @@ def one_system(a: argparse.Namespace, argv: Sequence[str]) -> None:
         o = options.get(n) if keyed else options
         more = ["--options", json.dumps(o, ensure_ascii=False)] if o is not None else []
         commands.append("    " + shlex.join(["opb", "run", "--system", n, *more, *rest]))
-    raise errors.UsageError(f"a run is one system, but {len(names)} were given ({', '.join(names)}). Run one "
-                            "command per system:\n" + "\n".join(commands) + "\nUse the same --sample (or "
-                            "--limit, --only, --suites) in each, so they answer the same rows.")
+    raise ValueError(f"a run is one system, but {len(names)} were given ({', '.join(names)}). Run one "
+                     "command per system:\n" + "\n".join(commands) + "\nUse the same --sample (or "
+                     "--limit, --only) in each, so they answer the same rows.")
 
 
 def run_one(a: argparse.Namespace, b: Any, system: Any) -> dict[str, Any] | None:
     """Plans `system`'s run from the flags, predicts it and grades it; None when the person at the terminal
     says no. With the deprecated `--score-only`, grades the run already on disk and predicts nothing."""
-    p = b.plan(system, a.out, suites=a.suites, limit=a.limit, sample=a.sample,
+    p = b.plan(system, a.out, limit=a.limit, sample=a.sample,
                only=read_ids(a.only, "--only") if a.only else None, timeout=a.timeout, workers=a.workers,
                retry_failed=a.retry_failed)
     if a.score_only:
         if not p.run.predictions.is_dir():
-            raise errors.UsageError(f"no run at {p.run.folder}: this system with these options was never "
-                                    "predicted under this --out")
+            raise ValueError(f"no run at {p.run.folder}: this system with these options was never "
+                             "predicted under this --out")
         return b.grade(p.run)
     print(b.describe(p), file=sys.stderr)
     if not a.yes and sys.stdin.isatty() and not proceed(): return None
@@ -222,14 +222,14 @@ def cmd_reread(a: argparse.Namespace) -> int:
     if a.cmd == "reparse":
         deprecated("`opb reparse`", "`opb reread`")
         if a.add:
-            raise errors.UsageError("--add is no longer possible: each page asks for the outputs its tests "
-                                    "read; run `opb reread` with no --add")
+            raise ValueError("--add is no longer possible: each page asks for the outputs its tests "
+                             "read; run `opb reread` with no --add")
     for folder in a.runs:
         said = runs.Run.at(folder).settings()
         if not said.get("system"):
-            raise errors.UsageError(f"{folder} has no system in its settings.json, so it is a folder of "
-                                    "your own predictions with no answers to read again; grade it with "
-                                    "`opb grade`")
+            raise ValueError(f"{folder} has no system in its settings.json, so it is a folder of "
+                             "your own predictions with no answers to read again; grade it with "
+                             "`opb grade`")
         # Note: a model id is the system's name, so the LLM adapter's `model` can't also be an option.
         options = {k: v for k, v in said.get("options", {}).items()
                    if not ("/" in said["system"] and k == "model")}
@@ -247,8 +247,8 @@ def cmd_score(a: argparse.Namespace) -> int:
     if pred and not set(pred) & set(vocab.OUTPUT_TYPES):
         hint = (" It looks like a gold file; --pred is the outputs, {output type: value}." if "tests" in pred
                 else "")
-        raise errors.UsageError(f"--pred {a.pred} holds none of the output types {list(vocab.OUTPUT_TYPES)}, "
-                                f"only {sorted(pred)[:5]}.{hint}")
+        raise ValueError(f"--pred {a.pred} holds none of the output types {list(vocab.OUTPUT_TYPES)}, "
+                         f"only {sorted(pred)[:5]}.{hint}")
     ignore_outputs(a)
     tests = unit_tests.tests.read(a.gold)
     print(json.dumps([v._asdict() for v in unit_tests.score(pred, tests)], indent=2, ensure_ascii=False))
@@ -268,24 +268,22 @@ def cmd_predict(a: argparse.Namespace) -> int:
     from omni_parse_bench import harness
 
     page = Path(a.page)
-    if not page.is_file(): raise errors.UsageError(f"--page {page}: no such file")
+    if not page.is_file(): raise ValueError(f"--page {page}: no such file")
     system = harness.system(a.system, bare(a.system, read_json(a.options, "--options")))
     if missing := system.missing_keys():
         how = " and ".join(f"export {k}=..." for k in missing)
-        raise errors.MissingCredential(f"{a.system} needs {', '.join(missing)}: {how}, then run again")
+        raise ValueError(f"{a.system} needs {', '.join(missing)}: {how}, then run again")
     wants = frozenset(a.outputs or system.SUPPORTS)
     if missing := sorted(wants - system.SUPPORTS):
-        raise errors.UsageError(f"{a.system} can't produce {', '.join(missing)}; it produces "
-                                f"{', '.join(sorted(system.SUPPORTS))}: give --outputs "
-                                f"{' '.join(sorted(system.SUPPORTS))}, or leave --outputs out")
+        raise ValueError(f"{a.system} can't produce {', '.join(missing)}; it produces "
+                         f"{', '.join(sorted(system.SUPPORTS))}: give --outputs "
+                         f"{' '.join(sorted(system.SUPPORTS))}, or leave --outputs out")
     try:
         record = adapter.predict(system, harness.Input(page, wants), timeout=a.timeout)
-    except errors.Stop:
+    except Exception as exc:
+        what = "reading the answer of" if hasattr(exc, "unread") else "predicting"
+        core_errors.noted(exc, type(system), f"{what} {page}")
         raise
-    except core_errors.Unread as exc:
-        raise core_errors.bug(f"reading the answer of {page}", exc.__cause__ or exc, type(system)) from None
-    except Exception as exc:  # noqa: BLE001 -- neither an answer nor a known failure: the adapter's bug
-        raise core_errors.bug(f"predicting {page}", exc, type(system)) from None
     if not a.raw: record.pop("raw")
     print(json.dumps(record, indent=2, ensure_ascii=False, default=str))
     return 1 if record["error"] else 0
@@ -299,8 +297,8 @@ def cmd_check(a: argparse.Namespace) -> int:
     b = benchmark.default(a.dataset, a.manifest)
     got = b.check()
     inputs = len({p.doc_path for p in b.rows()})
-    print(json.dumps({"ok": True, "manifest": a.manifest, "pages": got["rows"], "suites": got["suites"],
-                      "inputs": inputs}))
+    print(json.dumps({"ok": True, "manifest": a.manifest, "pages": got["rows"],
+                      "suites": len({p.suite for p in b.rows()}), "inputs": inputs}))
     return 0
 
 
@@ -342,10 +340,8 @@ def cmd_systems(a: argparse.Namespace) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     """Results go to stdout as JSON; progress and messages go to stderr. `run` shows its plan and asks before
     calling a system, unless given `-y` or run with no terminal; any answer but yes (Ctrl-D too) prints "not
-    run" and exits 1. A `UsageError` (what was asked is wrong) or a `Stop` (an account, a key, a dependency, a
-    model server that isn't running, or a bug in an adapter) is printed as `opb <command>: <what was wrong>`,
-    whose message ends with what to do, and exits 1; an interrupt exits 130; anything else is a bug of ours,
-    and is raised as it is.
+    run" and exits 1. An interrupt exits 130. Anything else (what was asked wrong, an account, a key, a model
+    server that isn't running, a bug) is raised as it is, a native exception whose message says what to do.
 
     Commands and flags from before 1.0 still work for now, and each prints what replaced it (`deprecated`), or
     that it is ignored (`ignored`):
@@ -391,11 +387,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     r.add_argument("--out", type=Path, default=Path("runs"),
                    help="where run folders go (default: %(default)s)")
     r.add_argument("--outputs", nargs="+", help=argparse.SUPPRESS)
-    r.add_argument("--suites", nargs="+", help="only these suites (default: every suite)")
-    r.add_argument("--limit", type=int, default=0,
-                   help="the first N pages, which may all be of one suite (default: every page)")
+    r.add_argument("--limit", type=int, default=0, help="the first N pages (default: every page)")
     r.add_argument("--sample", type=int, default=0,
-                   help="N pages spread evenly over every suite; the same N gives every system the same "
+                   help="N pages evenly spaced over the manifest; the same N gives every system the same "
                         "pages (default: every page)")
     r.add_argument("--only", type=Path, metavar="FILE",
                    help="a file of page ids, one per line: only these pages (default: every page)")
@@ -476,12 +470,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         if a.cmd == "run": one_system(a, argv)
         renamed(a)
         return cmd(a)
-    except errors.UsageError as exc:
-        print(f"opb {a.cmd}: {exc}", file=sys.stderr)
-        return 1
-    except errors.Stop as exc:
-        print(f"opb {a.cmd}: {type(exc).__name__}: {exc}", file=sys.stderr)
-        return 1
     except KeyboardInterrupt:
         print(f"opb {a.cmd}: interrupted" + ("; rerun to resume" if a.cmd == "run" else ""), file=sys.stderr)
         return 130

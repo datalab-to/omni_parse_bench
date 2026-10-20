@@ -49,14 +49,14 @@ that draws no layout blocks scores 0 on the layout family ([README](https://gith
 says how to read its results). `Benchmark.plan` refuses, before any call, a system whose key isn't set
 (`Adapter.keys`).
 
-`Benchmark.plan` takes `suites`, `limit`, `sample` and `only` (page ids) to choose pages, `timeout` (seconds
-per page), `workers` (pages at once; 0, the default, for the adapter's own) and `retry_failed`. `sample` spreads its pages over every
-suite, and `limit` takes the first ones; give one or the other. A run's folder is named for the whole
+`Benchmark.plan` takes `limit`, `sample` and `only` (page ids) to choose pages, `timeout` (seconds
+per page), `workers` (pages at once; 0, the default, for the adapter's own) and `retry_failed`. `sample` takes pages evenly
+spaced over the manifest, and `limit` takes the first ones; give one or the other. A run's folder is named for the whole
 question: the system and its options, the dataset, the manifest, the task and the pages chosen. So another question is another folder, and the same question resumes the same folder: a page
 is predicted only when its run has no record of it, and an answer is never paid for twice.
 
 A run is one system: `Benchmark.plan` and `Benchmark.run` take one adapter, and refuse a list. To compare
-systems, or settings of one system, run each with the same choice of pages (`sample`, `limit`, `suites`,
+systems, or settings of one system, run each with the same choice of pages (`sample`, `limit`,
 `only`), so every run is graded on the same pages. `Benchmark.run` grades the run once it is predicted, and
 returns the grading: `run` (the run folder's name), `cost` and `scorers`. A run that stops part way (a
 missing key, an account that can't pay, a model server that isn't running, a bug in an adapter, Ctrl-C)
@@ -79,7 +79,7 @@ opb run --system openai/gpt-5.6-sol --sample 20      # the same pages: the two r
 opb run --system tesseract --sample 5
 ```
 
-`opb run` takes `--dataset`, `--manifest`, `--out`, `--suites`, `--limit`, `--sample`, `--only` (a file of
+`opb run` takes `--dataset`, `--manifest`, `--out`, `--limit`, `--sample`, `--only` (a file of
 page ids), `--timeout`, `--workers N` (pages at once) and `--retry-failed`; `opb run --help` shows each one's default. It
 shows the plan and asks before calling a system, unless given `-y` or run with no terminal; any answer but
 yes (Ctrl-D too) prints "not run" and exits 1. It then shows a live table of the run's progress, and prints
@@ -93,8 +93,8 @@ on `opb run`, `opb grade` and `opb score`, and `--unsupported`, are accepted and
 each page asks for the outputs its tests read, and every test is graded.
 
 A run is one system, so several systems means one command per system, with the same choice of pages.
-`opb run` given several names (under `--system`, `--systems` or `--providers`) runs nothing, and prints the
-command for each system, each with its own options.
+`opb run` given several names (under `--system`, `--systems` or `--providers`) runs nothing, and raises a
+`ValueError` whose message is the command for each system, each with its own options.
 
 
 ## Score
@@ -112,9 +112,10 @@ outputs.json --gold gold/<page_id>.json` prints one page's verdicts, one per tes
 The summary holds `headline`, the mean of the families' scores, and `families`, always in the order
 text, tables, layout: each family's `score` (the share of its tests passed), `tests` and `documents` (the source documents its
 tests are from). `summarize` of a slice of test lines (one tag, one suite) is that slice's summary. In a
-benchmark, a page whose call failed counts as 0: the headline is the families' score over the scored
-pages, times the share of pages that didn't fail (`coverage`), so a run where every page failed has
-headline 0.
+benchmark's summary, the scorer's headline (with `headline_is`, "the mean of the families' scores") and
+families sit under `scored`, over the scored pages only. A page whose call failed counts as 0 in the top
+headline, `scored.headline` times the share of pages that didn't fail (`coverage`), so a run where every
+page failed has headline 0 and `scored` null.
 
 
 ## Adapters
@@ -161,8 +162,9 @@ under the entry-point group `omni_parse_bench.adapters`, pointing at its class.
 
 `harness.errors.SystemFailed` and its kinds are the core's own classes, which `reading` raises too. A
 failed call's reply goes in the error's `body`, which the record keeps as `raw`. A
-model server that refuses the connection (nothing listens at `base_url`) stops the run, saying how to
-start the server (`harness.errors.NoServer`), instead of failing every page.
+model server that refuses the connection (nothing listens at `base_url`) stops the run instead of failing
+every page: the connection error is raised as it is, with a note saying how to start the server
+(`harness.errors.no_server`).
 
 
 ## The dataset
@@ -175,8 +177,8 @@ gold/<page_id>.json     its tests: {"tests": [...]}
 ```
 
 Paths are relative to the dataset's folder and stay inside it. A gold file is named for its page,
-`<page_id>.json`, in any folder; a page file may have any name, and pages may share one. A page whose
-suite is null or empty is in the suite `"other"` (`omni_bench_core.data.NO_SUITE`), with any real suite of that name.
+`<page_id>.json`, in any folder; a page file may have any name, and pages may share one. A page's suite,
+where it comes from, is a non-empty string. It is opb's own column: omni-bench-core doesn't read it.
 
 A test is a JSON object with `id`, `test_type`, `output_type` (what the type reads), `derivation`,
 `tags`, `args` and `settings`. A test's `id` is unique across its dataset, and every page has at least
@@ -206,13 +208,13 @@ The dataset is read by `data`, and a page's tests by the scorer, `unit_tests.gol
 data.download_dataset(dataset)  # a local copy: an hf:// dataset downloaded whole; a folder as it is
 data.read_manifest(dataset, manifest="manifest.parquet")  # (folder, pages): every page of that manifest,
                                 # its file and gold as full local paths
-data.select(pages, suites=None, limit=0, sample=0, only=None)   # the pages to run (omni-bench-core's)
+data.select(pages, limit=0, sample=0, only=None)   # the pages to run (omni-bench-core's)
 unit_tests.gold(page)           # one page's tests, from its gold file (`page.gt_path`), checked
 unit_tests.check(pages)         # every page's tests, and the dataset as a whole, checked: for publishing
 ```
 
 None needs the harness; an `hf://` dataset needs the Hugging Face client (`[benchmark]`). A manifest that breaks the dataset's rules raises
-`data.ManifestError`, and a test that breaks them `unit_tests.GoldError`; each names what's wrong.
+a `ValueError`, and so does a test that breaks them; each names what's wrong and the fix.
 
 ```python
 from omni_parse_bench import data
@@ -314,11 +316,12 @@ runs/datalab-1a2b3c4d/
                                 `"unread": true` for an answer a bug in `parse` left unread
   predictions/<page_id>.json    each page's outputs alone, which is all that grading reads
   unit_tests-<digest>/          the scorer's results
-    scores.jsonl                one line per page: id, suite, status, row.document, tests, passed and
+    scores.jsonl                one line per page: id, status, row.document, tests, passed and
                                 per_family; or a failed page's error, with a traceback when the scorer
                                 said the prediction is unusable
-    summary.json                the summary: scorer, options, run, rows, failed, coverage, headline_is,
-                                headline and families, and partial when graded with --partial
+    summary.json                the summary: scorer, options, run, headline, headline_is, rows, failed,
+                                coverage, partial when graded with --partial, and scored: the headline
+                                and families over the scored pages
     details/<page_id>.jsonl     one line per test, a test line (`unit_tests.lines`): page_id, suite,
                                 document, test_id, test_type, output_type, derivation, tags, result and why
 ```

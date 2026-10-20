@@ -162,9 +162,10 @@ def test_a_refused_connection_stops_the_run(tmp_path, monkeypatch):
         raise httpx.ConnectError("refused") from ConnectionRefusedError(61, "Connection refused")
 
     monkeypatch.setitem(ANSWER, 0, refused)
-    with pytest.raises(errors.NoServer) as got:
+    with pytest.raises(httpx.ConnectError) as got:      # raised as it is, with a note saying how to start it
         core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
     assert errors.refused(got.value), "the refusal stays in the chain"
+    assert any("the connection was refused" in n for n in got.value.__notes__), got.value.__notes__
 
 
 def test_a_failure_that_is_the_accounts_stops_the_run(tmp_path, monkeypatch):
@@ -174,7 +175,7 @@ def test_a_failure_that_is_the_accounts_stops_the_run(tmp_path, monkeypatch):
         raise errors.SystemFailed("invalid key", status=401)
 
     monkeypatch.setitem(ANSWER, 0, refused)
-    with pytest.raises(errors.AccountFailure):
+    with pytest.raises(PermissionError):
         core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
 
 
@@ -189,14 +190,11 @@ def test_a_saved_answer_is_read_again_without_a_call(tmp_path):
 def test_a_parse_that_raises_a_bug_keeps_the_answer_unread(tmp_path, monkeypatch):
     """A KeyError in `parse` is a bug, not the system's failure: it isn't counted 0, and the answer is kept,
     unread, for the fixed `parse` to read."""
-    from omni_bench_core import errors as core_errors
-
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
     monkeypatch.setitem(ANSWER, 0, lambda: contract.Call({"text": "alpha"}))
-    with pytest.raises(core_errors.Unread) as got:
+    with pytest.raises(KeyError) as got:       # parse's own exception, carrying the record to save
         core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
-    r = got.value.record
-    assert isinstance(got.value.__cause__, KeyError)
+    r = got.value.unread
     assert (r["output"], r["error"], r["unread"], r["raw"][0]["raw"]) == (None, None, True, {"text": "alpha"})
 
 

@@ -15,7 +15,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from omni_parse_bench import equations, errors, normalize, vocab
+from omni_parse_bench import equations, normalize, vocab
 
 from . import runners
 
@@ -39,17 +39,6 @@ assert set(ARG_ROLES) == set(REQUIRED) == set(runners.TYPES) == set(vocab.READS)
 
 _LANGUAGE = re.compile(r"[a-z]{3}")    # ISO 639-3
 _SCRIPT = re.compile(r"[A-Z][a-z]{3}")   # ISO 15924
-
-
-class GoldError(errors.UsageError):
-    """A gold file, or a test in one, that breaks the dataset's rules.
-
-    It is raised for a test with a missing, unknown or misspelt field; an arg of a kind its role can't
-    compare; a parameter that doesn't match its type (an empty string counts as a mismatch); a max_diffs that
-    isn't fewer than its folded text's characters (it would pass on any output); LaTeX that KaTeX can't render
-    or that renders to nothing (it would fail, or pass, on any output); or a value outside the vocabulary.
-    `data` raises it too, for a manifest row that breaks the dataset's rules.
-    """
 
 
 class Test(NamedTuple):
@@ -88,24 +77,24 @@ def read(path: str | Path) -> tuple[Test, ...]:
     try:
         doc = json.loads(path.read_text())
     except FileNotFoundError:
-        raise GoldError(f"{path.stem}: no gold file at {path}") from None
+        raise ValueError(f"{path.stem}: no gold file at {path}") from None
     except IsADirectoryError:
-        raise GoldError(f"{path.stem}: {path} is a folder, not a gold file") from None
+        raise ValueError(f"{path.stem}: {path} is a folder, not a gold file") from None
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise GoldError(f"{path.stem}: its gold file {path} isn't JSON: {exc}") from None
+        raise ValueError(f"{path.stem}: its gold file {path} isn't JSON: {exc}") from None
     return parse(path.stem, doc)
 
 
 def parse(page_id: str, doc: Mapping[str, Any]) -> tuple[Test, ...]:
     """A gold file's contents as the page's tests."""
     if not isinstance(doc, dict):
-        raise GoldError(f"{page_id}: a gold file is an object, {{\"tests\": [...]}}, not a JSON "
-                        f"{type(doc).__name__}")
+        raise ValueError(f"{page_id}: a gold file is an object, {{\"tests\": [...]}}, not a JSON "
+                         f"{type(doc).__name__}")
     if unknown := set(doc) - {"tests"}:
-        raise GoldError(f"{page_id}: unknown keys {sorted(unknown)}; a gold file holds only 'tests'")
+        raise ValueError(f"{page_id}: unknown keys {sorted(unknown)}; a gold file holds only 'tests'")
     if not isinstance(doc.get("tests"), list):
-        raise GoldError(f"{page_id}: a gold file holds 'tests', the list of the page's tests: "
-                        '{"tests": [...]}')
+        raise ValueError(f"{page_id}: a gold file holds 'tests', the list of the page's tests: "
+                         '{"tests": [...]}')
     return tuple(test(page_id, t) for t in doc["tests"])
 
 
@@ -124,32 +113,32 @@ def wants(tests: Iterable[Test]) -> frozenset[str]:
 def test(page_id: str, t: Mapping[str, Any]) -> Test:
     """One test of a page's gold file, checked."""
     if not isinstance(t, dict):
-        raise GoldError(f"{page_id}: each test is an object, not {t!r:.80}")
+        raise ValueError(f"{page_id}: each test is an object, not {t!r:.80}")
     where = f"{page_id}: test {t.get('id')!r}"
     if missing := [f for f in FIELDS if f not in t]:
-        raise GoldError(f"{where} lacks {missing}")
+        raise ValueError(f"{where} lacks {missing}")
     if unknown := [f for f in t if f not in FIELDS]:
-        raise GoldError(f"{where}: unknown fields {unknown}; a test has {list(FIELDS)}")
+        raise ValueError(f"{where}: unknown fields {unknown}; a test has {list(FIELDS)}")
     if not (isinstance(t["id"], str) and t["id"].strip()):
-        raise GoldError(f"{where}: id must be a non-empty string")
+        raise ValueError(f"{where}: id must be a non-empty string")
     test_type, output_type = t["test_type"], t["output_type"]
     if test_type not in runners.TYPES:
-        raise GoldError(f"{where}: unknown test_type {test_type!r}; known: {sorted(runners.TYPES)}")
+        raise ValueError(f"{where}: unknown test_type {test_type!r}; known: {sorted(runners.TYPES)}")
     if output_type != vocab.READS[test_type]:
-        raise GoldError(f"{where}: {test_type} reads {vocab.READS[test_type]!r}, not {output_type!r}")
+        raise ValueError(f"{where}: {test_type} reads {vocab.READS[test_type]!r}, not {output_type!r}")
     if t["derivation"] not in vocab.DERIVATIONS:
-        raise GoldError(f"{where}: unknown derivation {t['derivation']!r}; known: {vocab.DERIVATIONS}")
+        raise ValueError(f"{where}: unknown derivation {t['derivation']!r}; known: {vocab.DERIVATIONS}")
     if not isinstance(t["tags"], list) or not all(isinstance(x, str) for x in t["tags"]):
-        raise GoldError(f"{where}: tags must be a list of strings, not {t['tags']!r:.80}")
+        raise ValueError(f"{where}: tags must be a list of strings, not {t['tags']!r:.80}")
     if unknown := [x for x in t["tags"] if not _tag(x)]:
-        raise GoldError(f"{where}: unknown tags {unknown}; a tag is one of {[*vocab.ROLES, *vocab.YES_NO]}, "
-                        "a language (ISO 639-3, e.g. eng) or a script (ISO 15924, e.g. Latn)")
+        raise ValueError(f"{where}: unknown tags {unknown}; a tag is one of {[*vocab.ROLES, *vocab.YES_NO]}, "
+                         "a language (ISO 639-3, e.g. eng) or a script (ISO 15924, e.g. Latn)")
     params = _params(where, test_type, t["args"], t["settings"])
     for name, hint in _hints(type(params)).items():
         if not _typed(getattr(params, name), hint):
-            raise GoldError(f"{where}: {name}={getattr(params, name)!r:.80} isn't a {hint}")
+            raise ValueError(f"{where}: {name}={getattr(params, name)!r:.80} isn't a {hint}")
     if test_type in runners.VALID and not (rule := runners.VALID[test_type])[0](params):
-        raise GoldError(f"{where}: {rule[1]}")
+        raise ValueError(f"{where}: {rule[1]}")
     return Test(t["id"], page_id, test_type, output_type, t["derivation"], tuple(t["tags"]), params)
 
 
@@ -161,26 +150,26 @@ def _tag(x: str) -> bool:
 def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
     """The runner's parameters from a test's args and settings."""
     if not isinstance(args, dict) or not isinstance(settings, dict):
-        raise GoldError(f"{where}: args and settings must be objects")
+        raise ValueError(f"{where}: args and settings must be objects")
     roles = ARG_ROLES[test_type]
     if unknown := [r for r in args if r not in roles]:
-        raise GoldError(f"{where}: {test_type} has no role {unknown}; its roles: {list(roles)}")
+        raise ValueError(f"{where}: {test_type} has no role {unknown}; its roles: {list(roles)}")
     if missing := [r for r in REQUIRED[test_type] if r not in args]:
-        raise GoldError(f"{where}: {test_type} needs args {missing}")
+        raise ValueError(f"{where}: {test_type} needs args {missing}")
     for r, v in args.items():
         if (r in LISTS) != isinstance(v, list):
-            raise GoldError(f"{where}: {r} takes {'a list of args' if r in LISTS else 'one arg'}")
+            raise ValueError(f"{where}: {r} takes {'a list of args' if r in LISTS else 'one arg'}")
         for a in v if isinstance(v, list) else [v]:
             match _kind(where, r, a):
                 case "text": _diffs(where, r, a)
                 case "latex": _renders(where, r, a)
     def text(r: str) -> str:
         if (k := _kind(where, r, args[r])) != "text":
-            raise GoldError(f"{where}: {test_type}'s {r} compares text only, not {k}")
+            raise ValueError(f"{where}: {test_type}'s {r} compares text only, not {k}")
         return args[r]["text"]
     def diffs(rs: list[str]) -> int:
         ds = {a["max_diffs"] for r in rs for a in (args[r] if isinstance(args[r], list) else [args[r]])}
-        if len(ds) != 1: raise GoldError(f"{where}: its args must share max_diffs, not {sorted(ds)}")
+        if len(ds) != 1: raise ValueError(f"{where}: its args must share max_diffs, not {sorted(ds)}")
         return ds.pop()
     try:
         match test_type:
@@ -192,20 +181,20 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
                 return runners.Order(text("before"), text("after"), diffs(["before", "after"]))
             case "repeat":
                 if diffs(["content"]) != 0:
-                    raise GoldError(f"{where}: repeat counts exact text: max_diffs must be 0")
+                    raise ValueError(f"{where}: repeat counts exact text: max_diffs must be 0")
                 if set(settings) != {"expected_count"}:
-                    raise GoldError(f"{where}: repeat's settings are exactly {{expected_count}}, how many "
-                                    f"times its content appears, not {sorted(settings)}")
+                    raise ValueError(f"{where}: repeat's settings are exactly {{expected_count}}, how many "
+                                     f"times its content appears, not {sorted(settings)}")
                 return runners.Repeat(text("content"), settings["expected_count"])
             case "layout_kind":
                 if set(settings) != {"kind"}:
-                    raise GoldError(f"{where}: layout_kind's settings are exactly {{kind}}")
+                    raise ValueError(f"{where}: layout_kind's settings are exactly {{kind}}")
                 return runners.LayoutKind(_arg(where, "content", args["content"]), settings["kind"])
             case "table_cell":
                 _no(where, settings)
                 for r in args:
                     for a in args[r] if r in LISTS else [args[r]]:
-                        if "text" not in a: raise GoldError(f"{where}: table_cell's {r} compares text only")
+                        if "text" not in a: raise ValueError(f"{where}: table_cell's {r} compares text only")
                 return runners.TableCell(
                     text("cell"), {r: text(r) for r in RELATIONS if r in args}, diffs(list(args)),
                     tuple(_frozen([a["text"] for a in args.get("headings", [])])),
@@ -214,7 +203,7 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
             case _:
                 raise AssertionError(test_type)
     except TypeError as e:
-        raise GoldError(f"{where}: {e}") from None
+        raise ValueError(f"{where}: {e}") from None
 
 
 def _arg(where: str, role: str, a: Any) -> runners.Arg:
@@ -230,8 +219,8 @@ def _kind(where: str, role: str, a: Any) -> str:
     k = next((k for k, fs in KINDS.items()
               if isinstance(a, dict) and set(fs) <= set(a) <= {*fs, *OPTIONAL.get(k, ())}), None)
     if k is None:
-        raise GoldError(f"{where}: {role}={a!r:.80} isn't an arg: the fields {{text, max_diffs[, place]}}, "
-                        f"{{number}} or {{latex}}")
+        raise ValueError(f"{where}: {role}={a!r:.80} isn't an arg: the fields {{text, max_diffs[, place]}}, "
+                         f"{{number}} or {{latex}}")
     return k
 
 
@@ -239,26 +228,26 @@ def _diffs(where: str, role: str, a: Mapping[str, Any]) -> None:
     """A text arg's max_diffs: a whole number of edits, fewer than its folded text has characters."""
     text, d = a["text"], a["max_diffs"]
     if not (isinstance(text, str) and (n := len(normalize.fold(text)))):
-        raise GoldError(f"{where}: {role}'s text must be a string with something left after folding, "
-                        f"not {text!r:.80}")
+        raise ValueError(f"{where}: {role}'s text must be a string with something left after folding, "
+                         f"not {text!r:.80}")
     # Note: at `n` edits any output holds the text, so the test would pass on anything.
     if not (isinstance(d, int) and not isinstance(d, bool) and 0 <= d < n):
-        raise GoldError(f"{where}: {role}'s max_diffs must be a whole number from 0 to {n - 1} (its folded "
-                        f"text has {n} characters), not {d!r}")
+        raise ValueError(f"{where}: {role}'s max_diffs must be a whole number from 0 to {n - 1} (its folded "
+                         f"text has {n} characters), not {d!r}")
 
 
 def _renders(where: str, role: str, a: Mapping[str, Any]) -> None:
     """A latex arg's equation: KaTeX renders it to at least one symbol."""
     tex = a["latex"]
     if not (isinstance(tex, str) and tex.strip()):
-        raise GoldError(f"{where}: {role}'s latex must be a non-empty string, not {tex!r:.80}")
+        raise ValueError(f"{where}: {role}'s latex must be a non-empty string, not {tex!r:.80}")
     # Note: a test whose LaTeX doesn't render fails on every output, and one rendering to no symbol
     # ("\\quad") passes on every output (`equations.appears`).
     if (got := equations.symbols(tex, True)) is None:
-        raise GoldError(f"{where}: {role}'s latex {tex!r:.80} doesn't render in KaTeX; fix its LaTeX")
+        raise ValueError(f"{where}: {role}'s latex {tex!r:.80} doesn't render in KaTeX; fix its LaTeX")
     if not got:
-        raise GoldError(f"{where}: {role}'s latex {tex!r:.80} renders to nothing (only spacing or "
-                        "invisible marks); give it the equation's symbols or remove the test")
+        raise ValueError(f"{where}: {role}'s latex {tex!r:.80} renders to nothing (only spacing or "
+                         "invisible marks); give it the equation's symbols or remove the test")
 
 
 def _place(where: str, role: str, place: Any) -> tuple[tuple[float, float, float, float], ...]:
@@ -267,13 +256,13 @@ def _place(where: str, role: str, place: Any) -> tuple[tuple[float, float, float
             isinstance(b, list) and len(b) == 4
             and all(isinstance(x, (int, float)) and 0 <= x <= 1 for x in b)
             and b[0] < b[2] and b[1] < b[3] for b in place):
-        raise GoldError(f"{where}: {role}'s place must be a list of [x0, y0, x1, y1] boxes from 0 to 1, "
-                        f"not {place!r:.80}")
+        raise ValueError(f"{where}: {role}'s place must be a list of [x0, y0, x1, y1] boxes from 0 to 1, "
+                         f"not {place!r:.80}")
     return tuple(tuple(float(x) for x in b) for b in place)
 
 
 def _no(where: str, settings: Mapping[str, Any]) -> None:
-    if settings: raise GoldError(f"{where}: no settings expected, got {sorted(settings)}")
+    if settings: raise ValueError(f"{where}: no settings expected, got {sorted(settings)}")
 
 
 @functools.cache

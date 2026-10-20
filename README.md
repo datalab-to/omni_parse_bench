@@ -84,7 +84,8 @@ manifest and the pages chosen. Asking another question uses another folder; aski
 resumes the same folder and pays for no page twice. So each setting of a system is its own run.
 
 A run is one system, so to compare systems, or settings of one system, run one command per system, with
-the same choice of pages (`opb run` given several systems runs nothing, and prints these commands):
+the same choice of pages (`opb run` given several systems runs nothing, and raises a `ValueError` whose
+message is these commands):
 
 ```bash
 export OPENROUTER_API_KEY=...
@@ -94,10 +95,10 @@ opb run --system openai/gpt-5.6-sol --out runs/ --sample 5 -y
 
 Choosing pages:
 
-- `--sample N`: N pages spread evenly over every suite; two systems run with the same N get the same pages;
-- `--limit N`: the first N pages, which may all be of one suite;
-- `--suites a b`: only these suites; and
-- `--only FILE`: only the page ids in a file, one per line.
+- `--sample N`: N pages evenly spaced over the manifest; two systems run with the same N get the same pages;
+- `--limit N`: the first N pages; and
+- `--only FILE`: only the page ids in a file, one per line. To run one suite, list its pages (`opb tests`
+  gives each test's page and suite).
 
 `--dataset` picks the dataset: a folder, or `hf://datasets/<repo>[@revision]` (ours by default). Each
 page asks a system for the outputs its tests read, limited to those the system can produce; a system that
@@ -121,8 +122,10 @@ page counts, and what to do. In short:
 - a bug in an adapter or in the scorer stops the run with its traceback. When it is in reading an
   answer, the answer is kept, unread (`"unread": true` in its record), and running the same command again
   after the fix reads it with no call;
-- a failure of the setup (a key, an account, a server) stops the run with nothing recorded for that
-  page, so the same command resumes it;
+- a failure of the setup stops the run with nothing recorded for that page, so the same command resumes
+  it. Each is a native exception: a missing key is a `ValueError`, an account that can't pay a
+  `PermissionError`, and a model server that isn't running the connection error itself, with a note saying
+  how to start it;
 - after a fix to an adapter that read answers wrongly without raising, `opb reread RUN_DIR` reads the
   saved answers again with no call, and `opb grade RUN_DIR` grades the run again; and
 - a run that stopped part way isn't graded until it is finished.
@@ -156,7 +159,7 @@ if __name__ == "__main__":
 `b.run(system, ...)` takes one system, and returns its grading, whose `run` is the run folder's name. With
 the adapter class itself, it is `b.run(Datalab(mode="accurate"), out="runs", sample=5)` (`from
 omni_parse_bench.harness.providers.datalab import Datalab`). To compare systems, call it once per system
-with the same `sample` (or `limit`, `suites`, `only`).
+with the same `sample` (or `limit`, `only`).
 
 Every Python snippet that runs a benchmark here sits under `if __name__ == "__main__":`. A scorer or an
 executor that works in several processes starts each one by importing your script again (on macOS and
@@ -190,21 +193,26 @@ summary looks like this:
   "scorer": "unit_tests",
   "options": {},
   "run": "datalab-1a2b3c4d",
+  "headline": 0.648,
+  "headline_is": "scored.headline × coverage",
   "rows": 5,
-  "failed": 0,
-  "coverage": 1.0,
-  "headline_is": "the mean of the families' scores × coverage",
-  "headline": 0.81,
-  "families": {
-    "text": {"score": 0.9, "tests": 120, "documents": 5},
-    "tables": {"score": 0.74, "tests": 40, "documents": 2},
-    "layout": {"score": 0.79, "tests": 30, "documents": 5}
+  "failed": 1,
+  "coverage": 0.8,
+  "scored": {
+    "headline": 0.81,
+    "headline_is": "the mean of the families' scores",
+    "families": {
+      "text": {"score": 0.9, "tests": 96, "documents": 4},
+      "tables": {"score": 0.74, "tests": 32, "documents": 2},
+      "layout": {"score": 0.79, "tests": 24, "documents": 4}
+    }
   }
 }
 ```
 
-`coverage` is the share of pages that didn't fail; a page that failed counts as 0, so the headline is the
-mean of the families' scores times coverage. The families are always in this order.
+`coverage` is the share of pages that didn't fail. Everything under `scored` is over the pages that didn't
+fail: the families, and their mean, `scored.headline`. The headline at the top is that mean times
+coverage, so a page that failed counts as 0. The families are always in this order.
 
 How to read a system that produces html only (such as `tesseract`, `nanonets-ocr` and `olmocr`): the
 families map onto outputs (html: text and tables; blocks: layout). Such a system is never asked for

@@ -74,9 +74,9 @@ class PageAdapter(adapter.Adapter[Input]):
 
     `keys` (the core's) names the environment variables the system needs, checked before any call. `ENV`
     says, in words, what else the environment can hold for it, such as an optional bearer token. A refused
-    connection (nothing listens at the address) stops the run (`errors.NoServer`) rather than failing every
-    page. `SERVE` names the system's folder in providers/serve/ when it is a model you serve yourself, so the
-    message says how to start its server.
+    connection (nothing listens at the address) stops the run, with a note (`errors.no_server`), rather than
+    failing every page. `SERVE` names the system's folder in providers/serve/ when it is a model you serve
+    yourself, so the message says how to start its server.
 
     The core's one rule decides what an exception does: a page counts 0 only when the adapter says, on
     purpose, that the system failed, by raising `errors.SystemFailed`; any other exception is a bug in the
@@ -132,12 +132,14 @@ class PageAdapter(adapter.Adapter[Input]):
         for r in self.requests(wants):
             try:
                 got = _send(self, x.page, r, clock.remaining())
-            except errors.NoServer as exc:
-                raise errors.NoServer(getattr(self, "base_url", exc.url), self.provider, self.SERVE) from exc
             except errors.SystemFailed as exc:
                 exc.sent = [*(a["sent"] for a in answers), r.sent]
                 paid = [exc.cost] if isinstance(exc.cost, adapter.Cost) else []
                 exc.cost = adapter.Cost.total([*costs, *paid])
+                raise
+            except Exception as exc:
+                if errors.refused(exc):
+                    errors.no_server(exc, getattr(self, "base_url", "its address"), self.provider, self.SERVE)
                 raise
             answers.append({"outputs": sorted(r.outputs), "sent": r.sent, "raw": got.raw,
                             "job_id": got.job_id})
@@ -173,11 +175,11 @@ def _send(a: PageAdapter, page: Path, r: contract.Request, timeout: float) -> co
     Nothing else is caught. An answer the system sent that can't be read is the system's failure only where
     the adapter reads it inside `omni_bench_core.adapter.reading`; any other exception is a bug in the
     adapter, so it stops the run instead of passing as one page's failure. A refused connection is
-    `errors.NoServer`, which stops the run: nothing listens at the address, for any page."""
+    raised as it is, which stops the run: nothing listens at the address, for any page."""
     try:
         return a.send(page, r, timeout=timeout)
     except httpx.TransportError as exc:
-        if errors.refused(exc): raise errors.NoServer(getattr(a, "base_url", "its address")) from exc
+        if errors.refused(exc): raise
         raise errors.transport(exc, "the request failed") from exc
     except httpx.HTTPStatusError as exc:
         status, body = exc.response.status_code, exc.response.text

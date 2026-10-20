@@ -291,8 +291,8 @@ def key(base_url: str) -> str:
     if base_url != DEFAULT_BASE_URL:
         return os.environ.get("OPB_ENDPOINT_KEY", "EMPTY")
     if not (got := os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY")):
-        raise errors.MissingCredential("an OpenRouter model needs OPENROUTER_API_KEY, which is not set: "
-                                       "export OPENROUTER_API_KEY=... (or OPENAI_API_KEY=...), then rerun")
+        raise ValueError("an OpenRouter model needs OPENROUTER_API_KEY, which is not set: "
+                         "export OPENROUTER_API_KEY=... (or OPENAI_API_KEY=...), then rerun")
     return got
 
 
@@ -311,7 +311,7 @@ def chat(base_url: str, body: dict, deadline: budget.Budget, spent: Sequence[con
         raise errors.SystemFailed(f"HTTP {exc.status_code}: {str(exc)}", status=exc.status_code,
                                  body=str(exc.body), cost=contract.Cost.total(list(spent))) from exc
     except openai.APIConnectionError as exc:
-        if errors.refused(exc): raise errors.NoServer(base_url) from exc
+        if errors.refused(exc): raise
         raise errors.SystemUnreachable(f"connection failed: {exc}",
                                        cost=contract.Cost.total(list(spent))) from exc
 

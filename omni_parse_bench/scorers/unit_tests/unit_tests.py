@@ -42,7 +42,6 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     type, suite or derivation) is `summarize` of a slice of them."""
 
     name: ClassVar[str] = "unit_tests"
-    headline_field: ClassVar[str] = HEADLINE
 
     def gold(self, row: data.Page) -> tuple[_tests.Test, ...]:
         """The page's tests."""
@@ -84,9 +83,10 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
         return {"document": row.document}
 
     def summarize(self, lines: Sequence[Line]) -> dict[str, Any]:
-        """The headline and `families`, over every scored page's counts."""
-        return _summary((f, x["row"]["document"], c["passed"], c["tests"])
-                        for x in scorer.scored(lines) for f, c in x["per_family"].items())
+        """The headline and `families`, over the scored pages' counts (the core gives only those)."""
+        s = _summary((f, x["row"]["document"], c["passed"], c["tests"])
+                     for x in lines for f, c in x["per_family"].items())
+        return {"headline": s["headline"], "headline_is": HEADLINE, "families": s["families"]}
 
     def check_gold(self, rows: Sequence[data.Page]) -> None:
         """Every page's tests read and checked (`check`), before any call."""
@@ -98,12 +98,12 @@ def gold(page: data.Page) -> tuple[_tests.Test, ...]:
     disagree with what its tests read."""
     ts = _tests.read(page.gt_path)
     if not ts:
-        raise _tests.GoldError(f"page {page.page_id!r}: its gold {page.gt_path} has no tests; give it tests, "
-                              "or drop the page from the manifest")
+        raise ValueError(f"page {page.page_id!r}: its gold {page.gt_path} has no tests; give it tests, "
+                        "or drop the page from the manifest")
     if frozenset(page.outputs) != _tests.wants(ts):
-        raise _tests.GoldError(f"page {page.page_id!r}: the manifest says it is asked for "
-                              f"{list(page.outputs)}, but its tests read {sorted(_tests.wants(ts))}; the "
-                              "manifest is out of step with the gold")
+        raise ValueError(f"page {page.page_id!r}: the manifest says it is asked for "
+                        f"{list(page.outputs)}, but its tests read {sorted(_tests.wants(ts))}; the "
+                        "manifest is out of step with the gold")
     return ts
 
 
@@ -117,12 +117,12 @@ def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
     stray."""
     every = tuple(t for p in pages for t in gold(p))
     if twice := [i for i, n in collections.Counter(t.id for t in every).items() if n > 1]:
-        raise _tests.GoldError(f"test ids used more than once, across the dataset: "
-                               f"{errors.counted(len(twice), 'id')}, e.g. {twice[:3]}; each test's id is "
-                               "unique in its dataset")
+        raise ValueError(f"test ids used more than once, across the dataset: "
+                         f"{errors.counted(len(twice), 'id')}, e.g. {twice[:3]}; each test's id is "
+                         "unique in its dataset")
     if empty := sorted({p.page_id for p in pages} - {t.page_id for t in every}):
-        raise _tests.GoldError(f"pages with no tests: {errors.counted(len(empty), 'page')}, e.g. "
-                               f"{empty[:3]}; remove them or give them tests")
+        raise ValueError(f"pages with no tests: {errors.counted(len(empty), 'page')}, e.g. "
+                         f"{empty[:3]}; remove them or give them tests")
     return every
 
 

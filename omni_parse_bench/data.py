@@ -12,16 +12,12 @@ from typing import Any
 
 from omni_bench_core import data as core
 
-from omni_parse_bench import errors, vocab
+from omni_parse_bench import vocab
 
 DEFAULT_DATASET = "hf://datasets/datalab-to/omni_parse_bench"
 MANIFEST = core.MANIFEST
-COLUMNS = ("document", "outputs")       # what opb's rows hold besides the core's
+COLUMNS = ("document", "suite", "outputs")       # what opb's rows hold besides the core's
 OUTPUTS = frozenset(vocab.READS.values())     # the output types a test can read: html, blocks
-
-
-class ManifestError(errors.UsageError):
-    """A manifest, or a row of one, that breaks the dataset's rules. The message names it and the fix."""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -57,10 +53,11 @@ def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, 
         pages/...              the page files that get sent: one-page PDFs, or .png for image pages
         gold/<page_id>.json    each page's tests: {"tests": [...]}, read by the scorer (`scorers.unit_tests`)
 
-    Downloading, and the checks every benchmark shares (ids, suites, paths inside the dataset, the gold named
-    `<page_id>.json`), are the core's. opb adds three checks:
+    Downloading, and the checks every benchmark shares (ids, paths inside the dataset, the gold named
+    `<page_id>.json`), are the core's. opb adds four checks:
 
     - a page names its source `document`, a non-empty string;
+    - its `suite`, where its pages come from, is a non-empty string;
     - its file is a .pdf or a .png; and
     - its `outputs` are the output types its tests read, a non-empty list of distinct names.
 
@@ -75,14 +72,16 @@ def page(r: dict[str, Any]) -> Page:
     """One row the core has read and checked, with opb's own checks."""
     where = f"page {r['page_id']!r}"
     if not (isinstance(r["document"], str) and r["document"].strip()):
-        raise ManifestError(f"{where}: document must be a non-empty string, not {r['document']!r}")
+        raise ValueError(f"{where}: document must be a non-empty string, not {r['document']!r}")
+    if not (isinstance(r["suite"], str) and r["suite"].strip()):
+        raise ValueError(f"{where}: suite must be a non-empty string, not {r['suite']!r}")
     if r["doc_path"].suffix not in (".pdf", ".png"):
-        raise ManifestError(f"{where}: doc_path must be a .pdf or .png, not {r['doc_path'].name}")
+        raise ValueError(f"{where}: doc_path must be a .pdf or .png, not {r['doc_path'].name}")
     outputs = r["outputs"]
     if (not isinstance(outputs, list | tuple) or not outputs or not set(outputs) <= OUTPUTS
             or len(set(outputs)) != len(outputs)):
-        raise ManifestError(f"{where}: outputs must be a non-empty list of distinct output types from "
-                            f"{sorted(OUTPUTS)}, not {outputs!r}")
+        raise ValueError(f"{where}: outputs must be a non-empty list of distinct output types from "
+                         f"{sorted(OUTPUTS)}, not {outputs!r}")
     return Page(r["page_id"], r["document"], r["suite"], r["doc_path"], r["gt_path"], tuple(sorted(outputs)),
                 r["extra"])
 

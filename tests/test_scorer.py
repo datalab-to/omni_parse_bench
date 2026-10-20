@@ -77,7 +77,11 @@ def test_a_pages_line_holds_its_counts_and_its_details_every_verdict():
 
 
 def test_unit_tests_names_its_headline():
-    assert scorer.UnitTests.headline_field == "the mean of the families' scores"
+    line = {"id": "p", "row": {"document": "d"}, "tests": 1, "passed": 1,
+            "per_family": {"text": {"tests": 1, "passed": 1}}}
+    assert scorer.UnitTests().summarize([line]) == {
+        "headline": 1.0, "headline_is": "the mean of the families' scores",
+        "families": {"text": {"score": 1.0, "tests": 1, "documents": 1}}}
 
 
 def test_the_families_come_in_a_fixed_order_whatever_the_order_met():

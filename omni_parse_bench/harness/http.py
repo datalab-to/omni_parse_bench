@@ -52,7 +52,7 @@ def post(url: str, body: dict, deadline: budget.Budget, key: str | None = None) 
     except httpx.TimeoutException as exc:
         raise errors.SystemTimeout(f"no answer within {deadline.total:g} s") from exc
     except httpx.TransportError as exc:
-        if errors.refused(exc): raise errors.NoServer(url) from exc
+        if errors.refused(exc): raise
         raise errors.transport(exc, "connection failed") from exc
     if r.status_code != 200:
         raise errors.SystemFailed(f"HTTP {r.status_code}: {r.text}", status=r.status_code, body=r.text)

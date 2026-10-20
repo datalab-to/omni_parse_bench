@@ -25,6 +25,13 @@ from omni_parse_bench import benchmark, cli, harness  # noqa: E402
 from omni_parse_bench.harness import contract  # noqa: E402
 from omni_parse_bench.harness import errors as harness_errors  # noqa: E402
 
+
+def raised(argv: list[str], kind: type[BaseException] = ValueError) -> str:
+    """What `opb argv` raised, as it is: the exception's message, then its notes."""
+    with pytest.raises(kind) as got:
+        cli.main(argv)
+    return "\n".join([str(got.value), *getattr(got.value, "__notes__", [])])
+
 CALLS: list[str] = []
 WANTS: list[frozenset[str]] = []   # what each `requests` was given
 BROKEN: set[str] = set()           # pages whose answer `parse` crashes on: a bug in `parse`
@@ -81,10 +88,10 @@ def test_an_html_only_system_is_predicted_graded_and_resumed(tmp_path):
     name = (g := b.run(Alpha(), tmp_path / "runs"))["run"]
     assert sorted(CALLS) == ["a-p0", "a-p1", "a-p2"]
     [s] = g["scorers"].values()
-    assert s["families"] == {"text": {"score": 1.0, "tests": 3, "documents": 3},
+    assert s["scored"]["families"] == {"text": {"score": 1.0, "tests": 3, "documents": 3},
                              "layout": {"score": 0.0, "tests": 3, "documents": 3}}, s
     assert (s["headline"], s["coverage"], s["failed"]) == (0.5, 1.0, 0), "no blocks: layout 0, not a failure"
-    assert s["headline_is"] == "the mean of the families' scores × coverage" and "partial" not in s
+    assert s["scored"]["headline_is"] == "the mean of the families' scores" and "partial" not in s
     assert g["cost"]["usd"] == 0.03
     CALLS.clear()
     b.run(Alpha(), tmp_path / "runs")
@@ -105,7 +112,7 @@ def test_a_page_wanting_nothing_the_system_supports_is_not_sent_and_fails_its_te
     assert (rec["output"], rec["error"], rec["cost"]["usd"]) == ({}, None, None), rec
     [s] = g["scorers"].values()
     assert (s["coverage"], s["failed"], s["rows"]) == (1.0, 0, 3), "not a failed page: coverage stays 1"
-    assert s["families"]["layout"] == {"score": 0.0, "tests": 3, "documents": 3}, s
+    assert s["scored"]["families"]["layout"] == {"score": 0.0, "tests": 3, "documents": 3}, s
 
 
 def test_details_lines_are_test_lines_that_summarize_reads(tmp_path):
@@ -119,7 +126,7 @@ def test_details_lines_are_test_lines_that_summarize_reads(tmp_path):
                                                                           for i in range(3)}
     [s] = g["scorers"].values()
     got = unit_tests.summarize(lines)
-    assert (got["headline"], got["families"]) == (s["headline"], s["families"])
+    assert (got["headline"], got["families"]) == (s["scored"]["headline"], s["scored"]["families"])
     assert list(got["families"]) == ["text", "layout"]
 
 
@@ -137,8 +144,7 @@ def test_an_unfinished_run_is_refused_unless_graded_partial(tmp_path, capsys):
     name = benchmark.default(data).run(Alpha(), tmp_path / "runs")["run"]
     run = tmp_path / "runs" / name
     for d in ("records", "predictions"): (run / d / "a-p2.json").unlink()
-    assert cli.main(["grade", str(run)]) == 1
-    err = capsys.readouterr().err
+    err = raised(["grade", str(run)])
     assert "isn't finished" in err and "a-p2" in err and "--partial" in err, err
     assert cli.main(["grade", str(run), "--partial"]) == 0
     [s] = json.loads(capsys.readouterr().out)["scorers"].values()
@@ -151,8 +157,7 @@ def test_opb_grade_grades_a_folder_of_your_own(tmp_path, capsys):
     mine = tmp_path / "mine"
     (mine / "predictions").mkdir(parents=True)
     (mine / "predictions" / "a-p0.json").write_text(json.dumps({"html": "<p>alpha</p>"}))
-    assert cli.main(["grade", str(mine), "--dataset", data]) == 1
-    assert "a-p1" in capsys.readouterr().err, "a missing prediction is refused"
+    assert "a-p1" in raised(["grade", str(mine), "--dataset", data]), "a missing prediction is refused"
     assert cli.main(["grade", str(mine), "--dataset", data, "--partial"]) == 0
     [s] = json.loads(capsys.readouterr().out)["scorers"].values()
     assert (s["rows"], s["failed"], s["headline"]) == (2, 1, 0.25), s
@@ -168,13 +173,14 @@ def test_outputs_is_accepted_with_a_warning_and_ignored(tmp_path, capsys, monkey
     assert "opb: --outputs is deprecated and ignored: each page asks for the outputs its tests read" in err
     g = json.loads(out)
     [s] = g["scorers"].values()
-    assert set(s["families"]) == {"text", "layout"} and s["options"] == {}, s
+    assert set(s["scored"]["families"]) == {"text", "layout"} and s["options"] == {}, s
     [run] = (tmp_path / "runs").iterdir()
     for argv in (["grade", str(run), "--outputs", "blocks"], ["grade", str(run), "--unsupported", "blocks"]):
         assert cli.main(argv) == 0
         out, err = capsys.readouterr()
         [again] = json.loads(out)["scorers"].values()
-        assert "is deprecated and ignored" in err and again["families"] == s["families"], (again, err)
+        assert "is deprecated and ignored" in err, err
+        assert again["scored"]["families"] == s["scored"]["families"], again
     pred, gold = tmp_path / "pred.json", tmp_path / "data" / "gold" / "a-p0.json"
     pred.write_text(json.dumps({"html": "<p>alpha</p>"}))
     assert cli.main(["score", "--pred", str(pred), "--gold", str(gold), "--outputs", "html"]) == 0
@@ -205,12 +211,11 @@ def test_a_missing_key_is_refused_before_any_call_and_any_folder(tmp_path, capsy
     CALLS.clear()
     argv = ["run", "--system", "keyed", "--dataset", dataset(tmp_path / "data"), "--out",
             str(tmp_path / "runs"), "-y"]
-    assert cli.main(argv) == 1
-    assert "export OPB_TEST_KEY=..." in capsys.readouterr().err
+    assert "export OPB_TEST_KEY=..." in raised(argv)
     assert CALLS == [] and not (tmp_path / "runs").exists()
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
-    assert cli.main(["predict", "--system", "keyed", "--page", str(pdf)]) == 1
-    assert "export OPB_TEST_KEY=..." in capsys.readouterr().err and CALLS == []
+    err = raised(["predict", "--system", "keyed", "--page", str(pdf)])
+    assert "export OPB_TEST_KEY=..." in err and CALLS == [], err
 
 
 @dataclasses.dataclass(frozen=True)
@@ -234,10 +239,8 @@ def test_a_server_that_isnt_running_stops_the_run_with_nothing_recorded(tmp_path
     monkeypatch.setitem(harness.ADAPTERS, "served", Served)
     argv = ["run", "--system", "served", "--options", json.dumps({"base_url": url}), "--dataset",
             dataset(tmp_path / "data"), "--out", str(tmp_path / "runs"), "-y"]
-    assert cli.main(argv) == 1
-    out, err = capsys.readouterr()
-    assert f"no server at {url}" in err and "providers/serve/chandra" in err and out == "", (out, err)
-    assert err.rstrip().endswith("then run the same command again") and "rerun" not in err, err
+    err = raised(argv, Exception)     # the connection error itself (httpx.ConnectError), with notes
+    assert f"no server at {url}" in err and "providers/serve/chandra" in err, err
     [run] = (tmp_path / "runs").iterdir()
     assert list((run / "records").iterdir()) == []
 
@@ -283,8 +286,7 @@ def test_opb_check_says_a_dataset_is_runnable_or_names_a_missing_page(tmp_path, 
     assert json.loads(capsys.readouterr().out) == {"ok": True, "manifest": "manifest.parquet", "pages": 3,
                                                    "suites": 1, "inputs": 3}
     (tmp_path / "data" / "pages" / "a-p1.pdf").unlink()
-    assert cli.main(["check", "--dataset", data]) == 1
-    assert "a-p1" in capsys.readouterr().err
+    assert "a-p1" in raised(["check", "--dataset", data])
 
 
 def test_opb_tests_writes_every_test_with_its_page(tmp_path, capsys):
@@ -347,7 +349,7 @@ def test_old_commands_still_work_and_say_what_replaced_them(tmp_path, capsys, mo
     assert cli.main(["reparse", str(folder)]) == 0
     assert CALLS == [] and "`opb reparse` is deprecated and will be removed in a later release; use `opb " \
         "reread`" in capsys.readouterr().err
-    assert cli.main(["reparse", str(folder), "--add", "blocks"]) == 1
+    raised(["reparse", str(folder), "--add", "blocks"])
     capsys.readouterr()
 
     (tmp_path / "ids.txt").write_text("a-p0\n")
@@ -388,12 +390,11 @@ def test_opb_reread_reads_a_runs_saved_answers_again(tmp_path, capsys, monkeypat
     [s] = json.loads(capsys.readouterr().out)["scorers"].values()
     assert (s["failed"], s["coverage"], s["headline"]) == (0, 1.0, 0.5), s
     BROKEN.add("a-p0")
-    assert cli.main(["reread", str(run)]) == 1
-    err = capsys.readouterr().err
-    assert "Bug: Alpha raised KeyError while reading the answer of a-p0" in err and "Traceback" in err, err
+    with pytest.raises(KeyError) as got:
+        cli.main(["reread", str(run)])
+    assert got.value.__notes__ == ["Alpha raised this while reading the answer of a-p0"], got.value.__notes__
     BROKEN.clear()
-    assert cli.main(["reread", str(tmp_path / "data")]) == 1
-    assert "no predictions/ folder" in capsys.readouterr().err
+    assert "no predictions/ folder" in raised(["reread", str(tmp_path / "data")])
 
 
 def test_a_bug_in_parse_stops_the_run_and_the_same_command_reads_it_again(tmp_path, capsys, monkeypatch):
@@ -404,9 +405,9 @@ def test_a_bug_in_parse_stops_the_run_and_the_same_command_reads_it_again(tmp_pa
     argv = ["run", "--system", "alpha", "--dataset", dataset(tmp_path / "data", 1), "--out",
             str(tmp_path / "runs"), "-y"]
     CALLS.clear()
-    assert cli.main(argv) == 1
-    err = capsys.readouterr().err
-    assert "Bug: Alpha raised KeyError while reading the answer of a-p0" in err and "Traceback" in err, err
+    with pytest.raises(KeyError) as got:
+        cli.main(argv)
+    assert "Alpha raised this while reading the answer of a-p0" in got.value.__notes__[0], got.value.__notes__
     [run] = (tmp_path / "runs").iterdir()
     rec = json.loads((run / "records" / "a-p0.json").read_text())
     assert (rec["unread"], rec["error"], rec["output"]) == (True, None, None)
@@ -420,8 +421,10 @@ def test_a_bug_in_parse_stops_the_run_and_the_same_command_reads_it_again(tmp_pa
     assert "unread" not in json.loads((run / "records" / "a-p0.json").read_text())
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
     BROKEN.add("p")
-    assert cli.main(["predict", "--system", "alpha", "--page", str(pdf)]) == 1
-    assert f"Bug: Alpha raised KeyError while reading the answer of {pdf}" in capsys.readouterr().err
+    with pytest.raises(KeyError) as got:
+        cli.main(["predict", "--system", "alpha", "--page", str(pdf)])
+    notes = got.value.__notes__
+    assert notes == [f"Alpha raised this while reading the answer of {pdf}"], notes
 
 
 def test_a_parse_raising_system_failed_counts_the_page_0_as_unreadable(tmp_path, monkeypatch):
@@ -440,7 +443,6 @@ def test_a_parse_raising_system_failed_counts_the_page_0_as_unreadable(tmp_path,
 
 def test_an_unexpected_exception_in_prediction_stops_grading(tmp_path, monkeypatch):
     """`UnitTests.prediction` raising anything but `SystemFailed` is a bug in the scorer, not a page at 0."""
-    from omni_bench_core import errors as core_errors
 
     from omni_parse_bench.scorers import unit_tests
 
@@ -451,8 +453,9 @@ def test_an_unexpected_exception_in_prediction_stops_grading(tmp_path, monkeypat
         raise KeyError("html")
 
     monkeypatch.setattr(unit_tests.UnitTests, "prediction", prediction)
-    with pytest.raises(core_errors.Bug, match="UnitTests raised KeyError while reading the prediction"):
+    with pytest.raises(KeyError) as got:
         b.grade(tmp_path / "runs" / name)
+    assert "UnitTests raised this while reading the prediction" in got.value.__notes__[0], got.value.__notes__
 
 
 def test_a_prediction_that_isnt_an_object_counts_0_with_its_traceback(tmp_path):
@@ -497,12 +500,12 @@ class Crashes(Alpha):
         raise ZeroDivisionError("oops")
 
 
-def test_opb_predict_says_whose_bug_a_crash_is(tmp_path, capsys, monkeypatch):
+def test_opb_predict_raises_a_crash_as_it_is(tmp_path, capsys, monkeypatch):
     monkeypatch.setitem(harness.ADAPTERS, "crashes", Crashes)
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
-    assert cli.main(["predict", "--system", "crashes", "--page", str(pdf)]) == 1
-    err = capsys.readouterr().err
-    assert "Bug: Crashes raised ZeroDivisionError while predicting" in err and "this is a bug in" in err, err
+    with pytest.raises(ZeroDivisionError) as got:
+        cli.main(["predict", "--system", "crashes", "--page", str(pdf)])
+    assert got.value.__notes__[0].startswith("Crashes raised this while predicting"), got.value.__notes__
 
 
 @pytest.mark.parametrize("flag", ["--system", "--systems", "--providers"])
@@ -515,14 +518,13 @@ def test_several_systems_are_refused_with_one_command_each(tmp_path, capsys, mon
     out_dir = tmp_path / "runs"
     argv = ["run", flag, "alpha", "tagged", "--sample", "5", "--out", str(out_dir), "--options",
             json.dumps({"tagged": {"tag": "y z"}}), "-y"]
-    assert cli.main(argv) == 1
-    out, err = capsys.readouterr()
+    err = raised(argv)
     assert err == (
-        "opb run: a run is one system, but 2 were given (alpha, tagged). Run one command per system:\n"
+        "a run is one system, but 2 were given (alpha, tagged). Run one command per system:\n"
         f"    opb run --system alpha --sample 5 --out {out_dir} -y\n"
         f"    opb run --system tagged --options '{{\"tag\": \"y z\"}}' --sample 5 --out {out_dir} -y\n"
-        "Use the same --sample (or --limit, --only, --suites) in each, so they answer the same rows.\n"), err
-    assert out == "" and CALLS == [] and not out_dir.exists()
+        "Use the same --sample (or --limit, --only) in each, so they answer the same rows."), err
+    assert capsys.readouterr().out == "" and CALLS == [] and not out_dir.exists()
 
 
 @pytest.mark.parametrize("flag", ["--systems", "--providers"])
@@ -555,8 +557,8 @@ def test_opb_run_takes_one_system_and_its_bare_options(tmp_path, capsys, monkeyp
     assert cli.main([*argv, "--options", '{"tagged": {"tag": "y"}}']) == 0
     assert json.loads(capsys.readouterr().out)["run"] == g["run"], "the keyed shape is the same run"
     monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
-    assert cli.main([*argv, "--options", '{"alpha": {}}']) == 1
-    assert "--options is keyed by alpha, but this command runs tagged" in capsys.readouterr().err
+    err = raised([*argv, "--options", '{"alpha": {}}'])
+    assert "--options is keyed by alpha, but this command runs tagged" in err, err
 
 
 def test_opb_run_workers_is_one_number(tmp_path, capsys, monkeypatch):

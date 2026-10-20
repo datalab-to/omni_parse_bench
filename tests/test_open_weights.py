@@ -234,9 +234,11 @@ def test_a_server_that_refuses_the_connection_stops_the_run(provider, tmp_path):
 
     Image.new("RGB", (64, 64), "white").save(pdf := tmp_path / "p.png")
     api = harness.system(provider, {"base_url": f"http://127.0.0.1:{port}"})
-    with pytest.raises(errors.NoServer, match=rf"no server at http://127.0.0.1:{port}") as e:
+    with pytest.raises(Exception) as e:      # the connection error itself, with a note saying how to start it
         core.predict(api, harness.Input(pdf, frozenset({"html"})))
-    assert f"providers/serve/{api.SERVE}" in str(e.value) and provider in str(e.value)
+    note = "\n".join(getattr(e.value, "__notes__", []))
+    assert f"no server at http://127.0.0.1:{port}" in note and f"providers/serve/{api.SERVE}" in note, note
+    assert provider in note, note
 
 
 def test_every_served_model_says_where_its_server_is():

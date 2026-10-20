@@ -14,7 +14,7 @@ def present(tags: list[str]) -> dict:
 def test_a_tag_is_a_vocabulary_tag_a_language_or_a_script():
     assert gold.test("p", present(["table", "eng", "Latn"])).tags == ("table", "eng", "Latn")
     for bad in ("english", "none", "language", "LATN"):
-        with pytest.raises(gold.GoldError, match="unknown tags"):
+        with pytest.raises(ValueError, match="unknown tags"):
             gold.test("p", present([bad]))
 
 
@@ -43,7 +43,7 @@ def with_args(args: dict, test_type: str = "present", settings: dict | None = No
     with_args({"content": {"text": "abc", "max_diffs": 0}}, id=" "),
 ])
 def test_a_bad_arg_or_setting_is_refused(t):
-    with pytest.raises(gold.GoldError):
+    with pytest.raises(ValueError):
         gold.test("p", t)
 
 
@@ -60,6 +60,6 @@ def test_max_diffs_may_be_one_less_than_the_folded_text():
     (r"\, \;", "renders to nothing"),
 ])
 def test_latex_must_render_to_something(latex, why):
-    with pytest.raises(gold.GoldError, match=why) as e:
+    with pytest.raises(ValueError, match=why) as e:
         gold.test("p", with_args({"content": {"latex": latex}}))
     assert "test 't'" in str(e.value) and repr(latex)[:20] in str(e.value)
