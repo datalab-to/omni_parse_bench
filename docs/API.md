@@ -84,18 +84,17 @@ page ids), `--timeout`, `--workers N` (pages at once) and `--retry-failed`; `opb
 shows the plan and asks before calling a system, unless given `-y` or run with no terminal; any answer but
 yes (Ctrl-D too) prints "not run" and exits 1. It then shows a live table of the run's progress, and prints
 its grading as JSON. `--options` is the system's options, as for `opb predict`; `{"datalab": {...}}`, keyed
-by the one system's name, is taken too. `opb --version` prints the version.
+by the one system's name, is taken too, and an object keyed by other systems is refused. `opb --version`
+prints the version.
 
 Flags from before 1.0 still work, and each prints what replaced it: `opb benchmark` (`opb run`), `opb
-providers` (`opb systems`), `opb reparse` (`opb reread`), `--provider` (`--system`), `--pages` (`--only`), `--wants` (`--outputs`) and `--score-only` (`opb grade`). `--outputs`
+providers` (`opb systems`), `opb reparse` (`opb reread`), `--provider` (`--system`), `--systems NAME` and `--providers NAME` on `opb run` (`--system`), `--pages` (`--only`), `--wants` (`--outputs`) and `--score-only` (`opb grade`). `--outputs`
 on `opb run`, `opb grade` and `opb score`, and `--unsupported`, are accepted and ignored, with a warning:
 each page asks for the outputs its tests read, and every test is graded.
 
-`--systems A B ...` (and `--providers`, its older name) is deprecated, and stays for one release: use
-`--system`, one per command. It runs each system in turn, one run each, predicting then grading, and prints
-one JSON object keyed by run name. Its `--options` maps each system to its options, or to a list of them for
-several runs of one system: `{"datalab": [{"mode": "balanced"}, {"mode": "accurate"}]}`. A system that stops
-is reported on stderr, the next one runs, and the command exits 1 at the end.
+A run is one system, so several systems means one command per system, with the same choice of pages.
+`opb run` given several names (under `--system`, `--systems` or `--providers`) runs nothing, and prints the
+command for each system, each with its own options.
 
 
 ## Score

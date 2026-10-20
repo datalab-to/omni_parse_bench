@@ -9,6 +9,9 @@
     opb check --dataset <folder or hf://...>                       # is the dataset one opb can run?
     opb tests --dataset <folder or hf://...> > tests.jsonl         # every test as a JSON line
     opb systems [NAME]                                             # the systems, or one's options
+
+A run is one system: to run several, run one command per system, with the same --sample (or --limit, --only,
+--suites). `opb run` given several systems runs nothing, and prints those commands.
 """
 from __future__ import annotations
 
@@ -18,6 +21,7 @@ import functools
 import importlib.metadata
 import json
 import logging
+import shlex
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -122,30 +126,49 @@ def read_ids(path: Path, flag: str) -> frozenset[str]:
 
 
 def bare(name: str, options: Any) -> Any:
-    """`--options` for the one system `name`: the bare object, or `{name: {...}}`, the shape the deprecated
-    `--systems` takes, which is taken too so one --options works for both."""
-    if isinstance(options, dict) and list(options) == [name] and isinstance(options[name], dict):
-        return options[name]
+    """`--options` for the one system `name`: the bare object, or `{name: {...}}`. An object keyed by other
+    systems is refused: a command runs one system."""
+    from omni_parse_bench import harness
+
+    if not isinstance(options, dict) or not options or not all(isinstance(v, dict) for v in options.values()):
+        return options
+    if list(options) == [name]: return options[name]
+    if others := [k for k in options if k != name and (k in harness.ADAPTERS or "/" in k)]:
+        raise errors.UsageError(f"--options is keyed by {', '.join(others)}, but this command runs {name}: "
+                                f"give {name}'s options alone, as {{\"<option>\": <value>}} or "
+                                f"{{\"{name}\": {{...}}}}")
     return options
 
 
-def systems(names: Sequence[str], options: Any) -> list:
-    """An adapter for each system at its options, for the deprecated `--systems`. `options` maps a system to
-    its options, or to a list of them for several runs of one system."""
-    from omni_parse_bench import harness
-
-    options = options or {}
-    if not isinstance(options, dict):
-        raise errors.UsageError(f"--options is a JSON object of options per system, such as "
-                                f'{{"datalab": {{"mode": "balanced"}}}}, not {json.dumps(options)}')
-    if bad := sorted(set(options) - set(names)):
-        raise errors.UsageError(f"--options names {', '.join(bad)}, which --systems doesn't: it names "
-                                f"{' '.join(names)}")
-    out = []
-    for p in names:
-        o = options.get(p, {})
-        out += [harness.system(p, x) for x in (o if isinstance(o, list) else [o])]
-    return out
+def one_system(a: argparse.Namespace, argv: Sequence[str]) -> None:
+    """Sets `a.system` to the one system `opb run` was given. One name under the old `--systems` or
+    `--providers` is the deprecated spelling of `--system`. Several names are refused, before anything is
+    planned or called, with one command per system built from `argv`."""
+    flag, names = next((f, v) for f, v in (("--system", a.system), ("--systems", a.systems),
+                                            ("--providers", a.providers)) if v)
+    if len(names) == 1:
+        if flag != "--system": deprecated(flag, "--system")
+        a.system = names[0]
+        return
+    options = read_json(a.options, "--options")
+    keyed = (isinstance(options, dict) and options and set(options) <= set(names)
+             and all(isinstance(v, dict) for v in options.values()))
+    rest, skip = [], False
+    for x in argv[1:]:
+        if x.split("=", 1)[0] in ("--system", "--systems", "--providers", "--options"):
+            skip = "=" not in x
+            continue
+        if skip and not x.startswith("-"): continue
+        skip = False
+        rest.append(x)
+    commands = []
+    for n in names:
+        o = options.get(n) if keyed else options
+        more = ["--options", json.dumps(o, ensure_ascii=False)] if o is not None else []
+        commands.append("    " + shlex.join(["opb", "run", "--system", n, *more, *rest]))
+    raise errors.UsageError(f"a run is one system, but {len(names)} were given ({', '.join(names)}). Run one "
+                            "command per system:\n" + "\n".join(commands) + "\nUse the same --sample (or "
+                            "--limit, --only, --suites) in each, so they answer the same rows.")
 
 
 def run_one(a: argparse.Namespace, b: Any, system: Any) -> dict[str, Any] | None:
@@ -165,42 +188,13 @@ def run_one(a: argparse.Namespace, b: Any, system: Any) -> dict[str, Any] | None
     return b.grade(p.run)
 
 
-def run_each(a: argparse.Namespace, b: Any, names: Sequence[str], options: Any) -> int:
-    """The deprecated `--systems A B ...`: one run per system (and per option set), in turn. Prints one JSON
-    object keyed by run name. A system that stops is reported and the next one runs; exits 1 if any stopped
-    or wasn't run."""
-    graded, stopped = {}, False
-    for x in systems(names, options):
-        # Note: a run that stops part way is not graded, and the same command resumes it; the others still
-        # run, so one system's account or bug doesn't hide the rest.
-        try:
-            g = run_one(a, b, x)
-        except (errors.UsageError, errors.Stop) as exc:
-            kind = f"{type(exc).__name__}: " if isinstance(exc, errors.Stop) else ""
-            print(f"opb run: {x.label}: {kind}{exc}", file=sys.stderr)
-            stopped = True
-            continue
-        if g is None:
-            print(f"opb run: {x.label}: not run", file=sys.stderr)
-            stopped = True
-            continue
-        graded[g["run"]] = g
-    print(json.dumps(graded, indent=2, default=str, ensure_ascii=False))
-    return int(stopped)
-
-
 def cmd_run(a: argparse.Namespace) -> int:
     from omni_parse_bench import benchmark, harness
 
     ignore_outputs(a)
     if a.score_only: deprecated("--score-only", "`opb grade <run folder>`")
-    b = benchmark.default(a.dataset, a.manifest)
-    options = read_json(a.options, "--options")
-    if a.system is None:
-        old = "--systems" if a.systems else "--providers"
-        deprecated(old, "`--system NAME`, one system per command")
-        return run_each(a, b, a.systems or a.providers, options)
-    if (g := run_one(a, b, harness.system(a.system, bare(a.system, options)))) is None:
+    system = harness.system(a.system, bare(a.system, read_json(a.options, "--options")))
+    if (g := run_one(a, benchmark.default(a.dataset, a.manifest), system)) is None:
         print("opb run: not run", file=sys.stderr)
         return 1
     print(json.dumps(g, indent=2, default=str, ensure_ascii=False))
@@ -359,9 +353,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         opb benchmark      is `opb run`, with the same flags
         opb providers      is `opb systems`
         opb reparse        is `opb reread`; `--add` is no longer possible
-        --systems A B      on `opb run` (and `--providers`, its older name): runs each system in turn, and
-                           prints the gradings keyed by run name; `--options` maps each system to its
-                           options, or to a list of them for several runs. Use `--system`, one per command
+        --systems NAME     on `opb run` (and `--providers`, its older name): is `--system`. Several names
+                           are refused, with one command per system to run instead
         --provider         on `opb predict`: is `--system`
         --pages            on `opb run`: is `--only`
         --wants            on `opb predict`: is `--outputs`
@@ -379,13 +372,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     manifest_help = "which of the dataset's manifests (default: %(default)s)"
 
     r = sub.add_parser("run", aliases=["benchmark"],
-                       help="predict every page with each system, then grade; resumable")
+                       help="predict every page with one system, then grade; resumable")
     # Note: --system is required unless a deprecated --systems or --providers takes its place; the two are
-    # hidden, so the usage shows `--system NAME` alone.
+    # hidden, so the usage shows `--system NAME` alone. Each takes several names only so that `one_system`
+    # can refuse them with the commands to run instead.
     who = r.add_mutually_exclusive_group(required=True)
-    who.add_argument("--system", metavar="NAME",
+    who.add_argument("--system", metavar="NAME", nargs="+",
                      help="the system to run, by name (`opb systems` lists them), or an OpenRouter model id "
-                          "such as openai/gpt-5.6-sol; its run gets its own folder under --out")
+                          "such as openai/gpt-5.6-sol; its run gets its own folder under --out. A run is one "
+                          "system: run one command per system")
     who.add_argument("--systems", nargs="+", help=argparse.SUPPRESS)
     who.add_argument("--providers", nargs="+", help=argparse.SUPPRESS)
     r.add_argument("--options", metavar="JSON",
@@ -462,6 +457,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     pl = sub.add_parser("systems", aliases=["providers"], help="list the systems, or one system's options")
     pl.add_argument("system", nargs="?", help="a system's name, to list its options and environment")
 
+    argv = list(sys.argv[1:] if argv is None else argv)
     a = ap.parse_args(argv)
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(logging.Formatter("%(message)s"))
@@ -477,6 +473,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     cmd = {"run": cmd_run, "grade": cmd_grade, "score": cmd_score, "predict": cmd_predict, "check": cmd_check,
            "tests": cmd_tests, "systems": cmd_systems, "reread": cmd_reread, "reparse": cmd_reread}[a.cmd]
     try:
+        if a.cmd == "run": one_system(a, argv)
         renamed(a)
         return cmd(a)
     except errors.UsageError as exc:

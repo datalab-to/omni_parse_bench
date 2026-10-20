@@ -83,7 +83,8 @@ A run is one system. A run folder answers one exact question: the system, its op
 manifest and the pages chosen. Asking another question uses another folder; asking the same one again
 resumes the same folder and pays for no page twice. So each setting of a system is its own run.
 
-To compare systems, or settings of one system, run each, with the same choice of pages:
+A run is one system, so to compare systems, or settings of one system, run one command per system, with
+the same choice of pages (`opb run` given several systems runs nothing, and prints these commands):
 
 ```bash
 export OPENROUTER_API_KEY=...

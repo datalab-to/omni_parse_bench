@@ -338,8 +338,7 @@ def test_old_commands_still_work_and_say_what_replaced_them(tmp_path, capsys, mo
     assert cli.main(["run", "--providers", "alpha", "--dataset", data, "--out", runs, "--score-only"]) == 0
     out, err = capsys.readouterr()
     assert CALLS == [] and "--score-only is deprecated" in err
-    [g] = json.loads(out).values()
-    [s] = g["scorers"].values()
+    [s] = json.loads(out)["scorers"].values()
     assert s["headline"] == 0.5, s
 
     [folder] = (tmp_path / "runs").iterdir()
@@ -505,19 +504,35 @@ def test_opb_predict_says_whose_bug_a_crash_is(tmp_path, capsys, monkeypatch):
     assert "Bug: Crashes raised ZeroDivisionError while predicting" in err and "this is a bug in" in err, err
 
 
-def test_deprecated_systems_runs_each_and_one_stopping_doesnt_stop_the_next(tmp_path, capsys, monkeypatch):
+@pytest.mark.parametrize("flag", ["--system", "--systems", "--providers"])
+def test_several_systems_are_refused_with_one_command_each(tmp_path, capsys, monkeypatch, flag):
+    """Before anything is planned, called or created: the message gives one command per system, with the
+    other flags as given and each system's own options."""
     monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
-    monkeypatch.setitem(harness.ADAPTERS, "crashes", Crashes)
+    monkeypatch.setitem(harness.ADAPTERS, "tagged", Tagged)
     CALLS.clear()
-    argv = ["run", "--systems", "crashes", "alpha", "--options", json.dumps({"alpha": [{}]}), "--dataset",
-            dataset(tmp_path / "data", 1), "--out", str(tmp_path / "runs"), "--workers", "1", "-y"]
+    out_dir = tmp_path / "runs"
+    argv = ["run", flag, "alpha", "tagged", "--sample", "5", "--out", str(out_dir), "--options",
+            json.dumps({"tagged": {"tag": "y z"}}), "-y"]
     assert cli.main(argv) == 1
     out, err = capsys.readouterr()
-    assert "--systems is deprecated" in err and "use `--system NAME`, one system per command" in err, err
-    assert "opb run: crashes: Bug: Crashes raised ZeroDivisionError" in err, err
-    [(name, g)] = json.loads(out).items()
-    assert name == g["run"] and name.startswith("alpha") and CALLS == ["a-p0"], (out, CALLS)
-    assert {p.name.split("-")[0] for p in (tmp_path / "runs").iterdir()} == {"alpha", "crashes"}
+    assert err == (
+        "opb run: a run is one system, but 2 were given (alpha, tagged). Run one command per system:\n"
+        f"    opb run --system alpha --sample 5 --out {out_dir} -y\n"
+        f"    opb run --system tagged --options '{{\"tag\": \"y z\"}}' --sample 5 --out {out_dir} -y\n"
+        "Use the same --sample (or --limit, --only, --suites) in each, so they answer the same rows.\n"), err
+    assert out == "" and CALLS == [] and not out_dir.exists()
+
+
+@pytest.mark.parametrize("flag", ["--systems", "--providers"])
+def test_one_system_under_an_old_flag_is_the_deprecated_system(tmp_path, capsys, monkeypatch, flag):
+    monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
+    argv = ["run", flag, "alpha", "--dataset", dataset(tmp_path / "data", 1), "--out", str(tmp_path / "runs"),
+            "-y"]
+    assert cli.main(argv) == 0
+    out, err = capsys.readouterr()
+    assert f"{flag} is deprecated and will be removed in a later release; use --system" in err, err
+    assert json.loads(out)["run"].startswith("alpha")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -538,9 +553,9 @@ def test_opb_run_takes_one_system_and_its_bare_options(tmp_path, capsys, monkeyp
     assert said["options"] == {"tag": "y"}, said
     assert cli.main([*argv, "--options", '{"tagged": {"tag": "y"}}']) == 0
     assert json.loads(capsys.readouterr().out)["run"] == g["run"], "the keyed shape is the same run"
-    with pytest.raises(SystemExit):
-        cli.main(["run", "--system", "tagged", "alpha", "--dataset", data])
-    assert "unrecognized arguments: alpha" in capsys.readouterr().err
+    monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
+    assert cli.main([*argv, "--options", '{"alpha": {}}']) == 1
+    assert "--options is keyed by alpha, but this command runs tagged" in capsys.readouterr().err
 
 
 def test_opb_run_workers_is_one_number(tmp_path, capsys, monkeypatch):
