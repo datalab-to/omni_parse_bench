@@ -185,7 +185,7 @@ def run_each(a: argparse.Namespace, b: Any, names: Sequence[str], options: Any) 
             stopped = True
             continue
         graded[g["run"]] = g
-    print(json.dumps(graded, indent=2, default=str))
+    print(json.dumps(graded, indent=2, default=str, ensure_ascii=False))
     return int(stopped)
 
 
@@ -203,7 +203,7 @@ def cmd_run(a: argparse.Namespace) -> int:
     if (g := run_one(a, b, harness.system(a.system, bare(a.system, options)))) is None:
         print("opb run: not run", file=sys.stderr)
         return 1
-    print(json.dumps(g, indent=2, default=str))
+    print(json.dumps(g, indent=2, default=str, ensure_ascii=False))
     return 0
 
 
@@ -215,7 +215,7 @@ def cmd_grade(a: argparse.Namespace) -> int:
     ignore_outputs(a)
     run = runs.Run.at(a.run)
     b = benchmark.default(*recorded(run.settings(), a.dataset, a.manifest))
-    print(json.dumps(b.grade(run, partial=a.partial), indent=2, default=str))
+    print(json.dumps(b.grade(run, partial=a.partial), indent=2, default=str, ensure_ascii=False))
     return 0
 
 
