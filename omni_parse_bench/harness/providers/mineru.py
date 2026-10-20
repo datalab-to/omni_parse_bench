@@ -9,6 +9,8 @@ import re
 from pathlib import Path
 from typing import Any, ClassVar
 
+from omni_bench_core import adapter
+
 from ... import markdown
 from .. import contract, errors, http, layout
 from ..adapter import PageAdapter
@@ -104,16 +106,18 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0, confi
 
 
 def parse(raw: dict, request: contract.Request, config: MinerU | None = None) -> tuple[dict, dict]:
-    """The page from the client's `json2md`; the blocks with their labels. A block type LABELS lacks
-    fails the blocks only: the page's text doesn't depend on how its blocks are labelled."""
+    """The page from the client's `json2md`; the blocks with their labels. A malformed block, or a type
+    LABELS lacks, fails the page's blocks output only; its html is still graded."""
     outputs, errs = {}, {}
     if "html" in request.outputs:
         outputs["html"] = markdown.to_html(raw["markdown"])
     if "blocks" in request.outputs:
+        found = raw["blocks"]
         try:
-            outputs["blocks"] = [layout.block(layout.label(LABELS, b["type"]), b["bbox"], (1, 1),
-                                              " ".join(_TAG.sub(" ", b.get("content") or "").split()))
-                                 for b in raw["blocks"]]
-        except errors.VendorError as exc:
+            with adapter.reading("the client's blocks"):
+                outputs["blocks"] = [layout.block(layout.label(LABELS, b["type"]), b["bbox"], (1, 1),
+                                                  " ".join(_TAG.sub(" ", b.get("content") or "").split()))
+                                     for b in found]
+        except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

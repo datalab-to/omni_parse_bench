@@ -96,7 +96,7 @@ def blocks(chunks: dict) -> list[dict]:
     page = info.get("0") or info.get(0) or next(iter(info.values()), {})
     frame = (page.get("bbox") or [0, 0, 0, 0])[2:]
     if not all(frame):
-        raise errors.VendorError(f"chunks carry no page frame: {str(info)[:200]}", status=200)
+        raise errors.SystemFailed(f"chunks carry no page frame: {str(info)}", status=200)
     return [layout.block(layout.label(LABELS, b.get("block_type") or ""), b["bbox"], frame,
                          re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", b.get("html") or "")).strip())
             for b in chunks.get("blocks") or [] if b.get("bbox") and str(b.get("page", 0)) == "0"]
@@ -119,12 +119,12 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                                files={"file": (contract.upload_name(page), fh, media)},
                                timeout=deadline.timeout(120))
         if resp.status_code != 200:
-            raise errors.VendorError(f"HTTP {resp.status_code}: {resp.text[:300]}",
+            raise errors.SystemFailed(f"HTTP {resp.status_code}: {resp.text}",
                                      status=resp.status_code, body=resp.text)
         with adapter.reading("the request's id"):
             request_id = contract.json_object(resp).get("request_id")
         if not request_id:
-            raise errors.VendorError(f"no request_id in the response: {resp.text[:200]}",
+            raise errors.SystemFailed(f"no request_id in the response: {resp.text}",
                                      status=resp.status_code, body=resp.text)
         url = f"{base_url}/api/v1/convert/{request_id}"
         retry = budget.PollRetry(deadline)
@@ -135,10 +135,10 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                     r = client.get(url, timeout=deadline.timeout(120))
                 except httpx.TransportError as exc:
                     if retry.again(): continue
-                    raise errors.VendorError(f"polling failed: {exc}"[:300], status=None) from None
+                    raise errors.transport(exc, "polling failed") from exc
                 if r.status_code != 200:
                     if retry.again(r.status_code): continue
-                    raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}",
+                    raise errors.SystemFailed(f"HTTP {r.status_code}: {r.text}",
                                              status=r.status_code, body=r.text)
                 retry.reset()
                 polls += 1
@@ -146,12 +146,12 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                     body = contract.json_object(r)
                 if body.get("status") == "complete":
                     if not body.get("success", True):
-                        raise errors.VendorError(f"vendor reported failure: {str(body.get('error'))[:300]}",
-                                                 status=200, raw=body, cost=_cost(body))
+                        raise errors.SystemFailed(f"vendor reported failure: {str(body.get('error'))}",
+                                                 status=200, body=body, cost=_cost(body))
                     return contract.Call(body, cost=_cost(body) or contract.Cost(), job_id=request_id)
                 if body.get("status") in ("error", "failed", "expired"):
-                    why = f"vendor reported {body.get('status')}: {str(body.get('error'))[:300]}"
-                    raise errors.VendorError(why, status=200, raw=body, cost=_cost(body))
+                    why = f"vendor reported {body.get('status')}: {str(body.get('error'))}"
+                    raise errors.SystemFailed(why, status=200, body=body, cost=_cost(body))
                 time.sleep(min(config.poll_interval, deadline.remaining()))
 
 
@@ -161,7 +161,9 @@ def parse(raw: dict, request: contract.Request, config: Datalab | None = None) -
     for o in request.outputs:
         if o == "html": outputs[o] = raw.get("html")
         if o == "blocks" and raw.get("chunks"):
-            try: outputs[o] = blocks(raw["chunks"])
-            except (errors.VendorError, KeyError, TypeError, ValueError) as exc:
+            try:
+                with adapter.reading("the chunks"):
+                    outputs[o] = blocks(raw["chunks"])
+            except errors.SystemFailed as exc:
                 errs[o] = errors.unread(exc)
     return outputs, errs

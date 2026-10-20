@@ -1,9 +1,11 @@
 """The line between a system's failure and our bug: an answer is read inside
 `omni_bench_core.adapter.reading`.
 
-Inside `reading`, an answer that can't be read fails one page and the run goes on. Anywhere else in an
-adapter's call, an exception is a bug, and stops the run. So every place that reads what a system sent back
-while calling it (a job id, a status, a server's answer) must sit inside `reading`.
+The core's one rule: a page counts 0 only when code raises `SystemFailed` on purpose, and `reading` is how
+an adapter says so for a malformed answer. Inside `reading`, an answer that can't be read fails one page and
+the run goes on. Anywhere else in an adapter's call, an exception is a bug, and stops the run. So every place
+that reads what a system sent back while calling it (a job id, a status, a server's answer) must sit inside
+`reading`.
 
 The guard walks each provider module, and `harness/http.py`, from the functions that call a system (`call`,
 `send`, and http's `post` and `parse`) through the module's own helpers they call. In those it fails on:
@@ -12,8 +14,9 @@ The guard walks each provider module, and `harness/http.py`, from the functions 
 - a subscript of a name bound from an answer (`.json()`, `json_object`, `http.parse`, `http.post`, `chat`)
   outside a `reading` block.
 
-It is a guard, not a type checker: reading the output itself is `parse`'s job, where the core already makes
-any failure the page's.
+It is a guard, not a type checker. `parse` isn't walked: it reads the answer throughout, so it states its
+failures itself, by raising `SystemFailed` or reading the system's structures inside `reading`; anything else
+it raises stops the run as a bug, with the answer kept unread (tests/test_flow.py).
 """
 from __future__ import annotations
 

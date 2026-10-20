@@ -19,7 +19,6 @@ from typing import Any, ClassVar
 
 import openai
 from omni_bench_core import adapter
-from omni_bench_core import errors as core_errors
 
 from ... import markdown
 from .. import budget, contract, errors, layout, raster
@@ -272,18 +271,18 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
             spent.append(_cost(body.get("usage") or {}))
             finish = ((body.get("choices") or [{}])[0]).get("finish_reason")
         if finish == "length":
-            raise errors.VendorError(f"the reply hit max_output_tokens ({config.max_output_tokens})",
-                                     status=200, raw=body, cost=contract.Cost.total(spent),
+            raise errors.SystemFailed(f"the reply hit max_output_tokens ({config.max_output_tokens})",
+                                     status=200, body=body, cost=contract.Cost.total(spent),
                                      job_id=body.get("id"))
         if finish == "content_filter":
-            raise errors.VendorError("the provider refused the page (content_filter)", status=200, raw=body,
+            raise errors.SystemFailed("the provider refused the page (content_filter)", status=200, body=body,
                                      cost=contract.Cost.total(spent), job_id=body.get("id"))
         cut = cut or finish != "stop"
         if finish == "stop" and _usable(body, output):
             return contract.Call(body, cost=contract.Cost.total(spent), job_id=body.get("id"))
-    raise errors.VendorError(f"no usable {output} after {config.attempts} attempts"
+    raise errors.SystemFailed(f"no usable {output} after {config.attempts} attempts"
                              + (" (a reply was cut off by an error)" if cut else ""),
-                             status=200, raw=last, cost=contract.Cost.total(spent))
+                             status=200, body=last, cost=contract.Cost.total(spent))
 
 
 def key(base_url: str) -> str:
@@ -305,16 +304,16 @@ def chat(base_url: str, body: dict, deadline: budget.Budget, spent: Sequence[con
     client = openai.OpenAI(base_url=base_url, api_key=key(base_url), max_retries=0)
     try:
         return client.chat.completions.create(**body, timeout=max(1.0, deadline.remaining())).model_dump()
-    except openai.APITimeoutError:
-        raise errors.VendorTimeout(f"no answer within {deadline.total:g} s",
-                                   cost=contract.Cost.total(list(spent))) from None
+    except openai.APITimeoutError as exc:
+        raise errors.SystemTimeout(f"no answer within {deadline.total:g} s",
+                                   cost=contract.Cost.total(list(spent))) from exc
     except openai.APIStatusError as exc:
-        raise errors.VendorError(f"HTTP {exc.status_code}: {str(exc)[:300]}", status=exc.status_code,
-                                 body=str(exc.body), cost=contract.Cost.total(list(spent))) from None
+        raise errors.SystemFailed(f"HTTP {exc.status_code}: {str(exc)}", status=exc.status_code,
+                                 body=str(exc.body), cost=contract.Cost.total(list(spent))) from exc
     except openai.APIConnectionError as exc:
-        if errors.refused(exc): raise errors.NoServer(base_url) from None
-        raise errors.VendorUnreachable(f"connection failed: {exc}"[:300],
-                                       cost=contract.Cost.total(list(spent))) from None
+        if errors.refused(exc): raise errors.NoServer(base_url) from exc
+        raise errors.SystemUnreachable(f"connection failed: {exc}",
+                                       cost=contract.Cost.total(list(spent))) from exc
 
 
 def image_part(png: bytes) -> dict:
@@ -331,9 +330,10 @@ def finish(body: dict) -> str | None:
 def content(body: dict) -> str:
     """A chat completion's text, finished or cut at its token limit (read as it is, as a vendor's own
     client reads it); empty for a page the model read as blank."""
-    if finish(body) not in ("stop", "length"):
-        raise errors.VendorError(f"the reply didn't finish: {finish(body)}", status=200)
-    return ((body["choices"][0].get("message")) or {}).get("content") or ""
+    with adapter.reading("the reply's text"):
+        if finish(body) not in ("stop", "length"):
+            raise errors.SystemFailed(f"the reply didn't finish: {finish(body)}", status=200)
+        return ((body["choices"][0].get("message")) or {}).get("content") or ""
 
 
 def tokens(bodies: list[dict]) -> contract.Cost:
@@ -344,22 +344,25 @@ def tokens(bodies: list[dict]) -> contract.Cost:
 
 
 def _usable(body: dict, output: str) -> bool:
-    """Whether the reply holds a usable `output`. A reply that can't be read doesn't, so it is asked again."""
+    """Whether the reply holds a usable `output`: `parse` doesn't raise `SystemFailed` on it. One that does is
+    asked again; anything else `parse` raises is a bug, and stops the run."""
     try:
-        with adapter.reading("the reply"):
-            return bool(parse(body, contract.Request(frozenset({output}), {}), None)[0].get(output))
-    except core_errors.VendorError:
+        return bool(parse(body, contract.Request(frozenset({output}), {}), None)[0].get(output))
+    except errors.SystemFailed:
         return False
 
 
 def parse(raw: dict, request: contract.Request, config: LLM | None = None) -> tuple[dict, dict]:
     """The one output in a finished reply: its text as HTML (`as_html`) or as blocks (`as_blocks`)."""
     (output,) = request.outputs
-    choice = (raw.get("choices") or [{}])[0]
-    if choice.get("finish_reason") != "stop":
-        raise errors.VendorError(f"the reply didn't finish: {choice.get('finish_reason')}", status=200)
-    text = (choice.get("message") or {}).get("content")
+    with adapter.reading("the reply's text"):
+        choice = (raw.get("choices") or [{}])[0]
+        if choice.get("finish_reason") != "stop":
+            raise errors.SystemFailed(f"the reply didn't finish: {choice.get('finish_reason')}", status=200)
+        text = (choice.get("message") or {}).get("content")
+        if text is not None and not isinstance(text, str):
+            raise errors.SystemFailed(f"the reply's content is a {type(text).__name__}, not text", status=200)
     value = (as_blocks(text) if output == "blocks" else as_html(text)) if text else None
     if not value:
-        raise errors.VendorError(f"no usable {output} in the reply", status=200)
+        raise errors.SystemFailed(f"no usable {output} in the reply", status=200)
     return {output: value}, {}

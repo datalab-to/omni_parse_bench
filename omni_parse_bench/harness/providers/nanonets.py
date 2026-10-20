@@ -120,5 +120,5 @@ def page(said: str) -> str:
 def parse(raw: dict, request: contract.Request, config: Nanonets | None = None) -> tuple[dict, dict]:
     text = llm.content(raw)
     if not text.strip():
-        raise errors.VendorError("the reply is empty", status=200)
+        raise errors.SystemFailed("the reply is empty", status=200)
     return {"html": markdown.to_html(page(text))}, {}

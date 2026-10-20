@@ -150,17 +150,18 @@ def blocks(said: str) -> list[dict]:
 
 
 def parse(raw: dict, request: contract.Request, config: UnlimitedOcr | None = None) -> tuple[dict, dict]:
-    """The page and its blocks. A label LABELS lacks fails the blocks only: the page's text doesn't
-    depend on how its blocks are labelled."""
+    """The page and its blocks. A malformed block, or a type LABELS lacks, fails the page's blocks output
+    only; its html is still graded."""
     text = llm.content(raw["completion"])
     if not text.strip():
-        raise errors.VendorError("the reply is empty", status=200)
+        raise errors.SystemFailed("the reply is empty", status=200)
     outputs, errs = {}, {}
     if "html" in request.outputs:
         outputs["html"] = markdown.to_html(strip(text))
     if "blocks" in request.outputs:
         try:
-            outputs["blocks"] = blocks(text)
-        except errors.VendorError as exc:
+            with adapter.reading("the reply's blocks"):
+                outputs["blocks"] = blocks(text)
+        except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

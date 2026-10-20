@@ -8,6 +8,8 @@ import dataclasses
 from pathlib import Path
 from typing import Any, ClassVar
 
+from omni_bench_core import adapter
+
 from ... import markdown
 from .. import contract, errors, http, layout
 from ..adapter import PageAdapter
@@ -104,8 +106,8 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0, confi
 
 
 def parse(raw: dict, request: contract.Request, config: IndraOcr | None = None) -> tuple[dict, dict]:
-    """The page's markdown as html, its blocks on the page as sent. A label LABELS lacks fails the
-    blocks only."""
+    """The page's markdown as html, its blocks on the page as sent. A malformed block, or a type LABELS
+    lacks, fails the page's blocks output only; its html is still graded."""
     outputs, errs = {}, {}
     if "html" in request.outputs:
         md = raw.get("markdown")
@@ -114,10 +116,12 @@ def parse(raw: dict, request: contract.Request, config: IndraOcr | None = None) 
         turned = raw.get("rotation") or 0
         w, h = raw["image_size"]
         upright = (h, w) if turned % 180 else (w, h)
+        found = raw["blocks"]
         try:
-            blocks = [layout.block(layout.label(LABELS, b["label"]), b["bbox"], upright,
-                                   " ".join(b["text"].split())) for b in raw["blocks"]]
-            outputs["blocks"] = [x | {"bbox": layout.unturned(x["bbox"], turned)} for x in blocks]
-        except errors.VendorError as exc:
+            with adapter.reading("the Converter's blocks"):
+                blocks = [layout.block(layout.label(LABELS, b["label"]), b["bbox"], upright,
+                                       " ".join(b["text"].split())) for b in found]
+                outputs["blocks"] = [x | {"bbox": layout.unturned(x["bbox"], turned)} for x in blocks]
+        except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

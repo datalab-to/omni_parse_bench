@@ -208,8 +208,12 @@ manifest are the `wants`, and the adapter asks its system for those it can produ
 that wants none of them is not sent: its answer holds no outputs, with no call, no cost and no error.
 There is no task-level or scorer-level choice of outputs. The record holds the outputs, the error
 when the page failed, each call's answer as received (what was sent and the raw answer), and the
-cost and time. An answer that arrives but can't be read is recorded as a `ReadError` that counts 0,
-keeping the raw answer, so it is read again after a fix without a new call (`opb reread`).
+cost and time. A page counts 0 only when the adapter says, on purpose, that the system failed, by
+raising `SystemFailed` (the core's one rule, [omni-bench-core's "The rules"](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules)); the record's
+`error` keeps its `traceback`. An answer the adapter says it can't read is recorded as `Unreadable`, which
+counts 0, keeping the raw answer. Any other exception is a bug and stops the run; a bug in reading an
+answer keeps it unread (`"unread": true`), and the same command reads it again after the fix, with no
+call. A fix to reading that gave wrong outputs without raising reaches a finished run with `opb reread`.
 
 ## Score
 
@@ -303,7 +307,9 @@ output", and the page isn't counted as failed. The families map onto outputs (ht
 blocks: layout), so an html-only system shows a layout family of 0, and its text and tables families say
 how it reads. Grading that raises anything else on a
 well-formed output is a scorer bug: it is raised, naming the page and the test, and no scores or summary
-are written, so a bug never passes as a score.
+are written, so a bug never passes as a score. A prediction that isn't an object of outputs is the
+system's failure: `UnitTests.prediction` raises `SystemFailed`, and the page counts 0, with the traceback on
+its line of `scores.jsonl`; anything else `prediction` raises stops grading as a bug.
 
 ## Benchmark
 

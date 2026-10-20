@@ -288,6 +288,8 @@ def cmd_predict(a: argparse.Namespace) -> int:
         record = adapter.predict(system, harness.Input(page, wants), timeout=a.timeout)
     except errors.Stop:
         raise
+    except core_errors.Unread as exc:
+        raise core_errors.bug(f"reading the answer of {page}", exc.__cause__ or exc, type(system)) from None
     except Exception as exc:  # noqa: BLE001 -- neither an answer nor a known failure: the adapter's bug
         raise core_errors.bug(f"predicting {page}", exc, type(system)) from None
     if not a.raw: record.pop("raw")

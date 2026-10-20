@@ -98,6 +98,6 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0, confi
 def parse(raw: dict, request: contract.Request, config: OlmOcr | None = None) -> tuple[dict, dict]:
     """The pipeline's `natural_text`, as html."""
     if raw.get("is_fallback"):
-        raise errors.VendorError("no attempt read the page (the pipeline would fall back to the PDF's own "
+        raise errors.SystemFailed("no attempt read the page (the pipeline would fall back to the PDF's own "
                                  "text layer)", status=200)
     return {o: markdown.to_html(raw.get("natural_text") or "") for o in request.outputs}, {}

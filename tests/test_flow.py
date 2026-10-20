@@ -27,7 +27,8 @@ from omni_parse_bench.harness import errors as harness_errors  # noqa: E402
 
 CALLS: list[str] = []
 WANTS: list[frozenset[str]] = []   # what each `requests` was given
-BROKEN: set[str] = set()           # pages whose answer `parse` can't read
+BROKEN: set[str] = set()           # pages whose answer `parse` crashes on: a bug in `parse`
+WRONG: set[str] = set()            # pages `parse` reads wrongly, without raising
 
 
 @dataclasses.dataclass(frozen=True)
@@ -47,6 +48,7 @@ class Alpha(harness.PageAdapter):
 
     def parse(self, raw, request):
         if raw.get("page") in BROKEN: raise KeyError("html")
+        if raw.get("page") in WRONG: return {"html": "<p>wrong</p>"}, {}
         return {"html": raw["html"]}, {}
 
 
@@ -181,7 +183,7 @@ def test_outputs_is_accepted_with_a_warning_and_ignored(tmp_path, capsys, monkey
 
 def test_every_page_failing_has_headline_0(tmp_path, monkeypatch):
     def refused(self, page, request, *, timeout):
-        raise harness_errors.VendorError("bad page", status=400)
+        raise harness_errors.SystemFailed("bad page", status=400)
 
     monkeypatch.setattr(Alpha, "send", refused)
     b = benchmark.default(dataset(tmp_path / "data"))
@@ -300,7 +302,7 @@ def test_opb_predict_prints_the_record_and_fails_on_a_failed_page(tmp_path, caps
     assert rec["output"] == {"html": "<p>alpha beta</p>"} and rec["error"] is None and "raw" not in rec
 
     def refused(self, page, request, *, timeout):
-        raise harness_errors.VendorError("bad page", status=400, raw={"why": "bad"},
+        raise harness_errors.SystemFailed("bad page", status=400, body={"why": "bad"},
                                          cost=contract.Cost(usd=0.02))
 
     monkeypatch.setattr(Alpha, "send", refused)
@@ -319,10 +321,10 @@ def test_opb_predict_prints_the_record_and_fails_on_a_failed_page(tmp_path, caps
 
 
 def test_a_403_is_the_accounts_unless_it_is_a_moderation_flag():
-    assert Alpha().account_failure(harness_errors.VendorError("forbidden", status=403))
-    assert not Alpha().account_failure(harness_errors.VendorError("flagged by moderation", status=403))
-    assert Alpha().account_failure(harness_errors.VendorError("insufficient credits", status=400, body="x"))
-    assert not Alpha().account_failure(harness_errors.VendorError("bad page", status=400))
+    assert Alpha().account_failure(harness_errors.SystemFailed("forbidden", status=403))
+    assert not Alpha().account_failure(harness_errors.SystemFailed("flagged by moderation", status=403))
+    assert Alpha().account_failure(harness_errors.SystemFailed("insufficient credits", status=400, body="x"))
+    assert not Alpha().account_failure(harness_errors.SystemFailed("bad page", status=400))
 
 
 def test_old_commands_still_work_and_say_what_replaced_them(tmp_path, capsys, monkeypatch):
@@ -365,20 +367,19 @@ def test_old_commands_still_work_and_say_what_replaced_them(tmp_path, capsys, mo
 
 
 def test_opb_reread_reads_a_runs_saved_answers_again(tmp_path, capsys, monkeypatch):
-    """A bug in `parse` records the pages as unreadable (counted 0); after the fix, `opb reread` reads the
-    saved answers with no call, and grading scores them."""
+    """A `parse` that gave wrong outputs without raising: after the fix, `opb reread` reads the saved answers
+    with no call, and grading scores them. A `parse` that raises while reading again is reported as a bug."""
     monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
     data = dataset(tmp_path / "data", 2)
-    monkeypatch.setattr(sys.modules[__name__], "BROKEN", {"a-p0", "a-p1"})
+    monkeypatch.setattr(sys.modules[__name__], "WRONG", {"a-p0", "a-p1"})
     CALLS.clear()
     argv = ["run", "--system", "alpha", "--dataset", data, "--out", str(tmp_path / "runs"), "-y"]
     assert cli.main(argv) == 0
     g = json.loads(capsys.readouterr().out)
     [s] = g["scorers"].values()
-    assert (s["failed"], s["headline"]) == (2, 0.0), s
+    assert (s["failed"], s["headline"]) == (0, 0.0), s
     [run] = (tmp_path / "runs").iterdir()
-    assert json.loads((run / "records" / "a-p0.json").read_text())["error"]["type"] == "ReadError"
-    BROKEN.clear()
+    WRONG.clear()
     CALLS.clear()
     assert cli.main(["reread", str(run)]) == 0
     out, err = capsys.readouterr()
@@ -386,8 +387,84 @@ def test_opb_reread_reads_a_runs_saved_answers_again(tmp_path, capsys, monkeypat
     assert cli.main(["grade", str(run)]) == 0
     [s] = json.loads(capsys.readouterr().out)["scorers"].values()
     assert (s["failed"], s["coverage"], s["headline"]) == (0, 1.0, 0.5), s
+    BROKEN.add("a-p0")
+    assert cli.main(["reread", str(run)]) == 1
+    err = capsys.readouterr().err
+    assert "Bug: Alpha raised KeyError while reading the answer of a-p0" in err and "Traceback" in err, err
+    BROKEN.clear()
     assert cli.main(["reread", str(tmp_path / "data")]) == 1
     assert "no predictions/ folder" in capsys.readouterr().err
+
+
+def test_a_bug_in_parse_stops_the_run_and_the_same_command_reads_it_again(tmp_path, capsys, monkeypatch):
+    """A KeyError in `parse` is a bug: the run stops with its traceback, the answer is kept unread, and after
+    the fix the same command reads it with no call."""
+    monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
+    monkeypatch.setattr(sys.modules[__name__], "BROKEN", {"a-p0"})
+    argv = ["run", "--system", "alpha", "--dataset", dataset(tmp_path / "data", 1), "--out",
+            str(tmp_path / "runs"), "-y"]
+    CALLS.clear()
+    assert cli.main(argv) == 1
+    err = capsys.readouterr().err
+    assert "Bug: Alpha raised KeyError while reading the answer of a-p0" in err and "Traceback" in err, err
+    [run] = (tmp_path / "runs").iterdir()
+    rec = json.loads((run / "records" / "a-p0.json").read_text())
+    assert (rec["unread"], rec["error"], rec["output"]) == (True, None, None)
+    assert rec["raw"][0]["raw"]["page"] == "a-p0", "the answer is kept"
+    assert not (run / "predictions" / "a-p0.json").exists() and CALLS == ["a-p0"]
+    BROKEN.clear()
+    CALLS.clear()
+    assert cli.main(argv) == 0
+    [s] = json.loads(capsys.readouterr().out)["scorers"].values()
+    assert CALLS == [] and (s["failed"], s["headline"]) == (0, 0.5), s
+    assert "unread" not in json.loads((run / "records" / "a-p0.json").read_text())
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    BROKEN.add("p")
+    assert cli.main(["predict", "--system", "alpha", "--page", str(pdf)]) == 1
+    assert f"Bug: Alpha raised KeyError while reading the answer of {pdf}" in capsys.readouterr().err
+
+
+def test_a_parse_raising_system_failed_counts_the_page_0_as_unreadable(tmp_path, monkeypatch):
+    def parse(self, raw, request):
+        raise harness_errors.SystemFailed("the answer holds no page", status=200)
+
+    monkeypatch.setattr(Alpha, "parse", parse)
+    b = benchmark.default(dataset(tmp_path / "data", 2))
+    name = (g := b.run(Alpha(), tmp_path / "runs"))["run"]
+    [s] = g["scorers"].values()
+    assert (s["failed"], s["coverage"], s["headline"]) == (2, 0.0, 0.0), s
+    err = json.loads((tmp_path / "runs" / name / "records" / "a-p0.json").read_text())["error"]
+    assert err["type"] == "Unreadable" and "the answer holds no page" in err["message"]
+    assert "in parse" in err["traceback"], err
+
+
+def test_an_unexpected_exception_in_prediction_stops_grading(tmp_path, monkeypatch):
+    """`UnitTests.prediction` raising anything but `SystemFailed` is a bug in the scorer, not a page at 0."""
+    from omni_bench_core import errors as core_errors
+
+    from omni_parse_bench.scorers import unit_tests
+
+    b = benchmark.default(dataset(tmp_path / "data", 2))
+    name = b.run(Alpha(), tmp_path / "runs")["run"]
+
+    def prediction(self, output):
+        raise KeyError("html")
+
+    monkeypatch.setattr(unit_tests.UnitTests, "prediction", prediction)
+    with pytest.raises(core_errors.Bug, match="UnitTests raised KeyError while reading the prediction"):
+        b.grade(tmp_path / "runs" / name)
+
+
+def test_a_prediction_that_isnt_an_object_counts_0_with_its_traceback(tmp_path):
+    b = benchmark.default(dataset(tmp_path / "data", 2))
+    name = b.run(Alpha(), tmp_path / "runs")["run"]
+    run = tmp_path / "runs" / name
+    (run / "predictions" / "a-p0.json").write_text("[]")
+    [s] = b.grade(run)["scorers"].values()
+    assert (s["failed"], s["coverage"]) == (1, 0.5), s
+    lines = (run / b.scorers[0].folder_name / "scores.jsonl").read_text().splitlines()
+    line = next(x for x in map(json.loads, lines) if x["id"] == "a-p0")
+    assert "not an object of outputs" in line["error"] and "in prediction" in line["traceback"], line
 
 
 @pytest.mark.parametrize("answer", ["n\n", ""])

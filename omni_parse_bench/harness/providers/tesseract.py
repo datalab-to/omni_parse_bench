@@ -47,8 +47,8 @@ class Tesseract(PageAdapter):
 
         opb run --system tesseract --sample 20
 
-    A tesseract that exits with an error fails the page (a `VendorError` with its stderr), and one that runs
-    past the page's time is a `VendorTimeout`.
+    A tesseract that exits with an error fails the page (a `SystemFailed` with its stderr), and one that runs
+    past the page's time is a `SystemTimeout`.
     """
 
     render_dpi: int = dataclasses.field(default=300,
@@ -114,10 +114,10 @@ def run(cmd: list[str], deadline: budget.Budget, check: bool = True) -> subproce
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, errors="replace",
                              timeout=max(1.0, deadline.remaining()))
-    except subprocess.TimeoutExpired:
-        raise errors.VendorTimeout(f"tesseract ran past the call's {deadline.total:g} s") from None
+    except subprocess.TimeoutExpired as exc:
+        raise errors.SystemTimeout(f"tesseract ran past the call's {deadline.total:g} s") from exc
     if check and out.returncode != 0:
-        raise errors.VendorError(f"tesseract exited {out.returncode}: {out.stderr[:300]}", status=None)
+        raise errors.SystemFailed(f"tesseract exited {out.returncode}: {out.stderr}", status=None)
     return out
 
 

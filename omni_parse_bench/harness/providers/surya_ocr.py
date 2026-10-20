@@ -9,6 +9,8 @@ import re
 from pathlib import Path
 from typing import Any, ClassVar
 
+from omni_bench_core import adapter
+
 from .. import contract, errors, http, layout
 from ..adapter import PageAdapter
 
@@ -100,7 +102,8 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0, confi
 
 
 def parse(raw: dict, request: contract.Request, config: SuryaOcr | None = None) -> tuple[dict, dict]:
-    """The page in reading order, and its blocks. A label LABELS lacks fails the blocks only."""
+    """The page in reading order, and its blocks. A malformed block, or a type LABELS lacks, fails the
+    page's blocks output only; its html is still graded."""
     blocks = sorted(raw.get("blocks") or [], key=lambda b: b.get("reading_order", 0))
     _, _, w, h = raw.get("image_bbox") or [0, 0, 1, 1]
     outputs, errs = {}, {}
@@ -108,9 +111,10 @@ def parse(raw: dict, request: contract.Request, config: SuryaOcr | None = None) 
         outputs["html"] = "\n".join(b.get("html") or "" for b in blocks if not b.get("skipped"))
     if "blocks" in request.outputs:
         try:
-            outputs["blocks"] = [layout.block(layout.label(LABELS, b["label"]), b["bbox"], (w, h),
-                                              " ".join(_TAG.sub(" ", b.get("html") or "").split()))
-                                 for b in blocks if b.get("label") != "BlankPage"]
-        except errors.VendorError as exc:
+            with adapter.reading("the result's blocks"):
+                outputs["blocks"] = [layout.block(layout.label(LABELS, b["label"]), b["bbox"], (w, h),
+                                                  " ".join(_TAG.sub(" ", b.get("html") or "").split()))
+                                     for b in blocks if b.get("label") != "BlankPage"]
+        except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

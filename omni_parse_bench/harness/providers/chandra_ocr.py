@@ -145,8 +145,8 @@ def picture(block: dict) -> str:
 
 
 def parse(raw: dict, request: contract.Request, config: ChandraOcr | None = None) -> tuple[dict, dict]:
-    """The page from the server's blocks, pictures as alt text; the blocks from the reply. A label
-    LABELS lacks fails the blocks only."""
+    """The page from the server's blocks, pictures as alt text; the blocks from the reply. A malformed
+    block, or a type LABELS lacks, fails the page's blocks output only; its html is still graded."""
     said = llm.content(raw["completion"])
     outputs, errs = {}, {}
     if "html" in request.outputs:
@@ -154,7 +154,8 @@ def parse(raw: dict, request: contract.Request, config: ChandraOcr | None = None
                                   if b["label"] != "Blank-Page")
     if "blocks" in request.outputs:
         try:
-            outputs["blocks"] = blocks(said)
-        except errors.VendorError as exc:
+            with adapter.reading("the reply's blocks"):
+                outputs["blocks"] = blocks(said)
+        except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

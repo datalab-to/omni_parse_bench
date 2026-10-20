@@ -147,14 +147,14 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         with adapter.reading("the uploaded file's id"):
             file_id = contract.json_object(r).get("file_id") if r.status_code == 200 else None
         if not file_id:
-            raise errors.VendorError(f"upload HTTP {r.status_code}: {r.text[:300]}",
+            raise errors.SystemFailed(f"upload HTTP {r.status_code}: {r.text}",
                                      status=r.status_code, body=r.text)
         r = client.post(f"{base_url}/parse_async", json={"input": file_id, **request.sent},
                         timeout=deadline.timeout(120))
         with adapter.reading("the job's id"):
             job_id = contract.json_object(r).get("job_id") if r.status_code == 200 else None
         if not job_id:
-            raise errors.VendorError(f"parse_async HTTP {r.status_code}: {r.text[:300]}",
+            raise errors.SystemFailed(f"parse_async HTTP {r.status_code}: {r.text}",
                                      status=r.status_code, body=r.text)
         retry = budget.PollRetry(deadline)
         with errors.job(job_id):
@@ -164,10 +164,10 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                     r = client.get(f"{base_url}/job/{job_id}", timeout=deadline.timeout(120))
                 except httpx.TransportError as exc:
                     if retry.again(): continue
-                    raise errors.VendorError(f"polling failed: {exc}"[:300], status=None) from None
+                    raise errors.transport(exc, "polling failed") from exc
                 if r.status_code != 200:
                     if retry.again(r.status_code): continue
-                    raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}",
+                    raise errors.SystemFailed(f"HTTP {r.status_code}: {r.text}",
                                              status=r.status_code, body=r.text)
                 retry.reset()
                 polls += 1
@@ -178,8 +178,8 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
             cost = contract.Cost.in_credits(((job.get("result") or {}).get("usage") or {}).get("credits"),
                                             "usage.credits")
             if job.get("status") != "Completed":
-                raise errors.VendorError(f"job {job.get('status')}: {str(job.get('reason'))[:300]}",
-                                         status=200, raw=job, cost=cost)
+                raise errors.SystemFailed(f"job {job.get('status')}: {str(job.get('reason'))}",
+                                         status=200, body=job, cost=cost)
             result = (job.get("result") or {}).get("result") or {}
             # Note: a large result comes as a URL to it; it is fetched, so the saved answer holds it, with
             # the polls' retry, since failing here would re-run, and re-pay for, a job that is done.
@@ -188,8 +188,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                     got = client.get(result.get("url"), timeout=deadline.timeout(300))
                 except httpx.TransportError as exc:
                     if retry.again(): continue
-                    raise errors.VendorError(f"fetching the result failed: {exc}"[:300], status=None,
-                                             raw=job, cost=cost) from None
+                    raise errors.transport(exc, "fetching the result failed", body=job, cost=cost) from exc
                 if got.status_code == 200:
                     with adapter.reading("the result at its URL"):
                         job["result"]["result"] = got.json()
@@ -198,24 +197,26 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                 # Note: the URL is presigned storage, not Reducto's API: its 403 (an expired link) says
                 # nothing about the key, so the status is left out, or it would stop the run as an account
                 # failure; a new call gets a new link.
-                raise errors.VendorError(f"result URL HTTP {got.status_code}: {got.text[:200]}", status=None,
-                                         raw=job, cost=cost)
+                raise errors.SystemFailed(f"result URL HTTP {got.status_code}: {got.text}", status=None,
+                                         body=job, cost=cost)
     return contract.Call(job, cost=cost, job_id=job_id)
 
 
 def parse(raw: dict, request: contract.Request, config: Reducto | None = None) -> tuple[dict, dict]:
     """The outputs in a completed job: its content as html, and its blocks."""
-    chunks = (((raw.get("result") or {}).get("result")) or {}).get("chunks")
-    if chunks is None:
-        raise errors.VendorError(f"completed with no chunks: {str(raw)[:300]}", status=200)
-    blocks = [b for c in chunks for b in c.get("blocks") or []]
+    with adapter.reading("the job's chunks"):
+        chunks = (((raw.get("result") or {}).get("result")) or {}).get("chunks")
+        if chunks is None:
+            raise errors.SystemFailed(f"completed with no chunks: {str(raw)}", status=200)
+        blocks = [b for c in chunks for b in c.get("blocks") or []]
+        md = "\n\n".join(described(c.get("content") or "", c.get("blocks") or []) for c in chunks)
     outputs, errs = {}, {}
     for o in request.outputs:
-        if o == "html":
-            pages = (described(c.get("content") or "", c.get("blocks") or []) for c in chunks)
-            outputs[o] = markdown.to_html("\n\n".join(pages))
+        if o == "html": outputs[o] = markdown.to_html(md)
         if o == "blocks":
-            try: outputs[o] = layout_blocks(blocks)
-            except (errors.VendorError, KeyError, TypeError, ValueError) as exc:
+            try:
+                with adapter.reading("the job's blocks"):
+                    outputs[o] = layout_blocks(blocks)
+            except errors.SystemFailed as exc:
                 errs[o] = errors.unread(exc)
     return outputs, errs

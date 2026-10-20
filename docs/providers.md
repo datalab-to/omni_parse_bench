@@ -56,16 +56,21 @@ adapter makes are format changes, and each is checked to lose nothing:
 - a vendor with no typed layout doesn't support `blocks`. It is never asked for them: a page asks it
   only for html, and a page whose tests read blocks alone is not sent. Its blocks tests fail as "no
   blocks output", so its layout family is 0 and its text and tables families say how it reads;
-- every vendor gets the same retries: a transient failure (a rate limit, a 5xx, a dropped
-  connection) is tried 4 times with backoff, the whole page again, within the same time per page. A
-  model's reply that is cut off by an error or doesn't parse is asked again within the call, up to 3
+- every vendor gets the same retries: a transient failure (a rate limit, a 5xx) is tried 4 times with
+  backoff, the whole page again, within the same time per page. A transport failure (a connection, a
+  read, a client timeout) of any request (an upload, a submit, a poll, once a poll's own retries are
+  spent) is the page's failure, `SystemUnreachable` or `SystemTimeout`, which a page asks again only
+  under `--retry-failed`; its record's traceback shows the httpx error underneath. A refused connection
+  stops the run instead. A model's reply that is cut off by an error or doesn't parse is asked again within the call, up to 3
   times. A page a vendor still doesn't answer counts as 0, whatever the cause: answering is part of
-  what a product does. Two failures are the adapter's, not the vendor's:
-  - an error in `read` (including `parse`) is recorded as an unreadable answer (`ReadError`) that
-    counts 0 and keeps the raw answer, until `read` is fixed and the run is reread (`opb reread
-    RUN_DIR`, or `Benchmark.reread(folder, system)`), then graded again; and
-  - an error elsewhere in the adapter stops the run as a bug, which prints its whole traceback and
-    whose code it is; and
+  what a product does. Under the core's one rule ([omni-bench-core's "The rules"](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules)),
+  a page counts 0 only when the adapter raises `SystemFailed` on purpose, or reads the answer inside
+  `omni_bench_core.adapter.reading`, which raises it for a malformed one. The record keeps the failure
+  with its `traceback`. Any other exception is the adapter's bug, not the vendor's:
+  - a bug in `parse` stops the run with its traceback; the raw answer is kept, unread (`"unread":
+    true`), and running the same command again after the fix reads it with no call; and
+  - a bug elsewhere in the adapter stops the run too, printing its whole traceback and whose code it
+    is; and
 - cost is what the response states, else `Cost()` (unknown). Credits go in `credits`, never
   converted to dollars.
 
@@ -275,7 +280,7 @@ Per vendor:
   (`--psm 0`) and reads it with that script's model, English when it detects none it has a model
   for, so it is told nothing about the page. Its text is written as html inside `<pre>`, escaped,
   and it gives no layout blocks. It is free, so its cost is recorded as `usd` 0.0. A tesseract that
-  exits with an error fails the page as a `VendorError` with its stderr. Needs `brew install tesseract tesseract-lang` (or the
+  exits with an error fails the page as a `SystemFailed` with its stderr. Needs `brew install tesseract tesseract-lang` (or the
   distribution's tesseract and its script models).
 
 ## Serving an open model
@@ -524,11 +529,25 @@ Indra OCR (`providers/indra_ocr.py`):
 ## Every adapter: fetch, then parse
 
 `send` returns the vendor's answer as received, and `parse` reads the outputs from it. Every answer
-is saved in the run's records (`raw`), even when parsing it fails. When `parse` raises, the page is
-recorded as an unreadable answer, a `ReadError` that names the exception and counts 0, so the record
-says what couldn't be read; it is never scored as an empty page. So a parsing fix reaches a finished run
-with `opb reread RUN_DIR` (`Benchmark.reread(folder, system)`), and never needs the vendor again; grade the
-run again afterwards. What happens in every other case is
+is saved in the run's records (`raw`), even when parsing it fails. `parse` says on purpose when an
+answer is the vendor's failure, and every adapter writes it the same way:
+
+- an answer that holds no usable page (no chunks, no markdown, a page the vendor marked failed, a reply
+  that didn't finish) raises `SystemFailed` with a message saying what was missing;
+- the vendor's own structures (a job's chunks, a page's markdown) are read inside `adapter.reading`, so
+  a malformed one is the vendor's failure too;
+- in either case the page is recorded as `Unreadable`, which counts 0 and keeps the message and its
+  traceback, so the record says what couldn't be read; it is never scored as an empty page;
+- `blocks` are read apart from the page, inside `reading` within a `try` that leaves them out: a
+  malformed block, or a block type the adapter's `LABELS` lacks, fails the page's blocks output only;
+  its html is still graded. A key missing from our own model server's answer (`completion`, `text`,
+  `markdown`, `blocks`) is a bug, not a malformed block; and
+- anything else `parse` raises is a bug in it: the run stops, the answer is kept unread, and the same
+  command reads it again after the fix.
+
+A fix to a `parse` that gave wrong outputs without raising reaches a finished run with `opb reread
+RUN_DIR` (`Benchmark.reread(folder, system)`), and never needs the vendor again; grade the run again
+afterwards. What happens in every other case is
 omni-bench-core's rules ([the table](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules)). `--retry-failed` predicts again only
 the pages whose failure may not recur: a timeout, an outage, a 429 or 5xx; never a 400 or a vendor's
 answer.

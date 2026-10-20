@@ -87,6 +87,32 @@ def test_an_unknown_label_fails_the_blocks_only():
     assert "Also kept" in views.text(outs["html"]) and "blocks" in errs and "blocks" not in outs
 
 
+def test_an_open_models_malformed_block_or_unknown_label_fails_the_blocks_only():
+    """A block with no box, or a type LABELS lacks, fails the blocks output only; the html is still graded."""
+    from omni_parse_bench.harness.providers import dots, mineru
+
+    request = mineru.MinerU().requests(frozenset({"html", "blocks"}))[0]
+    raw = {"markdown": "Kept", "blocks": [{"type": "no_such_label", "bbox": [0, 0, 1, 1], "content": "Kept"}]}
+    for blocks in (raw["blocks"], [{"type": "text", "content": "no box"}], ["not an object"]):
+        outs, errs = mineru.parse(raw | {"blocks": blocks}, request)
+        assert "Kept" in views.text(outs["html"]) and "blocks" in errs and "blocks" not in outs, blocks
+    request = dots.Dots().requests(frozenset({"html", "blocks"}))[0]
+    raw = {"markdown": "Kept", "image_size": [100, 100],
+           "cells": [{"category": "Text", "bbox": [0, 0, 50], "text": "Kept"}]}
+    outs, errs = dots.parse(raw, request)
+    assert "Kept" in views.text(outs["html"]) and "blocks" in errs and "blocks" not in outs
+    with pytest.raises(KeyError):
+        mineru.parse({"markdown": "Kept"}, request._replace(outputs=frozenset({"blocks"})))
+
+
+def test_an_api_vendors_malformed_blocks_fail_the_blocks_only():
+    request = harness.system("datalab").requests(frozenset({"html", "blocks"}))[0]
+    raw = {"html": "<p>Kept</p>", "chunks": {"page_info": {"0": {"bbox": [0, 0, 10, 10]}},
+                                           "blocks": [{"block_type": "Text", "bbox": [0, 0, 5], "page": 0}]}}
+    outs, errs = harness.system("datalab").parse(raw, request)
+    assert outs["html"] == "<p>Kept</p>" and "blocks" in errs and "blocks" not in outs
+
+
 def test_an_infinity_reply_cut_at_the_token_limit_keeps_its_complete_elements():
     """The server reads a cut reply up to its last complete element, as the SDK does; the adapter keeps it."""
     from omni_parse_bench.harness.providers import infinity
@@ -105,7 +131,7 @@ def test_a_reply_cut_at_the_token_limit_is_read_as_it_is():
     request = nanonets.Nanonets().requests(frozenset({"html"}))[0]
     cut = {"choices": [{"message": {"content": "text"}, "finish_reason": "length"}]}
     assert "text" in nanonets.parse(cut, request)[0]["html"]
-    with pytest.raises(errors.VendorError):
+    with pytest.raises(errors.SystemFailed):
         nanonets.parse({"choices": [{"message": {"content": "text"}, "finish_reason": "abort"}]}, request)
 
 

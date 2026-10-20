@@ -14,6 +14,14 @@ task, its adapters, and the unit-test scorer. The CLI is a thin wrapper.
 What happens in each case (a failed page, a missing key, a server that isn't running, an unfinished run)
 is the core's three rules, the same for every benchmark built on it: see the table in
 [omni-bench-core's "The rules"](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules).
+The one that decides how a page counts:
+
+    A page counts 0 only when code says, on purpose, that the system failed, by raising
+    `omni_bench_core.errors.SystemFailed`. Any other exception stops the run and prints its traceback.
+
+The failures a record can hold are `SystemFailed` and its kinds: `SystemTimeout`, `SystemUnreachable` and
+`Unreadable` (an answer `read` said it can't read). Each record's `error` holds its `type`, `status`,
+`transient`, `message` and `traceback`.
 
 
 ## Run the benchmark
@@ -52,9 +60,12 @@ systems, or settings of one system, run each with the same choice of pages (`sam
 `only`), so every run is graded on the same pages. `Benchmark.run` grades the run once it is predicted, and
 returns the grading: `run` (the run folder's name), `cost` and `scorers`. A run that stops part way (a
 missing key, an account that can't pay, a model server that isn't running, a bug in an adapter, Ctrl-C)
-isn't graded: run the same command again to finish it. `Benchmark.reread(folder, system)` reads a run's saved answers again after a
-fix to an adapter's `parse`, with no call; `opb reread RUN_DIR` does the same from the command line,
-rebuilding the system from the run's `settings.json`. Grade the run again afterwards.
+isn't graded: run the same command again to finish it. A bug in an adapter's `parse` stops the run with
+the answer kept, unread (`"unread": true` in its record); the same command after the fix reads it with no
+call. `Benchmark.reread(folder, system)` reads every saved answer of a run again, with no call, after a fix
+to a `parse` that gave wrong outputs without raising; `opb reread RUN_DIR` does the same from the command
+line, rebuilding the system from the run's `settings.json`, and reports a `parse` that still raises as a
+bug. Grade the run again afterwards.
 
 The dataset is downloaded whole the first time (about 1.5 GB, 5,903 files), into the Hugging Face cache,
 even for a few pages. Set `HF_TOKEN` (or run `hf auth login`) to download faster and avoid the Hub's rate
@@ -136,10 +147,21 @@ that isn't thread-safe (pdfium is one) needs a lock. Its docstring says how to w
 [providers.md](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/providers.md) describes each. An adapter of your own is declared by its package
 under the entry-point group `omni_parse_bench.adapters`, pointing at its class.
 
-`parse` may raise when an answer can't be read: the page is then recorded as an unreadable answer (a
-`ReadError`) that counts 0, says what failed and keeps the raw answer, and `opb reread`
-(`Benchmark.reread`) reads it again after a fix. An error anywhere else in the adapter is a bug, and stops
-the run. A
+`send` and `parse` follow the one rule:
+
+- `send` raises `harness.errors.SystemFailed` for a refusal, an error status or an unusable answer, and
+  reads what the system sent back (a job id, a status) inside `omni_bench_core.adapter.reading`, which
+  turns a `ValueError`, `KeyError`, `IndexError`, `TypeError` or `AttributeError` inside into
+  `SystemFailed`;
+- `parse` raises `SystemFailed` when the answer holds no usable page, and reads the system's own
+  structures inside `reading`: the page is recorded as `Unreadable`, which counts 0, says where it was
+  raised and keeps the raw answer. An output it can't read (malformed blocks) is left out, with its reason
+  in its second value, so only that output's tests fail; and
+- anything else either raises is a bug, and stops the run. A bug in `parse` keeps the answer unread, and
+  running the same command again after the fix reads it with no call.
+
+`harness.errors.SystemFailed` and its kinds are the core's own classes, which `reading` raises too. A
+failed call's reply goes in the error's `body`, which the record keeps as `raw`. A
 model server that refuses the connection (nothing listens at `base_url`) stops the run, saying how to
 start the server (`harness.errors.NoServer`), instead of failing every page.
 
@@ -259,6 +281,11 @@ if __name__ == "__main__":
 A run is graded over the pages it chose (its `settings.json`), on every test of those pages. Its dataset
 and manifest come from there too.
 
+`UnitTests.prediction` reads each page's prediction. Under the one rule, a prediction that isn't an object
+of outputs is the system's failure: it raises `SystemFailed`, the page counts 0, and its line of
+`scores.jsonl` has the error and its `traceback`. An output of the wrong shape inside it fails only that
+output's tests. Anything else `prediction` raises is a bug in the scorer, and stops grading.
+
 For your own predictions, put your system's outputs in a folder, one file per page,
 `predictions/<page_id>.json`, each `{"html": ..., "blocks": [...]}`. Such a folder is graded over the whole
 manifest, on every test; a page whose file lacks an output fails that output's tests. Grading writes
@@ -282,12 +309,14 @@ and a digest of its options and the question. omni-bench-core writes it:
 runs/datalab-1a2b3c4d/
   settings.json                 the system, its options, the dataset, its commit, the manifest, the task,
                                 the pages chosen, and the timeout
-  records/<page_id>.json        what each page's calls returned: the outputs, the raw answers, the error, the
-                                cost, and the adapter's package and version
+  records/<page_id>.json        what each page's calls returned: the outputs, the raw answers, the error
+                                with its traceback, the cost, and the adapter's package and version; and
+                                `"unread": true` for an answer a bug in `parse` left unread
   predictions/<page_id>.json    each page's outputs alone, which is all that grading reads
   unit_tests-<digest>/          the scorer's results
     scores.jsonl                one line per page: id, suite, status, row.document, tests, passed and
-                                per_family; or a failed page's error
+                                per_family; or a failed page's error, with a traceback when the scorer
+                                said the prediction is unusable
     summary.json                the summary: scorer, options, run, rows, failed, coverage, headline_is,
                                 headline and families, and partial when graded with --partial
     details/<page_id>.jsonl     one line per test, a test line (`unit_tests.lines`): page_id, suite,

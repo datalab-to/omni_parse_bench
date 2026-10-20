@@ -143,7 +143,7 @@ def layout_blocks(blocks: list[dict], turned: int = 0) -> list[dict]:
         if not box or None in (box.get(k) for k in ("left", "top", "right", "bottom")): continue
         if page.get("number", 1) != 1: continue
         if not (page.get("width") and page.get("height")):
-            raise errors.VendorError(f"block carries no page size: {str(b.get('metadata'))[:200]}",
+            raise errors.SystemFailed(f"block carries no page size: {str(b.get('metadata'))}",
                                      status=200)
         corners = (box["left"], box["top"], box["right"], box["bottom"])
         plain = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", b.get("content") or "")).strip()
@@ -170,14 +170,14 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         with adapter.reading("the uploaded file's id"):
             file_id = contract.json_object(r).get("id") if r.status_code == 200 else None
         if not file_id:
-            raise errors.VendorError(f"upload HTTP {r.status_code}: {r.text[:300]}",
+            raise errors.SystemFailed(f"upload HTTP {r.status_code}: {r.text}",
                                      status=r.status_code, body=r.text)
         r = client.post(f"{base_url}/parse_runs", json={"file": {"id": file_id}, **request.sent},
                         timeout=deadline.timeout(120))
         with adapter.reading("the parse run's id"):
             run_id = contract.json_object(r).get("id") if r.status_code == 200 else None
         if not run_id:
-            raise errors.VendorError(f"parse_runs HTTP {r.status_code}: {r.text[:300]}",
+            raise errors.SystemFailed(f"parse_runs HTTP {r.status_code}: {r.text}",
                                      status=r.status_code, body=r.text)
         retry = budget.PollRetry(deadline)
         with errors.job(run_id):
@@ -187,10 +187,10 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                     r = client.get(f"{base_url}/parse_runs/{run_id}", timeout=deadline.timeout(120))
                 except httpx.TransportError as exc:
                     if retry.again(): continue
-                    raise errors.VendorError(f"polling failed: {exc}"[:300], status=None) from None
+                    raise errors.transport(exc, "polling failed") from exc
                 if r.status_code != 200:
                     if retry.again(r.status_code): continue
-                    raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}",
+                    raise errors.SystemFailed(f"HTTP {r.status_code}: {r.text}",
                                              status=r.status_code, body=r.text)
                 retry.reset()
                 polls += 1
@@ -204,25 +204,29 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                 # unless the reason is an outage of Extend's, which a 500 retries.
                 why = f"{run.get('failureReason')}: {run.get('failureMessage')}"
                 outage = run.get("failureReason") in OUTAGES
-                raise errors.VendorError(f"parse run {status}: {why[:300]}", status=500 if outage else 200,
-                                         raw=run, cost=cost)
+                raise errors.SystemFailed(f"parse run {status}: {why}", status=500 if outage else 200,
+                                         body=run, cost=cost)
     return contract.Call(run, cost=cost, job_id=run_id)
 
 
 def parse(raw: dict, request: contract.Request, config: Extend | None = None) -> tuple[dict, dict]:
     """The outputs in a processed run: its content as html, and its blocks."""
-    chunks = (raw.get("output") or {}).get("chunks")
-    if chunks is None:
-        raise errors.VendorError(f"processed with no chunks: {str(raw)[:300]}", status=200)
-    blocks = [b for c in chunks for b in c.get("blocks") or []]
+    with adapter.reading("the run's chunks"):
+        chunks = (raw.get("output") or {}).get("chunks")
+        if chunks is None:
+            raise errors.SystemFailed(f"processed with no chunks: {str(raw)}", status=200)
+        blocks = [b for c in chunks for b in c.get("blocks") or []]
+        md = translated("\n\n".join(c.get("content") or "" for c in chunks))
     outputs, errs = {}, {}
     for o in request.outputs:
-        if o == "html":
-            outputs[o] = markdown.to_html(translated("\n\n".join(c.get("content") or "" for c in chunks)))
+        if o == "html": outputs[o] = markdown.to_html(md)
         if o == "blocks":
-            pages = ((raw.get("output") or {}).get("metadata") or {}).get("pages") or []
-            turned = next((x.get("rotationApplied") or 0 for x in pages if x.get("number", 1) == 1), 0)
-            try: outputs[o] = layout_blocks(blocks, turned)
-            except (errors.VendorError, KeyError, TypeError, ValueError) as exc:
+            try:
+                with adapter.reading("the run's blocks"):
+                    pages = ((raw.get("output") or {}).get("metadata") or {}).get("pages") or []
+                    turned = next((x.get("rotationApplied") or 0 for x in pages if x.get("number", 1) == 1),
+                                  0)
+                    outputs[o] = layout_blocks(blocks, turned)
+            except errors.SystemFailed as exc:
                 errs[o] = errors.unread(exc)
     return outputs, errs

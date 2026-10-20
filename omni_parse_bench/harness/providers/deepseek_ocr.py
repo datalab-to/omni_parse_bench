@@ -10,6 +10,8 @@ import re
 from pathlib import Path
 from typing import Any, ClassVar
 
+from omni_bench_core import adapter
+
 from ... import markdown
 from .. import contract, errors, http, layout
 from ..adapter import PageAdapter
@@ -143,17 +145,19 @@ def blocks(said: str) -> list[dict]:
 
 
 def parse(raw: dict, request: contract.Request, config: DeepseekOcr | None = None) -> tuple[dict, dict]:
-    """The page and its blocks. A block type LABELS lacks fails the blocks only."""
+    """The page and its blocks. A malformed block, or a type LABELS lacks, fails the page's blocks output
+    only; its html is still graded."""
     # Note: a reply cut at the token limit is read as it is, as the repository's scripts read it.
     if raw.get("finish_reason") not in ("stop", "length"):
-        raise errors.VendorError(f"the reply didn't finish: {raw.get('finish_reason')}", status=200)
+        raise errors.SystemFailed(f"the reply didn't finish: {raw.get('finish_reason')}", status=200)
     said = raw.get("raw") or ""
     outputs, errs = {}, {}
     if "html" in request.outputs:
         outputs["html"] = markdown.to_html(page_markdown(said))
     if "blocks" in request.outputs:
         try:
-            outputs["blocks"] = blocks(said)
-        except errors.VendorError as exc:
+            with adapter.reading("the reply's boxes"):
+                outputs["blocks"] = blocks(said)
+        except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

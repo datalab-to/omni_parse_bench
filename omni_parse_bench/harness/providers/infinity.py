@@ -114,7 +114,7 @@ def requests(wants: frozenset[str], config: Infinity) -> list[contract.Request]:
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Infinity) -> contract.Call:
     raw = http.parse(config, page, timeout)
     if raw.get("model") != config.model:
-        raise errors.VendorError(f"the server serves {raw.get('model')!r}, not {config.model!r}: set the "
+        raise errors.SystemFailed(f"the server serves {raw.get('model')!r}, not {config.model!r}: set the "
                                  f"`model` option to the model it serves", status=200)
     # Note: a reply cut at the token limit is kept: its complete elements are read, as the SDK reads them.
     with adapter.reading("the server's answer"):
@@ -138,7 +138,7 @@ def parse(raw: dict, request: contract.Request, config: Infinity | None = None) 
     """The SDK's reading, headers and footers kept; the elements as blocks."""
     llm.content(raw["completion"])     # the reply finished, or was cut at its token limit
     if "json" not in raw:
-        raise errors.VendorError("the reply is empty", status=200)
+        raise errors.SystemFailed("the reply is empty", status=200)
     outputs, errs = {}, {}
     if "html" in request.outputs:
         outputs["html"] = markdown.to_html(raw["markdown"])
@@ -148,10 +148,11 @@ def parse(raw: dict, request: contract.Request, config: Infinity | None = None) 
             errs["blocks"] = "the reply is not a JSON list of elements: no layout"
         else:
             try:
-                outputs["blocks"] = [
-                    layout.block(layout.label(LABELS, str(x.get("category"))), x["bbox"], (1000, 1000),
-                                 " ".join(views.text(str(x.get("text") or "")).split()))
-                    for x in items if isinstance(x.get("bbox"), list) and len(x["bbox"]) == 4]
-            except errors.VendorError as exc:
+                with adapter.reading("the reply's elements"):
+                    outputs["blocks"] = [
+                        layout.block(layout.label(LABELS, str(x.get("category"))), x["bbox"], (1000, 1000),
+                                     " ".join(views.text(str(x.get("text") or "")).split()))
+                        for x in items if isinstance(x.get("bbox"), list) and len(x["bbox"]) == 4]
+            except errors.SystemFailed as exc:
                 errs["blocks"] = errors.unread(exc)
     return outputs, errs

@@ -89,7 +89,7 @@ def test_tesseract_output_that_isnt_utf8_is_decoded_not_a_crash():
            "sys.exit(1)")
     clock = budget.Budget(60)
     assert tesseract.run([sys.executable, "-c", bad], clock, check=False).stdout == "ok \ufffd"
-    with pytest.raises(errors.VendorError, match="tesseract exited 1: no \ufffd"):
+    with pytest.raises(errors.SystemFailed, match="tesseract exited 1: no \ufffd"):
         tesseract.run([sys.executable, "-c", bad], clock)
 
 
@@ -110,7 +110,7 @@ def test_a_timeout_is_printed_with_its_decimals():
 
     clock = budget.Budget(0.1)
     while not clock.expired(): pass
-    with pytest.raises(errors.VendorTimeout, match="uniform 0.1 s limit"):
+    with pytest.raises(errors.SystemTimeout, match="uniform 0.1 s limit"):
         clock.check("the job")
 
 
@@ -137,11 +137,41 @@ def test_an_answer_that_doesnt_parse_is_recorded(tmp_path, monkeypatch):
     assert r["cost"]["attempts"] == 1
 
 
+@pytest.mark.parametrize("exc, kind", [("ConnectError", "SystemUnreachable"),
+                                       ("ReadError", "SystemUnreachable"),
+                                       ("ReadTimeout", "SystemTimeout")])
+def test_a_transport_failure_is_the_pages_failure_with_its_cause(tmp_path, monkeypatch, exc, kind):
+    import httpx
+
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+
+    def fails():
+        raise getattr(httpx, exc)("the network went away")
+
+    monkeypatch.setitem(ANSWER, 0, fails)
+    r = core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
+    assert r["error"]["type"] == kind and f"httpx.{exc}: the network went away" in r["error"]["traceback"], r
+
+
+def test_a_refused_connection_stops_the_run(tmp_path, monkeypatch):
+    import httpx
+
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+
+    def refused():
+        raise httpx.ConnectError("refused") from ConnectionRefusedError(61, "Connection refused")
+
+    monkeypatch.setitem(ANSWER, 0, refused)
+    with pytest.raises(errors.NoServer) as got:
+        core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
+    assert errors.refused(got.value), "the refusal stays in the chain"
+
+
 def test_a_failure_that_is_the_accounts_stops_the_run(tmp_path, monkeypatch):
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
 
     def refused():
-        raise errors.VendorError("invalid key", status=401)
+        raise errors.SystemFailed("invalid key", status=401)
 
     monkeypatch.setitem(ANSWER, 0, refused)
     with pytest.raises(errors.AccountFailure):
@@ -156,13 +186,33 @@ def test_a_saved_answer_is_read_again_without_a_call(tmp_path):
     assert core.reread(Stub(), x, r | {"output": None})["output"] == r["output"]
 
 
-def test_a_parse_that_raises_is_recorded_as_a_read_error_keeping_the_answer(tmp_path, monkeypatch):
-    """Not a page scored 0 with no error: the record says what failed, and keeps the answer to read again."""
+def test_a_parse_that_raises_a_bug_keeps_the_answer_unread(tmp_path, monkeypatch):
+    """A KeyError in `parse` is a bug, not the system's failure: it isn't counted 0, and the answer is kept,
+    unread, for the fixed `parse` to read."""
+    from omni_bench_core import errors as core_errors
+
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
     monkeypatch.setitem(ANSWER, 0, lambda: contract.Call({"text": "alpha"}))
+    with pytest.raises(core_errors.Unread) as got:
+        core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
+    r = got.value.record
+    assert isinstance(got.value.__cause__, KeyError)
+    assert (r["output"], r["error"], r["unread"], r["raw"][0]["raw"]) == (None, None, True, {"text": "alpha"})
+
+
+def test_a_parse_raising_system_failed_is_recorded_as_unreadable(tmp_path, monkeypatch):
+    """`parse` raising `SystemFailed` on purpose: the page counts 0, and the record says where, and keeps the
+    answer to read again."""
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+
+    def parse(self, raw, request):
+        raise errors.SystemFailed("no page in the answer", status=200)
+
+    monkeypatch.setattr(Stub, "parse", parse)
     r = core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
-    assert r["output"] is None and r["error"]["type"] == "ReadError" and "KeyError" in r["error"]["message"]
-    assert r["raw"][0]["raw"] == {"text": "alpha"}
+    assert r["output"] is None and r["error"]["type"] == "Unreadable", r
+    assert "no page in the answer" in r["error"]["message"] and "in parse" in r["error"]["traceback"]
+    assert r["raw"][0]["raw"] == {"html": "<p>alpha beta</p>"}
 
 
 @pytest.mark.parametrize("name, key", [("datalab", "DATALAB_API_KEY"), ("reducto", "REDUCTO_API_KEY"),
@@ -263,7 +313,7 @@ def test_a_llamaparse_item_nested_in_another_gives_its_own_box():
 
 def test_a_llamaparse_page_that_failed_is_an_error_not_an_empty_page():
     raw = {"markdown": {"pages": [{"page_number": 1, "success": False, "error": "timeout"}]}}
-    with pytest.raises(errors.VendorError, match="timeout"):
+    with pytest.raises(errors.SystemFailed, match="timeout"):
         llamaparse.parse(raw, contract.Request(frozenset({"html"}), {}))
 
 

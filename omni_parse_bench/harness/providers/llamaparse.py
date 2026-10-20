@@ -97,7 +97,7 @@ def layout_blocks(page: dict) -> list[dict]:
     """The page's item boxes as the `blocks` output, in the frame of the page's size."""
     frame = (page.get("page_width"), page.get("page_height"))
     if not all(frame):
-        raise errors.VendorError(f"items carry no page size: {str(page)[:200]}", status=200)
+        raise errors.SystemFailed(f"items carry no page size: {str(page)}", status=200)
     out = []
     for item in items(page.get("items")):
         md = item.get("md") or item.get("value") or ""
@@ -135,7 +135,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         with adapter.reading("the job's id"):
             job_id = contract.json_object(r).get("id") if r.status_code == 200 else None
         if not job_id:
-            raise errors.VendorError(f"upload HTTP {r.status_code}: {r.text[:300]}",
+            raise errors.SystemFailed(f"upload HTTP {r.status_code}: {r.text}",
                                      status=r.status_code, body=r.text)
         retry = budget.PollRetry(deadline)
         with errors.job(job_id):
@@ -145,10 +145,10 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                     r = client.get(f"{base_url}/api/v2/parse/{job_id}", timeout=deadline.timeout(120))
                 except httpx.TransportError as exc:
                     if retry.again(): continue
-                    raise errors.VendorError(f"polling failed: {exc}"[:300], status=None) from None
+                    raise errors.transport(exc, "polling failed") from exc
                 if r.status_code != 200:
                     if retry.again(r.status_code): continue
-                    raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}",
+                    raise errors.SystemFailed(f"HTTP {r.status_code}: {r.text}",
                                              status=r.status_code, body=r.text)
                 retry.reset()
                 polls += 1
@@ -159,8 +159,8 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                 if job.get("status") in TERMINAL: break
                 time.sleep(min(config.poll_interval, deadline.remaining()))
             if job.get("status") != "COMPLETED":
-                raise errors.VendorError(f"job {job.get('status')}: {str(job.get('error_message'))[:300]}",
-                                         status=200, raw={"job": job}, cost=_cost({"job": job}, job))
+                raise errors.SystemFailed(f"job {job.get('status')}: {str(job.get('error_message'))}",
+                                         status=200, body={"job": job}, cost=_cost({"job": job}, job))
             # Note: the result is fetched with the same retry as the polls, since failing here would
             # re-run, and re-pay for, a job that is done.
             while True:
@@ -169,11 +169,10 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                                    params={"expand": "markdown,items,usage"}, timeout=deadline.timeout(120))
                 except httpx.TransportError as exc:
                     if retry.again(): continue
-                    why = f"fetching the result failed: {exc}"[:300]
-                    raise errors.VendorError(why, status=None) from None
+                    raise errors.transport(exc, "fetching the result failed") from exc
                 if r.status_code == 200: break
                 if retry.again(r.status_code): continue
-                raise errors.VendorError(f"result HTTP {r.status_code}: {r.text[:300]}",
+                raise errors.SystemFailed(f"result HTTP {r.status_code}: {r.text}",
                                          status=r.status_code, body=r.text)
     with adapter.reading("the job's result"):
         body = contract.json_object(r)
@@ -191,20 +190,23 @@ def _cost(body: dict, job: dict) -> contract.Cost:
 
 def parse(raw: dict, request: contract.Request, config: LlamaParse | None = None) -> tuple[dict, dict]:
     """The outputs in a result: header, markdown and footer as html, and blocks."""
-    pages = [p for p in (raw.get("markdown") or {}).get("pages") or [] if p.get("page_number", 1) == 1]
-    items = [p for p in (raw.get("items") or {}).get("pages") or [] if p.get("page_number", 1) == 1]
-    if not pages:
-        raise errors.VendorError(f"completed with no markdown: {str(raw)[:300]}", status=200)
-    # Note: a job completes although a page of it failed; that page carries success false and its error.
-    if pages[0].get("success") is False:
-        raise errors.VendorError(f"the page failed: {str(pages[0].get('error'))[:300]}", status=200)
+    with adapter.reading("the result's pages"):
+        pages = [p for p in (raw.get("markdown") or {}).get("pages") or [] if p.get("page_number", 1) == 1]
+        items = [p for p in (raw.get("items") or {}).get("pages") or [] if p.get("page_number", 1) == 1]
+        if not pages:
+            raise errors.SystemFailed(f"completed with no markdown: {str(raw)}", status=200)
+        # Note: a job completes although a page of it failed; that page carries success false and its error.
+        if pages[0].get("success") is False:
+            raise errors.SystemFailed(f"the page failed: {str(pages[0].get('error'))}", status=200)
+        md = "\n\n".join(x for x in (pages[0].get("header"), pages[0].get("markdown"), pages[0].get("footer"))
+                          if x)
     outputs, errs = {}, {}
     for o in request.outputs:
-        if o == "html":
-            parts = (pages[0].get("header"), pages[0].get("markdown"), pages[0].get("footer"))
-            outputs[o] = markdown.to_html("\n\n".join(x for x in parts if x))
+        if o == "html": outputs[o] = markdown.to_html(md)
         if o == "blocks" and items:
-            try: outputs[o] = layout_blocks(items[0])
-            except (errors.VendorError, KeyError, TypeError, ValueError) as exc:
+            try:
+                with adapter.reading("the result's items"):
+                    outputs[o] = layout_blocks(items[0])
+            except errors.SystemFailed as exc:
                 errs[o] = errors.unread(exc)
     return outputs, errs

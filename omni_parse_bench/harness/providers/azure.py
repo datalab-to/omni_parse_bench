@@ -105,7 +105,7 @@ def layout_blocks(content: dict) -> list[dict]:
     """Paragraphs outside tables, tables and figures as the `blocks` output, in the page's frame."""
     pages = {p["pageNumber"]: p for p in content.get("pages") or []}
     if not (page := pages.get(1)) or not (page.get("width") and page.get("height")):
-        raise errors.VendorError(f"no size for page 1: {str(list(pages.values()))[:200]}", status=200)
+        raise errors.SystemFailed(f"no size for page 1: {str(list(pages.values()))}", status=200)
     frame = (page["width"], page["height"])
     tables = [t.get("span") or {} for t in content.get("tables") or []]
 
@@ -145,7 +145,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         r = client.post(url, content=page.read_bytes(), headers={"Content-Type": media},
                         timeout=deadline.timeout(300))
         if r.status_code >= 400 or not (op := r.headers.get("Operation-Location")):
-            raise errors.VendorError(f"analyze HTTP {r.status_code}: {r.text[:300]}",
+            raise errors.SystemFailed(f"analyze HTTP {r.status_code}: {r.text}",
                                      status=r.status_code, body=r.text)
         with adapter.reading("the analysis's id"):
             job_id = contract.json_object(r).get("id")
@@ -157,10 +157,10 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                     r = client.get(op, timeout=deadline.timeout(120))
                 except httpx.TransportError as exc:
                     if retry.again(): continue
-                    raise errors.VendorError(f"polling failed: {exc}"[:300], status=None) from None
+                    raise errors.transport(exc, "polling failed") from exc
                 if r.status_code != 200:
                     if retry.again(r.status_code): continue
-                    raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}",
+                    raise errors.SystemFailed(f"HTTP {r.status_code}: {r.text}",
                                              status=r.status_code, body=r.text)
                 retry.reset()
                 polls += 1
@@ -169,22 +169,25 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                 if str(body.get("status")).lower() in TERMINAL: break
                 time.sleep(min(config.poll_interval, deadline.remaining()))
             if str(body.get("status")).lower() != "succeeded":
-                raise errors.VendorError(f"analysis {body.get('status')}: {str(body.get('error'))[:300]}",
-                                         status=200, raw=body)
+                raise errors.SystemFailed(f"analysis {body.get('status')}: {str(body.get('error'))}",
+                                         status=200, body=body)
     return contract.Call(body, cost=contract.Cost(), job_id=job_id)
 
 
 def parse(raw: dict, request: contract.Request, config: Azure | None = None) -> tuple[dict, dict]:
     """The outputs in a finished analysis: markdown with header comments unwrapped, and blocks."""
-    contents = (raw.get("result") or {}).get("contents") or []
-    if not contents:
-        raise errors.VendorError(f"succeeded with no contents: {str(raw)[:300]}", status=200)
-    md = contents[0].get("markdown") or ""
+    with adapter.reading("the analysis's contents"):
+        contents = (raw.get("result") or {}).get("contents") or []
+        if not contents:
+            raise errors.SystemFailed(f"succeeded with no contents: {str(raw)}", status=200)
+        md = PAGE_MARKER.sub(lambda m: m[1], contents[0].get("markdown") or "")
     outputs, errs = {}, {}
     for o in request.outputs:
-        if o == "html": outputs[o] = markdown.to_html(PAGE_MARKER.sub(lambda m: m[1], md))
+        if o == "html": outputs[o] = markdown.to_html(md)
         if o == "blocks":
-            try: outputs[o] = layout_blocks(contents[0])
-            except (errors.VendorError, KeyError, TypeError, ValueError) as exc:
+            try:
+                with adapter.reading("the analysis's paragraphs, tables and figures"):
+                    outputs[o] = layout_blocks(contents[0])
+            except errors.SystemFailed as exc:
                 errs[o] = errors.unread(exc)
     return outputs, errs

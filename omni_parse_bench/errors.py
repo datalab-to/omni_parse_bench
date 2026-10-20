@@ -7,9 +7,24 @@ from our bugs:
                        server that isn't running, or a bug in an adapter; fix it and run the same command
                        again
     MissingCredential  the Stop of a missing key
+    Bug                the Stop of a bug in an adapter or a scorer, with its traceback
+    SystemFailed       the system failed on one page, which counts 0; raised on purpose, never a Stop.
+                       `SystemTimeout`, `SystemUnreachable` and `Unreadable` are its kinds
 
 Anything else raised is a bug of ours. `counted` writes a count in a message.
 """
-from omni_bench_core.errors import MissingCredential, Stop, Unfinished, UsageError, counted
+from omni_bench_core.errors import (
+    Bug,
+    MissingCredential,
+    Stop,
+    SystemFailed,
+    SystemTimeout,
+    SystemUnreachable,
+    Unfinished,
+    Unreadable,
+    UsageError,
+    counted,
+)
 
-__all__ = ["MissingCredential", "Stop", "Unfinished", "UsageError", "counted"]
+__all__ = ["Bug", "MissingCredential", "Stop", "SystemFailed", "SystemTimeout", "SystemUnreachable",
+           "Unfinished", "Unreadable", "UsageError", "counted"]

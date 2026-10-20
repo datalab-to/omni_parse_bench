@@ -49,12 +49,12 @@ def post(url: str, body: dict, deadline: budget.Budget, key: str | None = None) 
     headers = {"Authorization": f"Bearer {key}"} if key else {}
     try:
         r = httpx.post(url, json=body, headers=headers, timeout=max(1.0, deadline.remaining()))
-    except httpx.TimeoutException:
-        raise errors.VendorTimeout(f"no answer within {deadline.total:g} s") from None
+    except httpx.TimeoutException as exc:
+        raise errors.SystemTimeout(f"no answer within {deadline.total:g} s") from exc
     except httpx.TransportError as exc:
-        if errors.refused(exc): raise errors.NoServer(url) from None
-        raise errors.VendorUnreachable(f"connection failed: {exc}"[:300]) from None
+        if errors.refused(exc): raise errors.NoServer(url) from exc
+        raise errors.transport(exc, "connection failed") from exc
     if r.status_code != 200:
-        raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}", status=r.status_code, body=r.text)
+        raise errors.SystemFailed(f"HTTP {r.status_code}: {r.text}", status=r.status_code, body=r.text)
     with adapter.reading("the server's answer"):
         return contract.json_object(r)

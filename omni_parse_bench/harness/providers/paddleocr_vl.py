@@ -9,6 +9,8 @@ import re
 from pathlib import Path
 from typing import Any, ClassVar
 
+from omni_bench_core import adapter
+
 from ... import markdown
 from .. import contract, errors, http, layout
 from ..adapter import PageAdapter
@@ -55,8 +57,9 @@ class PaddleOcrVl(PageAdapter):
                               pixels of the page as loaded, content) and its markdown, every block kept
                               (`markdown_ignore_labels` empty).
       5. Mapping to opb outputs  html is that markdown through `markdown.to_html`; blocks are its blocks,
-                              each label from LABELS, content with tags removed. A block type LABELS lacks
-                              fails blocks only.
+                              each label from LABELS, content with tags removed. A malformed block, or
+                              a type LABELS lacks, fails the page's blocks output only; its html is
+                              still graded.
 
     Differences from the vendor:
 
@@ -118,13 +121,14 @@ def blocks(raw: dict) -> list[dict]:
 
 def parse(raw: dict, request: contract.Request, config: PaddleOcrVl | None = None) -> tuple[dict, dict]:
     if "markdown" not in raw:
-        raise errors.VendorError(f"no markdown in the answer: {str(raw)[:300]}", status=200)
+        raise errors.SystemFailed(f"no markdown in the answer: {str(raw)}", status=200)
     outputs, errs = {}, {}
     if "html" in request.outputs:
         outputs["html"] = markdown.to_html(raw["markdown"])
     if "blocks" in request.outputs:
         try:
-            outputs["blocks"] = blocks(raw)
-        except (errors.VendorError, KeyError, TypeError, ValueError) as exc:
+            with adapter.reading("the pipeline's blocks"):
+                outputs["blocks"] = blocks(raw)
+        except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

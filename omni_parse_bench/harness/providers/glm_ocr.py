@@ -10,6 +10,8 @@ import re
 from pathlib import Path
 from typing import Any, ClassVar
 
+from omni_bench_core import adapter
+
 from ... import markdown
 from .. import contract, errors, http, layout
 from ..adapter import PageAdapter
@@ -123,15 +125,16 @@ def _block(region: dict) -> dict:
 
 
 def parse(raw: dict, request: contract.Request, config: GlmOcr | None = None) -> tuple[dict, dict]:
-    """The page from `markdown_result`; the blocks from `json_result`. A label LABELS lacks fails the
-    blocks only."""
+    """The page from `markdown_result`; the blocks from `json_result`. A malformed block, or a type LABELS
+    lacks, fails the page's blocks output only; its html is still graded."""
     outputs, errs = {}, {}
     if "html" in request.outputs:
         md = _IMAGE_PLACEHOLDER.sub("", raw.get("markdown_result") or "")
         outputs["html"] = markdown.to_html(md)
     if "blocks" in request.outputs:
         try:
-            outputs["blocks"] = [_block(r) for r in _regions(raw) if r.get("bbox_2d")]
-        except errors.VendorError as exc:
+            with adapter.reading("the SDK's regions"):
+                outputs["blocks"] = [_block(r) for r in _regions(raw) if r.get("bbox_2d")]
+        except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

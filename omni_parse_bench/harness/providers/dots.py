@@ -102,7 +102,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0, confi
 def parse(raw: dict, request: contract.Request, config: Dots | None = None) -> tuple[dict, dict]:
     """The server's page as html, its cells as blocks."""
     if not (raw.get("markdown") or "").strip():
-        raise errors.VendorError("the reply is empty", status=200)
+        raise errors.SystemFailed("the reply is empty", status=200)
     outputs, errs = {}, {}
     if "html" in request.outputs:
         outputs["html"] = markdown.to_html(raw["markdown"])
@@ -110,11 +110,13 @@ def parse(raw: dict, request: contract.Request, config: Dots | None = None) -> t
         if raw["cells"] is None:
             errs["blocks"] = "the reply's JSON doesn't parse: the parser's cleaned text, no layout"
         else:
+            cells, frame = raw["cells"], tuple(raw["image_size"])
             try:
-                outputs["blocks"] = [
-                    layout.block(layout.label(LABELS, c["category"]), c["bbox"], tuple(raw["image_size"]),
-                                 " ".join(views.text(str(c.get("text") or "")).split()))
-                    for c in raw["cells"] if c.get("bbox")]
-            except errors.VendorError as exc:
+                with adapter.reading("the reply's cells"):
+                    outputs["blocks"] = [
+                        layout.block(layout.label(LABELS, c["category"]), c["bbox"], frame,
+                                     " ".join(views.text(str(c.get("text") or "")).split()))
+                        for c in cells if c.get("bbox")]
+            except errors.SystemFailed as exc:
                 errs["blocks"] = errors.unread(exc)
     return outputs, errs

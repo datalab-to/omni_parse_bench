@@ -11,7 +11,6 @@ from typing import Any, ClassVar
 
 import httpx
 from omni_bench_core import adapter
-from omni_bench_core import errors as core_errors
 
 from omni_parse_bench.task import Input
 
@@ -79,9 +78,22 @@ class PageAdapter(adapter.Adapter[Input]):
     page. `SERVE` names the system's folder in providers/serve/ when it is a model you serve yourself, so the
     message says how to start its server.
 
-    `read` raises when an answer can't be read, so the core records the page as a `ReadError` that counts 0
-    and keeps the raw answer; after a fix to `parse`, `Benchmark.reread` (`opb reread`) reads it again with
-    no call. An error anywhere else in the adapter (`requests`, `send`) is a bug: it stops the run.
+    The core's one rule decides what an exception does: a page counts 0 only when the adapter says, on
+    purpose, that the system failed, by raising `errors.SystemFailed`; any other exception is a bug in the
+    adapter, and stops the run (`omni_bench_core.errors`). So:
+
+    - `send` raises `SystemFailed` for a refusal, an error status or an answer it can see is unusable, and
+      reads what the system sent back (a job id, a status) inside `omni_bench_core.adapter.reading`, which
+      turns a malformed answer into `SystemFailed`;
+    - `parse` does the same for the outputs: it raises `SystemFailed` when the answer holds no usable page,
+      and reads the system's own structures inside `reading`. The core records the page as `Unreadable`,
+      which counts 0 and keeps the raw answer. One output it can't read is left out, with its reason in
+      the second value, so only that output's tests fail: blocks are read inside `reading` within a `try`
+      that catches `SystemFailed`, so a malformed block fails the page's blocks output only; its html is
+      still graded; and
+    - anything else `parse` raises is a bug: the core keeps the answer unread and stops the run, and running
+      the same command again after the fix reads it with no call. After a fix to a `parse` that gave wrong
+      outputs without raising, `Benchmark.reread` (`opb reread`) reads every saved answer again.
 
     Like every adapter, its run folder is named by the core (`omni_bench_core.run.folder_name`): its label,
     then a digest of its name, every option (`base_url` included) and the question (dataset, manifest,
@@ -121,8 +133,8 @@ class PageAdapter(adapter.Adapter[Input]):
             try:
                 got = _send(self, x.page, r, clock.remaining())
             except errors.NoServer as exc:
-                raise errors.NoServer(getattr(self, "base_url", exc.url), self.provider, self.SERVE) from None
-            except core_errors.VendorError as exc:
+                raise errors.NoServer(getattr(self, "base_url", exc.url), self.provider, self.SERVE) from exc
+            except errors.SystemFailed as exc:
                 exc.sent = [*(a["sent"] for a in answers), r.sent]
                 paid = [exc.cost] if isinstance(exc.cost, adapter.Cost) else []
                 exc.cost = adapter.Cost.total([*costs, *paid])
@@ -134,7 +146,7 @@ class PageAdapter(adapter.Adapter[Input]):
         return adapter.Call(raw=answers, cost=adapter.Cost.total(costs), job_id=job,
                             sent=[a["sent"] for a in answers])
 
-    def account_failure(self, e: core_errors.VendorError) -> bool:
+    def account_failure(self, e: errors.SystemFailed) -> bool:
         """The core's rule, and a 403 too, unless it is a moderation flag on this page's content."""
         if e.status == 403:
             body = e.body if isinstance(e.body, str) else ""
@@ -143,8 +155,9 @@ class PageAdapter(adapter.Adapter[Input]):
 
     def read(self, raw: Any, x: Input) -> dict[str, Any]:
         """The page's outputs, parsed from each saved answer. An output `parse` says is missing (its second
-        value) is None, so its tests fail. Anything `parse` raises is raised: the core records the page as a
-        `ReadError` saying what failed, and keeps the raw answer to read again after a fix."""
+        value) is None, so its tests fail. Anything `parse` raises is raised: `SystemFailed` is recorded as
+        `Unreadable`, which counts 0, and anything else is a bug that stops the run; either way the raw answer
+        is kept to read again after a fix."""
         out: dict[str, Any] = {}
         for a in raw:
             parsed, _ = self.parse(a["raw"], contract.Request(frozenset(a["outputs"]), a["sent"]))
@@ -154,7 +167,7 @@ class PageAdapter(adapter.Adapter[Input]):
 
 def _send(a: PageAdapter, page: Path, r: contract.Request, timeout: float) -> contract.Call:
     """`a.send`, with the failures of HTTP itself mapped the same way for every adapter: a network fault is
-    `VendorUnreachable`, and a status an adapter checked with `raise_for_status` is a `VendorError` with that
+    `SystemUnreachable`, and a status an adapter checked with `raise_for_status` is a `SystemFailed` with that
     status and body.
 
     Nothing else is caught. An answer the system sent that can't be read is the system's failure only where
@@ -164,8 +177,8 @@ def _send(a: PageAdapter, page: Path, r: contract.Request, timeout: float) -> co
     try:
         return a.send(page, r, timeout=timeout)
     except httpx.TransportError as exc:
-        if errors.refused(exc): raise errors.NoServer(getattr(a, "base_url", "its address")) from None
-        raise errors.VendorUnreachable(f"{type(exc).__name__}: {exc}"[:300]) from None
+        if errors.refused(exc): raise errors.NoServer(getattr(a, "base_url", "its address")) from exc
+        raise errors.transport(exc, "the request failed") from exc
     except httpx.HTTPStatusError as exc:
         status, body = exc.response.status_code, exc.response.text
-        raise errors.VendorError(f"HTTP {status}: {body[:300]}", status=status, body=body) from None
+        raise errors.SystemFailed(f"HTTP {status}: {body}", status=status, body=body) from exc

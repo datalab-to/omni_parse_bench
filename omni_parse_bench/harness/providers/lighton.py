@@ -132,7 +132,7 @@ def requests(wants: frozenset[str], config: LightOn) -> list[contract.Request]:
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: LightOn) -> contract.Call:
     raw = http.parse(config, page, timeout)
     if raw.get("model") != config.model:
-        raise errors.VendorError(f"the server serves {raw.get('model')!r}, not {config.model!r}: set the "
+        raise errors.SystemFailed(f"the server serves {raw.get('model')!r}, not {config.model!r}: set the "
                                  f"`model` option to the model it serves", status=200)
     with adapter.reading("the server's answer"):
         completion = raw["completion"]
@@ -177,12 +177,12 @@ def render(label: str, md: str) -> str:
 
 
 def parse(raw: dict, request: contract.Request, config: LightOn | None = None) -> tuple[dict, dict]:
-    """The outputs in a finished reply, as the server repaired it. A label LABELS lacks fails the
-    blocks only."""
+    """The outputs in a finished reply, as the server repaired it. A malformed block, or a type LABELS
+    lacks, fails the page's blocks output only; its html is still graded."""
     llm.content(raw["completion"])
     text = raw["text"]
     if not text.strip():
-        raise errors.VendorError("the reply is empty", status=200)
+        raise errors.SystemFailed("the reply is empty", status=200)
     parts = split(text)
     outputs, errs = {}, {}
     if "html" in request.outputs:
@@ -190,8 +190,9 @@ def parse(raw: dict, request: contract.Request, config: LightOn | None = None) -
                                                        for label, _, md in parts if md))
     if "blocks" in request.outputs:
         try:
-            outputs["blocks"] = [layout.block(layout.label(LABELS, label), box, (1000, 1000), _plain(md))
-                                 for label, box, md in parts if label]
-        except errors.VendorError as exc:
+            with adapter.reading("the reply's blocks"):
+                outputs["blocks"] = [layout.block(layout.label(LABELS, label), box, (1000, 1000), _plain(md))
+                                     for label, box, md in parts if label]
+        except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

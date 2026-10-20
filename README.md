@@ -104,16 +104,26 @@ draws no layout blocks (such as `tesseract`, `nanonets-ocr` and `olmocr`) runs t
 [Grade](#grade) says how to read its results. `opb run --help` has every option and its default.
 
 What happens when something goes wrong (a page the system refuses, a timeout, a missing key, a model
-server that isn't running, a bug in an adapter, Ctrl-C) follows three rules, the same for every system.
+server that isn't running, a bug in an adapter, Ctrl-C) follows one rule, the same for every system:
+
+    A page counts 0 only when code says, on purpose, that the system failed, by raising `SystemFailed`.
+    Any other exception stops the run and prints its traceback.
+
 The table in [omni-bench-core's "The rules"](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules) says, case by case, what you see, how the
 page counts, and what to do. In short:
 
-- a failure that is the system's counts 0;
-- an answer the adapter can't read is recorded as unreadable (`ReadError`) and counts 0, keeping the
-  raw answer; after a fix to the adapter, `opb reread RUN_DIR` reads the saved answers again with no
-  call, and `opb grade RUN_DIR` grades the run again;
-- a failure of the setup (a key, an account, a server) or a bug elsewhere in an adapter stops the run
-  with nothing recorded for that page, so the same command resumes it; and
+- a failure that is the system's (`SystemFailed`, or its kinds `SystemTimeout` and `SystemUnreachable`)
+  counts 0. Its record keeps the error with a `traceback`, which shows the line that decided the system
+  failed;
+- an answer the adapter says it can't read is recorded as `Unreadable` and counts 0, keeping the raw
+  answer;
+- a bug in an adapter or in the scorer stops the run with its traceback. When it is in reading an
+  answer, the answer is kept, unread (`"unread": true` in its record), and running the same command again
+  after the fix reads it with no call;
+- a failure of the setup (a key, an account, a server) stops the run with nothing recorded for that
+  page, so the same command resumes it;
+- after a fix to an adapter that read answers wrongly without raising, `opb reread RUN_DIR` reads the
+  saved answers again with no call, and `opb grade RUN_DIR` grades the run again; and
 - a run that stopped part way isn't graded until it is finished.
 
 Each system's key, read from the environment (`opb systems NAME` says the same):
@@ -310,7 +320,7 @@ from omni_parse_bench.scorers import unit_tests
 system = harness.system("datalab", {"mode": "balanced"})
 record = adapter.predict(system, harness.Input(Path("pages/<page_id>.pdf"), frozenset({"html", "blocks"})))
 record["output"]        # {"html": "...", "blocks": [...]}
-record["error"]         # why the page failed, or None
+record["error"]         # why the page failed (type, status, message, traceback), or None
 record["cost"]          # what it cost, its wall time and attempts
 
 unit_tests.score(record["output"], unit_tests.tests.read("gold/<page_id>.json"))

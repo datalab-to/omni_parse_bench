@@ -96,10 +96,10 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
     try:
         r = httpx.post(f"{config.base_url.rstrip('/')}/v1/ocr", json=body,
                        headers={"Authorization": f"Bearer {key}"}, timeout=max(1.0, deadline.remaining()))
-    except httpx.TimeoutException:
-        raise errors.VendorTimeout(f"no answer within the call's {deadline.total:g} s") from None
+    except httpx.TimeoutException as exc:
+        raise errors.SystemTimeout(f"no answer within the call's {deadline.total:g} s") from exc
     if r.status_code != 200:
-        raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}", status=r.status_code, body=r.text)
+        raise errors.SystemFailed(f"HTTP {r.status_code}: {r.text}", status=r.status_code, body=r.text)
     with adapter.reading("the OCR response"):
         body = contract.json_object(r)
     return contract.Call(body, cost=contract.Cost())
@@ -116,7 +116,7 @@ def layout_blocks(page: dict) -> list[dict]:
     """The page's blocks as the `blocks` output, in the page's pixel frame."""
     dims = page.get("dimensions") or {}
     if not (dims.get("width") and dims.get("height")):
-        raise errors.VendorError(f"no size for the page: {dims}", status=200)
+        raise errors.SystemFailed(f"no size for the page: {dims}", status=200)
     out = []
     for b in page.get("blocks") or []:
         corners = (b["top_left_x"], b["top_left_y"], b["bottom_right_x"], b["bottom_right_y"])
@@ -129,13 +129,17 @@ def layout_blocks(page: dict) -> list[dict]:
 def parse(raw: dict, request: contract.Request, config: Mistral | None = None) -> tuple[dict, dict]:
     """The outputs in an OCR response: the page with its header and footer, and its blocks."""
     if not (pages := raw.get("pages")):
-        raise errors.VendorError(f"no pages in the answer: {str(raw)[:300]}", status=200)
-    page = pages[0]
+        raise errors.SystemFailed(f"no pages in the answer: {str(raw)}", status=200)
+    with adapter.reading("the OCR response's page"):
+        page = pages[0]
+        md = page_markdown(page)
     outputs, errs = {}, {}
     for o in request.outputs:
-        if o == "html": outputs[o] = markdown.to_html(page_markdown(page))
+        if o == "html": outputs[o] = markdown.to_html(md)
         if o == "blocks":
-            try: outputs[o] = layout_blocks(page)
-            except (errors.VendorError, KeyError, TypeError, ValueError) as exc:
+            try:
+                with adapter.reading("the page's blocks"):
+                    outputs[o] = layout_blocks(page)
+            except errors.SystemFailed as exc:
                 errs[o] = errors.unread(exc)
     return outputs, errs
