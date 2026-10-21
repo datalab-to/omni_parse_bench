@@ -80,8 +80,10 @@ CI) it goes ahead without asking, so a script runs as written. It then predicts,
 the run's progress, and grades it. The grading is JSON on stdout, and in the run's folder.
 
 A run is one system. A run folder answers one exact question: the system, its options, the dataset, the
-manifest and the pages chosen. Asking another question uses another folder; asking the same one again
-resumes the same folder and pays for no page twice. So each setting of a system is its own run.
+manifest and the pages chosen. Every `opb run` is a new run in a new folder, named after its question and a
+run id (`datalab-1a2b3c4d-20261021-160012-3f9a`). `--resume <that name>` continues it instead, for the same
+question only, and pays for no page twice. So each setting of a system is its own run, and a system redeployed
+since an earlier run is never mixed into it.
 
 A run is one system, so to compare systems, or settings of one system, run one command per system, with
 the same choice of pages (`opb run` given several systems runs nothing, and raises a `ValueError` whose
@@ -120,9 +122,9 @@ page counts, and what to do. In short:
 - an answer the adapter says it can't read is recorded as `Unreadable` and counts 0, keeping the raw
   answer;
 - a bug in an adapter or in the scorer stops the run with its traceback. When it is in reading an
-  answer, the answer is kept, unread (`"unread": true` in its record), and running the same command again
+  answer, the answer is kept, unread (`"unread": true` in its record), and resuming the run (`--resume`)
   after the fix reads it with no call;
-- a failure of the setup stops the run with nothing recorded for that page, so the same command resumes
+- a failure of the setup stops the run with nothing recorded for that page, so resuming the run continues
   it. Each is a native exception: a missing key is a `ValueError`, an account that can't pay a
   `PermissionError`, and a model server that isn't running the connection error itself, with a note saying
   how to start it;

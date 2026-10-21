@@ -68,7 +68,7 @@ adapter makes are format changes, and each is checked to lose nothing:
   `omni_bench_core.adapter.reading`, which raises it for a malformed one. The record keeps the failure
   with its `traceback`. Any other exception is the adapter's bug, not the vendor's:
   - a bug in `parse` stops the run with its traceback; the raw answer is kept, unread (`"unread":
-    true`), and running the same command again after the fix reads it with no call; and
+    true`), and resuming the run (`--resume`) after the fix reads it with no call; and
   - a bug elsewhere in the adapter stops the run too, printing its whole traceback and whose code it
     is; and
 - cost is what the response states, else `Cost()` (unknown). Credits go in `credits`, never
@@ -294,9 +294,9 @@ that deploys it on any GPU host, and opb then benchmarks it from anywhere, point
 
 If nothing listens at `base_url` (the server isn't started, or the address is wrong), the connection is
 refused and the run stops before recording anything, with a message naming the address and the model's
-folder here. Start the server, or fix the address, and run the same command again. A server that is up
+folder here. Start the server, or fix the address, and resume the run (`--resume`). A server that is up
 but slow is different: a page it doesn't answer in time is recorded as a timeout, which counts 0 and is
-tried again with `--retry-failed`.
+tried again with `--resume` and `--retry-failed`.
 
 A folder holds:
 

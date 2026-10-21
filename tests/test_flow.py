@@ -94,7 +94,7 @@ def test_an_html_only_system_is_predicted_graded_and_resumed(tmp_path):
     assert s["scored"]["headline_is"] == "the mean of the families' scores" and "partial" not in s
     assert g["cost"]["usd"] == 0.03
     CALLS.clear()
-    b.run(Alpha(), tmp_path / "runs")
+    b.run(Alpha(), tmp_path / "runs", resume=name)
     assert CALLS == [], "a resumed run calls nothing"
     details = (tmp_path / "runs" / name / b.scorers[0].folder_name / "details" / "a-p0.jsonl").read_text()
     html, blocks = map(json.loads, details.splitlines())
@@ -338,7 +338,9 @@ def test_old_commands_still_work_and_say_what_replaced_them(tmp_path, capsys, mo
     assert cli.main(["benchmark", "--providers", "alpha", "--dataset", data, "--out", runs, "-y"]) == 0
     assert "`opb benchmark` is deprecated" in capsys.readouterr().err
     CALLS.clear()
-    assert cli.main(["run", "--providers", "alpha", "--dataset", data, "--out", runs, "--score-only"]) == 0
+    [name] = [p.name for p in (tmp_path / "runs").iterdir()]
+    assert cli.main(["run", "--providers", "alpha", "--dataset", data, "--out", runs, "--score-only",
+                     "--resume", name]) == 0
     out, err = capsys.readouterr()
     assert CALLS == [] and "--score-only is deprecated" in err
     [s] = json.loads(out)["scorers"].values()
@@ -397,9 +399,9 @@ def test_opb_reread_reads_a_runs_saved_answers_again(tmp_path, capsys, monkeypat
     assert "no predictions/ folder" in raised(["reread", str(tmp_path / "data")])
 
 
-def test_a_bug_in_parse_stops_the_run_and_the_same_command_reads_it_again(tmp_path, capsys, monkeypatch):
+def test_a_bug_in_parse_stops_the_run_and_resuming_reads_it_again(tmp_path, capsys, monkeypatch):
     """A KeyError in `parse` is a bug: the run stops with its traceback, the answer is kept unread, and after
-    the fix the same command reads it with no call."""
+    the fix resuming the run reads it with no call."""
     monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
     monkeypatch.setattr(sys.modules[__name__], "BROKEN", {"a-p0"})
     argv = ["run", "--system", "alpha", "--dataset", dataset(tmp_path / "data", 1), "--out",
@@ -415,7 +417,7 @@ def test_a_bug_in_parse_stops_the_run_and_the_same_command_reads_it_again(tmp_pa
     assert not (run / "predictions" / "a-p0.json").exists() and CALLS == ["a-p0"]
     BROKEN.clear()
     CALLS.clear()
-    assert cli.main(argv) == 0
+    assert cli.main([*argv, "--resume", run.name]) == 0
     [s] = json.loads(capsys.readouterr().out)["scorers"].values()
     assert CALLS == [] and (s["failed"], s["headline"]) == (0, 0.5), s
     assert "unread" not in json.loads((run / "records" / "a-p0.json").read_text())
@@ -554,8 +556,8 @@ def test_opb_run_takes_one_system_and_its_bare_options(tmp_path, capsys, monkeyp
     assert set(g) == {"run", "cost", "scorers"} and "deprecated" not in err, (g, err)
     said = json.loads((tmp_path / "runs" / g["run"] / "settings.json").read_text())
     assert said["options"] == {"tag": "y"}, said
-    assert cli.main([*argv, "--options", '{"tagged": {"tag": "y"}}']) == 0
-    assert json.loads(capsys.readouterr().out)["run"] == g["run"], "the keyed shape is the same run"
+    assert cli.main([*argv, "--options", '{"tagged": {"tag": "y"}}', "--resume", g["run"]]) == 0
+    assert json.loads(capsys.readouterr().out)["run"] == g["run"], "the keyed shape is the same question"
     monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
     err = raised([*argv, "--options", '{"alpha": {}}'])
     assert "--options is keyed by alpha, but this command runs tagged" in err, err

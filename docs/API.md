@@ -52,16 +52,17 @@ says how to read its results). `Benchmark.plan` refuses, before any call, a syst
 `Benchmark.plan` takes `limit`, `sample` and `only` (page ids) to choose pages, `timeout` (seconds
 per page), `workers` (pages at once; 0, the default, for the adapter's own) and `retry_failed`. `sample` takes pages evenly
 spaced over the manifest, and `limit` takes the first ones; give one or the other. A run's folder is named for the whole
-question: the system and its options, the dataset, the manifest, the task and the pages chosen. So another question is another folder, and the same question resumes the same folder: a page
-is predicted only when its run has no record of it, and an answer is never paid for twice.
+question: the system and its options, the dataset, the manifest, the task and the pages chosen, then a run id. Every launch is a new run in a new folder;
+`resume=<a run's name>` continues that run instead, for the same question only: a page is predicted only when its run
+has no record of it, and an answer is never paid for twice.
 
 A run is one system: `Benchmark.plan` and `Benchmark.run` take one adapter, and refuse a list. To compare
 systems, or settings of one system, run each with the same choice of pages (`sample`, `limit`,
 `only`), so every run is graded on the same pages. `Benchmark.run` grades the run once it is predicted, and
 returns the grading: `run` (the run folder's name), `cost` and `scorers`. A run that stops part way (a
 missing key, an account that can't pay, a model server that isn't running, a bug in an adapter, Ctrl-C)
-isn't graded: run the same command again to finish it. A bug in an adapter's `parse` stops the run with
-the answer kept, unread (`"unread": true` in its record); the same command after the fix reads it with no
+isn't graded: resume it (`resume=`, `--resume`) to finish it. A bug in an adapter's `parse` stops the run with
+the answer kept, unread (`"unread": true` in its record); resuming after the fix reads it with no
 call. `Benchmark.reread(folder, system)` reads every saved answer of a run again, with no call, after a fix
 to a `parse` that gave wrong outputs without raising; `opb reread RUN_DIR` does the same from the command
 line, rebuilding the system from the run's `settings.json`, and reports a `parse` that still raises as a
@@ -80,7 +81,7 @@ opb run --system tesseract --sample 5
 ```
 
 `opb run` takes `--dataset`, `--manifest`, `--out`, `--limit`, `--sample`, `--only` (a file of
-page ids), `--timeout`, `--workers N` (pages at once) and `--retry-failed`; `opb run --help` shows each one's default. It
+page ids), `--timeout`, `--workers N` (pages at once), `--resume RUN` and `--retry-failed` (with `--resume`); `opb run --help` shows each one's default. It
 shows the plan and asks before calling a system, unless given `-y` or run with no terminal; any answer but
 yes (Ctrl-D too) prints "not run" and exits 1. It then shows a live table of the run's progress, and prints
 its grading as JSON. `--options` is the system's options, as for `opb predict`; `{"datalab": {...}}`, keyed
@@ -160,7 +161,7 @@ pointing at its class.
   raised and keeps the raw answer. An output it can't read (malformed blocks) is left out, with its reason
   in its second value, so only that output's tests fail; and
 - anything else either raises is a bug, and stops the run. A bug in `parse` keeps the answer unread, and
-  running the same command again after the fix reads it with no call.
+  resuming the run after the fix reads it with no call.
 
 `harness.errors.SystemFailed` and its kinds are the core's own classes, which `reading` raises too. A
 failed call's reply goes in the error's `body`, which the record keeps as `raw`. A

@@ -1,6 +1,6 @@
 """The `opb` command: a thin wrapper over `benchmark.default()` and the scorer.
 
-    opb run --system datalab --sample 20                           # predict one system, then grade; resumable
+    opb run --system datalab --sample 20                           # predict one system, then grade: a new run
     opb run --system datalab --options '{"mode": "accurate"}'      # its options, as for `opb predict`
     opb grade RUN_DIR [--partial]                                  # a folder of predictions/, yours or a run
     opb reread RUN_DIR [RUN_DIR ...]                               # read saved answers again, after a fix
@@ -173,15 +173,14 @@ def one_system(a: argparse.Namespace, argv: Sequence[str]) -> None:
 
 def run_one(a: argparse.Namespace, b: Any, system: Any) -> dict[str, Any] | None:
     """Plans `system`'s run from the flags, predicts it and grades it; None when the person at the terminal
-    says no. With the deprecated `--score-only`, grades the run already on disk and predicts nothing."""
+    says no. With the deprecated `--score-only`, grades the run `--resume` names and predicts nothing."""
+    if a.score_only and not a.resume:
+        raise ValueError("--score-only grades a run already on disk: name it with --resume <its folder name>, or "
+                         "use opb grade <run folder>")
     p = b.plan(system, a.out, limit=a.limit, sample=a.sample,
                only=read_ids(a.only, "--only") if a.only else None, timeout=a.timeout, workers=a.workers,
-               retry_failed=a.retry_failed)
-    if a.score_only:
-        if not p.run.predictions.is_dir():
-            raise ValueError(f"no run at {p.run.folder}: this system with these options was never "
-                             "predicted under this --out")
-        return b.grade(p.run)
+               resume=a.resume, retry_failed=a.retry_failed)
+    if a.score_only: return b.grade(p.run)
     print(b.describe(p), file=sys.stderr)
     if not a.yes and sys.stdin.isatty() and not proceed(): return None
     b.predict(p)
@@ -359,7 +358,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     manifest_help = "which of the dataset's manifests (default: %(default)s)"
 
     r = sub.add_parser("run", aliases=["benchmark"],
-                       help="predict every page with one system, then grade; resumable")
+                       help="predict every page with one system, then grade; a new run, or --resume one")
     # Note: --system is required unless a deprecated --systems or --providers takes its place; the two are
     # hidden, so the usage shows `--system NAME` alone. Each takes several names only so that `one_system`
     # can refuse them with the commands to run instead.
@@ -388,8 +387,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     r.add_argument("--timeout", type=float, default=900, help="seconds per page (default: %(default)g)")
     r.add_argument("--workers", type=int, default=0, metavar="N",
                    help="pages at once (default: the system's own)")
+    r.add_argument("--resume", metavar="RUN",
+                   help="continue the run of this folder name under --out, asking the same question; it pays "
+                        "only for pages with no answer yet (default: a new run)")
     r.add_argument("--retry-failed", action="store_true",
-                   help="predict again pages whose failure may not recur: timeouts, outages, 429 and 5xx")
+                   help="with --resume, predict again pages whose failure may not recur: timeouts, outages, 429 "
+                        "and 5xx")
     r.add_argument("-y", "--yes", action="store_true", help="don't ask before calling systems")
     r.add_argument("--score-only", action="store_true", help=argparse.SUPPRESS)   # Note: deprecated.
 
@@ -462,7 +465,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         renamed(a)
         return cmd(a)
     except KeyboardInterrupt:
-        print(f"opb {a.cmd}: interrupted" + ("; rerun to resume" if a.cmd == "run" else ""), file=sys.stderr)
+        print(f"opb {a.cmd}: interrupted" + ("; continue it with --resume <its folder name>" if a.cmd == "run" else ""), file=sys.stderr)
         return 130
 
 

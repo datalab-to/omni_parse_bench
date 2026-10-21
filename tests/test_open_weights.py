@@ -149,7 +149,7 @@ def test_a_model_without_layout_is_never_asked_for_blocks(tmp_path, monkeypatch)
 
 def folder(provider: str, **options) -> str:
     """The run folder's name of `provider` at `options`, on one question."""
-    return runs.folder_name(harness.system(provider, options), {"dataset": "d", "task": "parse"})
+    return runs.stem(harness.system(provider, options), {"dataset": "d", "task": "parse"})
 
 
 def test_an_llm_run_is_named_after_its_model():
