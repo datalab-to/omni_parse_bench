@@ -273,3 +273,28 @@ def test_a_server_reply_must_say_what_it_serves(tmp_path, monkeypatch):
     served = {"weights": "org/model", "revision": "main"}
     monkeypatch.setattr(http, "post", lambda *a, **k: {"served": served})
     assert http.parse(config, page, 10)["served"]["weights"] == "org/model"
+
+
+def test_vllm_is_asked_what_it_serves_with_the_endpoint_key(monkeypatch):
+    """A model with no server.py says what it serves through vLLM's /v1/models, which needs the endpoint key
+    when one is set; a refusal is a failed call with its status, not a page that reads wrong."""
+    import httpx
+
+    from omni_parse_bench.harness import budget, errors, http
+
+    seen = {}
+
+    def get(url, timeout, headers):
+        seen.update(headers)
+        status = 200 if headers.get("Authorization") == "Bearer k" else 401
+        return httpx.Response(status, json={"data": [{"id": "org/model@main"}]},
+                              request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(httpx, "get", get)
+    monkeypatch.setenv("OPB_ENDPOINT_KEY", "k")
+    said = http.served("http://x", budget.Budget(10))
+    assert said == ("org/model@main", {"weights": "org/model", "revision": "main"})
+    monkeypatch.setenv("OPB_ENDPOINT_KEY", "wrong")
+    with pytest.raises(errors.SystemFailed) as got:
+        http.served("http://x", budget.Budget(10))
+    assert got.value.status == 401

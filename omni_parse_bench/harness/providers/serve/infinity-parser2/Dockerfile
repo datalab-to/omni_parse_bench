@@ -7,7 +7,7 @@
 #     opb run --system infinity-parser2 --options '{"base_url": "http://localhost:8001"}'
 #
 # WEIGHTS picks the model (docker run -e WEIGHTS=infly/Infinity-Parser2-Flash; Pro by default, which needs
-# two GPUs), and opb's `model` option names the same one; REVISION its checkpoint (start.sh pins each). The weights download when it starts, into
+# two GPUs); REVISION its checkpoint (start.sh pins each). The weights download when it starts, into
 # HF_HOME; mount a cache there to keep them. Set OPB_ENDPOINT_KEY (docker run -e) to require it as a
 # bearer token, as opb sends it.
 FROM vllm/vllm-openai:v0.17.1@sha256:0dc46f74eb0e630675d83101dc66c6441c4475cceedcf9235ee42b87c3affd23

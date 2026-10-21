@@ -53,11 +53,16 @@ def parse(config: Any, path: Path, timeout: float, body: dict | None = None) -> 
 def served(base_url: str, deadline: budget.Budget) -> tuple[str, dict]:
     """What a vLLM with no server.py of ours serves: the name it serves under, `<weights>@<revision>` (its
     start.sh's --served-model-name), from its /v1/models, and the same as a server.py's `served`."""
+    # Note: with OPB_ENDPOINT_KEY set, vLLM requires it on all of /v1, this route too.
+    key = os.environ.get("OPB_ENDPOINT_KEY")
     try:
-        r = httpx.get(f"{base_url.rstrip('/')}/v1/models", timeout=max(1.0, deadline.remaining()))
+        r = httpx.get(f"{base_url.rstrip('/')}/v1/models", timeout=max(1.0, deadline.remaining()),
+                      headers={"Authorization": f"Bearer {key}"} if key else {})
     except httpx.TransportError as exc:
         if errors.refused(exc): raise
         raise errors.transport(exc, "connection failed") from exc
+    if r.status_code != 200:
+        raise errors.SystemFailed(f"HTTP {r.status_code}: {r.text[:300]}", status=r.status_code, body=r.text)
     with adapter.reading("vLLM's /v1/models"):
         name = r.json()["data"][0]["id"]
     weights, at, revision = name.partition("@")

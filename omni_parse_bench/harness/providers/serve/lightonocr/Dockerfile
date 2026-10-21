@@ -6,8 +6,7 @@
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-lightonocr
 #     opb run --system lightonocr --options '{"base_url": "http://localhost:8001"}'
 #
-# WEIGHTS picks the model (docker run -e WEIGHTS=lightonai/LightOnOCR-3-0.8B; the 4B by default), and opb's
-# `model` option names the same one; REVISION its checkpoint (start.sh pins each). The weights download when it starts, into HF_HOME; mount a cache
+# WEIGHTS picks the model (docker run -e WEIGHTS=lightonai/LightOnOCR-3-0.8B; the 4B by default); REVISION its checkpoint (start.sh pins each). The weights download when it starts, into HF_HOME; mount a cache
 # there to keep them. Set OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb
 # sends it.
 FROM vllm/vllm-openai:v0.30.0@sha256:8a69ffad015f138d7170c4ddc429e230a3bc1c1719f67e14324749df200a4b90

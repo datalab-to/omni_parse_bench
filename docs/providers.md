@@ -334,20 +334,20 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 
 | model | provider | serve/ | outputs |
 | --- | --- | --- | --- |
-| LightOnOCR-3 (4B, 0.8B) | `lightonocr` (`model`) | `lighton` | html, blocks |
-| dots.mocr | `dots-mocr` | `dots` | html, blocks |
-| Unlimited-OCR | `unlimited-ocr` | `unlimited` | html, blocks |
-| Infinity-Parser2 (Pro, Flash) | `infinity-parser2` (`model`) | `infinity` | html, blocks |
-| chandra-ocr-2 | `chandra-ocr` | `chandra` | html, blocks |
+| LightOnOCR-3 (4B, 0.8B) | `lightonocr` | `lightonocr` | html, blocks |
+| dots.mocr | `dots-mocr` | `dots-mocr` | html, blocks |
+| Unlimited-OCR | `unlimited-ocr` | `unlimited-ocr` | html, blocks |
+| Infinity-Parser2 (Pro, Flash) | `infinity-parser2` | `infinity-parser2` | html, blocks |
+| chandra-ocr-2 | `chandra-ocr` | `chandra-ocr` | html, blocks |
 | olmOCR-2 | `olmocr` | `olmocr` | html |
-| HunyuanOCR-1.5 | `hunyuan-ocr` | `hunyuan` | html, blocks |
-| DeepSeek-OCR-2 | `deepseek-ocr` | `deepseek` | html, blocks |
-| Surya OCR 2 | `surya-ocr` | `surya` | html, blocks |
+| HunyuanOCR-1.5 | `hunyuan-ocr` | `hunyuan-ocr` | html, blocks |
+| DeepSeek-OCR-2 | `deepseek-ocr` | `deepseek-ocr` | html, blocks |
+| Surya OCR 2 | `surya-ocr` | `surya-ocr` | html, blocks |
 | MinerU2.5-Pro | `mineru` | `mineru` | html, blocks |
-| GLM-OCR | `glm-ocr` | `glm_ocr` | html, blocks |
-| PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr_vl` | html, blocks |
-| Indra OCR | `indra-ocr` | `indra` | html, blocks |
-| Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets` | html |
+| GLM-OCR | `glm-ocr` | `glm-ocr` | html, blocks |
+| PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
+| Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
+| Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets-ocr` | html |
 
 olmOCR-2 and Nanonets-OCR2 return no layout, so they have no blocks. Indra OCR runs on CPU (ONNX Runtime),
 no GPU: its server reads pages in one worker process per core, and its image runs without `--gpus`.
