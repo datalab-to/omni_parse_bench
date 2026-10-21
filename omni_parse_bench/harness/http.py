@@ -47,7 +47,10 @@ def post(url: str, body: dict, deadline: budget.Budget, key: str | None = None) 
     """The server's JSON answer, within what is left of `deadline`; `key`, if any, as its bearer token."""
     headers = {"Authorization": f"Bearer {key}"} if key else {}
     try:
-        r = httpx.post(url, json=body, headers=headers, timeout=max(1.0, deadline.remaining()))
+        # Note: a Modal web endpoint answers a request still running after 150 s with a 303 to a URL that waits for
+        # the result (https://modal.com/docs/guide/webhook-timeouts), so a cold start is slow rather than failed.
+        r = httpx.post(url, json=body, headers=headers, timeout=max(1.0, deadline.remaining()),
+                       follow_redirects=True)
     except httpx.TimeoutException as exc:
         raise errors.SystemTimeout(f"no answer within {deadline.total:g} s") from exc
     except httpx.TransportError as exc:
