@@ -570,3 +570,18 @@ def test_opb_run_workers_is_one_number(tmp_path, capsys, monkeypatch):
     with pytest.raises(SystemExit):
         cli.main([*argv, "--workers", '{"alpha": 2}'])
     assert "invalid int value" in capsys.readouterr().err
+
+
+def test_a_page_with_no_suite_is_in_other():
+    from pathlib import Path
+
+    from omni_parse_bench import data
+
+    row = {"page_id": "p1", "document": "d", "outputs": ["html"], "doc_path": Path("pages/p1.pdf"),
+           "gt_path": Path("gold/p1.json"), "extra": {}}
+    assert data.page(row).suite == data.NO_SUITE == "other"
+    assert data.page(row | {"extra": {"suite": "  "}}).suite == "other"
+    assert data.page(row | {"extra": {"suite": "tables", "lang": "en"}}).suite == "tables"
+    assert data.page(row | {"extra": {"suite": "tables", "lang": "en"}}).extra == {"lang": "en"}
+    with pytest.raises(ValueError, match="suite must be a string"):
+        data.page(row | {"extra": {"suite": 3}})

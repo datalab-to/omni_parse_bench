@@ -12,7 +12,8 @@ from omni_parse_bench import vocab
 
 DEFAULT_DATASET = "hf://datasets/datalab-to/omni_parse_bench"
 MANIFEST = core.MANIFEST
-COLUMNS = ("document", "suite", "outputs")       # what opb's rows hold besides the core's
+NO_SUITE = "other"   # the suite of a page whose manifest gives none
+COLUMNS = ("document", "outputs")       # what opb's rows hold besides the core's
 OUTPUTS = frozenset(vocab.READS.values())     # the output types a test can read: html, blocks
 
 
@@ -40,13 +41,13 @@ def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, 
     """The dataset's folder and its pages, checked, in the manifest's order; no gold file is opened. A dataset
     folder holds:
 
-        manifest.parquet       a row per page: page_id, document, suite, doc_path, gt_path, outputs
+        manifest.parquet       a row per page: page_id, document, doc_path, gt_path, outputs; suite optional
         pages/...              the page files sent: one-page PDFs, or .png for image pages
         gold/<page_id>.json    each page's tests: {"tests": [...]}
 
     On top of the core's checks (ids, paths inside the dataset, gold named `<page_id>.json`), opb checks that:
 
-    - `document` and `suite` are non-empty strings;
+    - `document` is a non-empty string, and `suite` a string, or missing, empty or null for `NO_SUITE`;
     - the page file is a .pdf or a .png; and
     - `outputs` are the output types its tests read, a non-empty list of distinct names.
 
@@ -61,8 +62,10 @@ def page(r: dict[str, Any]) -> Page:
     where = f"page {r['page_id']!r}"
     if not (isinstance(r["document"], str) and r["document"].strip()):
         raise ValueError(f"{where}: document must be a non-empty string, not {r['document']!r}")
-    if not (isinstance(r["suite"], str) and r["suite"].strip()):
-        raise ValueError(f"{where}: suite must be a non-empty string, not {r['suite']!r}")
+    extra = dict(r["extra"])
+    suite = extra.pop("suite", None)
+    if suite is not None and not isinstance(suite, str):
+        raise ValueError(f"{where}: suite must be a string, or null for {NO_SUITE!r}, not {suite!r}")
     if r["doc_path"].suffix not in (".pdf", ".png"):
         raise ValueError(f"{where}: doc_path must be a .pdf or .png, not {r['doc_path'].name}")
     outputs = r["outputs"]
@@ -70,8 +73,9 @@ def page(r: dict[str, Any]) -> Page:
             or len(set(outputs)) != len(outputs)):
         raise ValueError(f"{where}: outputs must be a non-empty list of distinct output types from "
                          f"{sorted(OUTPUTS)}, not {outputs!r}")
-    return Page(r["page_id"], r["document"], r["suite"], r["doc_path"], r["gt_path"], tuple(sorted(outputs)),
-                r["extra"])
+    suite = suite if (suite or "").strip() else NO_SUITE
+    return Page(r["page_id"], r["document"], suite, r["doc_path"], r["gt_path"], tuple(sorted(outputs)),
+                extra)
 
 
 select = core.select
