@@ -338,8 +338,9 @@ beside its page's id, suite and document, and `opb tests` gives each test's args
 the handwriting tests of every run:
 
 ```sql
-select split_part(filename, '/', 2) as run, avg((result = 'pass')::int) as score, count(*) as tests
-from read_json('runs/*/unit_tests-*/details/*.jsonl', filename = true)
+select regexp_extract(filename, '([^/]+)/unit_tests/details/', 1) as run,
+       avg((result = 'pass')::int) as score, count(*) as tests
+from read_json('runs/**/unit_tests/details/*.jsonl', filename = true)
 where list_contains(tags, 'handwriting') group by 1 order by score desc;
 ```
 
@@ -347,7 +348,7 @@ and one run's pass rate per suite:
 
 ```sql
 select suite, avg((result = 'pass')::int) as score, count(*) as tests
-from read_json('runs/datalab-1a2b3c4d/unit_tests-*/details/*.jsonl')
+from read_json('runs/datalab-1a2b3c4d/unit_tests/details/*.jsonl')
 group by 1 order by 1;
 ```
 
@@ -358,7 +359,7 @@ it the details lines you select, or test lines you made (`unit_tests.lines`):
 import glob, json
 from omni_parse_bench.scorers import unit_tests
 
-lines = [json.loads(x) for f in glob.glob("runs/datalab-1a2b3c4d/unit_tests-*/details/*.jsonl")
+lines = [json.loads(x) for f in glob.glob("runs/datalab-1a2b3c4d/unit_tests/details/*.jsonl")
          for x in open(f)]
 unit_tests.summarize([x for x in lines if x["suite"] == "tables"])
 ```
