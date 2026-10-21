@@ -1,11 +1,9 @@
-"""A vendor's layout blocks as the `blocks` output: `{label, bbox, text}`, boxes from 0 to 1.
+"""A vendor's layout blocks as the `blocks` output, `{label, bbox, text}` with boxes from 0 to 1:
 
-Every vendor names its block types its own way. Each adapter states how its types map onto
-`views.LABELS` in a table, and `label` looks a type up in it: a type the table doesn't have fails
-the page, so a new type is decided by a person rather than guessed. The label is what a
-`layout_kind` test grades (docs/providers.md has every vendor's table).
-
-`guess` is for a vendor with no fixed set of types, an LLM, whose types are free text.
+- `label`: a vendor's block type as one of `views.LABELS`, from the adapter's table. A type the table lacks
+  fails the page, so a new type is decided by a person (docs/providers.md has every table);
+- `guess`: a free-text block type (an LLM's), by its words; and
+- `block` and `unturned`: one block, and a box on a page the vendor turned upright.
 """
 from __future__ import annotations
 

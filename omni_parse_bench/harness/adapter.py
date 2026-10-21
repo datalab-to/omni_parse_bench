@@ -1,10 +1,11 @@
-"""What every opb adapter shares: its base class (`PageAdapter`), and the help of options many adapters
-have (`OPTION_HELP`). `Input`, what an adapter is sent, is the task's (`task.Input`).
+"""What every opb adapter shares:
 
-`PageAdapter` is the core's `Adapter` for one page. Its docstring says how to write one.
+- `PageAdapter`: the base class of every adapter; and
+- `OPTION_HELP` and `option_help`: the help of options many adapters have.
 """
 from __future__ import annotations
 
+import abc
 import dataclasses
 from pathlib import Path
 from typing import Any, ClassVar
@@ -46,73 +47,54 @@ def option_help(f: dataclasses.Field) -> str:
 
 @dataclasses.dataclass(frozen=True)
 class PageAdapter(adapter.Adapter[Input]):
-    """One parsing system. An instance is one configuration of it, and its fields are its options.
-
-    A system may need several calls for one page, such as one for html and one for layout blocks. So an
-    opb adapter writes three methods, and this class turns them into the core's `call` and `read`:
+    """One parsing system; its fields are its options. Write three methods, which this class turns into the
+    core's `call` and `read`:
 
         requests(wants)                     the calls that produce the wanted outputs, each a `Request`
-        send(page, request, *, timeout)     makes one of them and returns its answer as received (a `Call`)
+        send(page, request, *, timeout)     makes one call and returns its answer as received (a `Call`)
         parse(raw, request)                 the outputs in one answer, and why any is missing
 
-    `call` makes every request for the page, one after another, within the page's one time budget, and
-    keeps each answer whole. `read` parses each saved answer again, so a fix to `parse` costs no call
-    (`Benchmark.reread`). A failed call fails the whole page; the core retries it when it is transient. The
-    failure carries what every request of the page sent and what the calls before it cost, so a page that
-    failed part way still records what it asked and what it paid.
+    Class variables:
 
-    `account_failure` adds opb's rule to the core's: a 403 is the account's too (a key the system refuses),
-    unless it is a moderation flag on this page's content.
+        SUPPORTS    the outputs the system can produce; `requests` is given only those a page wants
+        ENV         in words, what else the environment can hold for it, such as an optional token
+        SERVE       its folder in providers/serve/, for a model you serve yourself
 
-    `SUPPORTS` is the outputs the system can produce. A page asks for the outputs its tests read
-    (`Input.wants`), and `call` asks the system only for those it supports: `requests` is never given an
-    empty set. A page that wants none of them is not sent: its answer holds no output, with no call, no cost
-    and no error, so its tests fail as "no <output> output" without counting as a failed page.
+    `call` makes a page's requests in order, within the page's one time budget, and keeps each answer whole.
+    A page that wants none of `SUPPORTS` gets no call, and its tests fail as "no <output> output" without
+    the page failing. A failed call fails the page, carrying what every request sent and what the earlier
+    calls cost. `read` parses each saved answer again, so a fix to `parse` costs no call (`opb reread`).
 
-    `send` is called from `workers` threads at once, one page each. A library that isn't thread-safe needs a
-    lock around its use: pdfium is one, so render pages with `raster`, which holds its lock.
+    What to raise:
 
-    `keys` (the core's) names the environment variables the system needs, checked before any call. `ENV`
-    says, in words, what else the environment can hold for it, such as an optional bearer token. A refused
-    connection (nothing listens at the address) stops the run, with a note (`errors.no_server`), rather than
-    failing every page. `SERVE` names the system's folder in providers/serve/ when it is a model you serve
-    yourself, so the message says how to start its server.
+    - in `send`: `SystemFailed` for a refusal, an error status or an unusable answer, and read the system's
+      answer (a job id, a status) inside `adapter.reading`;
+    - in `parse`: `SystemFailed` (or read inside `reading`) when the answer holds no usable page, which then
+      counts 0 as `Unreadable`. For one output it can't read, leave it out and give the reason in the second
+      value, so only that output's tests fail; blocks are read this way; and
+    - anything else is a bug: the run stops, the answer is kept, and the same command reads it again after
+      the fix.
 
-    The core's one rule decides what an exception does: a page counts 0 only when the adapter says, on
-    purpose, that the system failed, by raising `errors.SystemFailed`; any other exception is a bug in the
-    adapter, and stops the run (`omni_bench_core.errors`). So:
-
-    - `send` raises `SystemFailed` for a refusal, an error status or an answer it can see is unusable, and
-      reads what the system sent back (a job id, a status) inside `omni_bench_core.adapter.reading`, which
-      turns a malformed answer into `SystemFailed`;
-    - `parse` does the same for the outputs: it raises `SystemFailed` when the answer holds no usable page,
-      and reads the system's own structures inside `reading`. The core records the page as `Unreadable`,
-      which counts 0 and keeps the raw answer. One output it can't read is left out, with its reason in
-      the second value, so only that output's tests fail: blocks are read inside `reading` within a `try`
-      that catches `SystemFailed`, so a malformed block fails the page's blocks output only; its html is
-      still graded; and
-    - anything else `parse` raises is a bug: the core keeps the answer unread and stops the run, and running
-      the same command again after the fix reads it with no call. After a fix to a `parse` that gave wrong
-      outputs without raising, `Benchmark.reread` (`opb reread`) reads every saved answer again.
-
-    Like every adapter, its run folder is named by the core (`omni_bench_core.run.folder_name`): its label,
-    then a digest of its name, every option (`base_url` included) and the question (dataset, manifest,
-    task, rows). A served model whose address changes starts a new run folder. A change to the adapter's
-    code, such as a prompt, doesn't rename the folder: start a new run with another `out`. Each record keeps
-    what its requests sent and the package's version, so a run that mixes two prompts can be found."""
+    A 403 is an account failure too, unless it is a moderation flag on this page's content. A refused
+    connection stops the run, with a note on how to start the server (`errors.no_server`). `send` runs on
+    `workers` threads at once, so render a PDF with `raster`, which holds pdfium's lock. A change to the
+    adapter's code, such as a prompt, doesn't rename its run folder: start the new run with another `out`."""
 
     SUPPORTS: ClassVar[frozenset[str]] = frozenset()
     ENV: ClassVar[str] = ""
     SERVE: ClassVar[str | None] = None
 
+    @abc.abstractmethod
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
-        raise NotImplementedError(f"{type(self).__name__} has no requests(wants)")
+        """The calls that produce `wants`, a non-empty subset of `SUPPORTS`."""
 
+    @abc.abstractmethod
     def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
-        raise NotImplementedError(f"{type(self).__name__} has no send(page, request, *, timeout)")
+        """One call for `page`, within `timeout` seconds; its answer as received."""
 
+    @abc.abstractmethod
     def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
-        raise NotImplementedError(f"{type(self).__name__} has no parse(raw, request)")
+        """The outputs in one answer, and, for each output it couldn't read, why."""
 
     @property
     def provider(self) -> str:
@@ -156,10 +138,8 @@ class PageAdapter(adapter.Adapter[Input]):
         return super().account_failure(e)
 
     def read(self, raw: Any, x: Input) -> dict[str, Any]:
-        """The page's outputs, parsed from each saved answer. An output `parse` says is missing (its second
-        value) is None, so its tests fail. Anything `parse` raises is raised: `SystemFailed` is recorded as
-        `Unreadable`, which counts 0, and anything else is a bug that stops the run; either way the raw answer
-        is kept to read again after a fix."""
+        """The page's outputs, parsed from each saved answer. An output `parse` couldn't read is None, so its
+        tests fail; what `parse` raises is raised."""
         out: dict[str, Any] = {}
         for a in raw:
             parsed, _ = self.parse(a["raw"], contract.Request(frozenset(a["outputs"]), a["sent"]))
@@ -168,14 +148,9 @@ class PageAdapter(adapter.Adapter[Input]):
 
 
 def _send(a: PageAdapter, page: Path, r: contract.Request, timeout: float) -> contract.Call:
-    """`a.send`, with the failures of HTTP itself mapped the same way for every adapter: a network fault is
-    `SystemUnreachable`, and a status an adapter checked with `raise_for_status` is a `SystemFailed` with that
-    status and body.
-
-    Nothing else is caught. An answer the system sent that can't be read is the system's failure only where
-    the adapter reads it inside `omni_bench_core.adapter.reading`; any other exception is a bug in the
-    adapter, so it stops the run instead of passing as one page's failure. A refused connection is
-    raised as it is, which stops the run: nothing listens at the address, for any page."""
+    """`a.send`, with HTTP's own failures mapped alike for every adapter: a network fault is
+    `SystemUnreachable` (or `SystemTimeout`), and a `raise_for_status` error is a `SystemFailed` with its
+    status and body. A refused connection is raised as it is; nothing else is caught."""
     try:
         return a.send(page, r, timeout=timeout)
     except httpx.TransportError as exc:

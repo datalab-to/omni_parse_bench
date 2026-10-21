@@ -1,19 +1,17 @@
-"""How a call to a system fails, and whether a retry can fix it: the core's errors, with what opb's adapters
-add.
+"""How a call to a system fails, with what opb's adapters add to the core's errors:
 
-The core's one rule decides what each does: a page counts 0 only when an adapter raises `SystemFailed` on
-purpose (or `omni_bench_core.adapter.reading` raises it for one), and any other exception stops the run as a
-bug. `SystemFailed` and its kinds `SystemTimeout`, `SystemUnreachable` and `Unreadable` are the core's own
-classes, so `except errors.SystemFailed` catches what `reading` raises. A failed call's reply goes in its
-`body`, which the core keeps as the record's `raw`. Anything else stops the run, raised as it is: a missing
-key is a `ValueError`, and a refused connection is the connection error it is, with a note (`no_server`).
-`key` reads an API key, `refused` tells a refused connection, `no_server` says how to start a model server,
-`transport` words a transport failure, and `unread` words why one output is missing.
+- `SystemFailed`, `SystemTimeout`, `SystemUnreachable` and `Unreadable`: the core's, so `except
+  errors.SystemFailed` catches what `adapter.reading` raises. A failed call's reply goes in its `body`;
+- `transport`: a transport failure as the page's `SystemTimeout` or `SystemUnreachable`;
+- `refused` and `no_server`: a refused connection, and a note on how to start the model server;
+- `job`: makes a failure carry its job id; and
+- `unread`: why one output is missing from an answer.
+
+Anything else stops the run, raised as it is.
 """
 from __future__ import annotations
 
 import contextlib
-import os
 from collections.abc import Iterator
 
 from omni_bench_core import errors as core
@@ -28,22 +26,13 @@ Unreadable = core.Unreadable
 SERVE = "https://github.com/datalab-to/omni_parse_bench/tree/main/omni_parse_bench/harness/providers/serve"
 
 
-def key(name: str, system: str) -> str:
-    """The environment variable `name`, the key `system` needs. `Benchmark.plan` checks every key before a run
-    (`Adapter.keys`); this is for a call made without a plan, such as `opb predict`."""
-    if not (got := os.environ.get(name)):
-        raise ValueError(f"{system} needs {name}, which is not set: export {name}=..., then run again")
-    return got
-
-
 # Note: the core's test, so opb and the core agree on what a refused connection is.
 refused = core.refused
 
 
 def no_server(exc: BaseException, url: str, system: str, serve: str | None) -> None:
-    """Adds to a refused connection's exception a note saying nothing listens at `url`, and how to start the
-    server or give its address. It is the same for every page, so it stops the run rather than failing each
-    page; run the same command again once the server is up."""
+    """Adds to a refused connection a note: nothing listens at `url`, and how to start the server or give its
+    address."""
     start = f"Start it (how: {SERVE}/{serve})" if serve else "Start the server"
     where = f"--system {system} --options '{{\"base_url\": \"<its address>\"}}'"
     exc.add_note(f"no server at {url}: the connection was refused, so nothing listens there. {start}, or "
@@ -56,9 +45,8 @@ def unread(exc: Exception) -> str:
 
 
 def transport(exc: Exception, what: str, **kw) -> SystemFailed:
-    """A transport failure of a request to the system (a connection, a read, a client timeout) as the page's
-    failure: `SystemTimeout` for a client timeout, else `SystemUnreachable`. `kw` are the failure's fields
-    (`cost`, `body`). Raise it `from exc`: a refused connection then stays in its chain, and stops the run."""
+    """A transport failure (a connection, a read, a client timeout) as the page's failure: `SystemTimeout` for
+    a client timeout, else `SystemUnreachable`; `kw` are its fields (`cost`, `body`). Raise it `from exc`."""
     import httpx
 
     kind = SystemTimeout if isinstance(exc, httpx.TimeoutException) else SystemUnreachable

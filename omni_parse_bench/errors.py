@@ -2,6 +2,8 @@
 
     SystemFailed       the system failed on one page, which counts 0; raised on purpose. `SystemTimeout`,
                        `SystemUnreachable` and `Unreadable` are its kinds
+    Unscored           a scorer couldn't score a page (a judge that didn't answer): raised from `score`, or
+                       returned in the page's place from `score_all`; the page waits for a later grading
 
 Everything else a user meets is a native exception, raised as it is with its traceback: a `ValueError` for
 what was asked wrong (a flag, an option, a dataset, a manifest, a gold, a missing key, a run graded before it
@@ -14,7 +16,8 @@ from omni_bench_core.errors import (
     SystemTimeout,
     SystemUnreachable,
     Unreadable,
+    Unscored,
     counted,
 )
 
-__all__ = ["SystemFailed", "SystemTimeout", "SystemUnreachable", "Unreadable", "counted"]
+__all__ = ["SystemFailed", "SystemTimeout", "SystemUnreachable", "Unreadable", "Unscored", "counted"]

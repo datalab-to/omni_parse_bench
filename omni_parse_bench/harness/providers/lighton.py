@@ -1,7 +1,4 @@
-"""LightOnOCR-3 (lightonai/LightOnOCR-3-4B, -0.8B), served from providers/serve/lighton/ on any GPU host.
-
-The adapter is `LightOn`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""LightOnOCR-3 (lightonai/LightOnOCR-3-4B, -0.8B), served from providers/serve/lighton/ on any GPU host."""
 from __future__ import annotations
 
 import dataclasses
@@ -78,9 +75,7 @@ class LightOn(PageAdapter):
 
       - its benchmark reader wraps every formula block in `$$`; here only one with no delimiter of its own,
         since the model writes most in `$$` already and a formula block can be a list with inline math,
-        which one `$$` around it breaks;
-      - picture contents are alt text, as for every system; and
-      - each page has the benchmark's 900 s.
+        which one `$$` around it breaks.
 
     `model` names the model the server serves (its MODEL), so a run's name tells the two sizes apart; an
     answer from another model is refused.
@@ -89,8 +84,6 @@ class LightOn(PageAdapter):
         docker run --gpus all -p 8001:8001 opb-lighton
         opb run --system lightonocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"
@@ -177,8 +170,7 @@ def render(label: str, md: str) -> str:
 
 
 def parse(raw: dict, request: contract.Request, config: LightOn | None = None) -> tuple[dict, dict]:
-    """The outputs in a finished reply, as the server repaired it. A malformed block, or a type LABELS
-    lacks, fails the page's blocks output only; its html is still graded."""
+    """The outputs in a finished reply, as the server repaired it."""
     llm.content(raw["completion"])
     text = raw["text"]
     if not text.strip():

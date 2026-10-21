@@ -1,10 +1,8 @@
-"""Azure Content Understanding adapter: the prebuilt layout analyzer, POST :analyzeBinary, poll.
-
-The adapter is `Azure`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""Azure Content Understanding: the prebuilt layout analyzer, POST :analyzeBinary, poll."""
 from __future__ import annotations
 
 import dataclasses
+import os
 import re
 import time
 from pathlib import Path
@@ -34,28 +32,18 @@ TERMINAL = frozenset({"succeeded", "failed", "canceled", "cancelled"})
 
 @dataclasses.dataclass(frozen=True)
 class Azure(PageAdapter):
-    """The azure adapter. Its fields are what azure can be asked.
+    """Azure Content Understanding, one call for html and blocks. `endpoint`, the resource, is required: it is
+    an option, not an environment variable, since it decides where the page is analyzed.
 
-    `endpoint` has no default to give, since every Azure resource has its own; it is empty here, so
-    a `Azure` can be built (`opb systems`, a run's name), and `call` refuses it.
+    - `html`: its markdown, tables as html, with the page header, footer and number comments
+      (`<!-- PageHeader: ... -->`) unwrapped into their text where Azure put them;
+    - `blocks`: its paragraphs (by `role`), tables and figures, from `source` boxes in the page's unit; a
+      paragraph inside a table is a cell's text and is left out; and
+    - cost: unknown, since Azure states pages used.
 
-    One call produces both outputs. Azure returns the page as markdown, tables as html, with page
-    headers, footers and page numbers written in place as comments (`<!-- PageHeader: ... -->`), which
-    a reader never sees. So:
+    Auth: AZURE_CU_KEY.
 
-    - `html` is that markdown with those comments unwrapped into their text, where Azure put them: the
-      header is in Azure's document, marked as one, and the unwrapping moves and rebuilds nothing; and
-    - `blocks` are its paragraphs (with their `role`: title, sectionHeading, pageHeader, pageFooter,
-      pageNumber, footnote, or none), tables and figures. A paragraph inside a table's span is a cell's
-      text, already in the table's block, and is left out.
-
-    Boxes come as `source`, `D(page,x1,y1,...,x4,y4)`, in the page's unit (inches for a PDF). Azure
-    states pages used, not a cost, so the cost is unknown.
-
-    Auth: AZURE_CU_KEY. The resource is the `endpoint` option, not an environment variable: it
-    decides where the page is analyzed, so it is a setting the run records.
-
-        opb run --system azure --sample 20 \
+        opb run --system azure --sample 20 \\
             --options '{"endpoint": "https://<resource>.services.ai.azure.com"}'
     """
 
@@ -131,7 +119,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: Azure | None = None) -> contract.Call:
     """Analyze the page, poll until it is done, return the analysis."""
     config = config or Azure()
-    key = errors.key("AZURE_CU_KEY", "azure")
+    key = os.environ["AZURE_CU_KEY"]
     if not config.endpoint:
         raise ValueError(
 "azure needs its resource, which is an option, not an environment variable: "

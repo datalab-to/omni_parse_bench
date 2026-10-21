@@ -1,7 +1,4 @@
-"""Single-shot LLM parsing: the page image goes to the model, one call per output.
-
-The adapter is `LLM`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""Single-shot LLM parsing: the page image goes to the model, one call per output."""
 from __future__ import annotations
 
 import base64
@@ -66,33 +63,22 @@ LABELS = {k: k for k in ("heading", "page_furniture", "text", "list", "caption",
 
 @dataclasses.dataclass(frozen=True)
 class LLM(PageAdapter):
-    """What a raw-model leg can be asked. `model` has no default, because it is the provider name.
+    """A vision-language model (GPT, Claude, ...) through any OpenAI-compatible endpoint; the published runs
+    use OpenRouter, which returns billed cost (`usage.cost`). `model` is the provider name, never an option.
 
-    Used for vision-language models (GPT, Claude, ...) through any OpenAI-compatible endpoint. The
-    published runs use OpenRouter, which returns billed cost (`usage.cost`) rather than only a token
-    count. Every model gets the same prompts:
+    One call per output, the page image at high detail, the same prompts for every model:
 
         html      transcribe the page as HTML, keeping everything printed on it
         blocks    the page's layout blocks, one JSON object per line, boxes on a 0-1000 grid as
                   [ymin, xmin, ymax, xmax]
 
-    A reply that is markdown rather than HTML is converted by `markdown.to_html`, the same converter
-    every provider's markdown goes through. A reply that doesn't parse is asked for again.
+    A markdown reply goes through `markdown.to_html`, as every system's markdown does; a reply that doesn't
+    parse is asked for again. No sampling setting is sent, so each model runs at its own defaults.
 
-    No sampling setting is sent: each model runs at its own default temperature and reasoning, as every
-    vendor runs at its own settings (Google, for one, advises against lowering Gemini 3's temperature,
-    which can make it loop). The page image is sent at high detail, so no endpoint downscales it.
-
-    Another endpoint is selected with the `base_url` option, so the record says which endpoint
-    answered. Auth: OPENROUTER_API_KEY (or OPENAI_API_KEY) for OpenRouter; for any other endpoint
-    OPB_ENDPOINT_KEY if set, else none.
-
-    The open OCR models are providers of their own (providers/serve/); `chat`, `answer` and the small
-    helpers below are what they share with this adapter.
+    Auth: OPENROUTER_API_KEY (or OPENAI_API_KEY) for OpenRouter; for another `base_url`, OPB_ENDPOINT_KEY if
+    set. `chat`, `answer` and the helpers below are shared with the open models' adapters.
 
         opb run --system openai/gpt-5.6-sol --sample 20
-
-    The model is the provider name; `--options {"model": ...}` is refused.
     """
 
     model: str = dataclasses.field(metadata={"help": "an OpenRouter org/model id"})
@@ -244,15 +230,9 @@ def _cost(usage: dict) -> contract.Cost:
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: LLM) -> contract.Call:
-    """One completion for one output, asked again only for an answer that isn't usable.
-
-    Only a reply that finished (`stop`) and parses is kept. One cut off by an error is asked again,
-    and if every attempt is, the call fails for good: `predict` doesn't ask again. One cut at
-    max_output_tokens is final, since a retry at the same limit can't fit either; one the provider
-    refused (`content_filter`) is final too. The cost counts every attempt. Transport failures are
-    not retried here, and the SDK's retries are off: `predict`'s retry decides, so the loops can't
-    multiply.
-    """
+    """One completion for one output, asked again only while the reply isn't usable: one cut off by an
+    error is asked again; one cut at `max_output_tokens` or refused (`content_filter`) is final. The cost
+    counts every attempt. Transport failures aren't retried here: the core's retry decides."""
     deadline = budget.Budget(timeout)
     usage = {"extra_body": {"usage": {"include": True}}} if config.base_url == DEFAULT_BASE_URL else {}
     b64 = base64.b64encode(image(page)).decode("ascii")
@@ -290,17 +270,14 @@ def key(base_url: str) -> str:
     reaches an opb model server (providers/serve/)."""
     if base_url != DEFAULT_BASE_URL:
         return os.environ.get("OPB_ENDPOINT_KEY", "EMPTY")
-    if not (got := os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY")):
-        raise ValueError("an OpenRouter model needs OPENROUTER_API_KEY, which is not set: "
-                         "export OPENROUTER_API_KEY=... (or OPENAI_API_KEY=...), then rerun")
-    return got
+    # Note: `keys` (with `missing_keys`) is checked before any call, so one of the two is set.
+    return os.environ.get("OPENROUTER_API_KEY") or os.environ["OPENAI_API_KEY"]
 
 
 def chat(base_url: str, body: dict, deadline: budget.Budget, spent: Sequence[contract.Cost] = ()) -> dict:
-    """One chat completion's answer, as JSON: every chat call of every provider goes through here, so
-    their failures map alike. `body` is `chat.completions.create`'s arguments; `spent` is what earlier
-    attempts cost, kept on a failure. The SDK's own retries are off: `predict` retries every vendor the
-    same way, so the loops can't multiply."""
+    """One chat completion's answer as JSON; every chat call of every adapter goes through here, so their
+    failures map alike. `body` is `chat.completions.create`'s arguments; `spent`, what earlier attempts
+    cost, is kept on a failure. The SDK's own retries are off, so retries don't multiply."""
     client = openai.OpenAI(base_url=base_url, api_key=key(base_url), max_retries=0)
     try:
         return client.chat.completions.create(**body, timeout=max(1.0, deadline.remaining())).model_dump()

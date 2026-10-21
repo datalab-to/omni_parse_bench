@@ -1,7 +1,4 @@
-"""Extend adapter: upload the page, POST /parse_runs, poll /parse_runs/<id>.
-
-The adapter is `Extend`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""Extend: upload the page, POST /parse_runs, poll /parse_runs/<id>."""
 from __future__ import annotations
 
 import dataclasses
@@ -40,25 +37,14 @@ OUTAGES = frozenset({"INTERNAL_ERROR", "OCR_ERROR"})
 
 @dataclasses.dataclass(frozen=True)
 class Extend(PageAdapter):
-    """The extend adapter. Its fields are what extend can be asked.
+    """Extend, one call for html and blocks, its agentic passes on (text and tables) and an image page
+    converted to PDF at high quality.
 
-    One call produces both outputs. Extend returns the page as a chunk whose content is its typed
-    blocks joined (text, heading, section_heading, header, footer, page_number, table, figure,
-    key_value, formula, barcode, ...), each block with a box in the page's pixels. So:
-
-    - `html` is Extend's page content, as it returns it; and
-    - `blocks` are the blocks, their text with tags removed as for every vendor.
-
-    Figures: Extend writes a generated description of each figure as a `<caption>` inside its
-    `<figure>` (on 10 figure pages every one was a description, none a printed caption), and has no
-    switch to turn only that off. No vendor is sent free-text instructions, so it is translated, not
-    dropped: each such caption becomes an image's alt text in its place, where every vendor's image
-    descriptions are, and the scorer treats it as it treats theirs.
-    Tables are asked for as html. Extend's agentic passes are on, as Reducto's are: a vision model
-    corrects low-confidence OCR and handwriting (`blockOptions.text.agentic`) and table structure
-    (`blockOptions.tables.agentic`), each off by default and billed where it triggers; an image page
-    is converted to PDF at `imageConversionQuality` high (default medium). Cost comes back in Extend
-    credits (`usage.credits`). A run that fails with an outage code (`OUTAGES`) is retried as a 5xx is.
+    - `html`: the page content, each generated `<caption>` inside a `<figure>` as an image's alt text
+      (`described`), and its own tags (`<page_number>`) unwrapped to their text;
+    - `blocks`: its typed blocks (`LABELS`), boxes in the page's pixels, turned back from the upright frame;
+    - a run that fails with an outage code (`OUTAGES`) is retried as a 5xx is; and
+    - cost: stated in Extend credits (`usage.credits`).
 
     Auth: EXTEND_API_KEY, and EXTEND_WORKSPACE_ID when the key spans several workspaces.
 
@@ -155,9 +141,9 @@ def layout_blocks(blocks: list[dict], turned: int = 0) -> list[dict]:
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: Extend | None = None) -> contract.Call:
-    """Upload the page, start the parse run, poll until it is done, return the finished run."""
+    """Upload the page, start the parse run, poll until it is done, and return the finished run."""
     config = config or Extend()
-    key = errors.key("EXTEND_API_KEY", "extend")
+    key = os.environ["EXTEND_API_KEY"]
     headers = {"Authorization": f"Bearer {key}", "x-extend-api-version": config.api_version}
     if workspace := os.environ.get("EXTEND_WORKSPACE_ID"): headers["x-extend-workspace-id"] = workspace
     deadline = budget.Budget(timeout)

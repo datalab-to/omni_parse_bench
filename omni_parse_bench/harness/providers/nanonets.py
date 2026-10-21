@@ -1,6 +1,5 @@
-"""Nanonets-OCR2-3B (nanonets/Nanonets-OCR2-3B), served by vLLM from providers/serve/nanonets/ on a GPU host.
-
-The adapter is `Nanonets`; its docstring says how a page is processed, and how to serve and run it.
+"""Nanonets-OCR2-3B (nanonets/Nanonets-OCR2-3B), served by vLLM from providers/serve/nanonets/ on a GPU
+host.
 """
 from __future__ import annotations
 
@@ -57,16 +56,11 @@ class Nanonets(PageAdapter):
                               image's alt text and the other tags unwrapped to their text. The model draws
                               no layout: `html` only.
 
-    Differences from the vendor:
-
-      - each page has the benchmark's 900 s.
 
         docker build -t opb-nanonets omni_parse_bench/harness/providers/serve/nanonets
         docker run --gpus all -p 8001:8001 opb-nanonets
         opb run --system nanonets-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"

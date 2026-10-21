@@ -1,7 +1,4 @@
-"""DeepSeek-OCR-2 (deepseek-ai/DeepSeek-OCR-2), served from providers/serve/deepseek/ on any GPU host.
-
-The adapter is `DeepseekOcr`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""DeepSeek-OCR-2 (deepseek-ai/DeepSeek-OCR-2), served from providers/serve/deepseek/ on any GPU host."""
 from __future__ import annotations
 
 import ast
@@ -55,7 +52,7 @@ class DeepseekOcr(PageAdapter):
                               768 px tiles (2 to 6, by the page's shape).
       3. Model inference      vLLM 0.8.5 with the V0 engine and the repository's own model code registered
                               (the engine arguments of run_dpsk_ocr2_eval_batch.py); the prompt
-                              `<image>\n<|grounding|>Convert the document to markdown.`, temperature 0, at
+                              `<image>\\n<|grounding|>Convert the document to markdown.`, temperature 0, at
                               most 8192 tokens, special tokens kept, and its no-repeat n-gram logits
                               processor at ngram_size 40, window_size 90, `<td>` and `</td>` whitelisted
                               (the values of run_dpsk_ocr2_eval_batch.py).
@@ -67,16 +64,11 @@ class DeepseekOcr(PageAdapter):
       5. Mapping to opb outputs  html is that page through `markdown.to_html`; blocks are the markers, each
                               label from LABELS, with the text up to the next marker.
 
-    Differences from the vendor:
-
-      - each page has the benchmark's 900 s.
 
         docker build -t opb-deepseek omni_parse_bench/harness/providers/serve/deepseek
         docker run --gpus all -p 8001:8001 opb-deepseek
         opb run --system deepseek-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"
@@ -145,8 +137,7 @@ def blocks(said: str) -> list[dict]:
 
 
 def parse(raw: dict, request: contract.Request, config: DeepseekOcr | None = None) -> tuple[dict, dict]:
-    """The page and its blocks. A malformed block, or a type LABELS lacks, fails the page's blocks output
-    only; its html is still graded."""
+    """The page and its blocks."""
     # Note: a reply cut at the token limit is read as it is, as the repository's scripts read it.
     if raw.get("finish_reason") not in ("stop", "length"):
         raise errors.SystemFailed(f"the reply didn't finish: {raw.get('finish_reason')}", status=200)

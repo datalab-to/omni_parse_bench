@@ -1,11 +1,9 @@
-"""Mistral OCR adapter: one POST /v1/ocr, answered in the same response.
-
-The adapter is `Mistral`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""Mistral OCR: one POST /v1/ocr, answered in the same response."""
 from __future__ import annotations
 
 import base64
 import dataclasses
+import os
 import re
 from pathlib import Path
 from typing import Any, ClassVar
@@ -33,22 +31,13 @@ _IMAGE = re.compile(r"!\[(img-\d+\.\w+)\]\(\1\)")
 
 @dataclasses.dataclass(frozen=True)
 class Mistral(PageAdapter):
-    """The mistral adapter. Its fields are what mistral can be asked.
+    """Mistral OCR, one call for html and blocks: tables as html, header and footer extracted, image data not
+    returned.
 
-    One call produces both outputs. Mistral returns each page as markdown, with tables (asked for
-    as html) and images left as placeholders (`[tbl-0.html](tbl-0.html)`, `![img-0.jpeg](img-0.jpeg)`)
-    whose content is in the page's `tables` and `images`; asked to, it moves the page's header and
-    footer out of the markdown into `header` and `footer`; and it returns paragraph-level `blocks`, each
-    typed (text, title, table, image, header, footer, ...) with a box in the page's pixels. So:
-
-    - `html` is the header, the markdown and the footer, joined in that order, tables put in place of
-      their placeholders; the request's `sent` says so; and
-    - `blocks` are its blocks, their text with tags removed as for every vendor.
-
-    Images are found but not sent back (`include_image_base64` off): their pixels are no page text, and
-    their placeholders (`![img-0.jpeg](img-0.jpeg)`) are taken out of the markdown, while their regions
-    stay in the blocks. (`image_limit` 0 would drop those regions too.) Mistral states pages
-    processed, not a cost, so the cost is unknown.
+    - `html`: the page's `header`, markdown and `footer` joined, each table put in place of its placeholder
+      and image placeholders taken out;
+    - `blocks`: its typed paragraph blocks (`LABELS`), boxes in the page's pixels, image regions included; and
+    - cost: unknown, since Mistral states pages processed.
 
     Auth: MISTRAL_API_KEY.
 
@@ -84,9 +73,9 @@ def requests(wants: frozenset[str], config: Mistral) -> list[contract.Request]:
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: Mistral | None = None) -> contract.Call:
-    """Send the page inline, return the OCR response."""
+    """Send the page inline, and return the OCR response."""
     config = config or Mistral()
-    key = errors.key("MISTRAL_API_KEY", "mistral")
+    key = os.environ["MISTRAL_API_KEY"]
     deadline = budget.Budget(timeout)
     media = MEDIA.get(page.suffix.lower(), "application/pdf")
     url = f"data:{media};base64,{base64.b64encode(page.read_bytes()).decode()}"

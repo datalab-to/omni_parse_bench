@@ -1,8 +1,11 @@
-"""Omni Parse Bench: yes/no tests on single pages, graded against a provider's outputs.
+"""Omni Parse Bench: yes/no tests on single pages, graded against a system's outputs.
 
-`data` reads a dataset's pages, `task` is the parse task, `benchmark.default()` is the whole benchmark, and
-`scorers.unit_tests` grades on its own: `score` is pure, with no files and no network. Producing
-predictions is `harness` (`pip install 'omni-parse-bench[harness]'`), which the scorer never imports.
+- `data`: a dataset's pages;
+- `task`: the parse task;
+- `benchmark.default()`: the whole benchmark;
+- `scorers.unit_tests`: grading, on its own, with no files and no network; and
+- `harness`: producing predictions (`pip install 'omni-parse-bench[harness]'`), which grading never imports.
+
 docs/design.md has the full design.
 """
 from omni_parse_bench import data, scorers

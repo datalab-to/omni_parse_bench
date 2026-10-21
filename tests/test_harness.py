@@ -110,7 +110,7 @@ def test_a_timeout_is_printed_with_its_decimals():
 
     clock = budget.Budget(0.1)
     while not clock.expired(): pass
-    with pytest.raises(errors.SystemTimeout, match="uniform 0.1 s limit"):
+    with pytest.raises(errors.SystemTimeout, match="the 0.1 s limit"):
         clock.check("the job")
 
 

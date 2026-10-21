@@ -1,7 +1,4 @@
-"""Indra OCR (datalab-to/indra-ocr), served from providers/serve/indra/ on any host; it needs no GPU.
-
-The adapter is `IndraOcr`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""Indra OCR (datalab-to/indra-ocr), served from providers/serve/indra/ on any host; it needs no GPU."""
 from __future__ import annotations
 
 import dataclasses
@@ -56,17 +53,14 @@ class IndraOcr(PageAdapter):
     Differences from the vendor:
 
       - math is read as LaTeX (`math` on, its `--math`; the package's default is off, which reads math as
-        plain text);
+        plain text); and
       - page headers and footers are kept in the markdown (`furniture`; the package leaves them out by
-        default), as every other adapter keeps them; and
-      - each page has the benchmark's 900 s.
+        default), as every other adapter keeps them.
 
         docker build -t opb-indra omni_parse_bench/harness/providers/serve/indra
         docker run -p 8001:8001 opb-indra
         opb run --system indra-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"
@@ -106,8 +100,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0, confi
 
 
 def parse(raw: dict, request: contract.Request, config: IndraOcr | None = None) -> tuple[dict, dict]:
-    """The page's markdown as html, its blocks on the page as sent. A malformed block, or a type LABELS
-    lacks, fails the page's blocks output only; its html is still graded."""
+    """The page's markdown as html, its blocks on the page as sent."""
     outputs, errs = {}, {}
     if "html" in request.outputs:
         md = raw.get("markdown")

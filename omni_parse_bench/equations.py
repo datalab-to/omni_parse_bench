@@ -1,7 +1,5 @@
-"""Equations compared by what they render, not by how their LaTeX is written: the math runner's comparison.
-
-`symbols` turns an equation into what it renders, `spans` finds the math in an output, and `appears` says
-whether a test's equation is among it.
+"""Equations compared by what they render, not by how their LaTeX is written: `symbols` turns an equation into
+what it renders, `spans` finds the math in an output, and `appears` says whether a test's equation is in it.
 """
 from __future__ import annotations
 
@@ -65,10 +63,9 @@ def _katex() -> _KaTeX:
 def symbols(tex: str, display: bool = False) -> tuple[str, ...] | None:
     r"""What `tex` renders to, as a flat sequence of symbols and structure; None if it doesn't parse.
 
-    KaTeX turns the LaTeX into MathML (`katex/katex.js`, run in one embedded V8 per process), where every
-    symbol is its final character (`\to` and `\rightarrow` are both →) and the structure is explicit:
-    fractions, scripts, roots, rows of an array. This walks that MathML into a flat sequence, leaving out
-    what doesn't change the equation:
+    KaTeX (one embedded V8 per process) turns the LaTeX into MathML, where every symbol is its final character
+    (`\to` and `\rightarrow` are both →) and the structure is explicit: fractions, scripts, roots, rows of an
+    array. This walks that MathML into a flat sequence, leaving out what doesn't change the equation:
 
         spacing                  \quad, \, and friends: dropped
         alignment                `&`, and how rows are split into cells: dropped; rows are kept
@@ -80,10 +77,8 @@ def symbols(tex: str, display: bool = False) -> tuple[str, ...] | None:
         restrictions             a | opening a subscript and a | just before it (φ_{|S} and φ|_S)
         constructions            `cases` and `\left\{ \begin{aligned} … \right.` render alike already
 
-    These equivalences were decided on real disagreements between the gold and vendors' outputs. The
-    differences judged real stay differences: \bar and \overline, \setminus and a minus, one letter font for
-    another, a dropped blackboard font.
-    """
+    These stay differences: \bar and \overline, \setminus and a minus, one letter font for another, and a
+    dropped blackboard font."""
     mathml = _katex().mathml(tex, display)
     return None if mathml is None else _from_mathml(mathml)
 

@@ -1,6 +1,5 @@
-"""MinerU2.5-Pro (opendatalab/MinerU2.5-Pro-2605-1.2B), served from providers/serve/mineru/ on any GPU host.
-
-The adapter is `MinerU`; its docstring says how a page is processed, and how to serve and run it.
+"""MinerU2.5-Pro (opendatalab/MinerU2.5-Pro-2605-1.2B), served from providers/serve/mineru/ on any GPU
+host.
 """
 from __future__ import annotations
 
@@ -64,15 +63,10 @@ class MinerU(PageAdapter):
       5. Mapping to opb outputs  html is that markdown through `markdown.to_html`; blocks are the list, each
                               type mapped by LABELS.
 
-    Differences from the vendor:
-
-      - each page has the benchmark's 900 s.
 
         docker build -t opb-mineru omni_parse_bench/harness/providers/serve/mineru
         docker run --gpus all -p 8001:8001 opb-mineru
         opb run --system mineru --options '{"base_url": "http://localhost:8001"}' --sample 20
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"
@@ -106,8 +100,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0, confi
 
 
 def parse(raw: dict, request: contract.Request, config: MinerU | None = None) -> tuple[dict, dict]:
-    """The page from the client's `json2md`; the blocks with their labels. A malformed block, or a type
-    LABELS lacks, fails the page's blocks output only; its html is still graded."""
+    """The page from the client's `json2md`; the blocks with their labels."""
     outputs, errs = {}, {}
     if "html" in request.outputs:
         outputs["html"] = markdown.to_html(raw["markdown"])

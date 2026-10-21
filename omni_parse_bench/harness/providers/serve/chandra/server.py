@@ -119,9 +119,9 @@ def settings(body: dict) -> dict:
 class Handler(BaseHTTPRequestHandler):
     """The package's file loading, `scale_to_fit`, prompt, retry rule and `parse_html`, around the vLLM
     serving the model; how a page is processed is set out step by step in the adapter's docstring.
-    `parse_html` reads each top-level block on its own, so the adapter can treat picture blocks its own
-    way; concatenated, the blocks are the package's page, but for the names it gives images (a hash of the
-    HTML it was given).
+    `parse_html` reads each top-level block on its own, so the adapter can treat picture blocks its own way;
+    concatenated, the blocks are the package's page, but for the names it gives images (a hash of the HTML it
+    was given).
 
         GET  /health    200 once up
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
@@ -129,11 +129,7 @@ class Handler(BaseHTTPRequestHandler):
                         "max_retries"}}
                         -> {"completion": the kept chat completion, "attempts", "usage": summed over
                         attempts, "blocks": [{"label", "raw": the block's inner HTML as the model wrote it,
-                        "html": parse_html of the block}], "vendor": {"chandra-ocr": its commit}}
-
-    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image,
-    beside the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
-    """
+                        "html": parse_html of the block}], "vendor": {"chandra-ocr": its commit}}"""
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 

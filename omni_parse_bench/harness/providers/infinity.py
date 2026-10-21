@@ -1,6 +1,5 @@
-"""Infinity-Parser2 (infly/Infinity-Parser2-Pro, -Flash), served from providers/serve/infinity/ on a GPU host.
-
-The adapter is `Infinity`; its docstring says how a page is processed, and how to serve and run it.
+"""Infinity-Parser2 (infly/Infinity-Parser2-Pro, -Flash), served from providers/serve/infinity/ on a GPU
+host.
 """
 from __future__ import annotations
 
@@ -64,8 +63,7 @@ class Infinity(PageAdapter):
     Differences from the vendor:
 
       - headers, footers and page footnotes are kept (the SDK leaves them out by default; the benchmark
-        scores the whole page for every system); and
-      - each page has the benchmark's 900 s.
+        scores the whole page for every system).
 
     `model` names the model the server serves (its MODEL), so a run's name tells Pro and Flash apart; an
     answer from another model is refused.
@@ -74,8 +72,6 @@ class Infinity(PageAdapter):
         docker run --gpus all -p 8001:8001 opb-infinity
         opb run --system infinity-parser2 --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"

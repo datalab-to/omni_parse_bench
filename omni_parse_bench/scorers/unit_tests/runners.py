@@ -53,17 +53,13 @@ Arg = Text | Number | Latex
 
 
 def found(a: Arg, v: views.Html) -> Mark:
-    """Whether one piece of content is in the output, compared as its kind says: text within its
-    `max_diffs` edits; a number digit for digit (`_number_found`); LaTeX by what it renders, or by its
-    plain text when plain text writes it without loss (`_latex_found`).
-
-    How content is found depends on its kind, not on the test type: a `Text` is compared within its edits, a
-    `Number` digit for digit, and `Latex` by what it renders. Text is compared only after `normalize.fold`, on
-    both sides.
+    """Whether one piece of content is in the output, compared as its kind says, never by its test type: a
+    `Text` within its `max_diffs` edits, after `normalize.fold` on both sides; a `Number` digit for digit
+    (`_number_found`); and `Latex` by what it renders, or by its plain text when plain text writes it without
+    loss (`_latex_found`).
 
         present(Present(Text("Total due", max_diffs=1)), views.html("<p>Total due: 40</p>"))
-        # -> (True, "")
-    """
+        # -> (True, "")"""
     if isinstance(a, Number): return _number_found(a.number, v)
     if isinstance(a, Latex): return _latex_found(a.latex, v)
     ok, r, thr = contains(a.text, v.text, a.max_diffs)
@@ -233,9 +229,8 @@ def layout_kind(t: LayoutKind, blocks: Sequence[Block]) -> Mark:
 def holder(place: Sequence[Box], blocks: Sequence[Block]) -> Block | None:
     """The smallest block covering at least MIN_PLACE_COVER of the place's area, or None.
 
-    Note: coverage of the place, not IoU: a vendor's block may rightly be larger than our place (a
-    list for an item, a header line for one of its parts), and the smallest such block is the most
-    specific (a cell's text inside a table's block)."""
+    Note: coverage of the place, not IoU, since a vendor's block may rightly be larger than our place (a list
+    for an item), and the smallest is the most specific."""
     total = sum(_area(x) for x in place)
     if total <= 0: return None
     held = [b for b in blocks
@@ -348,8 +343,8 @@ def _ratio(needle: str, hay: str, max_diffs: int) -> tuple[bool, float, float]:
 def _partial(needle: str, hay: str) -> float:
     """How well `needle` matches its best window of `hay`, from 0 to 1.
 
-    Note: rapidfuzz's partial_ratio slides the shorter string over the longer, so a `hay` shorter
-    than `needle` would be looked for inside the needle; then the whole of each is compared."""
+    Note: rapidfuzz's partial_ratio slides the shorter string over the longer, so when `hay` is the shorter,
+    the whole of each is compared instead."""
     return (fuzz.partial_ratio(needle, hay) if len(hay) >= len(needle) else fuzz.ratio(needle, hay)) / 100.0
 
 

@@ -1,7 +1,4 @@
-"""Tesseract: plain OCR with no model of the page beyond its characters, the benchmark's floor.
-
-The adapter is `Tesseract`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""Tesseract: plain OCR with no model of the page beyond its characters, the benchmark's floor."""
 from __future__ import annotations
 
 import dataclasses
@@ -32,23 +29,14 @@ _SCRIPT = re.compile(r"Script: (\w+)")
 
 @dataclasses.dataclass(frozen=True)
 class Tesseract(PageAdapter):
-    """The tesseract adapter. Its fields are what tesseract can be asked.
-
-    A PDF page is rendered at `render_dpi` (pypdfium2); an image is read as it is. Tesseract first
-    detects the page's script itself (`--psm 0`) and then reads it with that script's model, English
-    when it detects none: it is told nothing about the page, as a tool with no metadata would be. Its
-    answer is plain text, written as html inside <pre>, escaped, and nothing else is done to it.
-
-    No layout blocks, so its layout family is 0; its text and tables families say how it reads. It runs
-    locally, costs nothing (each record says `usd` 0.0) and needs no key, only the `tesseract` binary with
-    its script models:
+    """Tesseract, run locally: html only, so its layout family is 0. A PDF page is rendered at `render_dpi`;
+    Tesseract detects the page's script (`--psm 0`) and reads it with that script's model, English when it
+    detects none. Its text is written as html inside `<pre>`, escaped. A tesseract that exits with an error
+    fails the page with its stderr, and one past the page's time is a `SystemTimeout`. It costs nothing (`usd`
+    0.0) and needs no key, only the binary and its script models:
 
         brew install tesseract tesseract-lang     # or: apt install tesseract-ocr tesseract-ocr-script-*
-
         opb run --system tesseract --sample 20
-
-    A tesseract that exits with an error fails the page (a `SystemFailed` with its stderr), and one that runs
-    past the page's time is a `SystemTimeout`.
     """
 
     render_dpi: int = dataclasses.field(default=300,
@@ -109,8 +97,7 @@ def detect(image: Path, deadline: budget.Budget) -> str | None:
 
 
 def run(cmd: list[str], deadline: budget.Budget, check: bool = True) -> subprocess.CompletedProcess:
-    """Runs tesseract within the page's time. Its output is decoded with `errors="replace"`, because it can
-    print bytes that aren't UTF-8 (seen with TMPDIR unset), and that is no reason to lose the page."""
+    """Runs tesseract within the page's time, its output decoded with `errors="replace"`."""
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, errors="replace",
                              timeout=max(1.0, deadline.remaining()))

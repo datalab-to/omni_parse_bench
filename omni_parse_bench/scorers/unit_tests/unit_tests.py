@@ -1,6 +1,9 @@
-"""A dataset's unit tests: each page's tests read and checked (`gold`, `check`), each page's verdicts as test
-lines (`lines`), test lines summarized (`summarize`), and `UnitTests`, the scorer as omni-bench-core grades a
-run.
+"""A dataset's unit tests:
+
+- `UnitTests`: the scorer a run is graded with;
+- `gold` and `check`: each page's tests, read and checked;
+- `lines`: a page's verdicts as test lines; and
+- `summarize`: test lines as one summary.
 """
 from __future__ import annotations
 
@@ -24,22 +27,15 @@ HEADLINE = "the mean of the families' scores"
 
 @dataclasses.dataclass(frozen=True)
 class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, Any]]):
-    """Omni Parse Bench's scorer: each page's yes/no tests, run against its outputs.
+    """Omni Parse Bench's scorer: each page's yes/no tests, run against its outputs. A test on an output the
+    system didn't produce fails as "no <output> output", so a system with html alone scores 0 on layout.
 
-    Every test of a page is graded. A test on an output the system didn't produce (one it can't, or one it
-    failed to give) fails as "no <output> output", so a system that produces html alone scores 0 on the layout
-    family, and its text and tables families say how it reads.
-
-    The summary holds the headline and `families`: each family's score (its tests' pass rate), tests and
-    source documents (`summarize`), in the order text, tables, layout. The headline is the mean of the
-    families' scores over the scored pages; the core then multiplies it by coverage, so a page whose call
-    failed counts as 0, and a run where every page failed has headline 0.
-
-    Each page's line in scores.jsonl holds its counts: `tests`, `passed`, and `per_family`, each family's
-    `tests` and `passed`. Each test's verdict is in the page's details (`details/<page_id>.jsonl`), as a test
-    line (`lines`): `page_id`, `suite`, `document`, `test_id`, `test_type`, `output_type`, `derivation`,
-    `tags`, `result` and `why`. So `summarize` reads details lines, and any other breakdown (by tag, test
-    type, suite or derivation) is `summarize` of a slice of them."""
+    - A page's line in scores.jsonl holds `tests`, `passed` and `per_family` (each family's `tests` and
+      `passed`);
+    - its details (`details/<page_id>.jsonl`) hold one test line per test (`lines`); and
+    - the summary is `summarize` over the scored pages: the families in the order text, tables, layout, and
+      their mean as the headline. Any other breakdown (by tag, test type, suite or derivation) is `summarize`
+      of a slice of the details."""
 
     name: ClassVar[str] = "unit_tests"
 
@@ -70,13 +66,14 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
                                       "tags": list(t.tags), "result": v.result, "why": v.why} for v in vs])
 
     def score_all(self, rows: Sequence[data.Page], preds: Sequence[Mapping[str, Any]],
-                  golds: Sequence[Sequence[_tests.Test]]) -> list[scorer.Score]:
+                  golds: Sequence[Sequence[_tests.Test]]) -> list[scorer.Score | errors.Unscored]:
         """The core's, with each detail line on its page (`page_id`, `suite`, `document`), so a page's details
         are test lines that `summarize` reads."""
         out = []
         for r, x in zip(rows, super().score_all(rows, preds, golds), strict=True):
             on = {"page_id": r.page_id, "suite": r.suite, "document": r.document}
-            out.append(x if x.details is None else x._replace(details=[on | d for d in x.details]))
+            scored = isinstance(x, scorer.Score) and x.details is not None
+            out.append(x._replace(details=[on | d for d in x.details]) if scored else x)
         return out
 
     def row_fields(self, row: data.Page) -> dict[str, Any]:
@@ -108,13 +105,11 @@ def gold(page: data.Page) -> tuple[_tests.Test, ...]:
 
 
 def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
-    """Every test of `pages` (a manifest's, `data.read_manifest`), each page's checked (`gold`), and what
-    no single page can show: a test id used twice, and a page with no tests. What publishing a dataset
-    checks, before any call of a benchmark; grading needs none of it.
+    """Every test of `pages`, each page's checked (`gold`), and what no single page can show: a test id used
+    twice. It is what publishing a dataset checks; grading needs none of it.
 
-    Note: a gold file no manifest names is not refused here: a dataset may hold several manifests (a
-    sample beside the whole), each naming some of the gold files, so one manifest can't say a file is
-    stray."""
+    Note: a gold file no manifest names isn't refused, since a dataset may hold several manifests, each naming
+    some of the gold files."""
     every = tuple(t for p in pages for t in gold(p))
     if twice := [i for i, n in collections.Counter(t.id for t in every).items() if n > 1]:
         raise ValueError(f"test ids used more than once, across the dataset: "
@@ -127,13 +122,8 @@ def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
 
 
 def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.Page) -> list[dict[str, Any]]:
-    """Each verdict of `page` as a test line: the page it's on, then what its test is (looked up by id in
-    `tests`), then the verdict.
-
-    A test line is one test's verdict beside what the page and the test are: `page_id`, `suite`, `document`,
-    `test_id`, `test_type`, `output_type`, `derivation`, `tags`, `result` and `why`. `summarize` reads any
-    number of them, and a slice of them (one tag, one suite) is summarized the same way.
-    """
+    """Each verdict of `page` as a test line: `page_id`, `suite`, `document`, `test_id`, `test_type`,
+    `output_type`, `derivation`, `tags`, `result` and `why`. `summarize` reads any set of them."""
     by_id = {t.id: t for t in tests}
     on = {"page_id": page.page_id, "suite": page.suite, "document": page.document}
     return [on | {"test_id": (t := by_id[v.id]).id, "test_type": t.test_type, "output_type": t.output_type,
@@ -142,17 +132,13 @@ def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.
 
 
 def summarize(lines: Iterable[Line]) -> dict[str, Any]:
-    """The test lines (from `lines()`) summarized: the benchmark's summary of a run, on any set of tests.
+    """Test lines (from `lines`) as one summary: `headline`, the mean of the families' scores, and `families`,
+    each family's `score` (the share of its tests passed), `tests` and `documents`. The headline is None when
+    there are no tests.
 
-    It holds `headline`, the mean of the families' scores, and `families`: each family's `score` (the share
-    of its tests passed), `tests` and `documents` (how many source documents its tests are from). Scores are
-    fractions from 0 to 1, and the headline is None when there are no tests.
-
-    The headline is a mean over families, each family's score flat over its tests, so how many tests a family
-    has never sets its weight. A document's tests pass or fail together (one misread table fails all its
-    cells), so a score over a few documents says less than its test count suggests: `documents` says how
-    many.
-    """
+    Note: a mean over families, each flat over its tests, so how many tests a family has never sets its
+    weight. A document's tests pass or fail together (one misread table fails all its cells), so
+    `documents` says how much a score rests on."""
     return _summary((vocab.FAMILIES[x["test_type"]], x["document"], int(x["result"] == "pass"), 1)
                     for x in lines)
 

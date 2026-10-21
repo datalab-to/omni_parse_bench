@@ -1,8 +1,5 @@
-"""The gold: a page's tests, read from its gold file and checked (`read`).
-
-Which pages there are, and where their gold files are, is `data`'s; reading one page's tests is the
-scorer's `gold(page)`, built on `read`.
-"""
+"""The gold: a page's tests, read from its gold file and checked (`read`). The scorer's `gold(page)` is
+built on it."""
 from __future__ import annotations
 
 import collections

@@ -109,7 +109,7 @@ What happens when something goes wrong (a page the system refuses, a timeout, a 
 server that isn't running, a bug in an adapter, Ctrl-C) follows one rule, the same for every system:
 
     A page counts 0 only when code says, on purpose, that the system failed, by raising `SystemFailed`.
-    Any other exception stops the run and prints its traceback.
+    Any other exception stops the run and is raised as it is.
 
 The table in [omni-bench-core's "The rules"](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules) says, case by case, what you see, how the
 page counts, and what to do. In short:

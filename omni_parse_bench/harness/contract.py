@@ -1,9 +1,5 @@
-"""What one call to a system is and returns: `Request`, `Call` and `Cost`.
-
-A page adapter (`adapter.PageAdapter`) makes one or more calls for a page, one per `Request`. Each call
-returns a `Call`. The adapter's `call` gathers them into the one answer the core keeps for the page.
-
-A leaf module: it imports nothing from this package, so every adapter can share it without a cycle.
+"""What one call to a system is and returns: `Request`, `Call` and `Cost`, with `upload_name` and
+`json_object`. It imports nothing from this package, so every adapter can share it.
 """
 from __future__ import annotations
 

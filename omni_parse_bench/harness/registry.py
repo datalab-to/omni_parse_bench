@@ -1,9 +1,10 @@
-"""Which adapter class a provider name means, and an adapter made from a config's options.
+"""Which adapter a provider name means:
 
-`ADAPTERS` maps each name to its class. Any model id (it contains `MODEL_SEPARATOR`, as `openai/gpt-5.6-sol`
-does) means the single-shot LLM adapter, with the id as its `model` option. An adapter of your own is
-declared by its package under the entry-point group `ENTRY_POINT_GROUP`, pointing at its class, and is
-loaded the first time it is asked for.
+- `ADAPTERS`: each name's class. A model id (it contains `MODEL_SEPARATOR`, as `openai/gpt-5.6-sol`) means
+  the single-shot LLM adapter, with the id as its `model`;
+- `PLUGINS`: adapters other packages declare under the entry-point group `ENTRY_POINT_GROUP`, loaded the
+  first time they are asked for; and
+- `system`: an adapter made from a config's options.
 """
 from __future__ import annotations
 

@@ -1,7 +1,5 @@
-"""A PDF page as an image, for the providers that send or read pixels instead of the PDF.
-
-pdfium isn't thread-safe, and a benchmark calls providers from many threads at once, several
-providers in one run; so every render in the process goes through one lock, here.
+"""A PDF page as an image (`render`), for systems that take pixels. Every render in the process holds one
+lock, since pdfium isn't thread-safe and adapters run on many threads.
 """
 from __future__ import annotations
 

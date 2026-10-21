@@ -6,5 +6,7 @@
                          has none, and its adapter asks vLLM's /v1 directly
 
 A server.py imports its vendor's code and never omni_parse_bench, so the vendor's code and its license stay
-in its image. Each provider's adapter docstring says how to build, run and point opb at it.
+in its image; it runs there beside the vLLM serving the model (start.sh). With OPB_ENDPOINT_KEY set, a
+server requires it as each request's bearer token. Each adapter's docstring says how to build, run and
+point opb at its server.
 """

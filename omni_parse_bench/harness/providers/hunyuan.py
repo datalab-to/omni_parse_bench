@@ -1,7 +1,4 @@
-"""HunyuanOCR-1.5 (tencent/HunyuanOCR), served from providers/serve/hunyuan/ on any GPU host.
-
-The adapter is `Hunyuan`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""HunyuanOCR-1.5 (tencent/HunyuanOCR), served from providers/serve/hunyuan/ on any GPU host."""
 from __future__ import annotations
 
 import base64
@@ -59,17 +56,14 @@ class Hunyuan(PageAdapter):
     Differences from the vendor:
 
       - `layout_parse`, not the `doc_parse` Tencent scores document parsing with: `doc_parse` drops headers
-        and footers and gives no boxes, and the benchmark scores both;
+        and footers and gives no boxes, and the benchmark scores both; and
       - the vLLM 0.18.1 setup, which Tencent now lists as archived but validated (its unified environment,
-        vLLM 0.25.1 on CUDA 13, is verified to align); and
-      - each page has the benchmark's 900 s.
+        vLLM 0.25.1 on CUDA 13, is verified to align).
 
         docker build -t opb-hunyuan omni_parse_bench/harness/providers/serve/hunyuan
         docker run --gpus all -p 8001:8001 opb-hunyuan
         opb run --system hunyuan-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"
@@ -186,8 +180,7 @@ def blocks(said: str) -> list[dict]:
 
 
 def parse(raw: dict, request: contract.Request, config: Hunyuan | None = None) -> tuple[dict, dict]:
-    """The client's text as the page and as blocks. A malformed block, or a type LABELS lacks, fails the
-    page's blocks output only; its html is still graded."""
+    """The client's text as the page and as blocks."""
     text = raw["text"] or ""
     outputs, errs = {}, {}
     if "html" in request.outputs:

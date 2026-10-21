@@ -1,9 +1,7 @@
-"""One page's tests run against its outputs: a verdict per test (`score`).
-
-Each output is read once into its view (`views.html`, `views.blocks`), and each test runs on its output's
-view (`runners.py`). A test fails when it fails, or when its output is missing or malformed
-(`views.MalformedOutput`). A test whose run raises on a well-formed output is a bug of ours, never the
-provider's fault, so `score` raises it, naming the test.
+"""One page's tests run against its outputs: a verdict per test (`score`). Each output is read once into its
+view (`views`), and each test runs on its output's view (`runners`). A test fails when it fails, or when its
+output is missing or malformed. A test that raises on a well-formed output is a bug of the scorer's, so
+`score` raises it, naming the test.
 """
 from __future__ import annotations
 

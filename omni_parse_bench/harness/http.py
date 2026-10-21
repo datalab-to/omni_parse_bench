@@ -1,8 +1,10 @@
-"""A JSON POST within a call's time budget, its failures mapped to the harness's errors.
+"""A JSON POST to a model server, within a call's time budget:
 
-For a server that answers one route with JSON: a vendor's pipeline or its own engine behind one
-endpoint, as every opb model server (providers/serve/) answers `/parse` (`parse`). A chat endpoint is
-`providers.llm.chat`.
+- `parse`: one page to an opb model server's /parse route (providers/serve/);
+- `post`: any JSON POST, its failures mapped to the harness's errors; and
+- `page` and `settings`: what a model server is sent.
+
+A chat endpoint is `providers.llm.chat`.
 """
 from __future__ import annotations
 
@@ -27,18 +29,15 @@ def page(path: Path) -> dict:
 
 
 def settings(config: Any, *local: str) -> dict:
-    """An open model adapter's options as its server takes them: every field but where the server is
-    (`base_url`), the model it serves (`model`, checked against its answer) and those the adapter applies
-    itself (`local`). Each defaults to the vendor's value; any other value is another configuration, and
-    gets its own run folder."""
+    """An open model adapter's options as its server takes them: every field but `base_url`, `model` (checked
+    against the answer) and those the adapter applies itself (`local`)."""
     out = {f.name: getattr(config, f.name) for f in dataclasses.fields(config)}
     return {k: v for k, v in out.items() if k not in ("base_url", "model", *local)}
 
 
 def parse(config: Any, path: Path, timeout: float, body: dict | None = None) -> dict:
-    """An opb model server's answer for one page: `body` (by default the page file and the config's
-    `settings`) to its /parse route at `config.base_url`, within `timeout`, with OPB_ENDPOINT_KEY as its
-    bearer token when it is set."""
+    """An opb model server's answer for one page: `body` (by default the page and `settings`) to /parse at
+    `config.base_url`, with OPB_ENDPOINT_KEY as its bearer token when set."""
     body = {**page(path), "settings": settings(config)} if body is None else body
     return post(f"{config.base_url.rstrip('/')}/parse", body, budget.Budget(timeout),
                 key=os.environ.get("OPB_ENDPOINT_KEY"))

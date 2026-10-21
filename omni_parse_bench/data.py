@@ -1,8 +1,4 @@
-"""The dataset: its pages, read from a folder or downloaded from Hugging Face.
-
-`Page` is one row of the manifest, and `read_manifest` reads them all, with opb's checks on top of the
-core's (`omni_bench_core.data`). Checking every test of a dataset is the scorer's, `unit_tests.check(pages)`.
-"""
+"""The dataset: `Page`, one row of the manifest, and `read_manifest`, which reads them all."""
 from __future__ import annotations
 
 import dataclasses
@@ -22,11 +18,8 @@ OUTPUTS = frozenset(vocab.READS.values())     # the output types a test can read
 
 @dataclasses.dataclass(frozen=True)
 class Page:
-    """One page: a row of the manifest, its paths full local paths, so a page's file and tests are read from
-    the page alone.
-
-    `extra` holds the row's other columns. omni-parse-bench reads none of them, so a dataset can carry
-    columns of its own (a language, a tag, another gold) for scorers of its own. Treat it as read-only."""
+    """One page: a row of the manifest, its paths full local paths. `extra` holds the row's other columns,
+    which opb never reads, for scorers of your own; treat it as read-only."""
 
     page_id: str
     document: str   # the source document: a page's tests pass or fail with its document's
@@ -44,25 +37,20 @@ class Page:
 
 @functools.cache
 def read_manifest(dataset: str | Path, manifest: str = MANIFEST) -> tuple[Path, tuple[Page, ...]]:
-    """The dataset's folder and its pages, checked, in the manifest's order. It reads the manifest alone: no
-    gold file is opened.
-
-    A dataset folder holds:
+    """The dataset's folder and its pages, checked, in the manifest's order; no gold file is opened. A dataset
+    folder holds:
 
         manifest.parquet       a row per page: page_id, document, suite, doc_path, gt_path, outputs
-        pages/...              the page files that get sent: one-page PDFs, or .png for image pages
-        gold/<page_id>.json    each page's tests: {"tests": [...]}, read by the scorer (`scorers.unit_tests`)
+        pages/...              the page files sent: one-page PDFs, or .png for image pages
+        gold/<page_id>.json    each page's tests: {"tests": [...]}
 
-    Downloading, and the checks every benchmark shares (ids, paths inside the dataset, the gold named
-    `<page_id>.json`), are the core's. opb adds four checks:
+    On top of the core's checks (ids, paths inside the dataset, gold named `<page_id>.json`), opb checks that:
 
-    - a page names its source `document`, a non-empty string;
-    - its `suite`, where its pages come from, is a non-empty string;
-    - its file is a .pdf or a .png; and
-    - its `outputs` are the output types its tests read, a non-empty list of distinct names.
+    - `document` and `suite` are non-empty strings;
+    - the page file is a .pdf or a .png; and
+    - `outputs` are the output types its tests read, a non-empty list of distinct names.
 
-    It reads each manifest once per process.
-    """
+    Each manifest is read once per process."""
     root, rows = core.read_manifest(dataset, manifest, columns=COLUMNS, id="page_id", inputs=("doc_path",),
                                     gold="gt_path")
     return root, tuple(page(r) for r in rows)

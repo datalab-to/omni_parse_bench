@@ -88,9 +88,6 @@ class Handler(BaseHTTPRequestHandler):
                         -> {"completion": the model's chat completion, "json": the reply as the SDK reads
                         it, "markdown": the page, "model", "vendor"}; an empty reply gives no "json" or
                         "markdown"
-
-    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image,
-    beside the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
     """
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})

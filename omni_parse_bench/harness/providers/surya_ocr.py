@@ -1,7 +1,4 @@
-"""Surya OCR 2 (datalab-to/surya-ocr-2), served from providers/serve/surya/ on any GPU host.
-
-The adapter is `SuryaOcr`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""Surya OCR 2 (datalab-to/surya-ocr-2), served from providers/serve/surya/ on any GPU host."""
 from __future__ import annotations
 
 import dataclasses
@@ -59,15 +56,12 @@ class SuryaOcr(PageAdapter):
     Differences from the vendor:
 
       - SURYA_FULLPAGE_REGEN is on (the package's default is off; it names it as the setting for
-        benchmarking); and
-      - each page has the benchmark's 900 s.
+        benchmarking).
 
         docker build -t opb-surya omni_parse_bench/harness/providers/serve/surya
         docker run --gpus all -p 8001:8001 opb-surya
         opb run --system surya-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"
@@ -102,8 +96,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0, confi
 
 
 def parse(raw: dict, request: contract.Request, config: SuryaOcr | None = None) -> tuple[dict, dict]:
-    """The page in reading order, and its blocks. A malformed block, or a type LABELS lacks, fails the
-    page's blocks output only; its html is still graded."""
+    """The page in reading order, and its blocks."""
     blocks = sorted(raw.get("blocks") or [], key=lambda b: b.get("reading_order", 0))
     _, _, w, h = raw.get("image_bbox") or [0, 0, 1, 1]
     outputs, errs = {}, {}

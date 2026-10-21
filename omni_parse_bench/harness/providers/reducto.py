@@ -1,11 +1,9 @@
-"""Reducto adapter: upload the page, POST /parse_async, poll /job/<id>.
-
-The adapter is `Reducto`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""Reducto: upload the page, POST /parse_async, poll /job/<id>."""
 from __future__ import annotations
 
 import dataclasses
 import html
+import os
 import re
 import time
 from pathlib import Path
@@ -33,28 +31,13 @@ TERMINAL = frozenset({"Completed", "Failed", "Error", "Cancelled"})
 
 @dataclasses.dataclass(frozen=True)
 class Reducto(PageAdapter):
-    """The reducto adapter. Its fields are what reducto can be asked.
+    """Reducto, one call for html and blocks, on r-1, its newest model (`model`; `legacy` runs the old
+    pipeline, with its agentic passes on tables and text and `extraction_mode`).
 
-    One call produces both outputs. Reducto returns the page as typed blocks (Header, Footer,
-    Page Number, Title, Section Header, Text, Table, Figure, Key Value, ...), each with a normalized
-    box and its content, markdown with tables as html. So:
-
-    - `html` is Reducto's own page content, with r-1's figure descriptions as alt text (below); and
-    - `blocks` are the blocks, their text with tags removed as for every vendor.
-
-    Nothing else is changed: markers such as `<empty>` and `<signature>` are left for the scorer, which
-    reads them as tags, as it does for every vendor. Tables are asked for as html.
-
-    The model is r-1, Reducto's newest (`settings.model`; a request without one runs the legacy
-    pipeline). r-1 writes each figure as a description of it (with a `<verbose>` list of a chart's
-    words), in the page content as if printed, and has no switch for it; as with Extend's figure
-    captions, each becomes an image's alt text in its place (`described`), where every vendor's image
-    descriptions are, and the scorer treats it as it treats theirs. r-1 does what the legacy agentic
-    passes did itself, and its docs say to leave them out, so they and `extraction_mode` are sent only
-    with `model` legacy. There, agentic enrichment runs on tables (`max`) and on text (OCR correction by
-    a vision model), not on figures, where it turns a chart into a data table, which isn't page text,
-    and figures aren't summarized, since a summary is text the page doesn't print (Datalab's
-    `disable_image_captions`). Cost comes back in Reducto credits (`usage.credits`).
+    - `html`: the page content, tables as html, each figure description r-1 writes as an image's alt text
+      (`described`), as for every vendor;
+    - `blocks`: its typed blocks (`LABELS`), boxes already fractions of the page; and
+    - cost: stated in Reducto credits (`usage.credits`).
 
     Auth: REDUCTO_API_KEY.
 
@@ -134,9 +117,9 @@ def layout_blocks(blocks: list[dict]) -> list[dict]:
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: Reducto | None = None) -> contract.Call:
-    """Upload the page, submit the parse, poll until it is done, return the finished job."""
+    """Upload the page, submit the parse, poll until it is done, and return the finished job."""
     config = config or Reducto()
-    key = errors.key("REDUCTO_API_KEY", "reducto")
+    key = os.environ["REDUCTO_API_KEY"]
     deadline = budget.Budget(timeout)
     base_url = config.base_url.rstrip("/")
     polls = 0

@@ -1,7 +1,4 @@
-"""GLM-OCR (zai-org/GLM-OCR), through its SDK's self-hosted pipeline, served from providers/serve/glm_ocr/.
-
-The adapter is `GlmOcr`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""GLM-OCR (zai-org/GLM-OCR), through its SDK's self-hosted pipeline, served from providers/serve/glm_ocr/."""
 from __future__ import annotations
 
 import dataclasses
@@ -68,14 +65,11 @@ class GlmOcr(PageAdapter):
       - the SDK's default config abandons the regions it labels header, footer, number, footnote,
         aside_text, reference and header/footer images; the server's `keep` config (its default) reads them,
         since the benchmark scores the whole page, headers and footers included, for every system; its
-        answer says which config read it (`sdk_config`); and
-      - each page has the benchmark's 900 s.
+        answer says which config read it (`sdk_config`).
 
         docker build -t opb-glm_ocr omni_parse_bench/harness/providers/serve/glm_ocr
         docker run --gpus all -p 8001:8001 opb-glm_ocr
         opb run --system glm-ocr --options '{"base_url": "http://localhost:8001"}' --sample 20
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"
@@ -125,8 +119,7 @@ def _block(region: dict) -> dict:
 
 
 def parse(raw: dict, request: contract.Request, config: GlmOcr | None = None) -> tuple[dict, dict]:
-    """The page from `markdown_result`; the blocks from `json_result`. A malformed block, or a type LABELS
-    lacks, fails the page's blocks output only; its html is still graded."""
+    """The page from `markdown_result`; the blocks from `json_result`."""
     outputs, errs = {}, {}
     if "html" in request.outputs:
         md = _IMAGE_PLACEHOLDER.sub("", raw.get("markdown_result") or "")

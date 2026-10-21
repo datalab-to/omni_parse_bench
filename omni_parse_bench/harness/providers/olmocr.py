@@ -1,7 +1,4 @@
-"""olmOCR 2 (allenai/olmOCR-2-7B-1025-FP8), served from providers/serve/olmocr/ on any GPU host.
-
-The adapter is `OlmOcr`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""olmOCR 2 (allenai/olmOCR-2-7B-1025-FP8), served from providers/serve/olmocr/ on any GPU host."""
 from __future__ import annotations
 
 import dataclasses
@@ -47,17 +44,14 @@ class OlmOcr(PageAdapter):
     Differences from the vendor:
 
       - the pipeline's last resort, the PDF's own text layer (pdftotext) for a page no attempt read, is a
-        failed page here: that is not the model reading the page;
+        failed page here: that is not the model reading the page; and
       - the attempts run one after another: the pipeline fires its remaining ones in parallel when the vLLM
-        it launched reports an empty queue, a count this server can't see; and
-      - each page has the benchmark's 900 s.
+        it launched reports an empty queue, a count this server can't see.
 
         docker build -t opb-olmocr omni_parse_bench/harness/providers/serve/olmocr
         docker run --gpus all -p 8001:8001 opb-olmocr
         opb run --system olmocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"

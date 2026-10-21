@@ -1,7 +1,5 @@
-"""The comparison normal form: both sides of every comparison go through `fold`.
-
-A test's string and a provider's text view are compared only after `fold`, the same function on both
-sides, so a rule can never favour one side. `squeeze` is `fold` with every space removed.
+"""The comparison normal form: a test's string and an output's text are compared only after `fold`, the same
+function on both sides, so no rule favours one side. `squeeze` is `fold` with every space removed.
 """
 from __future__ import annotations
 
@@ -159,11 +157,8 @@ def typography(s: str) -> str:
 
 
 def squeeze(s: str) -> str:
-    """`fold` with every space removed.
-
-    It is for text layers that glue a footnote marker to its word ("Probiotic1") where providers write a space
-    or a <sup>.
-    """
+    """`fold` with every space removed, for text layers that glue a footnote marker to its word
+    ("Probiotic1")."""
     return _WHITESPACE.sub("", fold(s))
 
 

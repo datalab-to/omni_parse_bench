@@ -328,6 +328,8 @@ once than it reads at once, for the same reason.
 ## Open-weight models
 
 Each model runs with the defaults its vendor recommends; each adapter's docstring lists where it differs.
+Two differences hold for every model, and aren't repeated there: each page has the benchmark's 900 s,
+and a picture's contents (a description, a chart's data) become an image's alt text.
 
 | model | provider | serve/ | outputs |
 | --- | --- | --- | --- |

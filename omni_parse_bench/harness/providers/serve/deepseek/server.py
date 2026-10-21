@@ -108,10 +108,10 @@ def settings(body: dict) -> dict:
 
 async def parse(request: web.Request) -> web.Response:
     """The engine, model registration, image processor, logits processor and sampling are the vendor's
-    (github.com/deepseek-ai/DeepSeek-OCR-2 at 2f3699e, DeepSeek-OCR2-master/DeepSeek-OCR2-vllm): the
-    engine arguments of run_dpsk_ocr2_eval_batch.py on the AsyncLLMEngine of run_dpsk_ocr2_image.py. The
-    repository runs it only as batch scripts; the transport is ours. How a page is processed is set out
-    step by step in the adapter's docstring.
+    (github.com/deepseek-ai/DeepSeek-OCR-2 at 2f3699e, DeepSeek-OCR2-master/DeepSeek-OCR2-vllm): the engine
+    arguments of run_dpsk_ocr2_eval_batch.py on the AsyncLLMEngine of run_dpsk_ocr2_image.py. The repository
+    runs it only as batch scripts; the transport is ours. How a page is processed is set out step by step in
+    the adapter's docstring.
 
         GET  /health    200 once the engine is up
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
@@ -119,9 +119,6 @@ async def parse(request: web.Request) -> web.Response:
                                      "window_size"}}
                         -> {"raw", "tokens", "finish_reason", "prompt",
                             "vendor": {"DeepSeek-OCR-2": its commit}}
-
-    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image
-    (start.sh); the Dockerfile says how to build and run it.
     """
     if KEY and request.headers.get("Authorization") != f"Bearer {KEY}":
         return web.json_response({"error": "a bearer token (OPB_ENDPOINT_KEY) is needed"}, status=401)

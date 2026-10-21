@@ -17,7 +17,7 @@ is the core's three rules, the same for every benchmark built on it: see the tab
 The one that decides how a page counts:
 
     A page counts 0 only when code says, on purpose, that the system failed, by raising
-    `omni_bench_core.errors.SystemFailed`. Any other exception stops the run and prints its traceback.
+    `omni_bench_core.errors.SystemFailed`. Any other exception stops the run and is raised as it is.
 
 The failures a record can hold are `SystemFailed` and its kinds: `SystemTimeout`, `SystemUnreachable` and
 `Unreadable` (an answer `read` said it can't read). Each record's `error` holds its `type`, `status`,
@@ -139,13 +139,15 @@ harness.ADAPTERS                       # name -> adapter class
 harness.system(name, options)          # an adapter at its options, checked; a model id is the LLM adapter
 ```
 
-An adapter is a `harness.PageAdapter`: a frozen dataclass whose fields are its options, with `SUPPORTS`
-(the outputs it can produce), `keys` (the environment variables it needs), `requests(wants)`, `send(page,
-request, *, timeout)` and `parse(raw, request)`. `requests` is never given an empty set: a page that wants
-nothing the system supports is not sent. `send` is called from `workers` threads at once, so a library
-that isn't thread-safe (pdfium is one) needs a lock. Its docstring says how to write one, and
-[providers.md](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/providers.md) describes each. An adapter of your own is declared by its package
-under the entry-point group `omni_parse_bench.adapters`, pointing at its class.
+An adapter is a `harness.PageAdapter`: a frozen dataclass whose fields are its options, with `SUPPORTS` (the
+outputs it can produce), `keys` (the environment variables it needs, checked by the core before any call, in
+a run and in `opb predict`), `requests(wants)`, `send(page, request, *, timeout)` and `parse(raw, request)`.
+`requests` is never given an empty set: a page that wants nothing the system supports is not sent. `send` is
+called from `workers` threads at once, so a library that isn't thread-safe (pdfium is one) needs a lock. Its
+docstring says how to write one, and
+[providers.md](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/providers.md) describes each.
+An adapter of your own is declared by its package under the entry-point group `omni_parse_bench.adapters`,
+pointing at its class.
 
 `send` and `parse` follow the one rule:
 

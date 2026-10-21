@@ -37,8 +37,8 @@ def settings(body: dict) -> dict:
 
 async def parse(data: bytes, suffix: str, s: dict) -> dict:
     """Each page goes through the pipeline's own `process_page` (github.com/allenai/olmocr at f7cfe4c,
-    olmocr/pipeline.py), at its arguments' defaults but for those the request sets, against the vLLM
-    serving the model; how a page is processed is set out step by step in the adapter's docstring.
+    olmocr/pipeline.py), at its arguments' defaults but for those the request sets, against the vLLM serving
+    the model; how a page is processed is set out step by step in the adapter's docstring.
 
         GET  /health    200 once up
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
@@ -47,10 +47,7 @@ async def parse(data: bytes, suffix: str, s: dict) -> dict:
                         "is_valid", "is_fallback", "input_tokens", "output_tokens", "vendor"
 
     A page no attempt read comes back with "is_fallback": true and no text: the pipeline's last resort, the
-    PDF's own text layer, is not the model reading the page. With OPB_ENDPOINT_KEY set, a request needs it
-    as its bearer token. It runs in this folder's image, beside the vLLM serving the model (start.sh); the
-    Dockerfile says how to build and run it.
-    """
+    PDF's own text layer, is not the model reading the page."""
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "page" + suffix)
         with open(path, "wb") as f:

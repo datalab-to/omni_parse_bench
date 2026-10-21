@@ -1,11 +1,9 @@
-"""Datalab API adapter: POST /api/v1/convert, then poll for the result.
-
-The adapter is `Datalab`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""Datalab: POST /api/v1/convert, then poll for the result."""
 from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -34,14 +32,11 @@ MEDIA = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", "
 
 @dataclasses.dataclass(frozen=True)
 class Datalab(PageAdapter):
-    """The datalab adapter. Its fields are what datalab can be asked.
+    """Datalab, one call for html and blocks (`output_format=html,chunks`), page headers and footers kept.
 
-    `mode` selects the tier (`fast`, `balanced`, `accurate`). One call produces `html` and `blocks`
-    together (`output_format=html,chunks`), with page headers and footers kept (the API's own switches
-    `additional_config.keep_pageheader_in_output` and `keep_pagefooter_in_output`).
-
-    Blocks come from the chunks output: each block's `block_type`, its `bbox` in the page's frame
-    (`page_info`), and its text. Cost comes back in cents (`cost_breakdown`) and is converted once.
+    - `mode`: the tier, `fast`, `balanced` or `accurate`;
+    - `blocks`: its chunks, each `block_type` mapped by `LABELS`, boxes in the page's frame (`page_info`); and
+    - cost: stated in cents, recorded in dollars.
 
     Auth: DATALAB_API_KEY.
 
@@ -104,9 +99,9 @@ def blocks(chunks: dict) -> list[dict]:
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: Datalab | None = None) -> contract.Call:
-    """POST the page, poll until it is done, return the finished conversion and its cost."""
+    """POST the page, poll until it is done, and return the finished conversion and its cost."""
     config = config or Datalab()
-    key = errors.key("DATALAB_API_KEY", "datalab")
+    key = os.environ["DATALAB_API_KEY"]
     deadline = budget.Budget(timeout)
     base_url = config.base_url.rstrip("/")
     form = {k: json.dumps(v) if isinstance(v, dict) else str(v).lower() if isinstance(v, bool) else str(v)

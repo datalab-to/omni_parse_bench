@@ -1,7 +1,4 @@
-"""Unlimited-OCR (baidu/Unlimited-OCR), served from providers/serve/unlimited/ on any GPU host.
-
-The adapter is `UnlimitedOcr`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""Unlimited-OCR (baidu/Unlimited-OCR), served from providers/serve/unlimited/ on any GPU host."""
 from __future__ import annotations
 
 import dataclasses
@@ -66,15 +63,12 @@ class UnlimitedOcr(PageAdapter):
     Differences from the vendor:
 
       - 28000 output tokens, not the recipe example's 8192: the model card's own `infer` allows 32768 of
-        context, and this is that less room for the prompt; and
-      - each page has the benchmark's 900 s.
+        context, and this is that less room for the prompt.
 
         docker build -t opb-unlimited omni_parse_bench/harness/providers/serve/unlimited
         docker run --gpus all -p 8001:8001 opb-unlimited
         opb run --system unlimited-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"
@@ -150,8 +144,7 @@ def blocks(said: str) -> list[dict]:
 
 
 def parse(raw: dict, request: contract.Request, config: UnlimitedOcr | None = None) -> tuple[dict, dict]:
-    """The page and its blocks. A malformed block, or a type LABELS lacks, fails the page's blocks output
-    only; its html is still graded."""
+    """The page and its blocks."""
     text = llm.content(raw["completion"])
     if not text.strip():
         raise errors.SystemFailed("the reply is empty", status=200)

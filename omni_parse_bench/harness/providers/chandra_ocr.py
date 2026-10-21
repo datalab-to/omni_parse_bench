@@ -1,7 +1,4 @@
-"""chandra-ocr-2 (datalab-to/chandra-ocr-2), served from providers/serve/chandra/ on any GPU host.
-
-The adapter is `ChandraOcr`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""chandra-ocr-2 (datalab-to/chandra-ocr-2), served from providers/serve/chandra/ on any GPU host."""
 from __future__ import annotations
 
 import dataclasses
@@ -67,16 +64,12 @@ class ChandraOcr(PageAdapter):
     Differences from the vendor:
 
       - headers and footers are kept (the package drops them by default; the benchmark scores the whole
-        page for every system);
-      - picture contents are alt text, as for every system; and
-      - each page has the benchmark's 900 s.
+        page for every system).
 
         docker build -t opb-chandra omni_parse_bench/harness/providers/serve/chandra
         docker run --gpus all -p 8001:8001 opb-chandra
         opb run --system chandra-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"
@@ -145,8 +138,7 @@ def picture(block: dict) -> str:
 
 
 def parse(raw: dict, request: contract.Request, config: ChandraOcr | None = None) -> tuple[dict, dict]:
-    """The page from the server's blocks, pictures as alt text; the blocks from the reply. A malformed
-    block, or a type LABELS lacks, fails the page's blocks output only; its html is still graded."""
+    """The page from the server's blocks, pictures as alt text; the blocks from the reply."""
     said = llm.content(raw["completion"])
     outputs, errs = {}, {}
     if "html" in request.outputs:

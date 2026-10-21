@@ -118,10 +118,7 @@ class Handler(BaseHTTPRequestHandler):
                         -> {"cells": [{bbox, category, text}] or null, "markdown", "image_size": [w, h] of
                         the page as loaded, "completion": the model's chat completion, "vendor"}
 
-    Boxes are in the pixels of the page as loaded (`image_size`). With OPB_ENDPOINT_KEY set, a request needs
-    it as its bearer token. It runs in this folder's image, beside the vLLM serving the model (start.sh);
-    the Dockerfile says how to build and run it.
-    """
+    Boxes are in the pixels of the page as loaded (`image_size`)."""
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 

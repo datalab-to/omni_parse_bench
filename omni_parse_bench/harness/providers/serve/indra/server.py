@@ -89,10 +89,8 @@ class Handler(BaseHTTPRequestHandler):
                         "image_size": the page as read [width, height] in pixels before any turn, and
                         "vendor": the indra-ocr version and the models' repository and revision
 
-    The models are the ones the package names (its models.py), downloaded once when it starts, as the package
-    downloads them. With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. The Dockerfile says how
-    to build and run it.
-    """
+    The models are the ones the package names (its models.py), downloaded once when it starts, as the
+    package downloads them."""
     pool: ProcessPoolExecutor
     vendor: dict
 

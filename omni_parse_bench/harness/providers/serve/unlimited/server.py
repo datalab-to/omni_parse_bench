@@ -65,8 +65,8 @@ def settings(body: dict) -> dict:
 
 class Handler(BaseHTTPRequestHandler):
     """The page loaded as its own pipeline loads one (github.com/baidu/Unlimited-OCR at 92ad94b, infer.py,
-    MIT; imported from the clone in the image), then asked as its vLLM recipe asks it, of the vLLM serving
-    the model; how a page is processed is set out step by step in the adapter's docstring.
+    MIT; imported from the clone in the image), then asked as its vLLM recipe asks it, of the vLLM serving the
+    model; how a page is processed is set out step by step in the adapter's docstring.
 
         GET  /health    200 once up
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
@@ -74,9 +74,6 @@ class Handler(BaseHTTPRequestHandler):
                         "window_size"}}
                         -> {"completion": the model's chat completion, "model",
                         "vendor": {"Unlimited": its commit}}
-
-    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image, beside
-    the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
     """
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})

@@ -256,12 +256,9 @@ def cmd_score(a: argparse.Namespace) -> int:
 
 
 def cmd_predict(a: argparse.Namespace) -> int:
-    """One page through one system: its record as JSON, without the raw answers unless `--raw`. Exits 1 when
-    the page failed.
-
-    A page file alone has no manifest row to say which outputs its tests read, so it asks for every output
-    the system supports, or for `--outputs`. Asking for one is worth it to try a page cheaply: the LLM
-    adapter, for one, makes one call per output."""
+    """One page through one system: its record as JSON, without the raw answers unless `--raw`; exits 1
+    when the page failed. With no manifest row, it asks for every output the system supports, or for
+    `--outputs`."""
     from omni_bench_core import adapter
     from omni_bench_core import errors as core_errors
 
@@ -270,9 +267,6 @@ def cmd_predict(a: argparse.Namespace) -> int:
     page = Path(a.page)
     if not page.is_file(): raise ValueError(f"--page {page}: no such file")
     system = harness.system(a.system, bare(a.system, read_json(a.options, "--options")))
-    if missing := system.missing_keys():
-        how = " and ".join(f"export {k}=..." for k in missing)
-        raise ValueError(f"{a.system} needs {', '.join(missing)}: {how}, then run again")
     wants = frozenset(a.outputs or system.SUPPORTS)
     if missing := sorted(wants - system.SUPPORTS):
         raise ValueError(f"{a.system} can't produce {', '.join(missing)}; it produces "
@@ -338,27 +332,24 @@ def cmd_systems(a: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Results go to stdout as JSON; progress and messages go to stderr. `run` shows its plan and asks before
-    calling a system, unless given `-y` or run with no terminal; any answer but yes (Ctrl-D too) prints "not
-    run" and exits 1. An interrupt exits 130. Anything else (what was asked wrong, an account, a key, a model
-    server that isn't running, a bug) is raised as it is, a native exception whose message says what to do.
+    """Results go to stdout as JSON; progress and messages to stderr. `run` shows its plan and asks before
+    calling a system, unless given `-y` or run with no terminal; any answer but yes exits 1. An interrupt
+    exits 130. Anything else is raised as it is, a native exception whose message says what to do.
 
-    Commands and flags from before 1.0 still work for now, and each prints what replaced it (`deprecated`), or
-    that it is ignored (`ignored`):
+    Commands and flags from before 1.0 still work, and each prints what replaced it, or that it is ignored:
 
-        opb benchmark      is `opb run`, with the same flags
+        opb benchmark      is `opb run`
         opb providers      is `opb systems`
         opb reparse        is `opb reread`; `--add` is no longer possible
-        --systems NAME     on `opb run` (and `--providers`, its older name): is `--system`. Several names
-                           are refused, with one command per system to run instead
+        --systems NAME     on `opb run` (and `--providers`): is `--system`; several names are refused, with
+                           one command per system to run instead
         --provider         on `opb predict`: is `--system`
         --pages            on `opb run`: is `--only`
         --wants            on `opb predict`: is `--outputs`
-        --score-only       on `opb run`: grades the runs already on disk and predicts nothing; use `opb grade`
+        --score-only       on `opb run`: grades the runs on disk; use `opb grade`
         --outputs          on `opb run`, `opb grade` and `opb score`: ignored, since each page asks for the
-                           outputs its tests read, and every test is graded
-        --unsupported      on `opb grade` and `opb score`: ignored, as `--outputs` is
-    """
+                           outputs its tests read
+        --unsupported      on `opb grade` and `opb score`: ignored"""
     parser = functools.partial(argparse.ArgumentParser, allow_abbrev=False)
     ap = parser(prog="opb", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version",

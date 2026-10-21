@@ -53,20 +53,16 @@ def settings(body: dict) -> dict:
 
 class Handler(BaseHTTPRequestHandler):
     """Its client's request, streaming early stop and post-processing, around the vLLM serving the model; how
-    a page is processed is set out step by step in the adapter's docstring. The repository takes images
-    only, so this takes the page as an image file. The client's utilities are imported from the
-    repository, which the image clones (inference/ on PYTHONPATH).
+    a page is processed is set out step by step in the adapter's docstring. The repository takes images only,
+    so this takes the page as an image file. The client's utilities are imported from the repository, which
+    the image clones (inference/ on PYTHONPATH).
 
         GET  /health    200 once up
         POST /parse     {"page": base64 image file, "suffix", "settings": {"task": "layout_parse" or
                         "doc_parse", "temperature", "top_p", "max_tokens", "repetition_penalty",
                         "min_repeats": the early stop's}}
                         -> {"text": the cleaned reply, "early_stopped", "task",
-                        "vendor": {"HunyuanOCR": its commit}}
-
-    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image,
-    beside the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
-    """
+                        "vendor": {"HunyuanOCR": its commit}}"""
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 

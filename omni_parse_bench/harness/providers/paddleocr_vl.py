@@ -1,6 +1,5 @@
-"""PaddleOCR-VL-1.6 (PaddlePaddle/PaddleOCR-VL-1.6), served from providers/serve/paddleocr_vl/ on a GPU host.
-
-The adapter is `PaddleOcrVl`; its docstring says how a page is processed, and how to serve and run it.
+"""PaddleOCR-VL-1.6 (PaddlePaddle/PaddleOCR-VL-1.6), served from providers/serve/paddleocr_vl/ on a GPU
+host.
 """
 from __future__ import annotations
 
@@ -57,23 +56,18 @@ class PaddleOcrVl(PageAdapter):
                               pixels of the page as loaded, content) and its markdown, every block kept
                               (`markdown_ignore_labels` empty).
       5. Mapping to opb outputs  html is that markdown through `markdown.to_html`; blocks are its blocks,
-                              each label from LABELS, content with tags removed. A malformed block, or
-                              a type LABELS lacks, fails the page's blocks output only; its html is
-                              still graded.
+                              each label from LABELS, content with tags removed.
 
     Differences from the vendor:
 
       - every block is kept in the markdown (Paddle's default list drops headers, footers, footnotes and
-        side text; the benchmark scores the whole page for every system);
-      - the layout model runs on the CPU (the vendor recommends a GPU, mainly for speed); and
-      - each page has the benchmark's 900 s.
+        side text; the benchmark scores the whole page for every system); and
+      - the layout model runs on the CPU (the vendor recommends a GPU, mainly for speed).
 
         docker build -t opb-paddleocr_vl omni_parse_bench/harness/providers/serve/paddleocr_vl
         docker run --gpus all -p 8001:8001 opb-paddleocr_vl
         opb run --system paddleocr-vl --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"

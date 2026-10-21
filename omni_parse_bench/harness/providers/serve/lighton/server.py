@@ -77,17 +77,14 @@ def settings(body: dict) -> dict:
 
 class Handler(BaseHTTPRequestHandler):
     """Its benchmark's page render, then its client's request and repair of the reply, around the vLLM serving
-    the model; how a page is processed is set out step by step in the adapter's docstring. The client
-    returns only the reply's text, so this asks with its pieces, to keep the reply's finish reason and usage.
+    the model; how a page is processed is set out step by step in the adapter's docstring. The client returns
+    only the reply's text, so this asks with its pieces, to keep the reply's finish reason and usage.
 
         GET  /health    200 once up
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
                         "settings": {"temperature", "top_p", "max_tokens", "dpi", "max_pixels"}}
                         -> {"completion": the model's chat completion, "text": its content repaired,
                         "model", "vendor": {"lightonocr": the client's commit}}
-
-    With OPB_ENDPOINT_KEY set, a request needs it as its bearer token. It runs in this folder's image,
-    beside the vLLM serving the model (start.sh); the Dockerfile says how to build and run it.
     """
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})

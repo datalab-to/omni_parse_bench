@@ -1,11 +1,9 @@
-"""LlamaParse adapter (v2 API): upload the page with its configuration, poll, read the result.
-
-The adapter is `LlamaParse`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""LlamaParse (v2 API): upload the page with its configuration, poll, read the result."""
 from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -38,21 +36,13 @@ TERMINAL = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 
 @dataclasses.dataclass(frozen=True)
 class LlamaParse(PageAdapter):
-    """The llamaparse adapter. Its fields are what llamaparse can be asked.
+    """LlamaParse, one call for html and blocks, at `agentic_plus`, its most accurate tier.
 
-    One call produces both outputs:
-
-    - `html` is LlamaParse's page `header`, its page markdown and its page `footer`, in that order.
-      The markdown leaves out what LlamaParse typed page header and footer, and returns them beside it
-      in those fields of the same page, so they go back where a header and a footer sit; and
-    - `blocks` are its items' boxes. An item (text, heading, table, image, header, footer, ...) can
-      have several boxes, each with a finer layout label (form, paragraph_title, table, image, ...)
-      and the span of the item's text it covers. A box's label is looked up in `BOX_LABELS`; a box
-      with no label takes its item's type from `ITEM_LABELS`. Items nest (a list's items, the lines of
-      a header), each level with its own boxes, and every level is read.
-
-    Tables are asked for as html. The tier is `agentic_plus`, LlamaParse's most accurate. Cost comes
-    back in LlamaParse credits (`job.usage.credits`).
+    - `html`: the page's `header`, markdown and `footer` joined, since its markdown leaves out what it typed
+      as header and footer;
+    - `blocks`: every item's boxes at every level of the item tree, each labelled by `BOX_LABELS`, or by its
+      item's type in `ITEM_LABELS`; and
+    - cost: stated in LlamaParse credits (`job.usage.credits`).
 
     Auth: LLAMA_CLOUD_API_KEY.
 
@@ -122,7 +112,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: LlamaParse | None = None) -> contract.Call:
     """Upload the page with its configuration, poll until it is done, return the result and cost."""
     config = config or LlamaParse()
-    key = errors.key("LLAMA_CLOUD_API_KEY", "llamaparse")
+    key = os.environ["LLAMA_CLOUD_API_KEY"]
     deadline = budget.Budget(timeout)
     base_url = config.base_url.rstrip("/")
     configuration = {k: v for k, v in request.sent.items() if k != "derived"}

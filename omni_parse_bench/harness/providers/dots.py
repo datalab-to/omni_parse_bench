@@ -1,7 +1,4 @@
-"""dots.mocr (rednote-hilab/dots.mocr), served from providers/serve/dots/ on any GPU host.
-
-The adapter is `Dots`; its docstring says how a page is processed, and how to serve and run it.
-"""
+"""dots.mocr (rednote-hilab/dots.mocr), served from providers/serve/dots/ on any GPU host."""
 from __future__ import annotations
 
 import dataclasses
@@ -54,15 +51,12 @@ class Dots(PageAdapter):
 
     Differences from the vendor:
 
-      - headers and footers are kept, as the parser's `.md` keeps them; and
-      - each page has the benchmark's 900 s.
+      - headers and footers are kept, as the parser's `.md` keeps them.
 
         docker build -t opb-dots omni_parse_bench/harness/providers/serve/dots
         docker run --gpus all -p 8001:8001 opb-dots
         opb run --system dots-mocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
-
-    OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
 
     base_url: str = "http://127.0.0.1:8001"
