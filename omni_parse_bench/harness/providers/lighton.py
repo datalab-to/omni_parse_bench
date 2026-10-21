@@ -16,7 +16,6 @@ from ..adapter import PageAdapter
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
-MODELS = ("lightonai/LightOnOCR-3-4B", "lightonai/LightOnOCR-3-0.8B")
 PROMPT = "grounding"
 
 # The model card's labels onto views.LABELS, and those LightOn's own ParseBench parser also reads
@@ -77,8 +76,8 @@ class LightOn(PageAdapter):
         since the model writes most in `$$` already and a formula block can be a list with inline math,
         which one `$$` around it breaks.
 
-    `model` names the model the server serves (its WEIGHTS), so a run's name tells the two sizes apart; an
-    answer from another model is refused.
+    The server serves the 4B or the 0.8B, as its WEIGHTS say, and says which in every reply (`served`), so a
+    run records which answered.
 
         docker build -t opb-lightonocr omni_parse_bench/harness/providers/serve/lightonocr
         docker run --gpus all -p 8001:8001 opb-lightonocr
@@ -87,7 +86,6 @@ class LightOn(PageAdapter):
     """
 
     base_url: str = "http://127.0.0.1:8001"
-    model: str = dataclasses.field(default=MODELS[0], metadata={"choices": list(MODELS)})
     temperature: float = 0.1
     top_p: float = 1.0
     max_tokens: int = 12288
@@ -113,7 +111,7 @@ def requests(wants: frozenset[str], config: LightOn) -> list[contract.Request]:
     """One call answers every output."""
     if not wants: return []
     sha = hashlib.sha256(PROMPT.encode()).hexdigest()[:12]
-    sent = {"model": config.model, "prompt": PROMPT, "prompt_sha": sha,
+    sent = {"prompt": PROMPT, "prompt_sha": sha,
             "page": "the file, rendered as its benchmark renders one",
             "fix_dollars": True, "settings": http.settings(config),
             "render": "loocr_grounding _render_block"}
@@ -124,9 +122,6 @@ def requests(wants: frozenset[str], config: LightOn) -> list[contract.Request]:
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: LightOn) -> contract.Call:
     raw = http.parse(config, page, timeout)
-    if raw.get("model") != config.model:
-        raise errors.SystemFailed(f"the server serves {raw.get('model')!r}, not {config.model!r}: set the "
-                                 f"`model` option to the model it serves", status=200)
     with adapter.reading("the server's answer"):
         completion = raw["completion"]
     return contract.Call(raw, cost=llm.tokens([completion]), job_id=completion.get("id"))

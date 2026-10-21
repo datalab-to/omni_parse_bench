@@ -33,6 +33,10 @@ FREE: queue.Queue[str] = queue.Queue()
 FAILURES = ("Recognition failed", "Layout detection failed")
 
 
+# What it serves, as start.sh started it; in every reply.
+SERVED = {"weights": os.environ.get("WEIGHTS"), "revision": os.environ.get("REVISION")}
+
+
 def config(port: int) -> dict:
     """The SDK's default config.yaml on `port`, with the abandoned regions read under `keep`."""
     cfg = yaml.safe_load((Path(glmocr.__file__).parent / "config.yaml").read_text())
@@ -148,7 +152,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(401, {"error": "a bearer token (OPB_ENDPOINT_KEY) is needed"})
         try:
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            self._send(200, parse(base64.b64decode(body["page"]), body["suffix"]))
+            self._send(200, {**parse(base64.b64decode(body["page"]), body["suffix"]), "served": SERVED})
         except Dropped as exc:
             self._send(503, {"error": str(exc)})
         except httpx.HTTPStatusError as exc:

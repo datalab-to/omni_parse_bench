@@ -16,7 +16,6 @@ from ..adapter import PageAdapter
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
-MODELS = ("infly/Infinity-Parser2-Pro", "infly/Infinity-Parser2-Flash")
 # The doc2json prompt's categories onto views.LABELS.
 LABELS = {
     "text": "text", "title": "heading", "header": "page_furniture", "footer": "page_furniture",
@@ -65,8 +64,8 @@ class Infinity(PageAdapter):
       - headers, footers and page footnotes are kept (the SDK leaves them out by default; the benchmark
         scores the whole page for every system).
 
-    `model` names the model the server serves (its WEIGHTS), so a run's name tells Pro and Flash apart; an
-    answer from another model is refused.
+    The server serves Pro or Flash, as its WEIGHTS say, and says which in every reply (`served`), so a run
+    records which answered.
 
         docker build -t opb-infinity-parser2 omni_parse_bench/harness/providers/serve/infinity-parser2
         docker run --gpus all -p 8001:8001 opb-infinity-parser2
@@ -75,7 +74,6 @@ class Infinity(PageAdapter):
     """
 
     base_url: str = "http://127.0.0.1:8001"
-    model: str = dataclasses.field(default=MODELS[0], metadata={"choices": list(MODELS)})
     temperature: float = 0.0
     top_p: float = 1.0
     max_tokens: int = 32768
@@ -101,7 +99,7 @@ class Infinity(PageAdapter):
 def requests(wants: frozenset[str], config: Infinity) -> list[contract.Request]:
     """One call answers every output."""
     if not wants: return []
-    sent = {"model": config.model, "prompt": "doc2json", "sdk": "infinity_parser2==0.4.0",
+    sent = {"prompt": "doc2json", "sdk": "infinity_parser2==0.4.0",
             "settings": http.settings(config), "keep_header_footer": True,
             "page": "the file, loaded by the SDK"}
     return [contract.Request(frozenset(wants) & SUPPORTS, sent)]
@@ -109,9 +107,6 @@ def requests(wants: frozenset[str], config: Infinity) -> list[contract.Request]:
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Infinity) -> contract.Call:
     raw = http.parse(config, page, timeout)
-    if raw.get("model") != config.model:
-        raise errors.SystemFailed(f"the server serves {raw.get('model')!r}, not {config.model!r}: set the "
-                                 f"`model` option to the model it serves", status=200)
     # Note: a reply cut at the token limit is kept: its complete elements are read, as the SDK reads them.
     with adapter.reading("the server's answer"):
         completion = raw["completion"]

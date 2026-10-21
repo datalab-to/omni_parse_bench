@@ -6,6 +6,12 @@
     <model>/server.py    the vendor's own code that reads a page, behind one route; a model with no such code
                          has none, and its adapter asks vLLM's /v1 directly
 
+Every reply says what is served: `"served": {"weights", "revision"}`, the Hugging Face weights start.sh
+started vLLM with, so a run records the model that answered whatever started the server; `http.parse`
+refuses a reply without it. A model with no server.py is served under the name `<weights>@<revision>`,
+which vLLM's /v1/models lists. vLLM serves the weights under a fixed name, so an adapter never names the
+weights it asks for.
+
 A server.py imports its vendor's code and never omni_parse_bench, so the vendor's code and its license stay
 in its image; it runs there beside the vLLM serving the model (start.sh). With OPB_ENDPOINT_KEY set, a
 server requires it as each request's bearer token. Each adapter's docstring says how to build, run and

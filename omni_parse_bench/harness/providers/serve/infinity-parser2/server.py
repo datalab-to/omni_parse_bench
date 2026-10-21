@@ -25,7 +25,7 @@ from infinity_parser2.utils.utils import (
 from PIL import Image
 
 VLLM = os.environ.get("VLLM_URL", "http://127.0.0.1:8000/v1")
-MODEL = os.environ.get("WEIGHTS", "infly/Infinity-Parser2-Pro")
+MODEL = "infinity-parser2"  # vLLM's name for the weights start.sh serves, whichever they are
 SAMPLING = ("temperature", "top_p", "max_tokens")
 # Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = SAMPLING + ("dpi", "min_pixels", "max_pixels")
@@ -35,6 +35,10 @@ KEY = os.environ.get("OPB_ENDPOINT_KEY")
 # time; requests arrive on many threads, so pages load one at a time here too.
 LOAD = threading.Lock()
 VERSION = importlib.metadata.version("infinity_parser2")
+
+
+# What it serves, as start.sh started it; in every reply.
+SERVED = {"weights": os.environ.get("WEIGHTS"), "revision": os.environ.get("REVISION")}
 
 
 def load(data: bytes, suffix: str, dpi: int) -> Image.Image:
@@ -63,7 +67,7 @@ def parse(data: bytes, suffix: str, s: dict) -> dict:
     r.raise_for_status()
     completion = r.json()
     said = ((completion.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
-    out = {"completion": completion, "model": MODEL, "vendor": {"infinity_parser2": VERSION}}
+    out = {"completion": completion, "vendor": {"infinity_parser2": VERSION}}
     if said.strip():
         read, _ = truncate_last_incomplete_element(extract_json_content(said))
         out |= {"json": read, "markdown": convert_json_to_markdown(read, keep_header_footer=True)}
@@ -86,7 +90,7 @@ class Handler(BaseHTTPRequestHandler):
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
                         "settings": {"temperature", "top_p", "max_tokens", "dpi", "min_pixels", "max_pixels"}}
                         -> {"completion": the model's chat completion, "json": the reply as the SDK reads
-                        it, "markdown": the page, "model", "vendor"}; an empty reply gives no "json" or
+                        it, "markdown": the page, "vendor", "served"}; an empty reply gives no "json" or
                         "markdown"
     """
     def do_GET(self):
@@ -99,7 +103,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(401, {"error": "a bearer token (OPB_ENDPOINT_KEY) is needed"})
         try:
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            self._send(200, parse(base64.b64decode(body["page"]), body["suffix"], settings(body)))
+            self._send(200, {**parse(base64.b64decode(body["page"]), body["suffix"], settings(body)),
+                             "served": SERVED})
         except httpx.TimeoutException as exc:
             self._send(504, {"error": f"vLLM timed out: {exc}"})
         except httpx.HTTPStatusError as exc:

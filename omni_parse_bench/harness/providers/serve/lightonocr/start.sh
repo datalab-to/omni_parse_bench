@@ -13,7 +13,7 @@ case "$WEIGHTS" in
         exit 1 ;;
 esac
 export WEIGHTS REVISION
-/opt/vllm-python -m vllm.entrypoints.cli.main serve "$WEIGHTS" --revision "$REVISION" --served-model-name "$WEIGHTS" \
+/opt/vllm-python -m vllm.entrypoints.cli.main serve "$WEIGHTS" --revision "$REVISION" --served-model-name lightonocr \
     --gpu-memory-utilization 0.85 --limit-mm-per-prompt '{"image": 1}' --max-model-len 24576 \
     --host 127.0.0.1 --port 8000 &
 VLLM=$!

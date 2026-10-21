@@ -32,6 +32,10 @@ KEY = os.environ.get("OPB_ENDPOINT_KEY")
 LOAD = threading.Lock()
 
 
+# What it serves, as start.sh started it; in every reply.
+SERVED = {"weights": os.environ.get("WEIGHTS"), "revision": os.environ.get("REVISION")}
+
+
 def commit() -> str | None:
     """The dots.mocr commit this server runs."""
     here = os.path.dirname(os.path.dirname(prompts.__file__))
@@ -129,7 +133,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(401, {"error": "a bearer token (OPB_ENDPOINT_KEY) is needed"})
         try:
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            self._send(200, parse(base64.b64decode(body["page"]), body["suffix"], settings(body)))
+            self._send(200, {**parse(base64.b64decode(body["page"]), body["suffix"], settings(body)),
+                             "served": SERVED})
         except httpx.HTTPStatusError as exc:
             self._send(502, {"error": f"vLLM answered {exc.response.status_code}: {exc.response.text[:300]}"})
         except Exception as exc:  # noqa: BLE001 - every failure goes back to the client as an answer

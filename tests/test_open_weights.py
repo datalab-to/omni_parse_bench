@@ -137,10 +137,13 @@ def test_a_reply_cut_at_the_token_limit_is_read_as_it_is():
 
 def test_a_model_without_layout_is_never_asked_for_blocks(tmp_path, monkeypatch):
     """Nanonets reads html only, so a page that wants blocks too is asked for html alone."""
+    from omni_parse_bench.harness import http
     from omni_parse_bench.harness.providers import llm
 
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
     monkeypatch.setattr(llm, "image", lambda *a: b"png")
+    served = {"weights": "org/model", "revision": "main"}
+    monkeypatch.setattr(http, "served", lambda *a: ("org/model@main", served))
     monkeypatch.setattr(llm, "chat", lambda *a, **k: {"choices": [{"message": {"content": "# Title"},
                                                                    "finish_reason": "stop"}]})
     record = core.predict(harness.system("nanonets-ocr"), harness.Input(pdf, frozenset({"html", "blocks"})))
@@ -187,7 +190,7 @@ def test_a_server_gets_every_setting_from_the_config(name, tmp_path, monkeypatch
     mod = importlib.import_module(f"omni_parse_bench.harness.providers.{name}")
     config = _changed(_adapter(mod)())
     got = {}
-    answer = {"completion": {}, "model": getattr(config, "model", None)}
+    answer = {"completion": {}, "served": {"weights": "org/model", "revision": "main"}}
     monkeypatch.setattr(http, "post", lambda url, body, *a, **k: got.update(body) or answer)
     Image.new("RGB", (64, 64), "white").save(page := tmp_path / "p.png")
     mod.call(page, mod.requests(mod.SUPPORTS, config)[0], config=config)
@@ -201,11 +204,17 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
 
     from omni_parse_bench.harness.providers import llm, nanonets
 
+    from omni_parse_bench.harness import http
+
     config = _changed(nanonets.Nanonets())
     got = {}
+    served = {"weights": "org/model", "revision": "main"}
+    monkeypatch.setattr(http, "served", lambda *a: ("org/model@main", served))
     monkeypatch.setattr(llm, "chat", lambda url, body, *a, **k: got.update(body) or {})
     Image.new("RGB", (64, 64), "white").save(page := tmp_path / "p.png")
-    nanonets.call(page, nanonets.requests(frozenset({"html"}), config)[0], config=config)
+    call = nanonets.call(page, nanonets.requests(frozenset({"html"}), config)[0], config=config)
+    # vLLM serves the weights under <weights>@<revision>: the request names it, and the answer records it
+    assert got["model"] == "org/model@main" and call.raw["served"] == served
     assert (got["temperature"], got["top_p"], got["max_tokens"]) == (config.temperature, config.top_p,
                                                                       config.max_tokens)
     assert got["extra_body"] == {"repetition_penalty": config.repetition_penalty}
@@ -248,3 +257,19 @@ def test_every_served_model_says_where_its_server_is():
             serve = Path(harness.__file__).parent / "providers" / "serve"
             assert c.SERVE and (serve / c.SERVE).is_dir(), name
             assert not c.keys and "OPB_ENDPOINT_KEY" in c.ENV
+
+
+def test_a_server_reply_must_say_what_it_serves(tmp_path, monkeypatch):
+    """What answered is what the server says it serves; a server that doesn't say is out of date, which stops
+    the run rather than failing the page."""
+    from omni_parse_bench.harness import http
+    from omni_parse_bench.harness.providers import chandra_ocr
+
+    (page := tmp_path / "p.png").write_bytes(b"png")
+    config = chandra_ocr.ChandraOcr()
+    monkeypatch.setattr(http, "post", lambda *a, **k: {"completion": {}})
+    with pytest.raises(ValueError, match="doesn't say what it serves"):
+        http.parse(config, page, 10)
+    served = {"weights": "org/model", "revision": "main"}
+    monkeypatch.setattr(http, "post", lambda *a, **k: {"served": served})
+    assert http.parse(config, page, 10)["served"]["weights"] == "org/model"

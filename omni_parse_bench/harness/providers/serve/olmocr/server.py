@@ -27,6 +27,10 @@ SETTINGS = ("target_longest_image_dim", "max_page_retries")
 ARGS = {"server": VLLM, "model": "olmocr", "api_key": None, "guided_decoding": False}
 
 
+# What it serves, as start.sh started it; in every reply.
+SERVED = {"weights": os.environ.get("WEIGHTS"), "revision": os.environ.get("REVISION")}
+
+
 def settings(body: dict) -> dict:
     """The request's settings, exactly SETTINGS."""
     s = body["settings"]
@@ -72,7 +76,7 @@ async def handle(request: web.Request) -> web.Response:
     try:
         body = await request.json()
         out = await parse(base64.b64decode(body["page"]), body["suffix"], settings(body))
-        return web.json_response(out)
+        return web.json_response({**out, "served": SERVED})
     except Exception as exc:  # noqa: BLE001 - every failure goes back to the client as an answer
         return web.json_response({"error": f"{type(exc).__name__}: {exc}"[:500]}, status=500)
 

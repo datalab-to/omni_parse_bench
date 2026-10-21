@@ -20,7 +20,7 @@ from lightonocr.postprocess import fix_escaped_dollars
 from PIL import Image
 
 VLLM = os.environ.get("VLLM_URL", "http://127.0.0.1:8000/v1")
-MODEL = os.environ.get("WEIGHTS", "lightonai/LightOnOCR-3-4B")
+MODEL = "lightonocr"  # vLLM's name for the weights start.sh serves, whichever they are
 SAMPLING = ("temperature", "top_p", "max_tokens")
 # Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = SAMPLING + ("dpi", "max_pixels")
@@ -29,6 +29,10 @@ KEY = os.environ.get("OPB_ENDPOINT_KEY")
 # Note: the client is installed from git, so pip's record of where it came from names the commit.
 COMMIT = (json.loads(importlib.metadata.distribution("lightonocr").read_text("direct_url.json") or "{}")
           .get("vcs_info", {}).get("commit_id"))
+
+
+# What it serves, as start.sh started it; in every reply.
+SERVED = {"weights": os.environ.get("WEIGHTS"), "revision": os.environ.get("REVISION")}
 
 
 def render(pdf: bytes, dpi: int, max_pixels: int) -> Image.Image:
@@ -63,7 +67,7 @@ def parse(data: bytes, suffix: str, s: dict) -> dict:
     r.raise_for_status()
     completion = r.json()
     said = ((completion.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
-    return {"completion": completion, "text": fix_escaped_dollars(said), "model": MODEL,
+    return {"completion": completion, "text": fix_escaped_dollars(said),
             "vendor": {"lightonocr": COMMIT}}
 
 
@@ -84,7 +88,7 @@ class Handler(BaseHTTPRequestHandler):
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
                         "settings": {"temperature", "top_p", "max_tokens", "dpi", "max_pixels"}}
                         -> {"completion": the model's chat completion, "text": its content repaired,
-                        "model", "vendor": {"lightonocr": the client's commit}}
+                        "vendor": {"lightonocr": the client's commit}, "served"}
     """
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
@@ -96,7 +100,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(401, {"error": "a bearer token (OPB_ENDPOINT_KEY) is needed"})
         try:
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            self._send(200, parse(base64.b64decode(body["page"]), body["suffix"], settings(body)))
+            self._send(200, {**parse(base64.b64decode(body["page"]), body["suffix"], settings(body)),
+                             "served": SERVED})
         except httpx.TimeoutException as exc:
             self._send(504, {"error": f"vLLM timed out: {exc}"})
         except httpx.HTTPStatusError as exc:

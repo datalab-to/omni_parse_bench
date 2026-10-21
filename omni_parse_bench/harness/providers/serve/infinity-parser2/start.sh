@@ -14,7 +14,7 @@ case "$WEIGHTS" in
         exit 1 ;;
 esac
 export WEIGHTS REVISION
-/opt/vllm-python -m vllm.entrypoints.cli.main serve "$WEIGHTS" --revision "$REVISION" --served-model-name "$WEIGHTS" \
+/opt/vllm-python -m vllm.entrypoints.cli.main serve "$WEIGHTS" --revision "$REVISION" --served-model-name infinity-parser2 \
     "${SPLIT[@]}" --trust-remote-code --reasoning-parser qwen3 --gpu-memory-utilization 0.85 \
     --max-model-len 65536 --mm-processor-cache-type shm --enable-prefix-caching --host 127.0.0.1 --port 8000 &
 VLLM=$!

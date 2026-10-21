@@ -27,6 +27,10 @@ _client: MinerUClient | None = None
 _lock = threading.Lock()
 
 
+# What it serves, as start.sh started it; in every reply.
+SERVED = {"weights": os.environ.get("WEIGHTS"), "revision": os.environ.get("REVISION")}
+
+
 def client() -> MinerUClient:
     """One client shared by the threads, as it holds the HTTP pool and the model's name; made on the
     first page, as making it asks vLLM for that name."""
@@ -71,7 +75,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(401, {"error": "a bearer token (OPB_ENDPOINT_KEY) is needed"})
         try:
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            self._send(200, parse(base64.b64decode(body["page"]), body["suffix"]))
+            self._send(200, {**parse(base64.b64decode(body["page"]), body["suffix"]), "served": SERVED})
         except httpx.TimeoutException as exc:
             self._send(504, {"error": f"vLLM timed out: {exc}"})
         except HttpResponseError as exc:

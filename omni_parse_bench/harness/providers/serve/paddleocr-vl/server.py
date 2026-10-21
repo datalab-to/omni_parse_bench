@@ -22,6 +22,10 @@ _LOCK = threading.Lock()
 _pipeline = None
 
 
+# What it serves, as start.sh started it; in every reply.
+SERVED = {"weights": os.environ.get("WEIGHTS"), "revision": os.environ.get("REVISION")}
+
+
 def wait_for_vlm(limit_s: float = 30 * 60) -> None:
     deadline = time.monotonic() + limit_s
     while time.monotonic() < deadline:
@@ -117,4 +121,4 @@ def parse(page: Page, authorization: str | None = Header(default=None)) -> dict:
     res["model_settings"]["markdown_ignore_labels"] = []
     out["markdown"] = res._to_markdown(pretty=True)["markdown_texts"]
     out["vendor"] = {p: importlib.metadata.version(p) for p in ("paddleocr", "paddlex", "paddlepaddle")}
-    return out
+    return {**out, "served": SERVED}

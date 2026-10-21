@@ -28,6 +28,10 @@ VERSION = importlib.metadata.version("surya-ocr")
 _local = threading.local()
 
 
+# What it serves, as start.sh started it; in every reply.
+SERVED = {"weights": os.environ.get("WEIGHTS"), "revision": os.environ.get("REVISION")}
+
+
 def predictor() -> RecognitionPredictor:
     """One predictor per thread, attached to the vLLM server."""
     if getattr(_local, "predictor", None) is None:
@@ -83,7 +87,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(401, {"error": "a bearer token (OPB_ENDPOINT_KEY) is needed"})
         try:
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            self._send(200, parse(base64.b64decode(body["page"]), body["suffix"], settings(body)))
+            self._send(200, {**parse(base64.b64decode(body["page"]), body["suffix"], settings(body)),
+                             "served": SERVED})
         except Exception as exc:  # noqa: BLE001 - every failure goes back to the client as an answer
             self._send(500, {"error": f"surya failed: {type(exc).__name__}: {exc}"[:500]})
 

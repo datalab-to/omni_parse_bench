@@ -9,4 +9,4 @@ if [ -n "${OPB_ENDPOINT_KEY:-}" ]; then export VLLM_API_KEY="$OPB_ENDPOINT_KEY";
 : "${REVISION:=c3886ff00bb037ce7da24988c9eafaf1fe2bed72}"
 export WEIGHTS REVISION
 exec /opt/vllm-python -m vllm.entrypoints.cli.main serve "$WEIGHTS" --revision "$REVISION" \
-    --served-model-name nanonets/Nanonets-OCR2-3B --host 0.0.0.0 --port "${PORT:-8001}"
+    --served-model-name "$WEIGHTS@$REVISION" --host 0.0.0.0 --port "${PORT:-8001}"

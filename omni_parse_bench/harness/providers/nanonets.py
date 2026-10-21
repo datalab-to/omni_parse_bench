@@ -16,7 +16,6 @@ from ..adapter import PageAdapter
 from . import llm
 
 SUPPORTS = frozenset({"html"})
-MODEL = "nanonets/Nanonets-OCR2-3B"
 # The model card's prompt, verbatim.
 PROMPT = (
     "Extract the text from the above document as if you were reading it naturally. Return the tables in "
@@ -90,19 +89,23 @@ class Nanonets(PageAdapter):
 def requests(wants: frozenset[str], config: Nanonets) -> list[contract.Request]:
     """One call, for the page as markdown; the model draws no layout."""
     if "html" not in wants: return []
-    sent = {"model": MODEL, "prompt_sha": hashlib.sha256(PROMPT.encode()).hexdigest()[:12],
+    sent = {"prompt_sha": hashlib.sha256(PROMPT.encode()).hexdigest()[:12],
             "settings": http.settings(config),
             "page": "llm png"}
     return [contract.Request(frozenset({"html"}), sent)]
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Nanonets) -> contract.Call:
+    deadline = budget.Budget(timeout)
+    # Note: vLLM serves the weights under `<weights>@<revision>`, so asking it which it serves names them for
+    # the request and for the run's record, whatever started it.
+    name, served = http.served(config.base_url, deadline)
     content = [llm.image_part(llm.image(page, config.long_edge)), {"type": "text", "text": PROMPT}]
-    body = {"model": MODEL, "messages": [{"role": "user", "content": content}],
+    body = {"model": name, "messages": [{"role": "user", "content": content}],
             "temperature": config.temperature, "top_p": config.top_p, "max_tokens": config.max_tokens,
             "extra_body": {"repetition_penalty": config.repetition_penalty}}
-    body = llm.chat(f"{config.base_url.rstrip('/')}/v1", body, budget.Budget(timeout))
-    return contract.Call(body, cost=llm.tokens([body]), job_id=body.get("id"))
+    body = llm.chat(f"{config.base_url.rstrip('/')}/v1", body, deadline)
+    return contract.Call({**body, "served": served}, cost=llm.tokens([body]), job_id=body.get("id"))
 
 
 def page(said: str) -> str:

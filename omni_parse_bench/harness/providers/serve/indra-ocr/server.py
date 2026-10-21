@@ -93,6 +93,7 @@ class Handler(BaseHTTPRequestHandler):
     package downloads them."""
     pool: ProcessPoolExecutor
     vendor: dict
+    served: dict  # what it serves: the models its package names, in every reply
 
     def do_GET(self):
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
@@ -106,7 +107,7 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             page = base64.b64decode(body["page"])
             got = self.pool.submit(read, page, body["suffix"], settings(body)).result()
-            self._send(200, {**got, "vendor": self.vendor})
+            self._send(200, {**got, "vendor": self.vendor, "served": self.served})
         except BrokenProcessPool as exc:
             # Note: a pool that lost a worker (killed for memory, say) fails every later page at once, so
             # the server stops: a page read after that would be a failure of the server, not of the model.
@@ -140,5 +141,6 @@ if __name__ == "__main__":
     indra_ocr.model_dir(math=True)
     Handler.vendor = {"indra-ocr": importlib.metadata.version("indra-ocr"),
                       "models": f"{models.HF_REPO}@{models.HF_REVISION}"}
+    Handler.served = {"weights": models.HF_REPO, "revision": models.HF_REVISION}
     Handler.pool = ProcessPoolExecutor(a.workers, mp_context=multiprocessing.get_context("spawn"))
     ThreadingHTTPServer(("0.0.0.0", a.port), Handler).serve_forever()

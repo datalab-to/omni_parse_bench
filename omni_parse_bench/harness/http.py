@@ -39,8 +39,32 @@ def parse(config: Any, path: Path, timeout: float, body: dict | None = None) -> 
     """An opb model server's answer for one page: `body` (by default the page and `settings`) to /parse at
     `config.base_url`, with OPB_ENDPOINT_KEY as its bearer token when set."""
     body = {**page(path), "settings": settings(config)} if body is None else body
-    return post(f"{config.base_url.rstrip('/')}/parse", body, budget.Budget(timeout),
-                key=os.environ.get("OPB_ENDPOINT_KEY"))
+    reply = post(f"{config.base_url.rstrip('/')}/parse", body, budget.Budget(timeout),
+                 key=os.environ.get("OPB_ENDPOINT_KEY"))
+    # Note: what answered is what the server says it serves, not what the adapter would ask for, so a run
+    # records the weights that answered however the server was started. A server that doesn't say is out of
+    # date: a bug of the setup, which stops the run, not a failure of the model.
+    if not (isinstance(served := reply.get("served"), dict) and "weights" in served):
+        raise ValueError(f"the server at {config.base_url} doesn't say what it serves (no \"served\" in its "
+                         "reply); rebuild it from its serve folder, whose server.py reports it")
+    return reply
+
+
+def served(base_url: str, deadline: budget.Budget) -> tuple[str, dict]:
+    """What a vLLM with no server.py of ours serves: the name it serves under, `<weights>@<revision>` (its
+    start.sh's --served-model-name), from its /v1/models, and the same as a server.py's `served`."""
+    try:
+        r = httpx.get(f"{base_url.rstrip('/')}/v1/models", timeout=max(1.0, deadline.remaining()))
+    except httpx.TransportError as exc:
+        if errors.refused(exc): raise
+        raise errors.transport(exc, "connection failed") from exc
+    with adapter.reading("vLLM's /v1/models"):
+        name = r.json()["data"][0]["id"]
+    weights, at, revision = name.partition("@")
+    if not at:
+        raise ValueError(f"the server at {base_url} serves {name!r}, not <weights>@<revision>; rebuild it "
+                         "from its serve folder, whose start.sh names it so")
+    return name, {"weights": weights, "revision": revision}
 
 
 def post(url: str, body: dict, deadline: budget.Budget, key: str | None = None) -> dict:

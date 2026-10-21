@@ -55,6 +55,10 @@ SAMPLING = ("temperature", "top_p", "max_tokens")
 SETTINGS = SAMPLING + ("dpi", "ngram_size", "window_size")
 
 
+# What it serves, as start.sh started it; in every reply.
+SERVED = {"weights": os.environ.get("WEIGHTS"), "revision": os.environ.get("REVISION")}
+
+
 def sampling(s: dict) -> SamplingParams:
     return SamplingParams(
         **{k: s[k] for k in SAMPLING},
@@ -132,7 +136,8 @@ async def parse(request: web.Request) -> web.Response:
                                      f"req-{uuid.uuid4().hex}"):
         final = out
     o = final.outputs[0]
-    return web.json_response({"raw": o.text, "tokens": len(o.token_ids), "finish_reason": o.finish_reason,
+    return web.json_response({"served": SERVED,
+                              "raw": o.text, "tokens": len(o.token_ids), "finish_reason": o.finish_reason,
                               "prompt": PROMPT, "vendor": {"DeepSeek-OCR-2": COMMIT}})
 
 
