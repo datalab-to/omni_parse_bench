@@ -2,8 +2,8 @@
 # asks it as the `infinity_parser2` SDK's vLLM backends do and reads the reply with the SDK's own
 # post-processing (start.sh). The adapter is providers/infinity.py:
 #
-#     docker build -t opb-infinity omni_parse_bench/harness/providers/serve/infinity
-#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-infinity
+#     docker build -t opb-infinity-parser2 omni_parse_bench/harness/providers/serve/infinity-parser2
+#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-infinity-parser2
 #     opb run --system infinity-parser2 --options '{"base_url": "http://localhost:8001"}'
 #
 # WEIGHTS picks the model (docker run -e WEIGHTS=infly/Infinity-Parser2-Flash; Pro by default, which needs

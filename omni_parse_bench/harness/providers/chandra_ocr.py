@@ -1,4 +1,4 @@
-"""chandra-ocr-2 (datalab-to/chandra-ocr-2), served from providers/serve/chandra/ on any GPU host."""
+"""chandra-ocr-2 (datalab-to/chandra-ocr-2), served from providers/serve/chandra-ocr/ on any GPU host."""
 from __future__ import annotations
 
 import dataclasses
@@ -33,11 +33,11 @@ PICTURES = ("Image", "Figure", "Picture", "Diagram", "Chemical-Block")
 
 @dataclasses.dataclass(frozen=True)
 class ChandraOcr(PageAdapter):
-    """Where the chandra-ocr-2 server (serve/chandra/) answers, and the sampling of its first attempt (the
+    """Where the chandra-ocr-2 server (serve/chandra-ocr/) answers, and the sampling of its first attempt (the
     package's by default; a retry follows the package's schedule).
 
     Run as the public `chandra-ocr` package runs it (github.com/datalab-to/chandra at d4f7467). Steps 1 to 4
-    run on the server (serve/chandra/server.py); step 5 runs here, with no vendor code.
+    run on the server (serve/chandra-ocr/server.py); step 5 runs here, with no vendor code.
 
     How a page is processed:
 
@@ -66,8 +66,8 @@ class ChandraOcr(PageAdapter):
       - headers and footers are kept (the package drops them by default; the benchmark scores the whole
         page for every system).
 
-        docker build -t opb-chandra omni_parse_bench/harness/providers/serve/chandra
-        docker run --gpus all -p 8001:8001 opb-chandra
+        docker build -t opb-chandra-ocr omni_parse_bench/harness/providers/serve/chandra-ocr
+        docker run --gpus all -p 8001:8001 opb-chandra-ocr
         opb run --system chandra-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
     """
@@ -82,7 +82,7 @@ class ChandraOcr(PageAdapter):
     name: ClassVar[str] = "chandra-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
     ENV: ClassVar[str] = http.ENDPOINT_KEY
-    SERVE: ClassVar[str | None] = "chandra"
+    SERVE: ClassVar[str | None] = "chandra-ocr"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

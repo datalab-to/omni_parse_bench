@@ -1,4 +1,4 @@
-"""DeepSeek-OCR-2 (deepseek-ai/DeepSeek-OCR-2), served from providers/serve/deepseek/ on any GPU host."""
+"""DeepSeek-OCR-2 (deepseek-ai/DeepSeek-OCR-2), served from providers/serve/deepseek-ocr/ on any GPU host."""
 from __future__ import annotations
 
 import ast
@@ -36,12 +36,12 @@ LABELS = {
 
 @dataclasses.dataclass(frozen=True)
 class DeepseekOcr(PageAdapter):
-    """Where the DeepSeek-OCR-2 server (serve/deepseek/) answers, and its sampling (the repository's
+    """Where the DeepSeek-OCR-2 server (serve/deepseek-ocr/) answers, and its sampling (the repository's
     scripts' by default; top_p, which they leave unset, at vLLM's 1.0).
 
     Run as its repository runs it (github.com/deepseek-ai/DeepSeek-OCR-2 at 2f3699e, DeepSeek-OCR2-vllm),
     which it does only as batch scripts; the server wraps that engine in one route. Steps 1 to 4 run on the
-    server (serve/deepseek/server.py); step 5 runs here, with no vendor code.
+    server (serve/deepseek-ocr/server.py); step 5 runs here, with no vendor code.
 
     How a page is processed:
 
@@ -65,8 +65,8 @@ class DeepseekOcr(PageAdapter):
                               label from LABELS, with the text up to the next marker.
 
 
-        docker build -t opb-deepseek omni_parse_bench/harness/providers/serve/deepseek
-        docker run --gpus all -p 8001:8001 opb-deepseek
+        docker build -t opb-deepseek-ocr omni_parse_bench/harness/providers/serve/deepseek-ocr
+        docker run --gpus all -p 8001:8001 opb-deepseek-ocr
         opb run --system deepseek-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
     """
@@ -82,7 +82,7 @@ class DeepseekOcr(PageAdapter):
     name: ClassVar[str] = "deepseek-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
     ENV: ClassVar[str] = http.ENDPOINT_KEY
-    SERVE: ClassVar[str | None] = "deepseek"
+    SERVE: ClassVar[str | None] = "deepseek-ocr"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

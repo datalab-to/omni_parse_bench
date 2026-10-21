@@ -1,4 +1,4 @@
-"""Surya OCR 2 (datalab-to/surya-ocr-2), served from providers/serve/surya/ on any GPU host."""
+"""Surya OCR 2 (datalab-to/surya-ocr-2), served from providers/serve/surya-ocr/ on any GPU host."""
 from __future__ import annotations
 
 import dataclasses
@@ -28,11 +28,11 @@ _TAG = re.compile(r"<[^>]+>")
 
 @dataclasses.dataclass(frozen=True)
 class SuryaOcr(PageAdapter):
-    """Where the Surya OCR 2 server (serve/surya/) answers, and the DPI a PDF is loaded at (the
+    """Where the Surya OCR 2 server (serve/surya-ocr/) answers, and the DPI a PDF is loaded at (the
     `surya_ocr` command's, IMAGE_DPI_HIGHRES, by default).
 
     Run as the public `surya-ocr` package (0.22.1) runs it with its `surya_ocr` command. Steps 1 to 4 run on
-    the server (serve/surya/server.py); step 5 runs here, with no vendor code.
+    the server (serve/surya-ocr/server.py); step 5 runs here, with no vendor code.
 
     How a page is processed:
 
@@ -58,8 +58,8 @@ class SuryaOcr(PageAdapter):
       - SURYA_FULLPAGE_REGEN is on (the package's default is off; it names it as the setting for
         benchmarking).
 
-        docker build -t opb-surya omni_parse_bench/harness/providers/serve/surya
-        docker run --gpus all -p 8001:8001 opb-surya
+        docker build -t opb-surya-ocr omni_parse_bench/harness/providers/serve/surya-ocr
+        docker run --gpus all -p 8001:8001 opb-surya-ocr
         opb run --system surya-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
     """
@@ -70,7 +70,7 @@ class SuryaOcr(PageAdapter):
     name: ClassVar[str] = "surya-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
     ENV: ClassVar[str] = http.ENDPOINT_KEY
-    SERVE: ClassVar[str | None] = "surya"
+    SERVE: ClassVar[str | None] = "surya-ocr"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

@@ -2,8 +2,8 @@
 # Its client reads a page with one chat call and no code of the vendor's, so opb asks vLLM directly
 # (providers/nanonets.py):
 #
-#     docker build -t opb-nanonets omni_parse_bench/harness/providers/serve/nanonets
-#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-nanonets
+#     docker build -t opb-nanonets-ocr omni_parse_bench/harness/providers/serve/nanonets-ocr
+#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-nanonets-ocr
 #     opb run --system nanonets-ocr --options '{"base_url": "http://localhost:8001"}'
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set

@@ -2,8 +2,8 @@
 # package's Converter in a pool of single-threaded worker processes, one per core, as its convert_many
 # does (start.sh). CPU only: no GPU is used. The adapter is providers/indra_ocr.py:
 #
-#     docker build -t opb-indra omni_parse_bench/harness/providers/serve/indra
-#     docker run -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-indra
+#     docker build -t opb-indra-ocr omni_parse_bench/harness/providers/serve/indra-ocr
+#     docker run -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-indra-ocr
 #     opb run --system indra-ocr --options '{"base_url": "http://localhost:8001"}'
 #
 # The models the package names download when it starts, into HF_HOME; mount a cache there to keep them.

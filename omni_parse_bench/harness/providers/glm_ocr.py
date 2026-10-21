@@ -1,4 +1,4 @@
-"""GLM-OCR (zai-org/GLM-OCR), through its SDK's self-hosted pipeline, served from providers/serve/glm_ocr/."""
+"""GLM-OCR (zai-org/GLM-OCR), through its SDK's self-hosted pipeline, served from providers/serve/glm-ocr/."""
 from __future__ import annotations
 
 import dataclasses
@@ -33,10 +33,10 @@ _TAG = re.compile(r"<[^>]+>")
 
 @dataclasses.dataclass(frozen=True)
 class GlmOcr(PageAdapter):
-    """Where the GLM-OCR server (serve/glm_ocr/) answers.
+    """Where the GLM-OCR server (serve/glm-ocr/) answers.
 
     Run as its SDK documents it (github.com/zai-org/GLM-OCR, "Self-host with vLLM / SGLang" and "SDK Server",
-    `glmocr[selfhosted,server]` 0.1.5). Steps 1 to 4 run on the server (serve/glm_ocr/server.py); step 5
+    `glmocr[selfhosted,server]` 0.1.5). Steps 1 to 4 run on the server (serve/glm-ocr/server.py); step 5
     runs here, with no vendor code.
 
     How a page is processed:
@@ -67,8 +67,8 @@ class GlmOcr(PageAdapter):
         since the benchmark scores the whole page, headers and footers included, for every system; its
         answer says which config read it (`sdk_config`).
 
-        docker build -t opb-glm_ocr omni_parse_bench/harness/providers/serve/glm_ocr
-        docker run --gpus all -p 8001:8001 opb-glm_ocr
+        docker build -t opb-glm-ocr omni_parse_bench/harness/providers/serve/glm-ocr
+        docker run --gpus all -p 8001:8001 opb-glm-ocr
         opb run --system glm-ocr --options '{"base_url": "http://localhost:8001"}' --sample 20
     """
 
@@ -77,7 +77,7 @@ class GlmOcr(PageAdapter):
     name: ClassVar[str] = "glm-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
     ENV: ClassVar[str] = http.ENDPOINT_KEY
-    SERVE: ClassVar[str | None] = "glm_ocr"
+    SERVE: ClassVar[str | None] = "glm-ocr"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

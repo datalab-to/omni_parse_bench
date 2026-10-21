@@ -2,8 +2,8 @@
 # as the repository's client does, with its streaming early stop and its post-processing (start.sh).
 # The adapter is providers/hunyuan.py:
 #
-#     docker build -t opb-hunyuan omni_parse_bench/harness/providers/serve/hunyuan
-#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-hunyuan
+#     docker build -t opb-hunyuan-ocr omni_parse_bench/harness/providers/serve/hunyuan-ocr
+#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-hunyuan-ocr
 #     opb run --system hunyuan-ocr --options '{"base_url": "http://localhost:8001"}'
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set

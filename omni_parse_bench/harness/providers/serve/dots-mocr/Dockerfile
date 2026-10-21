@@ -1,8 +1,8 @@
 # dots.mocr as its vendor runs it, behind one port: vLLM serves the model, server.py runs the
 # repository's parser around it (start.sh). The adapter is providers/dots.py:
 #
-#     docker build -t opb-dots omni_parse_bench/harness/providers/serve/dots
-#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-dots
+#     docker build -t opb-dots-mocr omni_parse_bench/harness/providers/serve/dots-mocr
+#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-dots-mocr
 #     opb run --system dots-mocr --options '{"base_url": "http://localhost:8001"}'
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set

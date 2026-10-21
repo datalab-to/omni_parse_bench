@@ -1,4 +1,4 @@
-"""LightOnOCR-3 (lightonai/LightOnOCR-3-4B, -0.8B), served from providers/serve/lighton/ on any GPU host."""
+"""LightOnOCR-3 (lightonai/LightOnOCR-3-4B, -0.8B), served from providers/serve/lightonocr/ on any GPU host."""
 from __future__ import annotations
 
 import dataclasses
@@ -38,11 +38,11 @@ _PLACEHOLDER = re.compile(r"^!\[([a-z_]+)\+?\]\((-?[\d.]+),(-?[\d.]+),(-?[\d.]+)
 
 @dataclasses.dataclass(frozen=True)
 class LightOn(PageAdapter):
-    """Where the LightOnOCR-3 server (serve/lighton/) answers, the model it serves, and its sampling (the
+    """Where the LightOnOCR-3 server (serve/lightonocr/) answers, the model it serves, and its sampling (the
     client's for LightOnOCR-3 by default, temperature as its benchmark sets it).
 
     Run as LightOn runs it for its own benchmark (github.com/lightonai/LightOnOCR at 36755d4, its
-    `lightonocr` client and benchmarks/ocr_bench). Steps 1 to 4 run on the server (serve/lighton/server.py);
+    `lightonocr` client and benchmarks/ocr_bench). Steps 1 to 4 run on the server (serve/lightonocr/server.py);
     step 5 runs here, with no vendor code.
 
     How a page is processed:
@@ -80,8 +80,8 @@ class LightOn(PageAdapter):
     `model` names the model the server serves (its WEIGHTS), so a run's name tells the two sizes apart; an
     answer from another model is refused.
 
-        docker build -t opb-lighton omni_parse_bench/harness/providers/serve/lighton
-        docker run --gpus all -p 8001:8001 opb-lighton
+        docker build -t opb-lightonocr omni_parse_bench/harness/providers/serve/lightonocr
+        docker run --gpus all -p 8001:8001 opb-lightonocr
         opb run --system lightonocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
     """
@@ -97,7 +97,7 @@ class LightOn(PageAdapter):
     name: ClassVar[str] = "lightonocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
     ENV: ClassVar[str] = http.ENDPOINT_KEY
-    SERVE: ClassVar[str | None] = "lighton"
+    SERVE: ClassVar[str | None] = "lightonocr"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

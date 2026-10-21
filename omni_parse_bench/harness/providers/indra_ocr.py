@@ -1,4 +1,4 @@
-"""Indra OCR (datalab-to/indra-ocr), served from providers/serve/indra/ on any host; it needs no GPU."""
+"""Indra OCR (datalab-to/indra-ocr), served from providers/serve/indra-ocr/ on any host; it needs no GPU."""
 from __future__ import annotations
 
 import dataclasses
@@ -25,11 +25,11 @@ LABELS = {
 
 @dataclasses.dataclass(frozen=True)
 class IndraOcr(PageAdapter):
-    """Where the Indra OCR server (serve/indra/) answers, and how its Converter reads a page (the
+    """Where the Indra OCR server (serve/indra-ocr/) answers, and how its Converter reads a page (the
     package's defaults, but math read as LaTeX and headers and footers kept).
 
     Run as the `indra-ocr` package (0.3.2) runs it with its `indra-ocr` command, with the models it names.
-    Steps 1 to 4 run on the server (serve/indra/server.py); step 5 runs here, with no vendor code.
+    Steps 1 to 4 run on the server (serve/indra-ocr/server.py); step 5 runs here, with no vendor code.
 
     How a page is processed:
 
@@ -57,8 +57,8 @@ class IndraOcr(PageAdapter):
       - page headers and footers are kept in the markdown (`furniture`; the package leaves them out by
         default), as every other adapter keeps them.
 
-        docker build -t opb-indra omni_parse_bench/harness/providers/serve/indra
-        docker run -p 8001:8001 opb-indra
+        docker build -t opb-indra-ocr omni_parse_bench/harness/providers/serve/indra-ocr
+        docker run -p 8001:8001 opb-indra-ocr
         opb run --system indra-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
     """
@@ -75,7 +75,7 @@ class IndraOcr(PageAdapter):
     name: ClassVar[str] = "indra-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
     ENV: ClassVar[str] = http.ENDPOINT_KEY
-    SERVE: ClassVar[str | None] = "indra"
+    SERVE: ClassVar[str | None] = "indra-ocr"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

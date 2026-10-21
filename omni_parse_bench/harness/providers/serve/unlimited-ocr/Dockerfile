@@ -2,8 +2,8 @@
 # serves the model, server.py loads the page as its repository's pipeline does and asks it (start.sh).
 # The adapter is providers/unlimited.py:
 #
-#     docker build -t opb-unlimited omni_parse_bench/harness/providers/serve/unlimited
-#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-unlimited
+#     docker build -t opb-unlimited-ocr omni_parse_bench/harness/providers/serve/unlimited-ocr
+#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-unlimited-ocr
 #     opb run --system unlimited-ocr --options '{"base_url": "http://localhost:8001"}'
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set

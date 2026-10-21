@@ -1,4 +1,4 @@
-"""HunyuanOCR-1.5 (tencent/HunyuanOCR), served from providers/serve/hunyuan/ on any GPU host."""
+"""HunyuanOCR-1.5 (tencent/HunyuanOCR), served from providers/serve/hunyuan-ocr/ on any GPU host."""
 from __future__ import annotations
 
 import base64
@@ -22,11 +22,11 @@ TASKS = ("layout_parse", "doc_parse")
 
 @dataclasses.dataclass(frozen=True)
 class Hunyuan(PageAdapter):
-    """Where the HunyuanOCR server (serve/hunyuan/) answers, the client's task, and its sampling (the
+    """Where the HunyuanOCR server (serve/hunyuan-ocr/) answers, the client's task, and its sampling (the
     client's by default).
 
     Run as its repository's client runs it (github.com/Tencent-Hunyuan/HunyuanOCR at 1ef4179,
-    inference/vLLM/infer_vllm_client.py). Steps 3 and 4 run on the server (serve/hunyuan/server.py); steps 1
+    inference/vLLM/infer_vllm_client.py). Steps 3 and 4 run on the server (serve/hunyuan-ocr/server.py); steps 1
     and 5 run here, with no vendor code.
 
     How a page is processed:
@@ -60,8 +60,8 @@ class Hunyuan(PageAdapter):
       - the vLLM 0.18.1 setup, which Tencent now lists as archived but validated (its unified environment,
         vLLM 0.25.1 on CUDA 13, is verified to align).
 
-        docker build -t opb-hunyuan omni_parse_bench/harness/providers/serve/hunyuan
-        docker run --gpus all -p 8001:8001 opb-hunyuan
+        docker build -t opb-hunyuan-ocr omni_parse_bench/harness/providers/serve/hunyuan-ocr
+        docker run --gpus all -p 8001:8001 opb-hunyuan-ocr
         opb run --system hunyuan-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
     """
@@ -84,7 +84,7 @@ class Hunyuan(PageAdapter):
     name: ClassVar[str] = "hunyuan-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
     ENV: ClassVar[str] = http.ENDPOINT_KEY
-    SERVE: ClassVar[str | None] = "hunyuan"
+    SERVE: ClassVar[str | None] = "hunyuan-ocr"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

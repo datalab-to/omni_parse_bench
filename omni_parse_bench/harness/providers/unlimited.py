@@ -1,4 +1,4 @@
-"""Unlimited-OCR (baidu/Unlimited-OCR), served from providers/serve/unlimited/ on any GPU host."""
+"""Unlimited-OCR (baidu/Unlimited-OCR), served from providers/serve/unlimited-ocr/ on any GPU host."""
 from __future__ import annotations
 
 import dataclasses
@@ -35,12 +35,12 @@ LABELS = {
 
 @dataclasses.dataclass(frozen=True)
 class UnlimitedOcr(PageAdapter):
-    """Where the Unlimited-OCR server (serve/unlimited/) answers, and its sampling (the recipe's by
+    """Where the Unlimited-OCR server (serve/unlimited-ocr/) answers, and its sampling (the recipe's by
     default; top_p, which it leaves unset, at vLLM's 1.0).
 
     Run as its vLLM recipe runs it (recipes.vllm.ai/baidu/Unlimited-OCR), the page loaded as its own pipeline
     loads one (github.com/baidu/Unlimited-OCR at 92ad94b, infer.py). Steps 1, 3 and 4 run on the server
-    (serve/unlimited/server.py); steps 2 and 5 run in vLLM and here.
+    (serve/unlimited-ocr/server.py); steps 2 and 5 run in vLLM and here.
 
     How a page is processed:
 
@@ -65,8 +65,8 @@ class UnlimitedOcr(PageAdapter):
       - 28000 output tokens, not the recipe example's 8192: the model card's own `infer` allows 32768 of
         context, and this is that less room for the prompt.
 
-        docker build -t opb-unlimited omni_parse_bench/harness/providers/serve/unlimited
-        docker run --gpus all -p 8001:8001 opb-unlimited
+        docker build -t opb-unlimited-ocr omni_parse_bench/harness/providers/serve/unlimited-ocr
+        docker run --gpus all -p 8001:8001 opb-unlimited-ocr
         opb run --system unlimited-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
     """
@@ -82,7 +82,7 @@ class UnlimitedOcr(PageAdapter):
     name: ClassVar[str] = "unlimited-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
     ENV: ClassVar[str] = http.ENDPOINT_KEY
-    SERVE: ClassVar[str | None] = "unlimited"
+    SERVE: ClassVar[str | None] = "unlimited-ocr"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

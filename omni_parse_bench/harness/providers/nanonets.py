@@ -1,4 +1,4 @@
-"""Nanonets-OCR2-3B (nanonets/Nanonets-OCR2-3B), served by vLLM from providers/serve/nanonets/ on a GPU
+"""Nanonets-OCR2-3B (nanonets/Nanonets-OCR2-3B), served by vLLM from providers/serve/nanonets-ocr/ on a GPU
 host.
 """
 from __future__ import annotations
@@ -32,7 +32,7 @@ _UNWRAP = re.compile(r"</?(?:watermark|page_number|signature)>", re.I)
 
 @dataclasses.dataclass(frozen=True)
 class Nanonets(PageAdapter):
-    """Where the server (serve/nanonets/) answers (its chat endpoint is vLLM's, under /v1), and its
+    """Where the server (serve/nanonets-ocr/) answers (its chat endpoint is vLLM's, under /v1), and its
     sampling (the model card's by default; top_p, which it leaves unset, at vLLM's 1.0).
 
     Run as its model card runs it (huggingface.co/nanonets/Nanonets-OCR2-3B, "Using vLLM"). Its vendor
@@ -57,8 +57,8 @@ class Nanonets(PageAdapter):
                               no layout: `html` only.
 
 
-        docker build -t opb-nanonets omni_parse_bench/harness/providers/serve/nanonets
-        docker run --gpus all -p 8001:8001 opb-nanonets
+        docker build -t opb-nanonets-ocr omni_parse_bench/harness/providers/serve/nanonets-ocr
+        docker run --gpus all -p 8001:8001 opb-nanonets-ocr
         opb run --system nanonets-ocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
     """
@@ -75,7 +75,7 @@ class Nanonets(PageAdapter):
     name: ClassVar[str] = "nanonets-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
     ENV: ClassVar[str] = http.ENDPOINT_KEY
-    SERVE: ClassVar[str | None] = "nanonets"
+    SERVE: ClassVar[str | None] = "nanonets-ocr"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

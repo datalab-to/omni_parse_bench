@@ -1,4 +1,4 @@
-"""dots.mocr (rednote-hilab/dots.mocr), served from providers/serve/dots/ on any GPU host."""
+"""dots.mocr (rednote-hilab/dots.mocr), served from providers/serve/dots-mocr/ on any GPU host."""
 from __future__ import annotations
 
 import dataclasses
@@ -24,10 +24,10 @@ LABELS = {
 
 @dataclasses.dataclass(frozen=True)
 class Dots(PageAdapter):
-    """Where the dots.mocr server (serve/dots/) answers, and its sampling (the parser's by default).
+    """Where the dots.mocr server (serve/dots-mocr/) answers, and its sampling (the parser's by default).
 
     Run as its repository's parser, `DotsMOCRParser`, runs it (github.com/rednote-hilab/dots.mocr at
-    23f3e56). Steps 1 to 4 run on the server (serve/dots/server.py); step 5 runs here, with no vendor code.
+    23f3e56). Steps 1 to 4 run on the server (serve/dots-mocr/server.py); step 5 runs here, with no vendor code.
 
     How a page is processed:
 
@@ -53,8 +53,8 @@ class Dots(PageAdapter):
 
       - headers and footers are kept, as the parser's `.md` keeps them.
 
-        docker build -t opb-dots omni_parse_bench/harness/providers/serve/dots
-        docker run --gpus all -p 8001:8001 opb-dots
+        docker build -t opb-dots-mocr omni_parse_bench/harness/providers/serve/dots-mocr
+        docker run --gpus all -p 8001:8001 opb-dots-mocr
         opb run --system dots-mocr --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
     """
@@ -68,7 +68,7 @@ class Dots(PageAdapter):
     name: ClassVar[str] = "dots-mocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
     ENV: ClassVar[str] = http.ENDPOINT_KEY
-    SERVE: ClassVar[str | None] = "dots"
+    SERVE: ClassVar[str | None] = "dots-mocr"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

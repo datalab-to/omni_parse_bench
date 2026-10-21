@@ -1,8 +1,8 @@
 # Surya OCR 2 as the public surya-ocr package runs it, behind one port: vLLM serves the model, server.py
 # runs the package's RecognitionPredictor against it (start.sh). The adapter is providers/surya_ocr.py:
 #
-#     docker build -t opb-surya omni_parse_bench/harness/providers/serve/surya
-#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-surya
+#     docker build -t opb-surya-ocr omni_parse_bench/harness/providers/serve/surya-ocr
+#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-surya-ocr
 #     opb run --system surya-ocr --options '{"base_url": "http://localhost:8001"}'
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set

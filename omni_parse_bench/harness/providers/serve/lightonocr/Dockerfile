@@ -2,8 +2,8 @@
 # asks it as the `lightonocr` client does and applies the client's repair of the reply (start.sh). The
 # adapter is providers/lighton.py:
 #
-#     docker build -t opb-lighton omni_parse_bench/harness/providers/serve/lighton
-#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-lighton
+#     docker build -t opb-lightonocr omni_parse_bench/harness/providers/serve/lightonocr
+#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-lightonocr
 #     opb run --system lightonocr --options '{"base_url": "http://localhost:8001"}'
 #
 # WEIGHTS picks the model (docker run -e WEIGHTS=lightonai/LightOnOCR-3-0.8B; the 4B by default), and opb's

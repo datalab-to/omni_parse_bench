@@ -2,8 +2,8 @@
 # (glmocr.server: layout detection, then the model per region) run around it, and server.py hands each
 # page to a free one (start.sh). The adapter is providers/glm_ocr.py:
 #
-#     docker build -t opb-glm_ocr omni_parse_bench/harness/providers/serve/glm_ocr
-#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-glm_ocr
+#     docker build -t opb-glm-ocr omni_parse_bench/harness/providers/serve/glm-ocr
+#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-glm-ocr
 #     opb run --system glm-ocr --options '{"base_url": "http://localhost:8001"}'
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set

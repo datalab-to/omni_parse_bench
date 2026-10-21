@@ -1,8 +1,8 @@
 # chandra-ocr-2 as the public chandra-ocr package runs it, behind one port: vLLM serves the model,
 # server.py runs the package's steps around it (start.sh). The adapter is providers/chandra_ocr.py:
 #
-#     docker build -t opb-chandra omni_parse_bench/harness/providers/serve/chandra
-#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-chandra
+#     docker build -t opb-chandra-ocr omni_parse_bench/harness/providers/serve/chandra-ocr
+#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-chandra-ocr
 #     opb run --system chandra-ocr --options '{"base_url": "http://localhost:8001"}'
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set

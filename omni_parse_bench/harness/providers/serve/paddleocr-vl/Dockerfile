@@ -2,8 +2,8 @@
 # PaddleOCR's own page pipeline (layout model, then the VLM per block) around it (start.sh). The
 # adapter is providers/paddleocr_vl.py:
 #
-#     docker build -t opb-paddleocr_vl omni_parse_bench/harness/providers/serve/paddleocr_vl
-#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-paddleocr_vl
+#     docker build -t opb-paddleocr-vl omni_parse_bench/harness/providers/serve/paddleocr-vl
+#     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-paddleocr-vl
 #     opb run --system paddleocr-vl --options '{"base_url": "http://localhost:8001"}'
 #
 # The weights download when it starts, into HF_HOME (the layout model too); mount a cache there to keep

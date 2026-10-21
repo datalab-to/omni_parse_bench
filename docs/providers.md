@@ -288,8 +288,8 @@ Per vendor:
 Serving and benchmarking are separate. Each open model has a folder, `omni_parse_bench/harness/providers/serve/<model>/`,
 that deploys it on any GPU host, and opb then benchmarks it from anywhere, pointed at its URL:
 
-    docker build -t opb-dots omni_parse_bench/harness/providers/serve/dots
-    docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-dots
+    docker build -t opb-dots-mocr omni_parse_bench/harness/providers/serve/dots-mocr
+    docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-dots-mocr
     opb run --system dots-mocr --options '{"base_url": "http://<host>:8001"}'
 
 If nothing listens at `base_url` (the server isn't started, or the address is wrong), the connection is

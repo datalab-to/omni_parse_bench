@@ -1,4 +1,4 @@
-"""Infinity-Parser2 (infly/Infinity-Parser2-Pro, -Flash), served from providers/serve/infinity/ on a GPU
+"""Infinity-Parser2 (infly/Infinity-Parser2-Pro, -Flash), served from providers/serve/infinity-parser2/ on a GPU
 host.
 """
 from __future__ import annotations
@@ -32,11 +32,11 @@ LABELS = {
 
 @dataclasses.dataclass(frozen=True)
 class Infinity(PageAdapter):
-    """Where the Infinity-Parser2 server (serve/infinity/) answers, the model it serves, and its sampling
+    """Where the Infinity-Parser2 server (serve/infinity-parser2/) answers, the model it serves, and its sampling
     (the SDK's by default).
 
     Run as the vendor's `infinity_parser2` SDK (0.4.0, github.com/infly-ai/INF-MLLM) runs it through its
-    vLLM backends. Steps 1 to 4 run on the server (serve/infinity/server.py); step 5 runs here, with no vendor
+    vLLM backends. Steps 1 to 4 run on the server (serve/infinity-parser2/server.py); step 5 runs here, with no vendor
     code.
 
     How a page is processed:
@@ -68,8 +68,8 @@ class Infinity(PageAdapter):
     `model` names the model the server serves (its WEIGHTS), so a run's name tells Pro and Flash apart; an
     answer from another model is refused.
 
-        docker build -t opb-infinity omni_parse_bench/harness/providers/serve/infinity
-        docker run --gpus all -p 8001:8001 opb-infinity
+        docker build -t opb-infinity-parser2 omni_parse_bench/harness/providers/serve/infinity-parser2
+        docker run --gpus all -p 8001:8001 opb-infinity-parser2
         opb run --system infinity-parser2 --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
     """
@@ -86,7 +86,7 @@ class Infinity(PageAdapter):
     name: ClassVar[str] = "infinity-parser2"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
     ENV: ClassVar[str] = http.ENDPOINT_KEY
-    SERVE: ClassVar[str | None] = "infinity"
+    SERVE: ClassVar[str | None] = "infinity-parser2"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

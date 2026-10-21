@@ -1,4 +1,4 @@
-"""PaddleOCR-VL-1.6 (PaddlePaddle/PaddleOCR-VL-1.6), served from providers/serve/paddleocr_vl/ on a GPU
+"""PaddleOCR-VL-1.6 (PaddlePaddle/PaddleOCR-VL-1.6), served from providers/serve/paddleocr-vl/ on a GPU
 host.
 """
 from __future__ import annotations
@@ -34,13 +34,13 @@ _TAG = re.compile(r"<[^>]+>")
 
 @dataclasses.dataclass(frozen=True)
 class PaddleOcrVl(PageAdapter):
-    """Where the PaddleOCR-VL server (serve/paddleocr_vl/) answers, and the DPI a PDF is loaded at (the
+    """Where the PaddleOCR-VL server (serve/paddleocr-vl/) answers, and the DPI a PDF is loaded at (the
     pipeline's, PDF_RENDER_SCALE 2.0, by default).
 
     Run as PaddleOCR's own pipeline runs it (`paddleocr.PaddleOCRVL`, pipeline_version v1.6, paddleocr 3.7.0,
     the VLM through its `vllm-server` backend). PaddleOCR-VL is a pipeline, not one model: its layout model
     (PP-DocLayoutV3) finds the page's blocks in reading order, and its 0.9B VLM, served by vLLM, reads each
-    one. Steps 1 to 4 run on the server (serve/paddleocr_vl/server.py); step 5 runs here, with no vendor code.
+    one. Steps 1 to 4 run on the server (serve/paddleocr-vl/server.py); step 5 runs here, with no vendor code.
 
     How a page is processed:
 
@@ -64,8 +64,8 @@ class PaddleOcrVl(PageAdapter):
         side text; the benchmark scores the whole page for every system); and
       - the layout model runs on the CPU (the vendor recommends a GPU, mainly for speed).
 
-        docker build -t opb-paddleocr_vl omni_parse_bench/harness/providers/serve/paddleocr_vl
-        docker run --gpus all -p 8001:8001 opb-paddleocr_vl
+        docker build -t opb-paddleocr-vl omni_parse_bench/harness/providers/serve/paddleocr-vl
+        docker run --gpus all -p 8001:8001 opb-paddleocr-vl
         opb run --system paddleocr-vl --sample 20 \\
             --options '{"base_url": "http://localhost:8001"}'
     """
@@ -76,7 +76,7 @@ class PaddleOcrVl(PageAdapter):
     name: ClassVar[str] = "paddleocr-vl"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
     ENV: ClassVar[str] = http.ENDPOINT_KEY
-    SERVE: ClassVar[str | None] = "paddleocr_vl"
+    SERVE: ClassVar[str | None] = "paddleocr-vl"
 
     def requests(self, wants: frozenset[str]) -> list[contract.Request]:
         return requests(wants, self)

@@ -223,7 +223,7 @@ class Served(Alpha):
     """A model server's adapter, at an address where nothing listens."""
 
     name: ClassVar[str] = "served"
-    SERVE: ClassVar[str | None] = "chandra"
+    SERVE: ClassVar[str | None] = "chandra-ocr"
     base_url: str = "http://127.0.0.1:9"
 
     def send(self, page, request, *, timeout):
@@ -240,7 +240,7 @@ def test_a_server_that_isnt_running_stops_the_run_with_nothing_recorded(tmp_path
     argv = ["run", "--system", "served", "--options", json.dumps({"base_url": url}), "--dataset",
             dataset(tmp_path / "data"), "--out", str(tmp_path / "runs"), "-y"]
     err = raised(argv, Exception)     # the connection error itself (httpx.ConnectError), with notes
-    assert f"no server at {url}" in err and "providers/serve/chandra" in err, err
+    assert f"no server at {url}" in err and "providers/serve/chandra-ocr" in err, err
     [run] = (tmp_path / "runs").iterdir()
     assert list((run / "records").iterdir()) == []
 
