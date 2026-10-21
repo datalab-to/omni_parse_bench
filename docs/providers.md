@@ -304,8 +304,9 @@ A folder holds:
   version, the vendor's repository at a full commit. apt packages aren't pinned: `poppler-utils` (LightOn,
   olmOCR), `libcairo2` (dots.mocr) and olmOCR's fonts come from the base image's Ubuntu release when the
   image is built, so a later build may get newer ones, which can change how a page is rendered;
-- `start.sh`: vLLM with the vendor's flags and the weights at a pinned revision, then server.py if
-  there is one; one port out, 8001; and
+- `start.sh`: vLLM with the vendor's flags and the weights WEIGHTS and REVISION name, by default the
+  pinned ones opb's numbers come from (`docker run -e WEIGHTS=... -e REVISION=...` serves others), then
+  server.py if there is one; one port out, 8001; and
 - `server.py`, for a model whose vendor's code takes part in reading a page (loading the file,
   preparing the image, asking, retrying, its pipeline or post-processing): that code, per page,
   behind one route, taking the page file and answering with the vendor's output and the model's raw

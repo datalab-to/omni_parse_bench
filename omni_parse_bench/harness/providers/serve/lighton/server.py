@@ -20,7 +20,7 @@ from lightonocr.postprocess import fix_escaped_dollars
 from PIL import Image
 
 VLLM = os.environ.get("VLLM_URL", "http://127.0.0.1:8000/v1")
-MODEL = os.environ.get("MODEL", "lightonai/LightOnOCR-3-4B")
+MODEL = os.environ.get("WEIGHTS", "lightonai/LightOnOCR-3-4B")
 SAMPLING = ("temperature", "top_p", "max_tokens")
 # Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = SAMPLING + ("dpi", "max_pixels")

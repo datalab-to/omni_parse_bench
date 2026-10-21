@@ -18,7 +18,7 @@ RUN PIP_BREAK_SYSTEM_PACKAGES=1 /usr/bin/python3 -m pip install --no-cache-dir -
 RUN git clone -q https://github.com/deepseek-ai/DeepSeek-OCR-2 /opt/dsocr2 \
     && git -C /opt/dsocr2 checkout -q 2f3699ebbb96fa8af32212e8c170f2cc28730fad
 # Note: config.py is where the repository says to set the model's path; it reads the weights start.sh
-# fetches at a pinned revision.
+# fetches (WEIGHTS at REVISION, the pinned ones by default).
 RUN sed -i "s|^MODEL_PATH = .*|import os; MODEL_PATH = os.environ['DEEPSEEK_WEIGHTS']|" \
         /opt/dsocr2/DeepSeek-OCR2-master/DeepSeek-OCR2-vllm/config.py
 

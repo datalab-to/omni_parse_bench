@@ -4,11 +4,20 @@
 # 8000 with the repository's flags; server.py answers on $PORT once vLLM is up. Either exiting stops the
 # container.
 set -euo pipefail
-W="${HF_HOME:-/root/.cache/huggingface}/hunyuan-47644ecc"
+# Note: WEIGHTS and REVISION are those pinned weights, so a run's record names the weights that answered. The
+# config.json swap below is for that revision alone, so any other weights or revision are refused.
+: "${WEIGHTS:=tencent/HunyuanOCR}"
+: "${REVISION:=47644ecc4fc854efa4f505155158831f36773ee4}"
+if [ "$WEIGHTS" != tencent/HunyuanOCR ] || [ "$REVISION" != 47644ecc4fc854efa4f505155158831f36773ee4 ]; then
+    echo "WEIGHTS@REVISION is $WEIGHTS@$REVISION; this server patches tencent/HunyuanOCR@47644ecc4fc854efa4f505155158831f36773ee4 alone" >&2
+    exit 1
+fi
+export WEIGHTS REVISION
+W="${HF_HOME:-/root/.cache/huggingface}/hunyuan-${REVISION:0:8}"
 if [ ! -f "$W/.ready" ]; then
-    /venv/bin/hf download tencent/HunyuanOCR --revision 47644ecc4fc854efa4f505155158831f36773ee4 \
+    /venv/bin/hf download "$WEIGHTS" --revision "$REVISION" \
         --exclude 'v1.0/*' 'dflash/*' --local-dir "$W"
-    /venv/bin/hf download tencent/HunyuanOCR config.json --revision 3d3cbc9ebde3bd08cfb70fa8b3c40466319e4b15 --local-dir "$W.cfg"
+    /venv/bin/hf download "$WEIGHTS" config.json --revision 3d3cbc9ebde3bd08cfb70fa8b3c40466319e4b15 --local-dir "$W.cfg"
     cp "$W.cfg/config.json" "$W/config.json" && touch "$W/.ready"
 fi
 /venv/bin/vllm serve "$W" --served-model-name tencent/HunyuanOCR -tp 1 --limit-mm-per-prompt '{"image":4,"video":0}' \

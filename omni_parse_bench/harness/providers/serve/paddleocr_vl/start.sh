@@ -3,9 +3,13 @@
 # answers on $PORT once the pipeline is loaded. Either exiting stops the container.
 set -euo pipefail
 export PADDLE_PDX_CACHE_HOME="${PADDLE_PDX_CACHE_HOME:-${HF_HOME:-/root/.cache/huggingface}/paddlex}"
-# Note: the weights at a pinned revision, so a run's record names the weights that answered.
-/opt/vllm-python -m vllm.entrypoints.cli.main serve PaddlePaddle/PaddleOCR-VL-1.6 \
-    --revision c5630abae1d940eafe0697512a0325494b02ab42 --served-model-name paddleocr-vl --trust-remote-code \
+# Note: WEIGHTS and REVISION pick the checkpoint; the defaults are the pinned weights opb's numbers come from,
+# so a run's record names the weights that answered.
+: "${WEIGHTS:=PaddlePaddle/PaddleOCR-VL-1.6}"
+: "${REVISION:=c5630abae1d940eafe0697512a0325494b02ab42}"
+export WEIGHTS REVISION
+/opt/vllm-python -m vllm.entrypoints.cli.main serve "$WEIGHTS" \
+    --revision "$REVISION" --served-model-name paddleocr-vl --trust-remote-code \
     --max-num-batched-tokens 16384 --no-enable-prefix-caching --mm-processor-cache-gb 0 \
     --gpu-memory-utilization 0.8 --trust-request-mm-kwargs --host 127.0.0.1 --port 8000 &
 VLLM=$!

@@ -77,7 +77,7 @@ class LightOn(PageAdapter):
         since the model writes most in `$$` already and a formula block can be a list with inline math,
         which one `$$` around it breaks.
 
-    `model` names the model the server serves (its MODEL), so a run's name tells the two sizes apart; an
+    `model` names the model the server serves (its WEIGHTS), so a run's name tells the two sizes apart; an
     answer from another model is refused.
 
         docker build -t opb-lighton omni_parse_bench/harness/providers/serve/lighton

@@ -6,8 +6,8 @@
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-lighton
 #     opb run --system lightonocr --options '{"base_url": "http://localhost:8001"}'
 #
-# MODEL picks the model (docker run -e MODEL=lightonai/LightOnOCR-3-0.8B; the 4B by default), and opb's
-# `model` option names the same one. The weights download when it starts, into HF_HOME; mount a cache
+# WEIGHTS picks the model (docker run -e WEIGHTS=lightonai/LightOnOCR-3-0.8B; the 4B by default), and opb's
+# `model` option names the same one; REVISION its checkpoint (start.sh pins each). The weights download when it starts, into HF_HOME; mount a cache
 # there to keep them. Set OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb
 # sends it.
 FROM vllm/vllm-openai:v0.30.0@sha256:8a69ffad015f138d7170c4ddc429e230a3bc1c1719f67e14324749df200a4b90
@@ -20,7 +20,7 @@ RUN /opt/vllm-python -m pip install --no-cache-dir uv && /opt/vllm-python -m uv 
     && /opt/vllm-python -m uv pip install --python /opt/lighton/bin/python --no-cache httpx==0.28.1 pdf2image==1.17.0 pypdf==6.20.1 \
         'lightonocr @ git+https://github.com/lightonai/LightOnOCR@36755d461be079737860a5f03ae0c803501269e9'
 
-ENV PORT=8001 MODEL=lightonai/LightOnOCR-3-4B
+ENV PORT=8001
 COPY server.py start.sh /srv/
 EXPOSE 8001
 ENTRYPOINT ["bash", "/srv/start.sh"]

@@ -25,7 +25,7 @@ from infinity_parser2.utils.utils import (
 from PIL import Image
 
 VLLM = os.environ.get("VLLM_URL", "http://127.0.0.1:8000/v1")
-MODEL = os.environ.get("MODEL", "infly/Infinity-Parser2-Pro")
+MODEL = os.environ.get("WEIGHTS", "infly/Infinity-Parser2-Pro")
 SAMPLING = ("temperature", "top_p", "max_tokens")
 # Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = SAMPLING + ("dpi", "min_pixels", "max_pixels")

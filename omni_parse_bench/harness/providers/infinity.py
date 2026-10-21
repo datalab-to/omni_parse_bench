@@ -65,7 +65,7 @@ class Infinity(PageAdapter):
       - headers, footers and page footnotes are kept (the SDK leaves them out by default; the benchmark
         scores the whole page for every system).
 
-    `model` names the model the server serves (its MODEL), so a run's name tells Pro and Flash apart; an
+    `model` names the model the server serves (its WEIGHTS), so a run's name tells Pro and Flash apart; an
     answer from another model is refused.
 
         docker build -t opb-infinity omni_parse_bench/harness/providers/serve/infinity

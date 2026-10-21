@@ -3,9 +3,13 @@
 # at --gpu h100, MTP off as it defaults); server.py answers on $PORT once vLLM is up. Either exiting stops
 # the container.
 set -euo pipefail
-# Note: the weights at a pinned revision, so a run's record names the weights that answered.
-/opt/vllm-python -m vllm.entrypoints.cli.main serve datalab-to/chandra-ocr-2 \
-    --revision af93b47dba1b47b6640c86ccf487ed2260ab9a09 --served-model-name chandra --no-enforce-eager \
+# Note: WEIGHTS and REVISION pick the checkpoint; the defaults are the pinned weights opb's numbers come from,
+# so a run's record names the weights that answered.
+: "${WEIGHTS:=datalab-to/chandra-ocr-2}"
+: "${REVISION:=af93b47dba1b47b6640c86ccf487ed2260ab9a09}"
+export WEIGHTS REVISION
+/opt/vllm-python -m vllm.entrypoints.cli.main serve "$WEIGHTS" \
+    --revision "$REVISION" --served-model-name chandra --no-enforce-eager \
     --max-num-seqs 64 --dtype bfloat16 --max-model-len 18000 --max_num_batched_tokens 8192 \
     --gpu-memory-utilization .85 --enable-prefix-caching \
     --mm-processor-kwargs '{"min_pixels": 3136, "max_pixels": 6291456}' --host 127.0.0.1 --port 8000 &
