@@ -75,6 +75,40 @@ def test_a_hunyuan_chart_is_alt_text_not_page_text():
     assert "12" not in views.text(page, alt=False)
 
 
+def test_a_nemotron_picture_or_chart_is_alt_text_not_page_text():
+    from omni_parse_bench.harness.providers import nemotron_parse
+
+    doc = {"blocks": [{"class": "Title", "bbox": [0, 0, 1, 0.1], "content": "Sales"},
+                      {"class": "Picture", "bbox": [0, 0.1, 1, 0.5], "content": "LOGO TEXT"},
+                      {"class": "Chart", "bbox": [0, 0.5, 1, 0.9],
+                       "content": "<table><tr><td>2024</td><td>12</td></tr></table>"}]}
+    request = nemotron_parse.requests(frozenset({"html", "blocks"}), nemotron_parse.Config())[0]
+    outs, errs = nemotron_parse.parse({"document": doc}, request)
+    assert errs == {} and [b["label"] for b in outs["blocks"]] == ["heading", "figure", "figure"]
+    assert "Sales" in views.text(outs["html"], alt=False) and "<h1>" in outs["html"]
+    for kept in ("LOGO TEXT", "12"):
+        assert kept in views.text(outs["html"]) and kept not in views.text(outs["html"], alt=False)
+
+
+def test_a_nemotron_reply_cut_at_the_token_limit_has_no_document_and_keeps_its_answer(tmp_path, monkeypatch):
+    """The client raises on a reply cut at its token limit and returns no document; the page has none."""
+    from PIL import Image
+
+    from omni_parse_bench.harness import http
+    from omni_parse_bench.harness.providers import nemotron_parse
+
+    answer = {"error": "fullpage generation failed or is incomplete (finish_reason='length')",
+              "stage": "fullpage", "response": {"raw_out": "a a a", "finish_reason": "length"},
+              "responses": [{"finish_reason": "length",
+                             "usage": {"prompt_tokens": 9, "completion_tokens": 8744}}]}
+    monkeypatch.setattr(http, "post", lambda *a, **k: answer)
+    Image.new("RGB", (64, 64), "white").save(page := tmp_path / "p.png")
+    config = nemotron_parse.Config()
+    with pytest.raises(errors.VendorError) as got:
+        nemotron_parse.call(page, nemotron_parse.requests(nemotron_parse.SUPPORTS, config)[0], config=config)
+    assert not got.value.transient and got.value.raw == answer and got.value.cost.tokens_out == 8744
+
+
 def test_an_unknown_label_fails_the_blocks_only():
     from omni_parse_bench.harness.providers import unlimited
 
@@ -138,7 +172,7 @@ def _changed(config):
 
 
 @pytest.mark.parametrize("name", ["chandra_ocr", "deepseek_ocr", "dots", "hunyuan", "infinity", "lighton",
-                                  "olmocr", "paddleocr_vl", "surya_ocr", "unlimited"])
+                                  "nemotron_parse", "olmocr", "paddleocr_vl", "surya_ocr", "unlimited"])
 def test_a_server_gets_every_setting_from_the_config(name, tmp_path, monkeypatch):
     """The server holds no setting of its own: the adapter sends its Config's, so an option changes it,
     and the request records it, so the run is named for it."""
@@ -175,8 +209,9 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("provider", ["chandra-ocr", "deepseek-ocr", "dots-mocr", "glm-ocr", "hunyuan-ocr",
-                                      "infinity-parser2", "lightonocr", "mineru", "nanonets-ocr", "olmocr",
-                                      "paddleocr-vl", "surya-ocr", "unlimited-ocr"])
+                                      "infinity-parser2", "lightonocr", "mineru", "nanonets-ocr",
+                                      "nemotron-parse", "olmocr", "paddleocr-vl", "surya-ocr",
+                                      "unlimited-ocr"])
 def test_a_served_model_run_is_named_without_its_server_address(provider):
     """A server's address is new each time it starts, so a resumed run keeps its name; a setting still
     names its own run."""
