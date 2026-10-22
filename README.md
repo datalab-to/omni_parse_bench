@@ -12,6 +12,7 @@ This repository contains a way to run our document-parsing benchmark using our d
 
 
 - [The design](#the-design)
+- [Results](#results)
 - [Install](#install)
 - [Run the benchmark](#run-the-benchmark)
 - [Score](#score)
@@ -46,6 +47,47 @@ tagged:
 
 A test's tags are the union of its args' tags. Tags never decide whether a test passes or what the
 headline is. It is only used to query tests and rerank. 
+
+## Results
+
+Every system on the published dataset (revision `961c0f89`, plus Nemotron 3.5 Parse; omni-parse-bench 0.1.2 or newer). The
+scores per tag (handwriting, math, tables, forms, rotated pages, ...), how parameters are counted and how
+each open model is served are in [`docs/results.md`](./docs/results.md); every verdict is in the dataset's
+`results.parquet` (Nemotron 3.5 Parse's once the dataset update that adds them is merged).
+
+| parser | weights | parameters | headline | text | tables | layout |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| **Datalab accurate** | closed |  | 92.9 | 91.2 | 92.0 | 95.6 |
+| Gemini 3.8 Flash* | closed |  | 92.9 | 91.3 | 95.2 | 92.2 |
+| **Datalab balanced** | closed |  | 91.6 | 90.0 | 89.2 | 95.5 |
+| Reducto | closed |  | 90.8 | 85.4 | 91.2 | 95.8 |
+| LlamaParse | closed |  | 90.4 | 88.2 | 92.6 | 90.4 |
+| **chandra-ocr-2** | open | 4.5B | 90.1 | 87.4 | 87.4 | 95.4 |
+| Mistral OCR | closed |  | 89.5 | 82.8 | 91.9 | 93.8 |
+| Claude Sonnet 5.5* | closed |  | 88.7 | 93.1 | 95.4 | 77.5 |
+| dots.mocr | open | 3.0B | 87.9 | 82.5 | 88.6 | 92.5 |
+| GPT-5.6 Sol | closed |  | 87.8 | 85.4 | 91.6 | 86.5 |
+| MinerU2.5-Pro | open | 1.2B | 87.1 | 77.4 | 92.1 | 91.7 |
+| Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | 83.3 | 84.1 | 93.5 |
+| Extend | closed |  | 83.3 | 64.1 | 92.5 | 93.4 |
+| **Surya OCR 2** | open | 0.67B | 83.1 | 80.6 | 74.3 | 94.3 |
+| Azure | closed |  | 83.0 | 74.6 | 81.7 | 92.8 |
+| LightOnOCR-3-4B | open | 4.5B | 82.9 | 83.9 | 70.8 | 94.0 |
+| LightOnOCR-3-0.8B | open | 0.85B | 81.6 | 81.1 | 72.1 | 91.7 |
+| GLM-OCR | open | 1.3B | 81.5 | 71.0 | 84.2 | 89.3 |
+| Nemotron 3.5 Parse | open | 0.63B | 80.0 | 72.4 | 77.3 | 90.2 |
+| Unlimited-OCR | open | 3.3B | 79.3 | 70.2 | 76.5 | 91.1 |
+| PaddleOCR-VL-1.6 | open | 0.96B | 78.7 | 61.7 | 83.7 | 90.7 |
+| Infinity-Parser2-Flash | open | 2.2B | 78.4 | 78.4 | 66.5 | 90.4 |
+| DeepSeek-OCR-2 | open | 3.4B | 75.2 | 64.2 | 70.0 | 91.4 |
+| **Indra OCR** | open | about 12M † | 69.5 | 60.3 | 58.1 | 90.1 |
+| HunyuanOCR-1.5 | open | 1.0B | 64.6 | 50.5 | 61.9 | 81.4 |
+| olmOCR-2 | open | 8.3B | none | 71.3 | 56.6 | unsupported |
+| Nanonets-OCR2-3B | open | 3.8B | none | 68.2 | 62.6 | unsupported |
+| Tesseract | open | n/a | none | 17.6 | 0.0 | unsupported |
+
+\* Used in creating and verifying at least some tests. Datalab's own systems are in bold. † See
+[`docs/results.md`](./docs/results.md).
 
 ## Install
 
@@ -190,6 +232,7 @@ Every provider gets the same timeout per call and its most accurate settings by 
 
 - [`docs/API.md`](./docs/API.md): every function and command, the dataset, and what a run writes;
 - [`docs/design.md`](./docs/design.md): each test type, tag and derivation, and the data layout;
+- [`docs/results.md`](./docs/results.md): every system's scores, by family and by tag;
 - [`docs/building-tests.md`](./docs/building-tests.md): how the tests were built, and where each
   one's answer comes from;
 - [`docs/providers.md`](./docs/providers.md): the provider adapters; and
