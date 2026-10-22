@@ -9,7 +9,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 SUPPORTS = frozenset({"html", "blocks"})
 # Note: the package names its models (a tag of datalab-to/indra-ocr), so its version decides them; the
@@ -24,7 +24,7 @@ LABELS = {
 
 
 @dataclasses.dataclass(frozen=True)
-class IndraOcr(PageAdapter):
+class IndraOcr(Parser):
     """Where the Indra OCR server (serve/indra-ocr/) answers, and how its Converter reads a page (the
     package's defaults, but math read as LaTeX and headers and footers kept).
 

@@ -14,7 +14,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import budget, contract, errors, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 DEFAULT_BASE_URL = "https://api.extend.ai"
 API_VERSION = "2026-02-09"
@@ -36,7 +36,7 @@ OUTAGES = frozenset({"INTERNAL_ERROR", "OCR_ERROR"})
 
 
 @dataclasses.dataclass(frozen=True)
-class Extend(PageAdapter):
+class Extend(Parser):
     """Extend, one call for html and blocks, its agentic passes on (text and tables) and an image page
     converted to PDF at high quality.
 

@@ -28,7 +28,7 @@ from omni_parse_bench.harness.providers import (  # noqa: E402
 
 @pytest.mark.parametrize("cls", list(harness.ADAPTERS.values()), ids=list(harness.ADAPTERS))
 def test_every_adapter_is_a_page_adapter(cls):
-    assert dataclasses.is_dataclass(cls) and issubclass(cls, harness.PageAdapter)
+    assert dataclasses.is_dataclass(cls) and issubclass(cls, harness.Parser)
     assert cls.SUPPORTS and cls.SUPPORTS <= {"html", "blocks"}
     assert cls().requests(cls.SUPPORTS), "every adapter asks for something"
 
@@ -45,7 +45,7 @@ def test_an_unknown_option_is_refused_by_name():
 
 
 @dataclasses.dataclass(frozen=True)
-class Stub(harness.PageAdapter):
+class Stub(harness.Parser):
     """A system producing html only, in one call, answering with whatever `ANSWER[0]` returns."""
 
     SUPPORTS: ClassVar[frozenset[str]] = frozenset({"html"})
@@ -183,7 +183,7 @@ def test_a_saved_answer_is_read_again_without_a_call(tmp_path):
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
     x = harness.Input(pdf, frozenset({"html"}))
     r = core.predict(Stub(), x)
-    assert r["output"] == {"html": "<p>alpha beta</p>"} and r["cost"]["usd"] == 0.01
+    assert r["output"] == {"pages": [{"html": "<p>alpha beta</p>"}]} and r["cost"]["usd"] == 0.01
     assert core.reread(Stub(), x, r | {"output": None})["output"] == r["output"]
 
 
@@ -235,17 +235,20 @@ class Reads(Stub):
         return contract.Call({"html": f"<p>{said}</p>"}, cost=contract.Cost(usd=0.01))
 
 
-def test_a_document_is_read_page_by_page_in_order_each_page_its_own_record(tmp_path):
-    doc = pdf(tmp_path / "doc.pdf", ["one", "bad", "three"])
-    got = Reads().document(doc, frozenset({"html"}), timeout=60)
-    assert [r["output"] for r in got] == [{"html": "<p>one</p>"}, None, {"html": "<p>three</p>"}]
-    # a failed page is its record's error, and the others are still read
-    assert got[1]["error"]["message"] == "the vendor refused this page" and got[0]["cost"]["usd"] == 0.01
+def test_a_document_is_parsed_page_by_page_in_order_and_fails_whole(tmp_path):
+    x = harness.Input(pdf(tmp_path / "doc.pdf", ["one", "two", "three"]), frozenset({"html"}))
+    r = core.predict(Reads(), x)
+    assert r["output"] == {"pages": [{"html": f"<p>{t}</p>"} for t in ("one", "two", "three")]}
+    assert r["cost"]["usd"] == 0.03 and len(r["raw"]) == 3, r  # one list of answers per page
     # each page is sent as a one-page file, its text layer copied with it
-    assert [text(p) for p in harness.raster.pages(doc, tmp_path)] == ["one", "bad", "three"]
-    # a page's record is read again with no call, as a run's is
-    again = core.reread(Reads(), harness.Input(doc, frozenset({"html"})), got[2] | {"output": None})
-    assert again["output"] == got[2]["output"]
+    assert [text(p) for p in harness.raster.pages(x.doc, tmp_path)] == ["one", "two", "three"]
+    # read again with no call, as a run's is
+    assert core.reread(Reads(), x, r | {"output": None})["output"] == r["output"]
+    # a page that fails fails the document, with what the pages before it cost
+    bad_doc = pdf(tmp_path / "bad.pdf", ["one", "bad", "three"])
+    bad = core.predict(Reads(), harness.Input(bad_doc, frozenset({"html"})))
+    assert bad["output"] is None and bad["error"]["message"] == "the vendor refused this page"
+    assert bad["cost"]["usd"] == 0.01, bad
 
 
 def test_an_image_is_a_document_of_one_page_and_a_page_is_never_read_as_its_first_page(tmp_path):
@@ -263,7 +266,8 @@ def test_a_parse_that_raises_a_bug_keeps_the_answer_unread(tmp_path, monkeypatch
     with pytest.raises(KeyError) as got:       # parse's own exception, carrying the record to save
         core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
     r = got.value.unread
-    assert (r["output"], r["error"], r["unread"], r["raw"][0]["raw"]) == (None, None, True, {"text": "alpha"})
+    assert (r["output"], r["error"], r["unread"]) == (None, None, True)
+    assert r["raw"][0][0]["raw"] == {"text": "alpha"}
 
 
 def test_a_parse_raising_system_failed_is_recorded_as_unreadable(tmp_path, monkeypatch):
@@ -278,7 +282,7 @@ def test_a_parse_raising_system_failed_is_recorded_as_unreadable(tmp_path, monke
     r = core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
     assert r["output"] is None and r["error"]["type"] == "Unreadable", r
     assert "no page in the answer" in r["error"]["message"] and "in parse" in r["error"]["traceback"]
-    assert r["raw"][0]["raw"] == {"html": "<p>alpha beta</p>"}
+    assert r["raw"][0][0]["raw"] == {"html": "<p>alpha beta</p>"}
 
 
 @pytest.mark.parametrize("name, key", [("datalab", "DATALAB_API_KEY"), ("reducto", "REDUCTO_API_KEY"),

@@ -18,7 +18,7 @@ from omni_bench_core import adapter as core
 # Note: we check the systems' packages once, here, so a missing extra fails at import with one message naming
 # it, not hours into a run.
 try:
-    from .adapter import PageAdapter
+    from .adapter import Parser
     from .providers import (
         azure,
         chandra_ocr,
@@ -55,7 +55,7 @@ except ImportError as exc:
 MODEL_SEPARATOR = "/"
 ENTRY_POINT_GROUP = "omni_parse_bench.adapters"
 
-ADAPTERS: dict[str, type[PageAdapter]] = {a.name: a for a in (
+ADAPTERS: dict[str, type[Parser]] = {a.name: a for a in (
     datalab.Datalab, reducto.Reducto, extend.Extend, llamaparse.LlamaParse, azure.Azure, mistral.Mistral,
     tesseract.Tesseract,
     # Open models, each served from its folder in providers/serve/: the vendor's own code on a server of ours,
@@ -84,7 +84,7 @@ PLUGINS = plugins()
 PROVIDERS = sorted({*ADAPTERS, *PLUGINS})
 
 
-def adapter_class(provider: str) -> type[PageAdapter]:
+def adapter_class(provider: str) -> type[Parser]:
     """The class a provider name means."""
     if MODEL_SEPARATOR in provider: return llm.LLM
     if provider not in ADAPTERS and (ep := PLUGINS.get(provider)):
@@ -99,7 +99,7 @@ def adapter_class(provider: str) -> type[PageAdapter]:
     return ADAPTERS[provider]
 
 
-def system(provider: str, options: dict[str, Any] | None = None) -> PageAdapter:
+def system(provider: str, options: dict[str, Any] | None = None) -> Parser:
     """The adapter `provider` names, at `options`, checked (`omni_bench_core.adapter.configure`). A model id
     is the LLM adapter with that `model`, which can't also be given as an option."""
     options = dict(options or {})

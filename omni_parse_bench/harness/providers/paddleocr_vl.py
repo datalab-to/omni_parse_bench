@@ -12,7 +12,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "PaddlePaddle/PaddleOCR-VL-1.6@c5630abae1d940eafe0697512a0325494b02ab42"
@@ -33,7 +33,7 @@ _TAG = re.compile(r"<[^>]+>")
 
 
 @dataclasses.dataclass(frozen=True)
-class PaddleOcrVl(PageAdapter):
+class PaddleOcrVl(Parser):
     """Where the PaddleOCR-VL server (serve/paddleocr-vl/) answers, and the DPI a PDF is loaded at (the
     pipeline's, PDF_RENDER_SCALE 2.0, by default).
 

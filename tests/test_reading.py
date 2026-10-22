@@ -97,7 +97,7 @@ def test_every_answer_is_read_inside_reading(path):
 
 
 @dataclasses.dataclass(frozen=True)
-class Answers(harness.PageAdapter):
+class Answers(harness.Parser):
     """A system whose answer lacks its html. `careful` reads the answer inside `reading`, as an adapter
     must."""
 

@@ -1,7 +1,6 @@
 """Producing predictions: opb's adapters, one per parsing system (`pip install 'omni-parse-bench[harness]'`).
 
-    adapter.py       `PageAdapter`, the base class of every adapter; its docstring says how to write one, and
-                     its `document` reads a whole document page by page
+    adapter.py       `Parser`, the base class of every adapter; its docstring says how to write one
     contract.py      `Request`, `Call` and `Cost`: one call to a system and its answer
     errors.py        how a call fails, whether a retry can fix it, and a model server that isn't running
     budget.py        one page's share of the clock
@@ -15,8 +14,8 @@
 from .registry import ADAPTERS, PROVIDERS, adapter_class, system  # isort: skip
 from omni_parse_bench.task import Input
 
-from .adapter import PageAdapter
+from .adapter import Parser
 from .contract import Call, Cost, Request
 
-__all__ = ["ADAPTERS", "Call", "Cost", "Input", "PROVIDERS", "PageAdapter", "Request",
+__all__ = ["ADAPTERS", "Call", "Cost", "Input", "PROVIDERS", "Parser", "Request",
            "adapter_class", "system"]

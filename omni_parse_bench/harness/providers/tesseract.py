@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from .. import budget, contract, errors, raster
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 SUPPORTS = frozenset({"html"})
 # Tesseract's script names, as its detection prints them, to its script models.
@@ -28,7 +28,7 @@ _SCRIPT = re.compile(r"Script: (\w+)")
 
 
 @dataclasses.dataclass(frozen=True)
-class Tesseract(PageAdapter):
+class Tesseract(Parser):
     """Tesseract, run locally: html only, so its layout family is 0. A PDF page is rendered at `render_dpi`;
     Tesseract detects the page's script (`--psm 0`) and reads it with that script's model, English when it
     detects none. Its text is written as html inside `<pre>`, escaped. A tesseract that exits with an error

@@ -14,7 +14,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import budget, contract, errors, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 DEFAULT_BASE_URL = "https://api.cloud.llamaindex.ai"
 SUPPORTS = frozenset({"html", "blocks"})
@@ -35,7 +35,7 @@ TERMINAL = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 
 
 @dataclasses.dataclass(frozen=True)
-class LlamaParse(PageAdapter):
+class LlamaParse(Parser):
     """LlamaParse, one call for html and blocks, at `agentic_plus`, its most accurate tier.
 
     - `html`: the page's `header`, markdown and `footer` joined, since its markdown leaves out what it typed

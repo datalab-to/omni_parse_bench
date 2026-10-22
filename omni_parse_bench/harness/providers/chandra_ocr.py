@@ -10,7 +10,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -32,7 +32,7 @@ PICTURES = ("Image", "Figure", "Picture", "Diagram", "Chemical-Block")
 
 
 @dataclasses.dataclass(frozen=True)
-class ChandraOcr(PageAdapter):
+class ChandraOcr(Parser):
     """Where the chandra-ocr-2 server (serve/chandra-ocr/) answers, and the sampling of its first attempt (the
     package's by default; a retry follows the package's schedule).
 

@@ -147,7 +147,8 @@ def test_a_model_without_layout_is_never_asked_for_blocks(tmp_path, monkeypatch)
     monkeypatch.setattr(llm, "chat", lambda *a, **k: {"choices": [{"message": {"content": "# Title"},
                                                                    "finish_reason": "stop"}]})
     record = core.predict(harness.system("nanonets-ocr"), harness.Input(pdf, frozenset({"html", "blocks"})))
-    assert list(record["output"]) == ["html"] and "Title" in views.text(record["output"]["html"])
+    [page] = record["output"]["pages"]
+    assert list(page) == ["html"] and "Title" in views.text(page["html"])
 
 
 def folder(provider: str, **options) -> str:
@@ -163,7 +164,7 @@ def test_an_llm_run_is_named_after_its_model():
 def _adapter(mod):
     """The adapter class a provider module defines."""
     return next(v for v in vars(mod).values()
-                if isinstance(v, type) and issubclass(v, harness.PageAdapter)
+                if isinstance(v, type) and issubclass(v, harness.Parser)
                 and v.__module__ == mod.__name__)
 
 

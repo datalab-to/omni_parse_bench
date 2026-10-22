@@ -330,8 +330,8 @@ from omni_parse_bench.scorers import unit_tests
 
 system = harness.system("datalab", {"mode": "balanced"})
 record = adapter.predict(system, harness.Input(Path("pages/<page_id>.pdf"), frozenset({"html", "blocks"})))
-record["output"]        # {"html": "...", "blocks": [...]}
-record["error"]         # why the page failed (type, status, message, traceback), or None
+record["output"]        # {"pages": [{"html": "...", "blocks": [...]}]}: one entry per page of the document
+record["error"]         # why the document failed (type, status, message, traceback), or None
 record["cost"]          # what it cost, its wall time and attempts
 
 unit_tests.score(record["output"], unit_tests.tests.read("gold/<page_id>.json"))

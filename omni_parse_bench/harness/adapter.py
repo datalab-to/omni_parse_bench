@@ -1,6 +1,6 @@
 """What every opb adapter shares:
 
-- `PageAdapter`: the base class of every adapter; and
+- `Parser`: the base class of every adapter; and
 - `OPTION_HELP` and `option_help`: the help of options many adapters have.
 """
 from __future__ import annotations
@@ -47,27 +47,28 @@ def option_help(f: dataclasses.Field) -> str:
 
 
 @dataclasses.dataclass(frozen=True)
-class PageAdapter(adapter.Adapter[Input]):
-    """One parsing system; its fields are its options. Write three methods, which this class turns into the
-    core's `call` and `read`:
+class Parser(adapter.Adapter[Input]):
+    """One parsing system; its fields are its options. It parses a document (`Input`: a PDF of any number of
+    pages, or an image) into its pages' outputs, `{"pages": [{"html": ..., "blocks": [...]}, ...]}`, one entry
+    per page in order. Write three methods, for one page, which this class turns into the core's `call` and
+    `read`:
 
         requests(wants)                     the calls that produce the wanted outputs, each a `Request`
-        send(page, request, *, timeout)     makes one call and returns its answer as received (a `Call`)
+        send(page, request, *, timeout)     makes one call for one page and returns its answer as received
         parse(raw, request)                 the outputs in one answer, and why any is missing
 
     Class variables:
 
-        SUPPORTS    the outputs the system can produce; `requests` is given only those a page wants
+        SUPPORTS    the outputs the system can produce; `requests` is given only those a document wants
         ENV         in words, what else the environment can hold for it, such as an optional token
         SERVE       its folder in providers/serve/, for a model you serve yourself
 
-    `document` reads a whole document, page by page, for code that holds one (an extraction pipeline that OCRs
-    its PDF first); the benchmark itself sends one page, as its rows are.
-
-    `call` makes a page's requests in order, within the page's one time budget, and keeps each answer whole.
-    A page that wants none of `SUPPORTS` gets no call, and its tests fail as "no <output> output" without
-    the page failing. A failed call fails the page, carrying what every request sent and what the earlier
-    calls cost. `read` parses each saved answer again, so a fix to `parse` costs no call (`opb reread`).
+    `call` splits the document into its pages (`raster.pages`; a one-page PDF or an image is sent as it is),
+    and makes each page's requests in order, page after page, within the document's one time budget, keeping
+    each answer whole. A document that wants none of `SUPPORTS` gets no call, and its tests fail as "no
+    <output> output" without it failing. A failed call fails the document, carrying what every request sent
+    and what the earlier calls cost. `read` parses each saved answer again, so a fix to `parse` costs no call
+    (`opb reread`). A vendor that reads whole documents may override `call` and `read` to send the file once.
 
     What to raise:
 
@@ -94,7 +95,7 @@ class PageAdapter(adapter.Adapter[Input]):
 
     @abc.abstractmethod
     def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
-        """One call for `page`, within `timeout` seconds; its answer as received."""
+        """One call for one `page`, within `timeout` seconds; its answer as received."""
 
     @abc.abstractmethod
     def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
@@ -110,42 +111,35 @@ class PageAdapter(adapter.Adapter[Input]):
         return self.provider.replace("/", "__")
 
     def call(self, x: Input, *, timeout: float) -> adapter.Call:
-        """Every request for the page, sent in order within one budget; their answers, kept whole. A page that
-        wants nothing the system supports gets no call, and an answer with no outputs."""
-        if not (wants := x.wants & self.SUPPORTS): return adapter.Call(raw=[])
+        """Every page's requests, page after page, in order within one budget; their answers, kept whole,
+        one list per page. A document that wants nothing the system supports gets no call: an empty list per
+        page."""
+        wants = x.wants & self.SUPPORTS
         clock = budget.Budget(timeout)
-        answers, costs, job = [], [], None
-        for r in self.requests(wants):
-            try:
-                got = _send(self, x.page, r, clock.remaining())
-            except errors.SystemFailed as exc:
-                exc.sent = [*(a["sent"] for a in answers), r.sent]
-                paid = [exc.cost] if isinstance(exc.cost, adapter.Cost) else []
-                exc.cost = adapter.Cost.total([*costs, *paid])
-                raise
-            except Exception as exc:
-                if errors.refused(exc):
-                    errors.no_server(exc, getattr(self, "base_url", "its address"), self.provider, self.SERVE)
-                raise
-            answers.append({"outputs": sorted(r.outputs), "sent": r.sent, "raw": got.raw,
-                            "job_id": got.job_id})
-            costs.append(got.cost)
-            job = job or got.job_id
-        return adapter.Call(raw=answers, cost=adapter.Cost.total(costs), job_id=job,
-                            sent=[a["sent"] for a in answers])
-
-    def document(self, doc: Path, wants: frozenset[str], *, timeout: float) -> list[dict[str, Any]]:
-        """Every page of `doc` (a PDF, or an image as one page), in order, as this system reads a page: one
-        record per page, as the core's `predict` makes it (`output`, `raw`, `error`, `cost`, ...), within one
-        budget. A page that fails is its record's `error`; an account failure, a refused connection or a bug
-        is raised, as in a run. `adapter.reread` reads a page's record again with no call.
-
-        By default the PDF is split into one-page files (`raster.pages`), each sent as the benchmark sends a
-        page. A system whose vendor reads a whole document may override it to send the file once."""
-        clock = budget.Budget(timeout)
+        pages: list[list[dict]] = []
+        costs, job = [], None
         with tempfile.TemporaryDirectory() as folder:
-            pages = raster.pages(doc, Path(folder))
-            return [adapter.predict(self, Input(p, wants), timeout=clock.remaining()) for p in pages]
+            for page in raster.pages(x.doc, Path(folder)):
+                pages.append(answers := [])
+                for r in self.requests(wants) if wants else ():
+                    try:
+                        got = _send(self, page, r, clock.remaining())
+                    except errors.SystemFailed as exc:
+                        exc.sent = [*(a["sent"] for p in pages for a in p), r.sent]
+                        paid = [exc.cost] if isinstance(exc.cost, adapter.Cost) else []
+                        exc.cost = adapter.Cost.total([*costs, *paid])
+                        raise
+                    except Exception as exc:
+                        if errors.refused(exc):
+                            url = getattr(self, "base_url", "its address")
+                            errors.no_server(exc, url, self.provider, self.SERVE)
+                        raise
+                    answers.append({"outputs": sorted(r.outputs), "sent": r.sent, "raw": got.raw,
+                                    "job_id": got.job_id})
+                    costs.append(got.cost)
+                    job = job or got.job_id
+        return adapter.Call(raw=pages, cost=adapter.Cost.total(costs), job_id=job,
+                            sent=[a["sent"] for p in pages for a in p])
 
     def account_failure(self, e: errors.SystemFailed) -> bool:
         """The core's rule, and a 403 too, unless it is a moderation flag on this page's content."""
@@ -155,16 +149,20 @@ class PageAdapter(adapter.Adapter[Input]):
         return super().account_failure(e)
 
     def read(self, raw: Any, x: Input) -> dict[str, Any]:
-        """The page's outputs, parsed from each saved answer. An output `parse` couldn't read is None, so its
-        tests fail; what `parse` raises is raised."""
+        """The document's pages, each its outputs parsed from its saved answers. An output `parse` couldn't
+        read is None, so its tests fail; what `parse` raises is raised."""
+        return {"pages": [self.page(answers) for answers in raw]}
+
+    def page(self, answers: list[dict]) -> dict[str, Any]:
+        """One page's outputs, parsed from its saved answers."""
         out: dict[str, Any] = {}
-        for a in raw:
+        for a in answers:
             parsed, _ = self.parse(a["raw"], contract.Request(frozenset(a["outputs"]), a["sent"]))
             out |= {o: parsed.get(o) for o in a["outputs"]}
         return out
 
 
-def _send(a: PageAdapter, page: Path, r: contract.Request, timeout: float) -> contract.Call:
+def _send(a: Parser, page: Path, r: contract.Request, timeout: float) -> contract.Call:
     """`a.send`, with HTTP's own failures mapped alike for every adapter: a network fault is
     `SystemUnreachable` (or `SystemTimeout`), and a `raise_for_status` error is a `SystemFailed` with its
     status and body. A refused connection is raised as it is; nothing else is caught."""

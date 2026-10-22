@@ -12,7 +12,7 @@ from omni_bench_core import adapter
 
 from ... import markdown, views
 from .. import contract, errors, http, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -36,7 +36,7 @@ _PLACEHOLDER = re.compile(r"^!\[([a-z_]+)\+?\]\((-?[\d.]+),(-?[\d.]+),(-?[\d.]+)
 
 
 @dataclasses.dataclass(frozen=True)
-class LightOn(PageAdapter):
+class LightOn(Parser):
     """Where the LightOnOCR-3 server (serve/lightonocr/) answers, the model it serves, and its sampling (the
     client's for LightOnOCR-3 by default, temperature as its benchmark sets it).
 

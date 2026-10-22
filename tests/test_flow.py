@@ -39,7 +39,7 @@ WRONG: set[str] = set()            # pages `parse` reads wrongly, without raisin
 
 
 @dataclasses.dataclass(frozen=True)
-class Alpha(harness.PageAdapter):
+class Alpha(harness.Parser):
     """Answers every page with html holding "alpha"."""
 
     name: ClassVar[str] = "alpha"
@@ -109,7 +109,7 @@ def test_a_page_wanting_nothing_the_system_supports_is_not_sent_and_fails_its_te
     assert sorted(CALLS) == ["a-p0", "a-p1"], "the blocks-only page isn't sent"
     assert WANTS and all(WANTS), "no adapter is asked for an empty set of outputs"
     rec = json.loads((tmp_path / "runs" / name / "records" / "a-p2.json").read_text())
-    assert (rec["output"], rec["error"], rec["cost"]["usd"]) == ({}, None, None), rec
+    assert (rec["output"], rec["error"], rec["cost"]["usd"]) == ({"pages": [{}]}, None, None), rec
     [s] = g["scorers"].values()
     assert (s["coverage"], s["failed"], s["rows"]) == (1.0, 0, 3), "not a failed page: coverage stays 1"
     assert s["scored"]["families"]["layout"] == {"score": 0.0, "tests": 3, "documents": 3}, s
@@ -156,7 +156,7 @@ def test_opb_grade_grades_a_folder_of_your_own(tmp_path, capsys):
     data = dataset(tmp_path / "data", 2)
     mine = tmp_path / "mine"
     (mine / "predictions").mkdir(parents=True)
-    (mine / "predictions" / "a-p0.json").write_text(json.dumps({"html": "<p>alpha</p>"}))
+    (mine / "predictions" / "a-p0.json").write_text(json.dumps({"pages": [{"html": "<p>alpha</p>"}]}))
     assert "a-p1" in raised(["grade", str(mine), "--dataset", data]), "a missing prediction is refused"
     assert cli.main(["grade", str(mine), "--dataset", data, "--partial"]) == 0
     [s] = json.loads(capsys.readouterr().out)["scorers"].values()
@@ -302,7 +302,8 @@ def test_opb_predict_prints_the_record_and_fails_on_a_failed_page(tmp_path, caps
     monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
     assert cli.main(["predict", "--system", "alpha", "--page", str(pdf)]) == 0
     rec = json.loads(capsys.readouterr().out)
-    assert rec["output"] == {"html": "<p>alpha beta</p>"} and rec["error"] is None and "raw" not in rec
+    assert rec["output"] == {"pages": [{"html": "<p>alpha beta</p>"}]}
+    assert rec["error"] is None and "raw" not in rec
 
     def refused(self, page, request, *, timeout):
         raise harness_errors.SystemFailed("bad page", status=400, body={"why": "bad"},
@@ -413,7 +414,7 @@ def test_a_bug_in_parse_stops_the_run_and_resuming_reads_it_again(tmp_path, caps
     [run] = (tmp_path / "runs").iterdir()
     rec = json.loads((run / "records" / "a-p0.json").read_text())
     assert (rec["unread"], rec["error"], rec["output"]) == (True, None, None)
-    assert rec["raw"][0]["raw"]["page"] == "a-p0", "the answer is kept"
+    assert rec["raw"][0][0]["raw"]["page"] == "a-p0", "the answer is kept"
     assert not (run / "predictions" / "a-p0.json").exists() and CALLS == ["a-p0"]
     BROKEN.clear()
     CALLS.clear()
@@ -469,7 +470,7 @@ def test_a_prediction_that_isnt_an_object_counts_0_with_its_traceback(tmp_path):
     assert (s["failed"], s["coverage"]) == (1, 0.5), s
     lines = (run / b.scorers[0].folder_name / "scores.jsonl").read_text().splitlines()
     line = next(x for x in map(json.loads, lines) if x["id"] == "a-p0")
-    assert "not an object of outputs" in line["error"] and "in prediction" in line["traceback"], line
+    assert "a row is one page" in line["error"] and "in prediction" in line["traceback"], line
 
 
 @pytest.mark.parametrize("answer", ["n\n", ""])

@@ -46,7 +46,7 @@ class Cost(adapter.Cost):
 
 
 class Call(NamedTuple):
-    """One call's answer as received, before reading: `PageAdapter.parse` reads the outputs from `raw`."""
+    """One call's answer as received, before reading: `Parser.parse` reads the outputs from `raw`."""
 
     raw: Any
     cost: adapter.Cost = Cost()

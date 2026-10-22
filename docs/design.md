@@ -200,7 +200,8 @@ suite and document are its page's.
 ## Predict
 
 ```python
-omni_bench_core.adapter.predict(system, task.Input(page, wants)) -> record   # page: a .pdf or .png
+omni_bench_core.adapter.predict(system, task.Input(doc, wants)) -> record   # doc: a PDF of any length, or a .png
+record["output"] == {"pages": [{"html": ..., "blocks": [...]}, ...]}         # one entry per page; a row is one
 ```
 
 The benchmark asks a provider only for what a page's tests read: the page's `outputs` in the
@@ -343,8 +344,8 @@ omni_parse_bench/
   katex/          KaTeX (MIT), run in an embedded V8 (mini-racer)
   markdown.py     markdown → HTML, the one converter the harness runs on every provider's markdown
   harness/        producing predictions:
-    adapter.py    PageAdapter: an omni-bench-core adapter for one page (SUPPORTS, keys, requests, send,
-                  parse), and the help of options many adapters share
+    adapter.py    Parser: an omni-bench-core adapter for a document, written for one page (SUPPORTS, keys,
+                  requests, send, parse), and the help of options many adapters share
     contract.py   Request, Call and Cost: one call and its answer
     errors.py     how a call fails, whether a retry can fix it, and the note for a model server not running
     budget.py     one page's share of the clock

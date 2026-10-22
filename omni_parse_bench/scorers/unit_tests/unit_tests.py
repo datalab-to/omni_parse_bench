@@ -44,13 +44,15 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
         return gold(row)
 
     def prediction(self, output: Any) -> Mapping[str, Any]:
-        """The page's outputs. A prediction that isn't an object of outputs is the system's failure: the
-        page counts 0. An output of the wrong shape inside it fails only its own tests
-        (`views.MalformedOutput`)."""
-        if not isinstance(output, dict):
-            raise errors.SystemFailed(f"the prediction is a JSON {type(output).__name__}, not an object "
-                                           "of outputs")
-        return output
+        """The page's outputs: the one page of the prediction's `pages`, as a row is one page. A prediction
+        that isn't `{"pages": [an object of outputs]}` is the system's failure: the page counts 0. An output
+        of the wrong shape inside it fails only its own tests (`views.MalformedOutput`)."""
+        pages = output.get("pages") if isinstance(output, dict) else None
+        if not (isinstance(pages, list) and len(pages) == 1 and isinstance(pages[0], dict)):
+            got = f"{len(pages)} pages" if isinstance(pages, list) else f"a JSON {type(output).__name__}"
+            raise errors.SystemFailed(f"the prediction is {got}, not {{\"pages\": [the page's outputs]}}: "
+                                      "a row is one page")
+        return pages[0]
 
     def score(self, pred: Mapping[str, Any], tests: Sequence[_tests.Test]) -> scorer.Score:
         vs = compare.score(pred, tests)

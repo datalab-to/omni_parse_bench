@@ -12,7 +12,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "opendatalab/MinerU2.5-Pro-2605-1.2B"
@@ -38,7 +38,7 @@ _TAG = re.compile(r"<[^>]+>")
 
 
 @dataclasses.dataclass(frozen=True)
-class MinerU(PageAdapter):
+class MinerU(Parser):
     """Where the MinerU2.5-Pro server (serve/mineru/) answers.
 
     Run as its model card and client run it (github.com/opendatalab/mineru-vl-utils 2.0.7, `MinerUClient`

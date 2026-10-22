@@ -13,7 +13,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import budget, contract, errors, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 DEFAULT_BASE_URL = "https://api.mistral.ai"
 SUPPORTS = frozenset({"html", "blocks"})
@@ -30,7 +30,7 @@ _IMAGE = re.compile(r"!\[(img-\d+\.\w+)\]\(\1\)")
 
 
 @dataclasses.dataclass(frozen=True)
-class Mistral(PageAdapter):
+class Mistral(Parser):
     """Mistral OCR, one call for html and blocks: tables as html, header and footer extracted, image data not
     returned.
 

@@ -11,7 +11,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "deepseek-ai/DeepSeek-OCR-2"
@@ -35,7 +35,7 @@ LABELS = {
 
 
 @dataclasses.dataclass(frozen=True)
-class DeepseekOcr(PageAdapter):
+class DeepseekOcr(Parser):
     """Where the DeepSeek-OCR-2 server (serve/deepseek-ocr/) answers, and its sampling (the repository's
     scripts' by default; top_p, which they leave unset, at vLLM's 1.0).
 

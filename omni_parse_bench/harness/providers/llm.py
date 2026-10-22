@@ -19,7 +19,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import budget, contract, errors, layout, raster
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 SUPPORTS = frozenset({"html", "blocks"})
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
@@ -62,7 +62,7 @@ LABELS = {k: k for k in ("heading", "page_furniture", "text", "list", "caption",
 
 
 @dataclasses.dataclass(frozen=True)
-class LLM(PageAdapter):
+class LLM(Parser):
     """A vision-language model (GPT, Claude, ...) through any OpenAI-compatible endpoint; the published runs
     use OpenRouter, which returns billed cost (`usage.cost`). `model` is the provider name, never an option.
 

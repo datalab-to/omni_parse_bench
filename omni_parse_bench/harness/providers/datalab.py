@@ -13,7 +13,7 @@ import httpx
 from omni_bench_core import adapter
 
 from .. import budget, contract, errors, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 DEFAULT_BASE_URL = "https://www.datalab.to"
 SUPPORTS = frozenset({"html", "blocks"})
@@ -31,7 +31,7 @@ MEDIA = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", "
 
 
 @dataclasses.dataclass(frozen=True)
-class Datalab(PageAdapter):
+class Datalab(Parser):
     """Datalab, one call for html and blocks (`output_format=html,chunks`), page headers and footers kept.
 
     - `mode`: the tier, `fast`, `balanced` or `accurate`;

@@ -7,14 +7,14 @@ from typing import Any, ClassVar
 
 from ... import markdown
 from .. import contract, errors, http
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 SUPPORTS = frozenset({"html"})
 WEIGHTS = "allenai/olmOCR-2-7B-1025-FP8"
 
 
 @dataclasses.dataclass(frozen=True)
-class OlmOcr(PageAdapter):
+class OlmOcr(Parser):
     """Where the olmOCR 2 server (serve/olmocr/) answers, and the pipeline's arguments it sets (its
     defaults by default).
 

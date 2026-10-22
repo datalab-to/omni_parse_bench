@@ -11,7 +11,7 @@ from omni_bench_core import adapter
 
 from ... import markdown, views
 from .. import contract, errors, http, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -34,7 +34,7 @@ LABELS = {
 
 
 @dataclasses.dataclass(frozen=True)
-class UnlimitedOcr(PageAdapter):
+class UnlimitedOcr(Parser):
     """Where the Unlimited-OCR server (serve/unlimited-ocr/) answers, and its sampling (the recipe's by
     default; top_p, which it leaves unset, at vLLM's 1.0).
 

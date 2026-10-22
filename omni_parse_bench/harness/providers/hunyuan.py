@@ -12,7 +12,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -21,7 +21,7 @@ TASKS = ("layout_parse", "doc_parse")
 
 
 @dataclasses.dataclass(frozen=True)
-class Hunyuan(PageAdapter):
+class Hunyuan(Parser):
     """Where the HunyuanOCR server (serve/hunyuan-ocr/) answers, the client's task, and its sampling (the
     client's by default).
 

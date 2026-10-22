@@ -12,7 +12,7 @@ from typing import Any, ClassVar
 
 from ... import markdown
 from .. import budget, contract, errors, http
-from ..adapter import PageAdapter
+from ..adapter import Parser
 from . import llm
 
 SUPPORTS = frozenset({"html"})
@@ -30,7 +30,7 @@ _UNWRAP = re.compile(r"</?(?:watermark|page_number|signature)>", re.I)
 
 
 @dataclasses.dataclass(frozen=True)
-class Nanonets(PageAdapter):
+class Nanonets(Parser):
     """Where the server (serve/nanonets-ocr/) answers (its chat endpoint is vLLM's, under /v1), and its
     sampling (the model card's by default; top_p, which it leaves unset, at vLLM's 1.0).
 

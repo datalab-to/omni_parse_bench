@@ -13,7 +13,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import budget, contract, errors, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 API_VERSION = "2025-11-01"
 SUPPORTS = frozenset({"html", "blocks"})
@@ -31,7 +31,7 @@ TERMINAL = frozenset({"succeeded", "failed", "canceled", "cancelled"})
 
 
 @dataclasses.dataclass(frozen=True)
-class Azure(PageAdapter):
+class Azure(Parser):
     """Azure Content Understanding, one call for html and blocks. `endpoint`, the resource, is required: it is
     an option, not an environment variable, since it decides where the page is analyzed.
 

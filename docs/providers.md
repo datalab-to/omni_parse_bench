@@ -1,7 +1,7 @@
 # Providers
 
 How each vendor becomes an adapter in `omni_parse_bench/harness/providers/`: one module per vendor,
-each defining one `PageAdapter` class (`harness/adapter.py`), the omni-bench-core core's `Adapter` for one
+each defining one `Parser` class (`harness/adapter.py`), the omni-bench-core core's `Adapter` for one
 page. The class has:
 
 - its fields: the vendor's options;
@@ -16,7 +16,7 @@ page. The class has:
   thread-safe needs a lock: pdfium is one, so render pages with `raster`, which holds its lock; and
 - `parse(raw, request)`: read the outputs from an answer.
 
-`PageAdapter` turns these into the core's `call` and `read`: `call` makes every request for a page
+`Parser` turns these into the core's `call` and `read`: `call` makes every request for a page
 within the page's one time budget and keeps each answer, and `read` parses each saved answer.
 `registry.ADAPTERS` lists the vendors and the open-weight models with adapters of their own; any
 model id goes to `llm.LLM`.

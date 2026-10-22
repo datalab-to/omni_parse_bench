@@ -14,7 +14,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import budget, contract, errors, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 DEFAULT_BASE_URL = "https://platform.reducto.ai"
 SUPPORTS = frozenset({"html", "blocks"})
@@ -30,7 +30,7 @@ TERMINAL = frozenset({"Completed", "Failed", "Error", "Cancelled"})
 
 
 @dataclasses.dataclass(frozen=True)
-class Reducto(PageAdapter):
+class Reducto(Parser):
     """Reducto, one call for html and blocks, on r-1, its newest model (`model`; `legacy` runs the old
     pipeline, with its agentic passes on tables and text and `extraction_mode`).
 

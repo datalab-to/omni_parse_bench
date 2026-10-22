@@ -140,7 +140,7 @@ harness.ADAPTERS                       # name -> adapter class
 harness.system(name, options)          # an adapter at its options, checked; a model id is the LLM adapter
 ```
 
-An adapter is a `harness.PageAdapter`: a frozen dataclass whose fields are its options, with `SUPPORTS` (the
+An adapter is a `harness.Parser`: a frozen dataclass whose fields are its options, with `SUPPORTS` (the
 outputs it can produce), `keys` (the environment variables it needs, checked by the core before any call, in
 a run and in `opb predict`), `requests(wants)`, `send(page, request, *, timeout)` and `parse(raw, request)`.
 `requests` is never given an empty set: a page that wants nothing the system supports is not sent. `send` is
@@ -291,7 +291,7 @@ of outputs is the system's failure: it raises `SystemFailed`, the page counts 0,
 output's tests. Anything else `prediction` raises is a bug in the scorer, and stops grading.
 
 For your own predictions, put your system's outputs in a folder, one file per page,
-`predictions/<page_id>.json`, each `{"html": ..., "blocks": [...]}`. Such a folder is graded over the whole
+`predictions/<page_id>.json`, each `{"pages": [{"html": ..., "blocks": [...]}]}`, as a system's output is. Such a folder is graded over the whole
 manifest, on every test; a page whose file lacks an output fails that output's tests. Grading writes
 nothing into it but the scorer's results. A folder none of whose files names a page is refused.
 

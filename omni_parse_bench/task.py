@@ -1,4 +1,4 @@
-"""The parse task: `Parse`, and `Input`, what a system is sent for one page. It imports nothing of the
+"""The parse task: `Parse`, and `Input`, what a system is sent: a document. It imports nothing of the
 harness.
 """
 from __future__ import annotations
@@ -13,16 +13,18 @@ from omni_parse_bench import data
 
 
 class Input(NamedTuple):
-    """What a system is sent for one page: the page file, and the outputs wanted from it."""
+    """What a system is sent: a document (a PDF of any number of pages, or an image), and the outputs wanted
+    from it. A row of the benchmark is one page, a document of one page."""
 
-    page: Path
+    doc: Path
     wants: frozenset[str]
 
 
 @dataclasses.dataclass(frozen=True)
 class Parse(task.Task[data.Page, Input]):
-    """A page goes in, and the outputs its tests read come out (html, layout blocks). The adapter asks its
-    system only for those it can produce (`harness.PageAdapter.SUPPORTS`); a test on another output fails."""
+    """A document goes in, one page per row, and its pages' outputs come out, the ones its tests read (html,
+    layout blocks): `{"pages": [...]}`. The adapter asks its system only for those it can produce
+    (`harness.Parser.SUPPORTS`); a test on another output fails."""
 
     name: ClassVar[str] = "parse"
 

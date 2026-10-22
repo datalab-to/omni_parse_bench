@@ -9,7 +9,7 @@ from omni_bench_core import adapter
 
 from ... import markdown, views
 from .. import contract, errors, http, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -23,7 +23,7 @@ LABELS = {
 
 
 @dataclasses.dataclass(frozen=True)
-class Dots(PageAdapter):
+class Dots(Parser):
     """Where the dots.mocr server (serve/dots-mocr/) answers, and its sampling (the parser's by default).
 
     Run as its repository's parser, `DotsMOCRParser`, runs it (github.com/rednote-hilab/dots.mocr at

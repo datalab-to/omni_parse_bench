@@ -35,16 +35,23 @@ def render(pdf: Path, scale: Callable[[tuple[float, float]], float]) -> Image.Im
 
 
 def pages(doc: Path, folder: Path) -> list[Path]:
-    """`doc`'s pages, in order, each a file in `folder`: a PDF split into one-page PDFs, its pages copied
-    whole (text layer and fonts too); an image is one page, itself."""
+    """`doc`'s pages, in order, each a file: a PDF of several pages split into one-page PDFs in `folder`,
+    its pages copied whole (text layer and fonts too); a one-page PDF or an image is one page, itself, so a
+    page is sent as its file is. A file pdfium can't open is sent as it is too: its system says what it
+    makes of it."""
     import pypdfium2 as pdfium
 
     if doc.suffix.lower() != ".pdf":
         return [doc]
     out = []
     with _LOCK:
-        src = pdfium.PdfDocument(doc)
         try:
+            src = pdfium.PdfDocument(doc)
+        except pdfium.PdfiumError:
+            return [doc]
+        try:
+            if len(src) == 1:
+                return [doc]
             for i in range(len(src)):
                 one = pdfium.PdfDocument.new()
                 try:

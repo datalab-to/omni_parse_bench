@@ -12,7 +12,7 @@ from omni_bench_core import adapter
 
 from ... import markdown, views
 from .. import contract, errors, http, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -30,7 +30,7 @@ LABELS = {
 
 
 @dataclasses.dataclass(frozen=True)
-class Infinity(PageAdapter):
+class Infinity(Parser):
     """Where the Infinity-Parser2 server (serve/infinity-parser2/) answers, the model it serves, and its sampling
     (the SDK's by default).
 

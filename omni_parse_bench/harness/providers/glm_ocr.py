@@ -11,7 +11,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import PageAdapter
+from ..adapter import Parser
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "zai-org/GLM-OCR"
@@ -32,7 +32,7 @@ _TAG = re.compile(r"<[^>]+>")
 
 
 @dataclasses.dataclass(frozen=True)
-class GlmOcr(PageAdapter):
+class GlmOcr(Parser):
     """Where the GLM-OCR server (serve/glm-ocr/) answers.
 
     Run as its SDK documents it (github.com/zai-org/GLM-OCR, "Self-host with vLLM / SGLang" and "SDK Server",
