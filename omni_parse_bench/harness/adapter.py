@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import abc
 import dataclasses
+import tempfile
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -15,7 +16,7 @@ from omni_bench_core import adapter
 
 from omni_parse_bench.task import Input
 
-from . import budget, contract, errors
+from . import budget, contract, errors, raster
 
 # A 403 that refuses this page's content, not the account (OpenRouter's moderation flag).
 PAGE_REFUSALS = ("moderation", "flagged")
@@ -59,6 +60,9 @@ class PageAdapter(adapter.Adapter[Input]):
         SUPPORTS    the outputs the system can produce; `requests` is given only those a page wants
         ENV         in words, what else the environment can hold for it, such as an optional token
         SERVE       its folder in providers/serve/, for a model you serve yourself
+
+    `document` reads a whole document, page by page, for code that holds one (an extraction pipeline that OCRs
+    its PDF first); the benchmark itself sends one page, as its rows are.
 
     `call` makes a page's requests in order, within the page's one time budget, and keeps each answer whole.
     A page that wants none of `SUPPORTS` gets no call, and its tests fail as "no <output> output" without
@@ -129,6 +133,19 @@ class PageAdapter(adapter.Adapter[Input]):
             job = job or got.job_id
         return adapter.Call(raw=answers, cost=adapter.Cost.total(costs), job_id=job,
                             sent=[a["sent"] for a in answers])
+
+    def document(self, doc: Path, wants: frozenset[str], *, timeout: float) -> list[dict[str, Any]]:
+        """Every page of `doc` (a PDF, or an image as one page), in order, as this system reads a page: one
+        record per page, as the core's `predict` makes it (`output`, `raw`, `error`, `cost`, ...), within one
+        budget. A page that fails is its record's `error`; an account failure, a refused connection or a bug
+        is raised, as in a run. `adapter.reread` reads a page's record again with no call.
+
+        By default the PDF is split into one-page files (`raster.pages`), each sent as the benchmark sends a
+        page. A system whose vendor reads a whole document may override it to send the file once."""
+        clock = budget.Budget(timeout)
+        with tempfile.TemporaryDirectory() as folder:
+            pages = raster.pages(doc, Path(folder))
+            return [adapter.predict(self, Input(p, wants), timeout=clock.remaining()) for p in pages]
 
     def account_failure(self, e: errors.SystemFailed) -> bool:
         """The core's rule, and a 403 too, unless it is a moderation flag on this page's content."""

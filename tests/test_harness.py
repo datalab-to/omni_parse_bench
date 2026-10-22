@@ -187,6 +187,74 @@ def test_a_saved_answer_is_read_again_without_a_call(tmp_path):
     assert core.reread(Stub(), x, r | {"output": None})["output"] == r["output"]
 
 
+
+def pdf(path, texts):
+    """A PDF with one page per text, each page's text layer that text, written out by hand."""
+    font = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    objs = [b"<< /Type /Catalog /Pages 2 0 R >>", None, font]
+    kids = []
+    for t in texts:
+        stream = f"BT /F1 12 Tf 20 50 Td ({t}) Tj ET".encode()
+        objs.append(b"<< /Length %d >>\nstream\n%s\nendstream" % (len(stream), stream))
+        objs.append(b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] "
+                    b"/Resources << /Font << /F1 3 0 R >> >> /Contents %d 0 R >>" % len(objs))
+        kids.append(len(objs))
+    objs[1] = b"<< /Type /Pages /Kids [%s] /Count %d >>" % (b" ".join(b"%d 0 R" % k for k in kids), len(kids))
+    out, offsets = bytearray(b"%PDF-1.4\n"), []
+    for i, o in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n%s\nendobj\n" % (i, o)
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    out += b"".join(b"%010d 00000 n \n" % x for x in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    path.write_bytes(bytes(out))
+    return path
+
+
+def text(page):
+    """A one-page PDF's text layer."""
+    import pypdfium2 as pdfium
+
+    doc = pdfium.PdfDocument(page)
+    try:
+        assert len(doc) == 1
+        return doc[0].get_textpage().get_text_range().strip()
+    finally:
+        doc.close()
+
+
+@dataclasses.dataclass(frozen=True)
+class Reads(Stub):
+    """The stub, answering with its page's own text; a page whose text is "bad" is a failed call."""
+
+    def send(self, page, request, *, timeout):
+        said = text(page)
+        if said == "bad":
+            raise errors.SystemFailed("the vendor refused this page", status=400)
+        return contract.Call({"html": f"<p>{said}</p>"}, cost=contract.Cost(usd=0.01))
+
+
+def test_a_document_is_read_page_by_page_in_order_each_page_its_own_record(tmp_path):
+    doc = pdf(tmp_path / "doc.pdf", ["one", "bad", "three"])
+    got = Reads().document(doc, frozenset({"html"}), timeout=60)
+    assert [r["output"] for r in got] == [{"html": "<p>one</p>"}, None, {"html": "<p>three</p>"}]
+    # a failed page is its record's error, and the others are still read
+    assert got[1]["error"]["message"] == "the vendor refused this page" and got[0]["cost"]["usd"] == 0.01
+    # each page is sent as a one-page file, its text layer copied with it
+    assert [text(p) for p in harness.raster.pages(doc, tmp_path)] == ["one", "bad", "three"]
+    # a page's record is read again with no call, as a run's is
+    again = core.reread(Reads(), harness.Input(doc, frozenset({"html"})), got[2] | {"output": None})
+    assert again["output"] == got[2]["output"]
+
+
+def test_an_image_is_a_document_of_one_page_and_a_page_is_never_read_as_its_first_page(tmp_path):
+    (png := tmp_path / "p.png").write_bytes(b"png")
+    assert harness.raster.pages(png, tmp_path) == [png]
+    with pytest.raises(ValueError, match="has 2 pages; a page is one: split it with raster.pages"):
+        harness.raster.render(pdf(tmp_path / "two.pdf", ["a", "b"]), lambda size: 1.0)
+
+
 def test_a_parse_that_raises_a_bug_keeps_the_answer_unread(tmp_path, monkeypatch):
     """A KeyError in `parse` is a bug, not the system's failure: it isn't counted 0, and the answer is kept,
     unread, for the fixed `parse` to read."""

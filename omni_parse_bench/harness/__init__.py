@@ -1,11 +1,12 @@
 """Producing predictions: opb's adapters, one per parsing system (`pip install 'omni-parse-bench[harness]'`).
 
-    adapter.py       `PageAdapter`, the base class of every adapter; its docstring says how to write one
+    adapter.py       `PageAdapter`, the base class of every adapter; its docstring says how to write one, and
+                     its `document` reads a whole document page by page
     contract.py      `Request`, `Call` and `Cost`: one call to a system and its answer
     errors.py        how a call fails, whether a retry can fix it, and a model server that isn't running
     budget.py        one page's share of the clock
     layout.py        a system's layout blocks as the `blocks` output
-    raster.py        a PDF page as an image, for systems that take images
+    raster.py        a PDF page as an image, for systems that take images; a document as its pages
     http.py          a JSON POST to a model server
     registry.py      which adapter a provider name means, made from a config's options
     providers/       one module per system
