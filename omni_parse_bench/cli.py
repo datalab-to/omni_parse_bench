@@ -299,8 +299,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     calling a system, unless given `-y` or run with no terminal; any answer but yes exits 1. An interrupt
     exits 130. Anything else is raised as it is, a native exception whose message says what to do.
 
-    Some commands and flags from before 1.0 still work, and each prints what replaced it, or that it is ignored;
-    `opb run`'s old flags are gone:
+    Some commands and flags from before 1.0 still work, and each prints what replaced it, or that it is
+    ignored; `opb run`'s old flags are gone:
 
         opb providers      is `opb systems`
         opb reparse        is `opb reread`; `--add` is no longer possible
