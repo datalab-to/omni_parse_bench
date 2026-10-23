@@ -226,10 +226,11 @@ that is missing stops a run before any call and says which `export` to type.
 | a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2: html) | kept: vendor defaults that leave them out turned off | none; OPB_ENDPOINT_KEY, when the server has one |
 | `tesseract` | the local `tesseract` binary, no model of the page | html | kept: it has no notion of them | none |
 
-A vendor's tiers are runs of their own, one command each, with the same choice of pages:
+A vendor's tiers are runs of their own, one config each (or one config and `--set`), with the same pages:
 
-    opb run --system datalab --options '{"mode": "balanced"}' --sample 20
-    opb run --system datalab --options '{"mode": "accurate"}' --sample 20
+    opb init datalab > datalab.yaml
+    opb run --config datalab.yaml --set system.datalab.mode=balanced --set rows.sample=20
+    opb run --config datalab.yaml --set system.datalab.mode=accurate --set rows.sample=20
 
 `opb systems` lists each vendor's options. Any OpenRouter model id works (`openai/gpt-5.6-sol`, ...).
 
@@ -290,7 +291,8 @@ that deploys it on any GPU host, and opb then benchmarks it from anywhere, point
 
     docker build -t opb-dots-mocr omni_parse_bench/harness/providers/serve/dots-mocr
     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-dots-mocr
-    opb run --system dots-mocr --options '{"base_url": "http://<host>:8001"}'
+    opb init dots-mocr > dots.yaml
+    opb run --config dots.yaml --set system.dots-mocr.base_url=http://<host>:8001
 
 If nothing listens at `base_url` (the server isn't started, or the address is wrong), the connection is
 refused and the run stops before recording anything, with a message naming the address and the model's

@@ -75,27 +75,30 @@ limits.
 From the command line:
 
 ```bash
-opb run --system datalab --options '{"mode": "accurate"}' --sample 20
-opb run --system openai/gpt-5.6-sol --sample 20      # the same pages: the two runs compare
-opb run --system tesseract --sample 5
+opb init datalab > datalab.yaml                     # a config: one run, every key written out
+opb init openai/gpt-5.6-sol > gpt.yaml
+opb run --config datalab.yaml --set system.datalab.mode=accurate --set rows.sample=20
+opb run --config gpt.yaml --set rows.sample=20       # the same pages: the two runs compare
+opb run --config runs/<run>/config.yaml             # the same question again, as a new run
 ```
 
-`opb run` takes `--dataset`, `--manifest`, `--out`, `--limit`, `--sample`, `--only` (a file of
-page ids), `--timeout`, `--workers N` (pages at once), `--resume RUN` and `--retry-failed` (with `--resume`); `opb run --help` shows each one's default. It
-shows the plan and asks before calling a system, unless given `-y` or run with no terminal; any answer but
-yes (Ctrl-D too) prints "not run" and exits 1. It then shows a live table of the run's progress, and prints
-its grading as JSON. `--options` is the system's options, as for `opb predict`; `{"datalab": {...}}`, keyed
-by the one system's name, is taken too, and an object keyed by other systems is refused. `opb --version`
-prints the version.
+A run is one config, omni-bench-core's (its `config` module): `dataset`, `manifest`, `scorers`, `rows`
+(`sample` N evenly spaced, `limit` the first N, 0 for every page, or `only` these ids), `timeout`, `workers`
+and `system`, one system and every option it has. Nothing has a default and nothing comes from another file,
+so the file says the whole run; a missing key, an unknown one or a value of the wrong kind is refused at its
+key. `opb init <system>` writes one with every option at its default (`--dataset` and `--manifest` for another
+dataset). `--set path=value` changes one value the file has, read as YAML; a path it hasn't is refused, with the
+nearest one it has. The run folder keeps the config, every `--set` applied, as `config.yaml`.
 
-Flags from before 1.0 still work, and each prints what replaced it: `opb benchmark` (`opb run`), `opb
-providers` (`opb systems`), `opb reparse` (`opb reread`), `--provider` (`--system`), `--systems NAME` and `--providers NAME` on `opb run` (`--system`), `--pages` (`--only`), `--wants` (`--outputs`) and `--score-only` (`opb grade`). `--outputs`
-on `opb run`, `opb grade` and `opb score`, and `--unsupported`, are accepted and ignored, with a warning:
-each page asks for the outputs its tests read, and every test is graded.
+`opb run` also takes `--out`, `--resume RUN` and `--retry-failed` (with `--resume`). It shows the plan and asks
+before calling a system, unless given `-y` or run with no terminal; any answer but yes (Ctrl-D too) prints "not
+run" and exits 1. It then shows a live table of the run's progress, and prints its grading as JSON. `opb
+--version` prints the version.
 
-A run is one system, so several systems means one command per system, with the same choice of pages.
-`opb run` given several names (under `--system`, `--systems` or `--providers`) runs nothing, and raises a
-`ValueError` whose message is the command for each system, each with its own options.
+Flags from before 1.0 still work, and each prints what replaced it: `opb providers` (`opb systems`), `opb
+reparse` (`opb reread`), `--provider` (`--system`) and `--wants` (`--outputs`) on `opb predict`. `--outputs` on
+`opb grade` and `opb score`, and `--unsupported`, are accepted and ignored, with a warning: each page asks for
+the outputs its tests read, and every test is graded.
 
 
 ## Score
@@ -132,7 +135,7 @@ opb reread runs/datalab-1a2b3c4d     # read a run's saved answers again after a 
 the outputs, the error if the page failed, what was sent, and the cost. The raw answers are left out unless
 `--raw`. It exits 1 when the page failed. A page file has no manifest row, so it asks for every output
 the system supports, or for `--outputs`: asking for html alone tries a page with fewer calls (the LLM
-adapter makes one call per output). An adapter that crashes is reported as a bug, naming its package. `--options` takes the system's options, `{"mode": "fast"}`, as `opb run` does. The keys each system needs are in the
+adapter makes one call per output). An adapter that crashes is reported as a bug, naming its package. `--options` takes the system's options, `{"mode": "fast"}`, or the same keyed by the system's name. The keys each system needs are in the
 [README's table](https://github.com/datalab-to/omni_parse_bench/blob/main/README.md#run-the-benchmark).
 
 ```python
@@ -265,8 +268,8 @@ dataset that passes prints `{"ok": true, "manifest": ..., "pages": N, "suites": 
 being the distinct page files (fewer than `pages` when pages share one).
 
 `opb tests` writes every test as a JSON line, with its page's `page_id`, `suite` and `document`: a flat table
-to query with DuckDB, polars or pandas. To run only some pages, collect their ids into a file and pass it to
-`opb run --only`.
+to query with DuckDB, polars or pandas. To run only some pages, collect their ids into the config's
+`rows.only`.
 
 
 ## Grading

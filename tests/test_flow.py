@@ -12,6 +12,7 @@ import json
 import socket
 import subprocess
 import sys
+from pathlib import Path
 from typing import ClassVar
 
 import pytest
@@ -21,9 +22,23 @@ pytest.importorskip("openai")
 pa = pytest.importorskip("pyarrow")
 pq = pytest.importorskip("pyarrow.parquet")
 
+from omni_bench_core import config  # noqa: E402
+
 from omni_parse_bench import benchmark, cli, harness  # noqa: E402
 from omni_parse_bench.harness import contract  # noqa: E402
 from omni_parse_bench.harness import errors as harness_errors  # noqa: E402
+
+
+def configured(system: str, data: str, *sets: str) -> list[str]:
+    """`opb run` of the config `opb init` writes for `system` on dataset `data`, written beside it, each of
+    `sets` (`path=value`) given as `--set`."""
+    import yaml
+
+    c = config.template(harness.system, system, dataset=data, manifest="manifest.parquet",
+                        scorers={"unit_tests": {}}, timeout=900)
+    path = Path(data).parent / f"{system}.yaml"
+    path.write_text(yaml.safe_dump(c, sort_keys=False))
+    return ["run", "--config", str(path), *[x for kv in sets for x in ("--set", kv)]]
 
 
 def raised(argv: list[str], kind: type[BaseException] = ValueError) -> str:
@@ -167,10 +182,8 @@ def test_opb_grade_grades_a_folder_of_your_own(tmp_path, capsys):
 def test_outputs_is_accepted_with_a_warning_and_ignored(tmp_path, capsys, monkeypatch):
     monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
     data = dataset(tmp_path / "data", 2)
-    assert cli.main(["run", "--system", "alpha", "--dataset", data, "--out", str(tmp_path / "runs"),
-                     "--outputs", "html", "-y"]) == 0
+    assert cli.main([*configured("alpha", data), "--out", str(tmp_path / "runs"), "-y"]) == 0
     out, err = capsys.readouterr()
-    assert "opb: --outputs is deprecated and ignored: each page asks for the outputs its tests read" in err
     g = json.loads(out)
     [s] = g["scorers"].values()
     assert set(s["scored"]["families"]) == {"text", "layout"} and s["options"] == {}, s
@@ -209,8 +222,7 @@ def test_a_missing_key_is_refused_before_any_call_and_any_folder(tmp_path, capsy
     monkeypatch.setitem(harness.ADAPTERS, "keyed", Keyed)
     monkeypatch.delenv("OPB_TEST_KEY", raising=False)
     CALLS.clear()
-    argv = ["run", "--system", "keyed", "--dataset", dataset(tmp_path / "data"), "--out",
-            str(tmp_path / "runs"), "-y"]
+    argv = [*configured("keyed", dataset(tmp_path / "data")), "--out", str(tmp_path / "runs"), "-y"]
     assert "export OPB_TEST_KEY=..." in raised(argv)
     assert CALLS == [] and not (tmp_path / "runs").exists()
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
@@ -237,8 +249,8 @@ def test_a_server_that_isnt_running_stops_the_run_with_nothing_recorded(tmp_path
         s.bind(("127.0.0.1", 0))
         url = f"http://127.0.0.1:{s.getsockname()[1]}"
     monkeypatch.setitem(harness.ADAPTERS, "served", Served)
-    argv = ["run", "--system", "served", "--options", json.dumps({"base_url": url}), "--dataset",
-            dataset(tmp_path / "data"), "--out", str(tmp_path / "runs"), "-y"]
+    argv = [*configured("served", dataset(tmp_path / "data"), f"system.served.base_url={url}"), "--out",
+            str(tmp_path / "runs"), "-y"]
     err = raised(argv, Exception)     # the connection error itself (httpx.ConnectError), with notes
     assert f"no server at {url}" in err and "providers/serve/chandra-ocr" in err, err
     [run] = (tmp_path / "runs").iterdir()
@@ -277,7 +289,7 @@ def test_opb_help_lists_no_hidden_command_and_takes_no_abbreviation(capsys):
     out = capsys.readouterr().out
     assert "SUPPRESS" not in out and "reparse" not in out
     with pytest.raises(SystemExit):
-        cli.main(["run", "--sys", "alpha"])
+        cli.main(["run", "--conf", "x.yaml"])
 
 
 def test_opb_check_says_a_dataset_is_runnable_or_names_a_missing_page(tmp_path, capsys):
@@ -335,18 +347,7 @@ def test_old_commands_still_work_and_say_what_replaced_them(tmp_path, capsys, mo
     """The commands and flags from before 1.0 work as before, each with a deprecation line."""
     monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
     data = dataset(tmp_path / "data", 2)
-    runs = str(tmp_path / "runs")
-    assert cli.main(["benchmark", "--providers", "alpha", "--dataset", data, "--out", runs, "-y"]) == 0
-    assert "`opb benchmark` is deprecated" in capsys.readouterr().err
-    CALLS.clear()
-    [name] = [p.name for p in (tmp_path / "runs").iterdir()]
-    assert cli.main(["run", "--providers", "alpha", "--dataset", data, "--out", runs, "--score-only",
-                     "--resume", name]) == 0
-    out, err = capsys.readouterr()
-    assert CALLS == [] and "--score-only is deprecated" in err
-    [s] = json.loads(out)["scorers"].values()
-    assert s["headline"] == 0.5, s
-
+    benchmark.default(data).run(Alpha(), tmp_path / "runs")
     [folder] = (tmp_path / "runs").iterdir()
     CALLS.clear()
     assert cli.main(["reparse", str(folder)]) == 0
@@ -355,20 +356,12 @@ def test_old_commands_still_work_and_say_what_replaced_them(tmp_path, capsys, mo
     raised(["reparse", str(folder), "--add", "blocks"])
     capsys.readouterr()
 
-    (tmp_path / "ids.txt").write_text("a-p0\n")
-    assert cli.main(["run", "--providers", "alpha", "--dataset", data, "--out", str(tmp_path / "old"),
-                     "--pages", str(tmp_path / "ids.txt"), "-y"]) == 0
-    err = capsys.readouterr().err
-    assert all(f"{x} is deprecated" in err for x in ("--providers", "--pages")), err
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
     assert cli.main(["predict", "--provider", "alpha", "--page", str(pdf), "--wants", "html"]) == 0
     err = capsys.readouterr().err
     assert all(f"{x} is deprecated" in err for x in ("--provider", "--wants")), err
     assert cli.main(["providers"]) == 0
     assert "`opb providers` is deprecated" in capsys.readouterr().err
-    with pytest.raises(SystemExit):
-        cli.main(["run", "--providers", "alpha", "--systems", "alpha", "--dataset", data, "-y"])
-    assert "not allowed with argument" in capsys.readouterr().err
 
 
 def test_opb_reread_reads_a_runs_saved_answers_again(tmp_path, capsys, monkeypatch):
@@ -378,7 +371,7 @@ def test_opb_reread_reads_a_runs_saved_answers_again(tmp_path, capsys, monkeypat
     data = dataset(tmp_path / "data", 2)
     monkeypatch.setattr(sys.modules[__name__], "WRONG", {"a-p0", "a-p1"})
     CALLS.clear()
-    argv = ["run", "--system", "alpha", "--dataset", data, "--out", str(tmp_path / "runs"), "-y"]
+    argv = [*configured("alpha", data), "--out", str(tmp_path / "runs"), "-y"]
     assert cli.main(argv) == 0
     g = json.loads(capsys.readouterr().out)
     [s] = g["scorers"].values()
@@ -405,8 +398,7 @@ def test_a_bug_in_parse_stops_the_run_and_resuming_reads_it_again(tmp_path, caps
     the fix resuming the run reads it with no call."""
     monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
     monkeypatch.setattr(sys.modules[__name__], "BROKEN", {"a-p0"})
-    argv = ["run", "--system", "alpha", "--dataset", dataset(tmp_path / "data", 1), "--out",
-            str(tmp_path / "runs"), "-y"]
+    argv = [*configured("alpha", dataset(tmp_path / "data", 1)), "--out", str(tmp_path / "runs"), "-y"]
     CALLS.clear()
     with pytest.raises(KeyError) as got:
         cli.main(argv)
@@ -481,18 +473,17 @@ def test_no_or_ctrl_d_at_the_prompt_runs_nothing(tmp_path, capsys, monkeypatch, 
     monkeypatch.setattr(sys, "stdin", io.StringIO(answer))
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     CALLS.clear()
-    assert cli.main(["run", "--system", "alpha", "--dataset", dataset(tmp_path / "data", 1), "--out",
-                     str(tmp_path / "runs")]) == 1
+    argv = [*configured("alpha", dataset(tmp_path / "data", 1)), "--out", str(tmp_path / "runs")]
+    assert cli.main(argv) == 1
     err = capsys.readouterr().err
     assert err.rstrip().endswith("opb run: not run") and "Traceback" not in err and CALLS == [], err
 
 
-def test_opb_run_help_shows_defaults_and_system_as_required(capsys):
+def test_opb_run_help_shows_the_config_as_required(capsys):
     with pytest.raises(SystemExit):
         cli.main(["run", "--help"])
     out = " ".join(capsys.readouterr().out.split())
-    assert "seconds per page (default: 900)" in out and "(default: the system's own)" in out, out
-    assert "--system NAME" in out and "[--system" not in out and "--systems" not in out, out
+    assert "--config YAML" in out and "[--config" not in out and "[--set PATH=VALUE]" in out, out
 
 
 @dataclasses.dataclass(frozen=True)
@@ -511,68 +502,33 @@ def test_opb_predict_raises_a_crash_as_it_is(tmp_path, capsys, monkeypatch):
     assert got.value.__notes__[0].startswith("Crashes raised this while predicting"), got.value.__notes__
 
 
-@pytest.mark.parametrize("flag", ["--system", "--systems", "--providers"])
-def test_several_systems_are_refused_with_one_command_each(tmp_path, capsys, monkeypatch, flag):
-    """Before anything is planned, called or created: the message gives one command per system, with the
-    other flags as given and each system's own options."""
-    monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
-    monkeypatch.setitem(harness.ADAPTERS, "tagged", Tagged)
-    CALLS.clear()
-    out_dir = tmp_path / "runs"
-    argv = ["run", flag, "alpha", "tagged", "--sample", "5", "--out", str(out_dir), "--options",
-            json.dumps({"tagged": {"tag": "y z"}}), "-y"]
-    err = raised(argv)
-    assert err == (
-        "a run is one system, but 2 were given (alpha, tagged). Run one command per system:\n"
-        f"    opb run --system alpha --sample 5 --out {out_dir} -y\n"
-        f"    opb run --system tagged --options '{{\"tag\": \"y z\"}}' --sample 5 --out {out_dir} -y\n"
-        "Use the same --sample (or --limit, --only) in each, so they answer the same rows."), err
-    assert capsys.readouterr().out == "" and CALLS == [] and not out_dir.exists()
-
-
-@pytest.mark.parametrize("flag", ["--systems", "--providers"])
-def test_one_system_under_an_old_flag_is_the_deprecated_system(tmp_path, capsys, monkeypatch, flag):
-    monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
-    argv = ["run", flag, "alpha", "--dataset", dataset(tmp_path / "data", 1), "--out", str(tmp_path / "runs"),
-            "-y"]
-    assert cli.main(argv) == 0
-    out, err = capsys.readouterr()
-    assert f"{flag} is deprecated and will be removed in a later release; use --system" in err, err
-    assert json.loads(out)["run"].startswith("alpha")
-
-
 @dataclasses.dataclass(frozen=True)
 class Tagged(Alpha):
     name: ClassVar[str] = "tagged"
     tag: str = "x"
 
 
-def test_opb_run_takes_one_system_and_its_bare_options(tmp_path, capsys, monkeypatch):
+def test_opb_init_writes_a_config_and_a_run_folder_keeps_it(tmp_path, capsys, monkeypatch):
+    """`opb init` writes every option at its default; `--set` changes one; the run folder's config.yaml, given
+    back, asks the same question."""
     monkeypatch.setitem(harness.ADAPTERS, "tagged", Tagged)
     data = dataset(tmp_path / "data", 1)
-    argv = ["run", "--system", "tagged", "--dataset", data, "--out", str(tmp_path / "runs"), "-y"]
-    assert cli.main([*argv, "--options", '{"tag": "y"}']) == 0
+    assert cli.main(["init", "tagged", "--dataset", data]) == 0
+    (c := tmp_path / "tagged.yaml").write_text(capsys.readouterr().out)
+    assert "tag: x" in c.read_text() and "timeout: 900.0" in c.read_text()
+    argv = ["run", "--config", str(c), "--out", str(tmp_path / "runs"), "-y"]
+    assert cli.main([*argv, "--set", "system.tagged.tag=y", "--set", "workers=2"]) == 0
     out, err = capsys.readouterr()
     g = json.loads(out)
-    assert set(g) == {"run", "cost", "scorers"} and "deprecated" not in err, (g, err)
+    assert set(g) == {"run", "cost", "scorers"} and "2 at a time" in err, (g, err)
     said = json.loads((tmp_path / "runs" / g["run"] / "settings.json").read_text())
     assert said["options"] == {"tag": "y"}, said
-    assert cli.main([*argv, "--options", '{"tagged": {"tag": "y"}}', "--resume", g["run"]]) == 0
-    assert json.loads(capsys.readouterr().out)["run"] == g["run"], "the keyed shape is the same question"
-    monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
-    err = raised([*argv, "--options", '{"alpha": {}}'])
-    assert "--options is keyed by alpha, but this command runs tagged" in err, err
-
-
-def test_opb_run_workers_is_one_number(tmp_path, capsys, monkeypatch):
-    monkeypatch.setitem(harness.ADAPTERS, "alpha", Alpha)
-    argv = ["run", "--system", "alpha", "--dataset", dataset(tmp_path / "data", 1), "--out",
-            str(tmp_path / "runs"), "-y"]
-    assert cli.main([*argv, "--workers", "2"]) == 0
-    assert "2 at a time" in capsys.readouterr().err
-    with pytest.raises(SystemExit):
-        cli.main([*argv, "--workers", '{"alpha": 2}'])
-    assert "invalid int value" in capsys.readouterr().err
+    kept = tmp_path / "runs" / g["run"] / "config.yaml"
+    assert cli.main(["run", "--config", str(kept), "--out", str(tmp_path / "runs"), "-y",
+                     "--resume", g["run"]]) == 0
+    assert json.loads(capsys.readouterr().out)["run"] == g["run"], "the kept config is the same question"
+    assert "did you mean system.tagged.tag?" in raised([*argv, "--set", "system.tagged.tga=y"])
+    assert "workers:" in raised([*argv, "--set", "workers=two"])
 
 
 def test_a_page_with_no_suite_is_in_other():

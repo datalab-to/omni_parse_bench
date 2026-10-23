@@ -1,7 +1,7 @@
 """The `opb` command: a thin wrapper over `benchmark.default()` and the scorer.
 
-    opb run --system datalab --sample 20                           # predict one system, then grade: a new run
-    opb run --system datalab --options '{"mode": "accurate"}'      # its options, as for `opb predict`
+    opb init datalab > datalab.yaml                                # a config: one run, every key written out
+    opb run --config datalab.yaml --set rows.sample=20             # predict its system, then grade: a new run
     opb grade RUN_DIR [--partial]                                  # a folder of predictions/, yours or a run
     opb reread RUN_DIR [RUN_DIR ...]                               # read saved answers again, after a fix
     opb score --pred outputs.json --gold gold/<page_id>.json       # one page's verdicts
@@ -10,8 +10,9 @@
     opb tests --dataset <folder or hf://...> > tests.jsonl         # every test as a JSON line
     opb systems [NAME]                                             # the systems, or one's options
 
-A run is one system: to run several, run one command per system, with the same --sample (or --limit or
---only). `opb run` given several systems runs nothing, and prints those commands.
+A run is one config (omni-bench-core's `config`): the dataset, its manifest, the scorers, which rows, and
+one system with every option. `--set path=value` changes one value the file has. To compare systems, write
+one config per system, with the same `rows`. Each run folder keeps its config, resolved, as `config.yaml`.
 """
 from __future__ import annotations
 
@@ -21,12 +22,12 @@ import functools
 import importlib.metadata
 import json
 import logging
-import shlex
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from omni_bench_core import config
 from omni_bench_core import run as runs
 
 from omni_parse_bench import data, errors, vocab
@@ -50,7 +51,6 @@ def ignored(old: str, why: str) -> None:
 # Note: each pre-1.0 flag that was renamed, as (its dest, the new flag's dest, the old flag, the new flag).
 RENAMED = (
     ("provider", "system", "--provider", "--system"),
-    ("pages", "only", "--pages", "--only"),
     ("wants", "outputs", "--wants", "--outputs"),
 )
 
@@ -117,17 +117,9 @@ def read_json(value: str | None, flag: str) -> Any:
         raise ValueError(f"{flag} {value!r} is neither JSON nor a JSON file: {e}") from None
 
 
-def read_ids(path: Path, flag: str) -> frozenset[str]:
-    """A file of ids, one per line; blank lines and `#` comments are skipped."""
-    if not path.is_file():
-        raise ValueError(f"{flag} {path}: no such file; it holds ids, one per line")
-    return frozenset(x for line in path.read_text(encoding="utf-8-sig").splitlines()
-                     if (x := line.split("#", 1)[0].strip()))
-
-
 def bare(name: str, options: Any) -> Any:
-    """`--options` for the one system `name`: the bare object, or `{name: {...}}`. An object keyed by other
-    systems is refused: a command runs one system."""
+    """`--options` of `opb predict` for the one system `name`: the bare object, or `{name: {...}}`. An
+    object keyed by other systems is refused: a command runs one system."""
     from omni_parse_bench import harness
 
     if not isinstance(options, dict) or not options or not all(isinstance(v, dict) for v in options.values()):
@@ -140,63 +132,35 @@ def bare(name: str, options: Any) -> Any:
     return options
 
 
-def one_system(a: argparse.Namespace, argv: Sequence[str]) -> None:
-    """Sets `a.system` to the one system `opb run` was given. One name under the old `--systems` or
-    `--providers` is the deprecated spelling of `--system`. Several names are refused, before anything is
-    planned or called, with one command per system built from `argv`."""
-    flag, names = next((f, v) for f, v in (("--system", a.system), ("--systems", a.systems),
-                                            ("--providers", a.providers)) if v)
-    if len(names) == 1:
-        if flag != "--system": deprecated(flag, "--system")
-        a.system = names[0]
-        return
-    options = read_json(a.options, "--options")
-    keyed = (isinstance(options, dict) and options and set(options) <= set(names)
-             and all(isinstance(v, dict) for v in options.values()))
-    rest, skip = [], False
-    for x in argv[1:]:
-        if x.split("=", 1)[0] in ("--system", "--systems", "--providers", "--options"):
-            skip = "=" not in x
-            continue
-        if skip and not x.startswith("-"): continue
-        skip = False
-        rest.append(x)
-    commands = []
-    for n in names:
-        o = options.get(n) if keyed else options
-        more = ["--options", json.dumps(o, ensure_ascii=False)] if o is not None else []
-        commands.append("    " + shlex.join(["opb", "run", "--system", n, *more, *rest]))
-    raise ValueError(f"a run is one system, but {len(names)} were given ({', '.join(names)}). Run one "
-                     "command per system:\n" + "\n".join(commands) + "\nUse the same --sample (or "
-                     "--limit, --only) in each, so they answer the same rows.")
+def cmd_init(a: argparse.Namespace) -> int:
+    """A config for one system on the published dataset, graded by its unit tests, as YAML on stdout:
+    every page, and every option of the system at its default, so the file says the whole run."""
+    import yaml
 
+    from omni_parse_bench import harness
 
-def run_one(a: argparse.Namespace, b: Any, system: Any) -> dict[str, Any] | None:
-    """Plans `system`'s run from the flags, predicts it and grades it; None when the person at the terminal
-    says no. With the deprecated `--score-only`, grades the run `--resume` names and predicts nothing."""
-    if a.score_only and not a.resume:
-        raise ValueError("--score-only grades a run already on disk: name it with --resume <its folder name>, or "
-                         "use opb grade <run folder>")
-    p = b.plan(system, a.out, limit=a.limit, sample=a.sample,
-               only=read_ids(a.only, "--only") if a.only else None, timeout=a.timeout, workers=a.workers,
-               resume=a.resume, retry_failed=a.retry_failed)
-    if a.score_only: return b.grade(p.run)
-    print(b.describe(p), file=sys.stderr)
-    if not a.yes and sys.stdin.isatty() and not proceed(): return None
-    b.predict(p)
-    return b.grade(p.run)
+    c = config.template(harness.system, a.system, dataset=a.dataset, manifest=a.manifest,
+                        scorers={unit_tests.UnitTests.name: {}}, timeout=900)
+    sys.stdout.write(yaml.safe_dump(c, sort_keys=False, width=1000, allow_unicode=True))
+    return 0
 
 
 def cmd_run(a: argparse.Namespace) -> int:
-    from omni_parse_bench import benchmark, harness
+    """Plans the run a config asks, shows the plan and asks, predicts, then grades: a new run, or the one
+    `--resume` names."""
+    from omni_parse_bench import harness, task
 
-    ignore_outputs(a)
-    if a.score_only: deprecated("--score-only", "`opb grade <run folder>`")
-    system = harness.system(a.system, bare(a.system, read_json(a.options, "--options")))
-    if (g := run_one(a, benchmark.default(a.dataset, a.manifest), system)) is None:
+    c = config.load(a.config, a.set)
+    b = config.benchmark(c, task.Parse(), {unit_tests.UnitTests.name: unit_tests.UnitTests})
+    system = config.system(c, harness.system)
+    p = config.plan(c, b, system, a.out, resume=a.resume, retry_failed=a.retry_failed)
+    print(b.describe(p), file=sys.stderr)
+    if not a.yes and sys.stdin.isatty() and not proceed():
         print("opb run: not run", file=sys.stderr)
         return 1
-    print(json.dumps(g, indent=2, default=str, ensure_ascii=False))
+    config.write(c, system, p.run.folder)
+    b.predict(p)
+    print(json.dumps(b.grade(p.run), indent=2, default=str, ensure_ascii=False))
     return 0
 
 
@@ -337,16 +301,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Commands and flags from before 1.0 still work, and each prints what replaced it, or that it is ignored:
 
-        opb benchmark      is `opb run`
         opb providers      is `opb systems`
         opb reparse        is `opb reread`; `--add` is no longer possible
-        --systems NAME     on `opb run` (and `--providers`): is `--system`; several names are refused, with
-                           one command per system to run instead
         --provider         on `opb predict`: is `--system`
-        --pages            on `opb run`: is `--only`
         --wants            on `opb predict`: is `--outputs`
-        --score-only       on `opb run`: grades the runs on disk; use `opb grade`
-        --outputs          on `opb run`, `opb grade` and `opb score`: ignored, since each page asks for the
+        --outputs          on `opb grade` and `opb score`: ignored, since each page asks for the
                            outputs its tests read
         --unsupported      on `opb grade` and `opb score`: ignored"""
     parser = functools.partial(argparse.ArgumentParser, allow_abbrev=False)
@@ -357,36 +316,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     dataset_help = "a dataset folder, or hf://datasets/<repo>[@rev] (default: %(default)s)"
     manifest_help = "which of the dataset's manifests (default: %(default)s)"
 
-    r = sub.add_parser("run", aliases=["benchmark"],
-                       help="predict every page with one system, then grade; a new run, or --resume one")
-    # Note: --system is required unless a deprecated --systems or --providers takes its place; the two are
-    # hidden, so the usage shows `--system NAME` alone. Each takes several names only so that `one_system`
-    # can refuse them with the commands to run instead.
-    who = r.add_mutually_exclusive_group(required=True)
-    who.add_argument("--system", metavar="NAME", nargs="+",
-                     help="the system to run, by name (`opb systems` lists them), or an OpenRouter model id "
-                          "such as openai/gpt-5.6-sol; its run gets its own folder under --out. A run is one "
-                          "system: run one command per system")
-    who.add_argument("--systems", nargs="+", help=argparse.SUPPRESS)
-    who.add_argument("--providers", nargs="+", help=argparse.SUPPRESS)
-    r.add_argument("--options", metavar="JSON",
-                   help='the system\'s options, inline JSON or a file: {"mode": "balanced"} (default: its '
-                        "defaults, `opb systems NAME`)")
-    r.add_argument("--dataset", default=data.DEFAULT_DATASET, help=dataset_help)
-    r.add_argument("--manifest", default=data.MANIFEST, help=manifest_help)
+    n = sub.add_parser("init", help="a config for one system, as YAML on stdout")
+    n.add_argument("system", help="a system (`opb systems`), or an OpenRouter model id")
+    n.add_argument("--dataset", default=data.DEFAULT_DATASET, help=dataset_help)
+    n.add_argument("--manifest", default=data.MANIFEST, help=manifest_help)
+
+    r = sub.add_parser("run", help="predict every page with one config's system, then grade; a new run, or "
+                                   "--resume one")
+    r.add_argument("--config", required=True, metavar="YAML",
+                   help="the run: a config, as `opb init` writes one")
+    r.add_argument("--set", action="append", default=[], metavar="PATH=VALUE",
+                   help="change one value the config has, read as YAML, e.g. rows.sample=20; repeatable")
     r.add_argument("--out", type=Path, default=Path("runs"),
                    help="where run folders go (default: %(default)s)")
-    r.add_argument("--outputs", nargs="+", help=argparse.SUPPRESS)
-    r.add_argument("--limit", type=int, default=0, help="the first N pages (default: every page)")
-    r.add_argument("--sample", type=int, default=0,
-                   help="N pages evenly spaced over the manifest; the same N gives every system the same "
-                        "pages (default: every page)")
-    r.add_argument("--only", type=Path, metavar="FILE",
-                   help="a file of page ids, one per line: only these pages (default: every page)")
-    r.add_argument("--pages", type=Path, help=argparse.SUPPRESS)
-    r.add_argument("--timeout", type=float, default=900, help="seconds per page (default: %(default)g)")
-    r.add_argument("--workers", type=int, default=0, metavar="N",
-                   help="pages at once (default: the system's own)")
     r.add_argument("--resume", metavar="RUN",
                    help="continue the run of this folder name under --out, asking the same question; it pays "
                         "only for pages with no answer yet (default: a new run)")
@@ -394,7 +336,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                    help="with --resume, predict again pages whose failure may not recur: timeouts, outages, 429 "
                         "and 5xx")
     r.add_argument("-y", "--yes", action="store_true", help="don't ask before calling systems")
-    r.add_argument("--score-only", action="store_true", help=argparse.SUPPRESS)   # Note: deprecated.
 
     g = sub.add_parser("grade", help="grade a folder of predictions/<page_id>.json: yours, or a run's")
     g.add_argument("run", help="the folder holding predictions/")
@@ -452,16 +393,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     logging.getLogger().handlers[:] = [handler]
     logging.getLogger().setLevel(logging.WARNING)
     for name in (__package__, "omni_bench_core"): logging.getLogger(name).setLevel(logging.INFO)
-    if a.cmd == "benchmark":
-        deprecated("`opb benchmark`", "`opb run`, which takes the same flags")
-        a.cmd = "run"
     if a.cmd == "providers":
         deprecated("`opb providers`", "`opb systems`")
         a.cmd = "systems"
-    cmd = {"run": cmd_run, "grade": cmd_grade, "score": cmd_score, "predict": cmd_predict, "check": cmd_check,
+    cmd = {"init": cmd_init, "run": cmd_run, "grade": cmd_grade,
+           "score": cmd_score, "predict": cmd_predict, "check": cmd_check,
            "tests": cmd_tests, "systems": cmd_systems, "reread": cmd_reread, "reparse": cmd_reread}[a.cmd]
     try:
-        if a.cmd == "run": one_system(a, argv)
         renamed(a)
         return cmd(a)
     except KeyboardInterrupt:

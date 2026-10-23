@@ -105,13 +105,37 @@ Python 3.12 or newer.
 
 ## Run the benchmark
 
-With `[benchmark]` installed, set the system's key, then run it on the dataset (5 pages here, spread over
-the suites):
+With `[benchmark]` installed, write a config for the system, set its key, then run it on the dataset (5
+pages here, spread over the suites). A config is one run, a YAML file with every key written out: the dataset,
+the manifest, the scorers, which pages, the timeout, the workers, and the system with every option. `opb init`
+writes one with every option at its default, on our dataset:
 
 ```bash
+opb init datalab > datalab.yaml
 export DATALAB_API_KEY=...
-opb run --system datalab --options '{"mode": "accurate"}' --out runs/ --sample 5
+opb run --config datalab.yaml --set system.datalab.mode=accurate --set rows.sample=5 --out runs/
 ```
+
+```yaml
+dataset: hf://datasets/datalab-to/omni_parse_bench
+manifest: manifest.parquet
+scorers:
+  unit_tests: {}
+rows:            # sample N evenly spaced, or limit to the first N (0 for every page), or only these ids
+  sample: 0
+  limit: 0
+  only: null
+timeout: 900.0   # seconds per row
+workers: 0       # rows at once; 0 for the system's own
+system:
+  datalab:
+    mode: balanced
+    ...
+```
+
+`--set path=value` changes one value the file has, read as YAML, and refuses a path it hasn't. Each run folder
+keeps its config as `config.yaml`, every `--set` applied, so `opb run --config runs/<run>/config.yaml` asks the
+same question again.
 
 The first run downloads the whole dataset once (about 1.5 GB, 5,903 files) into the Hugging Face cache, even
 for 5 pages, because grading needs it; later runs read the copy. Tip: set `HF_TOKEN` (or run
@@ -127,27 +151,27 @@ run id (`datalab-1a2b3c4d-20261021-160012-3f9a`). `--resume <that name>` continu
 question only, and pays for no page twice. So each setting of a system is its own run, and a system redeployed
 since an earlier run is never mixed into it.
 
-A run is one system, so to compare systems, or settings of one system, run one command per system, with
-the same choice of pages (`opb run` given several systems runs nothing, and raises a `ValueError` whose
-message is these commands):
+A run is one system, so to compare systems, or settings of one system, write one config per system, with the
+same `rows`:
 
 ```bash
 export OPENROUTER_API_KEY=...
-opb run --system datalab --options '{"mode": "accurate"}' --out runs/ --sample 5 -y
-opb run --system openai/gpt-5.6-sol --out runs/ --sample 5 -y
+opb init openai/gpt-5.6-sol > gpt.yaml
+opb run --config datalab.yaml --set rows.sample=5 --out runs/ -y
+opb run --config gpt.yaml --set rows.sample=5 --out runs/ -y
 ```
 
-Choosing pages:
+Choosing pages, under `rows`:
 
-- `--sample N`: N pages evenly spaced over the manifest; two systems run with the same N get the same pages;
-- `--limit N`: the first N pages; and
-- `--only FILE`: only the page ids in a file, one per line. To run one suite, list its pages (`opb tests`
-  gives each test's page and suite).
+- `sample: N`: N pages evenly spaced over the manifest; two systems run with the same N get the same pages;
+- `limit: N`: the first N pages; and
+- `only: [ids]`: only these page ids. To run one suite, list its pages (`opb tests` gives each test's page and
+  suite).
 
-`--dataset` picks the dataset: a folder, or `hf://datasets/<repo>[@revision]` (ours by default). Each
+`dataset` is a folder, or `hf://datasets/<repo>[@revision]` (ours, as `opb init` writes it). Each
 page asks a system for the outputs its tests read, limited to those the system can produce; a system that
 draws no layout blocks (such as `tesseract`, `nanonets-ocr` and `olmocr`) runs the same way, and
-[Grade](#grade) says how to read its results. `opb run --help` has every option and its default.
+[Grade](#grade) says how to read its results. `opb systems <name>` has every option and its default.
 
 What happens when something goes wrong (a page the system refuses, a timeout, a missing key, a model
 server that isn't running, a bug in an adapter, Ctrl-C) follows one rule, the same for every system:

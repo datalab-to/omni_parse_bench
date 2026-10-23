@@ -355,7 +355,7 @@ omni_parse_bench/
     providers/    one module per vendor (docs/providers.md)
   task.py         the Parse task, and Input: a page in, its html and layout blocks out
   benchmark.py    the benchmark: the Parse task on a dataset, graded by UnitTests
-  cli.py          opb run | grade | score | predict | check | tests | systems
+  cli.py          opb init | run | grade | score | predict | check | tests | systems
 tests/            including test_dataset.py, the dataset's invariants
 docs/
 ```

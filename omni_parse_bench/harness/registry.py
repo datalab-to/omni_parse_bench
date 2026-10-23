@@ -103,10 +103,10 @@ def adapter_class(provider: str) -> type[Parser]:
 
 def system(provider: str, options: dict[str, Any] | None = None) -> Parser:
     """The adapter `provider` names, at `options`, checked (`omni_bench_core.adapter.configure`). A model id
-    is the LLM adapter with that `model`, which can't also be given as an option."""
+    is the LLM adapter with that `model`; a `model` option other than it is refused."""
     options = dict(options or {})
     if MODEL_SEPARATOR in provider:
-        if "model" in options:
+        if options.get("model", provider) != provider:
             raise ValueError(f"{provider}: `model` is the provider name, not an option, so a run is "
                              "never filed under a model it did not use. Run the one you want: "
                              f"{options['model']}")
