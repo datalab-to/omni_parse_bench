@@ -128,7 +128,7 @@ page failed has headline 0 and `scored` null.
 opb systems              # every system, the outputs it can produce, and its key
 opb systems datalab      # one system's options, their defaults and what each does, and its environment
 opb predict --system datalab --page pages/<page_id>.pdf [--outputs html] [--options JSON] [--raw]
-opb reread runs/datalab-1a2b3c4d     # read a run's saved answers again after a fix to `parse`; no call
+opb reread runs/datalab-20261021-160012-3f9a     # read a run's saved answers again after a fix to `parse`; no call
 ```
 
 `opb predict` sends one page through one system and prints its record as JSON (`omni_bench_core.adapter.predict`):
@@ -273,14 +273,14 @@ to query with DuckDB, polars or pandas. To run only some pages, collect their id
 ## Grading
 
 ```bash
-opb grade runs/datalab-1a2b3c4d [--partial]
+opb grade runs/datalab-20261021-160012-3f9a [--partial]
 opb grade mine/ [--dataset ...] [--manifest ...] [--partial]
 ```
 
 ```python
 if __name__ == "__main__":
     benchmark.default().grade("mine/")
-    benchmark.default().grade("runs/datalab-1a2b3c4d", partial=True)
+    benchmark.default().grade("runs/datalab-20261021-160012-3f9a", partial=True)
 ```
 
 A run is graded over the pages it chose (its `settings.json`), on every test of those pages. Its dataset
@@ -309,10 +309,10 @@ To grade another way, write your own scorer and pass it to `omni_bench_core.benc
 ## What a run writes
 
 A run is one system at one setting, on one question, in its own folder under `out`, named for the system
-and a digest of its options and the question. omni-bench-core writes it:
+and a run id; its settings.json keeps the question, which a resume must match. omni-bench-core writes it:
 
 ```
-runs/datalab-1a2b3c4d/
+runs/datalab-20261021-160012-3f9a/
   settings.json                 the system, its options, the dataset, its commit, the manifest, the task,
                                 the pages chosen, and the timeout
   records/<page_id>.json        what each page's calls returned: the outputs, the raw answers, the error
@@ -350,7 +350,7 @@ and one run's pass rate per suite:
 
 ```sql
 select suite, avg((result = 'pass')::int) as score, count(*) as tests
-from read_json('runs/datalab-1a2b3c4d/unit_tests/details/*.jsonl')
+from read_json('runs/datalab-20261021-160012-3f9a/unit_tests/details/*.jsonl')
 group by 1 order by 1;
 ```
 
@@ -361,7 +361,7 @@ it the details lines you select, or test lines you made (`unit_tests.lines`):
 import glob, json
 from omni_parse_bench.scorers import unit_tests
 
-lines = [json.loads(x) for f in glob.glob("runs/datalab-1a2b3c4d/unit_tests/details/*.jsonl")
+lines = [json.loads(x) for f in glob.glob("runs/datalab-20261021-160012-3f9a/unit_tests/details/*.jsonl")
          for x in open(f)]
 unit_tests.summarize([x for x in lines if x["suite"] == "tables"])
 ```

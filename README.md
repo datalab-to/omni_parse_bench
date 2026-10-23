@@ -146,8 +146,8 @@ CI) it goes ahead without asking, so a script runs as written. It then predicts,
 the run's progress, and grades it. The grading is JSON on stdout, and in the run's folder.
 
 A run is one system. A run folder answers one exact question: the system, its options, the dataset, the
-manifest and the pages chosen. Every `opb run` is a new run in a new folder, named after its question and a
-run id (`datalab-1a2b3c4d-20261021-160012-3f9a`). `--resume <that name>` continues it instead, for the same
+manifest and the pages chosen, which its settings.json keeps. Every `opb run` is a new run in a new folder, named
+after its system and a run id (`datalab-20261021-160012-3f9a`). `--resume <that name>` continues it instead, for the same
 question only, and pays for no page twice. So each setting of a system is its own run, and a system redeployed
 since an earlier run is never mixed into it.
 
@@ -238,9 +238,9 @@ Grading compares saved answers with the tests, and calls no system. `opb run` gr
 finishes; to grade again, or to grade predictions you made yourself:
 
 ```bash
-opb grade runs/datalab-1a2b3c4d            # a run: graded on the pages it chose
+opb grade runs/datalab-20261021-160012-3f9a            # a run: graded on the pages it chose
 opb grade mine/                            # your own: mine/predictions/<page_id>.json, every page
-opb grade runs/datalab-1a2b3c4d --partial  # an unfinished run, its missing pages counted as 0
+opb grade runs/datalab-20261021-160012-3f9a --partial  # an unfinished run, its missing pages counted as 0
 ```
 
 A run is graded only when it is finished: every page it chose has an answer or a recorded failure.
@@ -256,7 +256,7 @@ summary looks like this:
 {
   "scorer": "unit_tests",
   "options": {},
-  "run": "datalab-1a2b3c4d",
+  "run": "datalab-20261021-160012-3f9a",
   "headline": 0.648,
   "headline_is": "scored.headline × coverage",
   "rows": 5,

@@ -187,14 +187,15 @@ def test_a_model_without_layout_is_never_asked_for_blocks(tmp_path, monkeypatch)
     assert list(page) == ["html"] and "Title" in views.text(page["html"])
 
 
-def folder(provider: str, **options) -> str:
-    """The run folder's name of `provider` at `options`, on one question."""
-    return runs.stem(harness.system(provider, options), {"dataset": "d", "task": "parse"})
+def folder(provider: str, **options) -> dict:
+    """What a run of `provider` at `options` answers, on one question (`omni_bench_core.run.identity`)."""
+    return runs.identity(harness.system(provider, options), {"dataset": "d", "task": "parse"})
 
 
 def test_an_llm_run_is_named_after_its_model():
-    name = folder("openai/gpt-5.6-sol")
-    assert name.startswith("openai__gpt-5.6-sol-") and name != folder("openai/gpt-5.5")
+    s = harness.system("openai/gpt-5.6-sol")
+    assert runs.folder_name(s, "20261021-160012-3f9a") == "openai__gpt-5.6-sol-20261021-160012-3f9a"
+    assert folder("openai/gpt-5.6-sol") != folder("openai/gpt-5.5")
 
 
 def _adapter(mod):
