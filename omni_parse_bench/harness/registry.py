@@ -107,9 +107,9 @@ def system(provider: str, options: dict[str, Any] | None = None) -> Parser:
     options = dict(options or {})
     if MODEL_SEPARATOR in provider:
         if options.get("model", provider) != provider:
-            raise ValueError(f"{provider}: `model` is the provider name, not an option, so a run is "
-                             "never filed under a model it did not use. Run the one you want: "
-                             f"{options['model']}")
+            raise ValueError(f"{provider}: its `model` is its name, not {options['model']!r}, so a run is "
+                             f"never filed under a model it did not use; to run {options['model']}, write its "
+                             f"config: opb init {options['model']}")
         options["model"] = provider
     try:
         return core.configure(adapter_class(provider), options)

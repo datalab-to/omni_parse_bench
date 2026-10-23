@@ -95,7 +95,7 @@ before calling a system, unless given `-y` or run with no terminal; any answer b
 run" and exits 1. It then shows a live table of the run's progress, and prints its grading as JSON. `opb
 --version` prints the version.
 
-Flags from before 1.0 still work, and each prints what replaced it: `opb providers` (`opb systems`), `opb
+Some flags from before 1.0 still work, and each prints what replaced it: `opb providers` (`opb systems`), `opb
 reparse` (`opb reread`), `--provider` (`--system`) and `--wants` (`--outputs`) on `opb predict`. `--outputs` on
 `opb grade` and `opb score`, and `--unsupported`, are accepted and ignored, with a warning: each page asks for
 the outputs its tests read, and every test is graded.

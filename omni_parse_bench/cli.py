@@ -158,7 +158,7 @@ def cmd_run(a: argparse.Namespace) -> int:
     if not a.yes and sys.stdin.isatty() and not proceed():
         print("opb run: not run", file=sys.stderr)
         return 1
-    config.write(c, system, p.run.folder)
+    config.write(c, b, system, p.run.folder)
     b.predict(p)
     print(json.dumps(b.grade(p.run), indent=2, default=str, ensure_ascii=False))
     return 0
@@ -299,7 +299,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     calling a system, unless given `-y` or run with no terminal; any answer but yes exits 1. An interrupt
     exits 130. Anything else is raised as it is, a native exception whose message says what to do.
 
-    Commands and flags from before 1.0 still work, and each prints what replaced it, or that it is ignored:
+    Some commands and flags from before 1.0 still work, and each prints what replaced it, or that it is ignored;
+    `opb run`'s old flags are gone:
 
         opb providers      is `opb systems`
         opb reparse        is `opb reread`; `--add` is no longer possible

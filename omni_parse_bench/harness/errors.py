@@ -34,7 +34,8 @@ def no_server(exc: BaseException, url: str, system: str, serve: str | None) -> N
     """Adds to a refused connection a note: nothing listens at `url`, and how to start the server or give its
     address."""
     start = f"Start it (how: {SERVE}/{serve})" if serve else "Start the server"
-    where = f"--system {system} --options '{{\"base_url\": \"<its address>\"}}'"
+    where = (f"--set system.{system}.base_url=<its address> (opb run), or --options "
+             f"'{{\"base_url\": \"<its address>\"}}' (opb predict)")
     exc.add_note(f"no server at {url}: the connection was refused, so nothing listens there. {start}, or "
                  f"give its address with {where}; then run the same command again")
 
