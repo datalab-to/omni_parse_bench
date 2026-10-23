@@ -24,7 +24,6 @@ A rewrite of olmOCR-bench's table parser (https://github.com/allenai/olmocr, Apa
 from __future__ import annotations
 
 import functools
-from collections.abc import Iterator
 from typing import Literal, NamedTuple
 
 from omni_parse_bench import views
@@ -188,7 +187,6 @@ def _grid(specs: list[list[tuple[str, int, int, bool]]]) -> Table | None:
     """Places cells on a grid, carrying rowspans down, then links each cell to its neighbours."""
     text: dict[Cell, str] = {}
     headings: set[Cell] = set()
-    extent: dict[Cell, tuple[int, int]] = {}
     grid: list[list[Cell | None]] = []
     carried: list[tuple[Cell, int] | None] = []   # per column: a rowspan still running down
 
@@ -214,7 +212,6 @@ def _grid(specs: list[list[tuple[str, int, int, bool]]]) -> Table | None:
             cell = (r, col)
             text[cell] = t
             if is_heading: headings.add(cell)
-            extent[cell] = (rowspan, colspan)
             carried.extend([None] * max(0, col + colspan - len(carried)))
             for c in range(col, col + colspan):
                 slots.append(cell)
@@ -230,23 +227,26 @@ def _grid(specs: list[list[tuple[str, int, int, bool]]]) -> Table | None:
     width, height = max(used) + 1, len(grid)
     grid = [(row + [None] * width)[:width] for row in grid]
 
-    def first(cell: Cell, cells: Iterator[tuple[int, int]]) -> Cell | None:
-        for r, c in cells:
-            if r < height and (x := grid[r][c]) is not None and x != cell:
-                return x
+    def at(r: int, c: int) -> Cell | None:
+        return grid[r][c] if 0 <= r < height and 0 <= c < width else None
+
+    def first(cell: Cell, r: int, c: int, dr: int, dc: int) -> Cell | None:
+        """The first other cell from slot (r, c) on, stepping by (dr, dc)."""
+        while 0 <= r < height and 0 <= c < width:
+            if (x := grid[r][c]) is not None and x != cell: return x
+            r, c = r + dr, c + dc
         return None
 
-    directions = ("up", "down", "left", "right")
-    rel: dict[str, dict[Cell, set[Cell]]] = {d: {c: set() for c in text} for d in directions}
-    for cell, (rowspan, colspan) in extent.items():
-        r0, c0 = cell
-        r1, c1 = r0 + rowspan - 1, c0 + colspan - 1
-        for r in range(r0, r1 + 1):
-            if x := first(cell, ((r, c) for c in range(c1 + 1, width))): rel["right"][cell].add(x)
-            if x := first(cell, ((r, c) for c in range(c0 - 1, -1, -1))): rel["left"][cell].add(x)
-        for c in range(c0, c1 + 1):
-            if x := first(cell, ((r, c) for r in range(r1 + 1, height))): rel["down"][cell].add(x)
-            if x := first(cell, ((r, c) for r in range(r0 - 1, -1, -1))): rel["up"][cell].add(x)
+    # Note: neighbours are read off the slots each cell holds, not the spans it declares: a later
+    # cell's colspan can cut a rowspan short, and the grid, not the HTML, is what the tests read.
+    steps = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}
+    rel: dict[str, dict[Cell, set[Cell]]] = {d: {c: set() for c in text} for d in steps}
+    for r, row in enumerate(grid):
+        for c, cell in enumerate(row):
+            if cell is None: continue
+            for d, (dr, dc) in steps.items():
+                if at(r + dr, c + dc) == cell: continue
+                if x := first(cell, r + dr, c + dc, dr, dc): rel[d][cell].add(x)
     rows_of: dict[Cell, set[int]] = {}
     cols_of: dict[Cell, set[int]] = {}
     for r, row in enumerate(grid):
