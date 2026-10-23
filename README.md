@@ -179,8 +179,7 @@ server that isn't running, a bug in an adapter, Ctrl-C) follows one rule, the sa
     A page counts 0 only when code says, on purpose, that the system failed, by raising `SystemFailed`.
     Any other exception stops the run and is raised as it is.
 
-The table in [omni-bench-core's "The rules"](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules) says, case by case, what you see, how the
-page counts, and what to do. In short:
+Case by case, what you see, how the page counts, and what to do:
 
 - a failure that is the system's (`SystemFailed`, or its kinds `SystemTimeout` and `SystemUnreachable`)
   counts 0. Its record keeps the error with a `traceback`, which shows the line that decided the system
@@ -232,9 +231,6 @@ with the same `sample` (or `limit`, `only`).
 Every Python snippet that runs a benchmark here sits under `if __name__ == "__main__":`. A scorer or an
 executor that works in several processes starts each one by importing your script again (on macOS and
 Windows), and the guard keeps that import from starting the run a second time.
-
-The loop (planning, predicting, resuming, grading) is [omni-bench-core](https://github.com/datalab-to/omni-bench-core)'s;
-its [OVERVIEW](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md) explains it from the start.
 
 ## Grade
 
@@ -292,8 +288,8 @@ comes from the files: each test's verdict, with its test type, tags and derivati
 `details/<page_id>.jsonl`, and `opb tests` lists every test with its page and suite
 ([docs/API.md](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/API.md#a-slice-of-the-benchmark)).
 
-To grade another way, write your own scorer: a frozen dataclass with `gold(row)` and `score(pred, gold)`.
-[omni-bench-core's OVERVIEW](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#scorer) shows how, and how to run it beside `UnitTests`.
+To grade another way, write your own scorer: a frozen dataclass with `gold(row)`, `score(pred, gold)` and
+`summarize(lines)`, given to the benchmark beside `UnitTests`.
 
 ## Score
 
@@ -390,12 +386,11 @@ With `[harness]` installed, predict with our adapters for each system:
 ```python
 from pathlib import Path
 
-from omni_bench_core import adapter
 from omni_parse_bench import harness
 from omni_parse_bench.scorers import unit_tests
 
 system = harness.system("datalab", {"mode": "balanced"})
-record = adapter.predict(system, harness.Input(Path("pages/<page_id>.pdf"), frozenset({"html", "blocks"})))
+record = harness.predict(system, harness.Input(Path("pages/<page_id>.pdf"), frozenset({"html", "blocks"})))
 record["output"]        # {"pages": [{"html": "...", "blocks": [...]}]}: one entry per page of the document
 record["error"]         # why the document failed (type, status, message, traceback), or None
 record["cost"]          # what it cost, its wall time and attempts

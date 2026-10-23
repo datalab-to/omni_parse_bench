@@ -12,10 +12,12 @@
 """
 # Note: the registry first: it checks, once, that the adapters' packages are installed.
 from .registry import ADAPTERS, PROVIDERS, adapter_class, system  # isort: skip
+from omni_bench_core.adapter import predict
+
 from omni_parse_bench.task import Input
 
 from .adapter import Parser
 from .contract import Call, Cost, Request
 
 __all__ = ["ADAPTERS", "Call", "Cost", "Input", "PROVIDERS", "Parser", "Request",
-           "adapter_class", "system"]
+           "adapter_class", "predict", "system"]
