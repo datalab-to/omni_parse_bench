@@ -211,10 +211,8 @@ removed with its files and its manifest row. The pages' licenses are in `license
 The dataset is read by `data`, and a page's tests by the scorer, `unit_tests.gold`:
 
 ```python
-data.download_dataset(dataset)  # a local copy: an hf:// dataset downloaded whole; a folder as it is
 data.read_manifest(dataset, manifest="manifest.parquet")  # (folder, pages): every page of that manifest,
                                 # its file and gold as full local paths
-data.select(pages, limit=0, sample=0, only=None)   # the pages to run (omni-bench-core's)
 unit_tests.gold(page)           # one page's tests, from its gold file (`page.gt_path`), checked
 unit_tests.check(pages)         # every page's tests, and the dataset as a whole, checked: for publishing
 ```

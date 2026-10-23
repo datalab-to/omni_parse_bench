@@ -76,8 +76,3 @@ def page(r: dict[str, Any]) -> Page:
     suite = suite if (suite or "").strip() else NO_SUITE
     return Page(r["page_id"], r["document"], suite, r["doc_path"], r["gt_path"], tuple(sorted(outputs)),
                 extra)
-
-
-select = core.select
-download_dataset = core.download_dataset
-dataset_id = core.dataset_id
