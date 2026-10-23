@@ -16,8 +16,8 @@ from omni_bench_core.adapter import predict
 
 from omni_parse_bench.task import Input
 
-from .adapter import Parser
+from .adapter import Parser, Served
 from .contract import Call, Cost, Request
 
-__all__ = ["ADAPTERS", "Call", "Cost", "Input", "PROVIDERS", "Parser", "Request",
+__all__ = ["ADAPTERS", "Call", "Cost", "Input", "PROVIDERS", "Parser", "Request", "Served",
            "adapter_class", "predict", "system"]

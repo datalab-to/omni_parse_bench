@@ -10,7 +10,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import Parser
+from ..adapter import Served
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -32,7 +32,7 @@ PICTURES = ("Image", "Figure", "Picture", "Diagram", "Chemical-Block")
 
 
 @dataclasses.dataclass(frozen=True)
-class ChandraOcr(Parser):
+class ChandraOcr(Served):
     """Where the chandra-ocr-2 server (serve/chandra-ocr/) answers, and the sampling of its first attempt (the
     package's by default; a retry follows the package's schedule).
 
@@ -73,6 +73,10 @@ class ChandraOcr(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "datalab-to/chandra-ocr-2",
+                                 "revision": "af93b47dba1b47b6640c86ccf487ed2260ab9a09"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     temperature: float = 0.0
     top_p: float = 0.1
     max_tokens: int = 12384

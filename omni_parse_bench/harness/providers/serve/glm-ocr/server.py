@@ -136,6 +136,7 @@ class Handler(BaseHTTPRequestHandler):
     text, the header and footer images as images. `default` runs the SDK as it ships.
 
         GET  /health                       200 once every SDK server is up
+        GET  /served                       what it serves: {weights, revision}, as each answer says
         POST /parse                        {"page": base64 file, "suffix": ".pdf" or the image's}
                                            -> the SDK's answer (`markdown_result`, `json_result`), with
                                            "sdk_config" and "vendor" (the SDK version) added; 503 when the SDK
@@ -143,6 +144,7 @@ class Handler(BaseHTTPRequestHandler):
 
     It exits when an SDK server does."""
     def do_GET(self):
+        if self.path == "/served": return self._send(200, SERVED)
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 
     def do_POST(self):

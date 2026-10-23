@@ -9,7 +9,7 @@ from omni_bench_core import adapter
 
 from ... import markdown, views
 from .. import contract, errors, http, layout
-from ..adapter import Parser
+from ..adapter import Served
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -23,7 +23,7 @@ LABELS = {
 
 
 @dataclasses.dataclass(frozen=True)
-class Dots(Parser):
+class Dots(Served):
     """Where the dots.mocr server (serve/dots-mocr/) answers, and its sampling (the parser's by default).
 
     Run as its repository's parser, `DotsMOCRParser`, runs it (github.com/rednote-hilab/dots.mocr at
@@ -60,6 +60,10 @@ class Dots(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "rednote-hilab/dots.mocr",
+                                 "revision": "e539fbb52280393adc081b289ec597430a0f9031"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     temperature: float = 0.1
     top_p: float = 1.0
     max_tokens: int = 32768

@@ -60,12 +60,14 @@ class Handler(BaseHTTPRequestHandler):
     The client is made on the first page, as making it asks vLLM for the model's name.
 
         GET  /health    200 once up
+        GET  /served    what it serves: {weights, revision}, as each answer says
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's}
                         -> {"blocks": the client's blocks {type, bbox, angle, content}, boxes from 0 to 1,
                         "markdown": json2md of them, "vendor"}
 
     A client error keeps its HTTP status."""
     def do_GET(self):
+        if self.path == "/served": return self._send(200, SERVED)
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 
     def do_POST(self):

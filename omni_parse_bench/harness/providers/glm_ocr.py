@@ -11,7 +11,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import Parser
+from ..adapter import Served
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "zai-org/GLM-OCR"
@@ -32,7 +32,7 @@ _TAG = re.compile(r"<[^>]+>")
 
 
 @dataclasses.dataclass(frozen=True)
-class GlmOcr(Parser):
+class GlmOcr(Served):
     """Where the GLM-OCR server (serve/glm-ocr/) answers.
 
     Run as its SDK documents it (github.com/zai-org/GLM-OCR, "Self-host with vLLM / SGLang" and "SDK Server",
@@ -73,6 +73,10 @@ class GlmOcr(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "zai-org/GLM-OCR",
+                                 "revision": "2e85a62840ccac27daa451df36c736c4636b8628"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
 
     name: ClassVar[str] = "glm-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS

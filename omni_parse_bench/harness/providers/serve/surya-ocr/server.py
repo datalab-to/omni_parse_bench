@@ -73,11 +73,13 @@ class Handler(BaseHTTPRequestHandler):
     processed is set out step by step in the adapter's docstring.
 
         GET  /health    200 once up
+        GET  /served    what it serves: {weights, revision}, as each answer says
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's, "settings": {"dpi"}}
                         -> the package's result for the page (its `model_dump`), with "vendor": the
                         surya-ocr version
     """
     def do_GET(self):
+        if self.path == "/served": return self._send(200, SERVED)
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 
     def do_POST(self):

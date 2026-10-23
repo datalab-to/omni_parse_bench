@@ -118,6 +118,7 @@ async def parse(request: web.Request) -> web.Response:
     the adapter's docstring.
 
         GET  /health    200 once the engine is up
+        GET  /served    what it serves: {weights, revision}, as each answer says
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
                         "settings": {"temperature", "top_p", "max_tokens", "dpi", "ngram_size",
                                      "window_size"}}
@@ -141,12 +142,16 @@ async def parse(request: web.Request) -> web.Response:
                               "prompt": PROMPT, "vendor": {"DeepSeek-OCR-2": COMMIT}})
 
 
+async def served(request: web.Request) -> web.Response:
+    return web.json_response(SERVED)
+
+
 async def health(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "model": MODEL_PATH})
 
 
 app = web.Application(client_max_size=64 * 1024 * 1024)
-app.add_routes([web.get("/health", health), web.post("/parse", parse)])
+app.add_routes([web.get("/health", health), web.get("/served", served), web.post("/parse", parse)])
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

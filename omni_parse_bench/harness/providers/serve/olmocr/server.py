@@ -45,6 +45,7 @@ async def parse(data: bytes, suffix: str, s: dict) -> dict:
     the model; how a page is processed is set out step by step in the adapter's docstring.
 
         GET  /health    200 once up
+        GET  /served    what it serves: {weights, revision}, as each answer says
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
                         "settings": {"target_longest_image_dim", "max_page_retries"}: pipeline arguments}
                         -> the pipeline's PageResponse fields ("natural_text", "is_rotation_valid", ...),
@@ -81,6 +82,10 @@ async def handle(request: web.Request) -> web.Response:
         return web.json_response({"error": f"{type(exc).__name__}: {exc}"[:500]}, status=500)
 
 
+async def served(request: web.Request) -> web.Response:
+    return web.json_response(SERVED)
+
+
 async def health(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
@@ -95,5 +100,5 @@ if __name__ == "__main__":
     ap.add_argument("--port", type=int, default=8001)
     app = web.Application(client_max_size=64 * 1024 * 1024)
     app.on_startup.append(startup)
-    app.add_routes([web.get("/health", health), web.post("/parse", handle)])
+    app.add_routes([web.get("/health", health), web.get("/served", served), web.post("/parse", handle)])
     web.run_app(app, host="0.0.0.0", port=ap.parse_args().port)

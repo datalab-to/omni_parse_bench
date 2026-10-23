@@ -9,7 +9,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import Parser
+from ..adapter import Served
 
 SUPPORTS = frozenset({"html", "blocks"})
 # Note: the package names its models (a tag of datalab-to/indra-ocr), so its version decides them; the
@@ -24,7 +24,7 @@ LABELS = {
 
 
 @dataclasses.dataclass(frozen=True)
-class IndraOcr(Parser):
+class IndraOcr(Served):
     """Where the Indra OCR server (serve/indra-ocr/) answers, and how its Converter reads a page (the
     package's defaults, but math read as LaTeX and headers and footers kept).
 
@@ -64,6 +64,10 @@ class IndraOcr(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "datalab-to/indra-ocr",
+                                 "revision": "v3.1.1"},
+        metadata={"help": "the weights its server serves and their revision; by default its package's"})
     mode: str = dataclasses.field(default="auto", metadata={
         "help": "auto reads a PDF's text layer where it passes the checks and OCRs elsewhere; ocr never "
                 "reads it; text reads it even when the checks fail"})

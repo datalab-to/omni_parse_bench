@@ -12,7 +12,7 @@ from ... import markdown, views
 from omni_bench_core import adapter
 
 from .. import contract, errors, http, layout
-from ..adapter import Parser
+from ..adapter import Served
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -32,7 +32,7 @@ PICTURES = frozenset({"Picture", "Chart"})
 
 
 @dataclasses.dataclass(frozen=True)
-class NemotronParse(Parser):
+class NemotronParse(Served):
     """Where the Nemotron Parse server (serve/nemotron-parse/) answers, the client's mode, and the sampling of
     its full-page request (the client's defaults).
 
@@ -79,6 +79,10 @@ class NemotronParse(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "nvidia/Nemotron-3.5-Parse",
+                                 "revision": "62cb1e4ba153d113ff64aaf2be6e068c377cf53c"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     mode: str = dataclasses.field(default="single", metadata={
         "choices": list(MODES),
         "help": "single: one full-page request; double or triple: the client's Table/Chart crop passes too"})

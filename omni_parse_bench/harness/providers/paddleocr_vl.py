@@ -12,7 +12,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import Parser
+from ..adapter import Served
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "PaddlePaddle/PaddleOCR-VL-1.6@c5630abae1d940eafe0697512a0325494b02ab42"
@@ -33,7 +33,7 @@ _TAG = re.compile(r"<[^>]+>")
 
 
 @dataclasses.dataclass(frozen=True)
-class PaddleOcrVl(Parser):
+class PaddleOcrVl(Served):
     """Where the PaddleOCR-VL server (serve/paddleocr-vl/) answers, and the DPI a PDF is loaded at (the
     pipeline's, PDF_RENDER_SCALE 2.0, by default).
 
@@ -71,6 +71,10 @@ class PaddleOcrVl(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "PaddlePaddle/PaddleOCR-VL-1.6",
+                                 "revision": "c5630abae1d940eafe0697512a0325494b02ab42"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     dpi: int = 144
 
     name: ClassVar[str] = "paddleocr-vl"

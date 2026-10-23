@@ -62,12 +62,14 @@ class Handler(BaseHTTPRequestHandler):
     the image clones (inference/ on PYTHONPATH).
 
         GET  /health    200 once up
+        GET  /served    what it serves: {weights, revision}, as each answer says
         POST /parse     {"page": base64 image file, "suffix", "settings": {"task": "layout_parse" or
                         "doc_parse", "temperature", "top_p", "max_tokens", "repetition_penalty",
                         "min_repeats": the early stop's}}
                         -> {"text": the cleaned reply, "early_stopped", "task",
                         "vendor": {"HunyuanOCR": its commit}}"""
     def do_GET(self):
+        if self.path == "/served": return self._send(200, SERVED)
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 
     def do_POST(self):

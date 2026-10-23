@@ -12,7 +12,7 @@ from typing import Any, ClassVar
 
 from ... import markdown
 from .. import budget, contract, errors, http
-from ..adapter import Parser
+from ..adapter import Served
 from . import llm
 
 SUPPORTS = frozenset({"html"})
@@ -30,7 +30,7 @@ _UNWRAP = re.compile(r"</?(?:watermark|page_number|signature)>", re.I)
 
 
 @dataclasses.dataclass(frozen=True)
-class Nanonets(Parser):
+class Nanonets(Served):
     """Where the server (serve/nanonets-ocr/) answers (its chat endpoint is vLLM's, under /v1), and its
     sampling (the model card's by default; top_p, which it leaves unset, at vLLM's 1.0).
 
@@ -63,6 +63,10 @@ class Nanonets(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "nanonets/Nanonets-OCR2-3B",
+                                 "revision": "c3886ff00bb037ce7da24988c9eafaf1fe2bed72"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     temperature: float = 0.0
     top_p: float = 1.0
     max_tokens: int = 15000
@@ -84,6 +88,15 @@ class Nanonets(Parser):
 
     def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
         return parse(raw, request, self)
+
+    def server(self, *, timeout: float) -> dict[str, Any]:
+        """What vLLM says it serves, read off its /v1/models: this folder runs vLLM alone, with no /served
+        route."""
+        try:
+            return http.served(self.base_url, budget.Budget(timeout))[1]
+        except Exception as exc:
+            if errors.refused(exc): errors.no_server(exc, self.base_url, self.provider, self.SERVE)
+            raise
 
 
 def requests(wants: frozenset[str], config: Nanonets) -> list[contract.Request]:

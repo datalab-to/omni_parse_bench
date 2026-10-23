@@ -7,14 +7,14 @@ from typing import Any, ClassVar
 
 from ... import markdown
 from .. import contract, errors, http
-from ..adapter import Parser
+from ..adapter import Served
 
 SUPPORTS = frozenset({"html"})
 WEIGHTS = "allenai/olmOCR-2-7B-1025-FP8"
 
 
 @dataclasses.dataclass(frozen=True)
-class OlmOcr(Parser):
+class OlmOcr(Served):
     """Where the olmOCR 2 server (serve/olmocr/) answers, and the pipeline's arguments it sets (its
     defaults by default).
 
@@ -55,6 +55,10 @@ class OlmOcr(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "allenai/olmOCR-2-7B-1025-FP8",
+                                 "revision": "40bd7202494b8264ee17ada08b401b5aab7a9ce1"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     target_longest_image_dim: int = dataclasses.field(default=1288, metadata={
         "help": "the rendered page's long edge, in pixels (the pipeline's --target_longest_image_dim)"})
     max_page_retries: int = dataclasses.field(default=8, metadata={

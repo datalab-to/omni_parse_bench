@@ -12,7 +12,7 @@ from omni_bench_core import adapter
 
 from ... import markdown, views
 from .. import contract, errors, http, layout
-from ..adapter import Parser
+from ..adapter import Served
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -30,7 +30,7 @@ LABELS = {
 
 
 @dataclasses.dataclass(frozen=True)
-class Infinity(Parser):
+class Infinity(Served):
     """Where the Infinity-Parser2 server (serve/infinity-parser2/) answers, the model it serves, and its sampling
     (the SDK's by default).
 
@@ -74,6 +74,10 @@ class Infinity(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "infly/Infinity-Parser2-Pro",
+                                 "revision": "b27d470100514329fc6439aada8f16ccea5f9e2a"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     temperature: float = 0.0
     top_p: float = 1.0
     max_tokens: int = 32768

@@ -12,7 +12,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import Parser
+from ..adapter import Served
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -21,7 +21,7 @@ TASKS = ("layout_parse", "doc_parse")
 
 
 @dataclasses.dataclass(frozen=True)
-class Hunyuan(Parser):
+class Hunyuan(Served):
     """Where the HunyuanOCR server (serve/hunyuan-ocr/) answers, the client's task, and its sampling (the
     client's by default).
 
@@ -67,6 +67,10 @@ class Hunyuan(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "tencent/HunyuanOCR",
+                                 "revision": "47644ecc4fc854efa4f505155158831f36773ee4"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     task: str = dataclasses.field(default="layout_parse", metadata={
         "choices": list(TASKS), "help": "the client's task type: layout_parse (with blocks) or doc_parse"})
     temperature: float = 0.0

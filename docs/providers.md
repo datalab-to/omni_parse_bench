@@ -294,6 +294,12 @@ that deploys it on any GPU host, and opb then benchmarks it from anywhere, point
     opb init dots-mocr > dots.yaml
     opb run --config dots.yaml --set system.dots-mocr.base_url=http://<host>:8001
 
+Which model answers is part of the run: the system's `served` option names the weights and their revision
+(`opb init` writes the folder's defaults), so another checkpoint is another run. Before any call, opb asks the
+server what it serves (its `/served` route; a vLLM alone, its `/v1/models`) and refuses a run whose server
+serves something else, so a run folder always names the weights that answered. To serve other weights, start
+the folder with `WEIGHTS` and `REVISION` and give the same in `served`.
+
 If nothing listens at `base_url` (the server isn't started, or the address is wrong), the connection is
 refused and the run stops before recording anything, with a message naming the address and the model's
 folder here. Start the server, or fix the address, and resume the run (`--resume`). A server that is up

@@ -9,7 +9,7 @@ from typing import Any, ClassVar
 from omni_bench_core import adapter
 
 from .. import contract, errors, http, layout
-from ..adapter import Parser
+from ..adapter import Served
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "datalab-to/surya-ocr-2"
@@ -27,7 +27,7 @@ _TAG = re.compile(r"<[^>]+>")
 
 
 @dataclasses.dataclass(frozen=True)
-class SuryaOcr(Parser):
+class SuryaOcr(Served):
     """Where the Surya OCR 2 server (serve/surya-ocr/) answers, and the DPI a PDF is loaded at (the
     `surya_ocr` command's, IMAGE_DPI_HIGHRES, by default).
 
@@ -65,6 +65,10 @@ class SuryaOcr(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "datalab-to/surya-ocr-2",
+                                 "revision": "3b3d4cdf88d6928b0acdc75181b13206ea67c4a3"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     dpi: int = 192
 
     name: ClassVar[str] = "surya-ocr"

@@ -85,12 +85,14 @@ class Handler(BaseHTTPRequestHandler):
     only the reply's text, so this asks with its pieces, to keep the reply's finish reason and usage.
 
         GET  /health    200 once up
+        GET  /served    what it serves: {weights, revision}, as each answer says
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
                         "settings": {"temperature", "top_p", "max_tokens", "dpi", "max_pixels"}}
                         -> {"completion": the model's chat completion, "text": its content repaired,
                         "vendor": {"lightonocr": the client's commit}, "served"}
     """
     def do_GET(self):
+        if self.path == "/served": return self._send(200, SERVED)
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 
     def do_POST(self):

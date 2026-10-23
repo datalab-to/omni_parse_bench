@@ -5,6 +5,7 @@ around the vLLM serving the model; how a page is processed is set out step by st
 docstring. The client takes images only, so this takes the page as an image file.
 
     GET  /health    200 once up
+    GET  /served    what it serves: {weights, revision}, as each answer says
     POST /parse     {"page": base64 image file, "suffix", "settings": {"mode": "single", "double" or
                     "triple", and the full-page request's "temperature", "top_k", "top_p",
                     "repetition_penalty", "seed", "max_tokens"}}
@@ -88,6 +89,7 @@ def settings(body: dict) -> dict:
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path == "/served": return self._send(200, SERVED)
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 
     def do_POST(self):

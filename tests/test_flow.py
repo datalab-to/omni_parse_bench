@@ -13,7 +13,7 @@ import socket
 import subprocess
 import sys
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pytest
 
@@ -230,13 +230,17 @@ def test_a_missing_key_is_refused_before_any_call_and_any_folder(tmp_path, capsy
     assert "export OPB_TEST_KEY=..." in err and CALLS == [], err
 
 
+ORG_M = {"weights": "org/m", "revision": "main"}   # what the stand-in model servers serve
+
+
 @dataclasses.dataclass(frozen=True)
-class Served(Alpha):
+class Served(Alpha, harness.Served):
     """A model server's adapter, at an address where nothing listens."""
 
     name: ClassVar[str] = "served"
     SERVE: ClassVar[str | None] = "chandra-ocr"
     base_url: str = "http://127.0.0.1:9"
+    served: dict[str, Any] = dataclasses.field(default_factory=lambda: dict(ORG_M))
 
     def send(self, page, request, *, timeout):
         from omni_parse_bench.harness import http
@@ -244,7 +248,7 @@ class Served(Alpha):
         return contract.Call(http.post(f"{self.base_url}/parse", {}, harness.budget.Budget(timeout)))
 
 
-def test_a_server_that_isnt_running_stops_the_run_with_nothing_recorded(tmp_path, capsys, monkeypatch):
+def test_a_server_that_isnt_running_stops_the_run_before_any_folder(tmp_path, capsys, monkeypatch):
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         url = f"http://127.0.0.1:{s.getsockname()[1]}"
@@ -253,8 +257,61 @@ def test_a_server_that_isnt_running_stops_the_run_with_nothing_recorded(tmp_path
             str(tmp_path / "runs"), "-y"]
     err = raised(argv, Exception)     # the connection error itself (httpx.ConnectError), with notes
     assert f"no server at {url}" in err and "providers/serve/chandra-ocr" in err, err
-    [run] = (tmp_path / "runs").iterdir()
-    assert list((run / "records").iterdir()) == []
+    assert not (tmp_path / "runs").exists()
+
+
+NOW: dict[str, Any] = {}   # what the stand-in model server says it serves; {} for a server with no /served
+
+
+@dataclasses.dataclass(frozen=True)
+class Checked(Alpha, harness.Served):
+    """Alpha, as a model we serve: its server, a stand-in, says what it serves at /served."""
+
+    name: ClassVar[str] = "checked"
+    base_url: str = "http://127.0.0.1:9"
+    served: dict[str, Any] = dataclasses.field(default_factory=lambda: dict(ORG_M))
+
+
+def test_how_a_model_is_served_is_its_runs_question_and_its_server_must_say_so(tmp_path, capsys, monkeypatch):
+    """`served` is an option: a run records it, and another revision is another run. Before any call the
+    server must say what `served` says at /served; a server that doesn't, or has no /served, is refused."""
+    import json as _json
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = _json.dumps(NOW).encode()
+            self.send_response(200 if NOW and self.path == "/served" else 404)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args): pass
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{srv.server_address[1]}"
+    monkeypatch.setitem(harness.ADAPTERS, "checked", Checked)
+    data = dataset(tmp_path / "data", 1)
+    argv = [*configured("checked", data, f"system.checked.base_url={url}"), "--out", str(tmp_path / "runs"),
+            "-y"]
+    try:
+        NOW.update(weights="org/m", revision="main")
+        assert cli.main(argv) == 0
+        g = json.loads(capsys.readouterr().out)
+        said = json.loads((tmp_path / "runs" / g["run"] / "settings.json").read_text())
+        assert said["options"]["served"] == {"weights": "org/m", "revision": "main"}, said
+        err = raised([*argv, "--set", "system.checked.served.revision=other"])
+        assert "revision is 'main' there and 'other' in served" in err, err
+        assert len(list((tmp_path / "runs").iterdir())) == 1, "a refused server makes no run folder"
+        NOW.clear()
+        assert "doesn't say what it serves (GET /served: HTTP 404" in raised(argv)
+    finally:
+        srv.shutdown()
+        NOW.clear()
+    assert cli.main(["init", "chandra-ocr", "--dataset", data]) == 0
+    assert "weights: datalab-to/chandra-ocr-2" in capsys.readouterr().out
 
 
 def test_grading_and_checking_need_no_harness_packages(tmp_path):

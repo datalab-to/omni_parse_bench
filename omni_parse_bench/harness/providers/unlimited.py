@@ -11,7 +11,7 @@ from omni_bench_core import adapter
 
 from ... import markdown, views
 from .. import contract, errors, http, layout
-from ..adapter import Parser
+from ..adapter import Served
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -34,7 +34,7 @@ LABELS = {
 
 
 @dataclasses.dataclass(frozen=True)
-class UnlimitedOcr(Parser):
+class UnlimitedOcr(Served):
     """Where the Unlimited-OCR server (serve/unlimited-ocr/) answers, and its sampling (the recipe's by
     default; top_p, which it leaves unset, at vLLM's 1.0).
 
@@ -72,6 +72,10 @@ class UnlimitedOcr(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "baidu/Unlimited-OCR",
+                                 "revision": "07dea832e22aefee32ad281d4b80551282e1c168"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     temperature: float = 0.0
     top_p: float = 1.0
     max_tokens: int = 28000

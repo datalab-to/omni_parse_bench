@@ -12,7 +12,7 @@ from omni_bench_core import adapter
 
 from ... import markdown, views
 from .. import contract, errors, http, layout
-from ..adapter import Parser
+from ..adapter import Served
 from . import llm
 
 SUPPORTS = frozenset({"html", "blocks"})
@@ -36,7 +36,7 @@ _PLACEHOLDER = re.compile(r"^!\[([a-z_]+)\+?\]\((-?[\d.]+),(-?[\d.]+),(-?[\d.]+)
 
 
 @dataclasses.dataclass(frozen=True)
-class LightOn(Parser):
+class LightOn(Served):
     """Where the LightOnOCR-3 server (serve/lightonocr/) answers, the model it serves, and its sampling (the
     client's for LightOnOCR-3 by default, temperature as its benchmark sets it).
 
@@ -86,6 +86,10 @@ class LightOn(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "lightonai/LightOnOCR-3-4B",
+                                 "revision": "b71010f095dc3735de7ee6b9969bff8f8f50b39a"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     temperature: float = 0.1
     top_p: float = 1.0
     max_tokens: int = 12288

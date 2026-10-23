@@ -117,6 +117,7 @@ class Handler(BaseHTTPRequestHandler):
     serving the model; how a page is processed is set out step by step in the adapter's docstring.
 
         GET  /health    200 once up
+        GET  /served    what it serves: {weights, revision}, as each answer says
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
                         "settings": {"temperature", "top_p", "max_tokens", "dpi"}}
                         -> {"cells": [{bbox, category, text}] or null, "markdown", "image_size": [w, h] of
@@ -124,6 +125,7 @@ class Handler(BaseHTTPRequestHandler):
 
     Boxes are in the pixels of the page as loaded (`image_size`)."""
     def do_GET(self):
+        if self.path == "/served": return self._send(200, SERVED)
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 
     def do_POST(self):

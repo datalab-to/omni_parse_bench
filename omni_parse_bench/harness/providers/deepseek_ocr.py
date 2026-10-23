@@ -11,7 +11,7 @@ from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
-from ..adapter import Parser
+from ..adapter import Served
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "deepseek-ai/DeepSeek-OCR-2"
@@ -35,7 +35,7 @@ LABELS = {
 
 
 @dataclasses.dataclass(frozen=True)
-class DeepseekOcr(Parser):
+class DeepseekOcr(Served):
     """Where the DeepSeek-OCR-2 server (serve/deepseek-ocr/) answers, and its sampling (the repository's
     scripts' by default; top_p, which they leave unset, at vLLM's 1.0).
 
@@ -72,6 +72,10 @@ class DeepseekOcr(Parser):
     """
 
     base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "deepseek-ai/DeepSeek-OCR-2",
+                                 "revision": "aaa02f3811945a91062062994c5c4a3f4c0af2b0"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     temperature: float = 0.0
     top_p: float = 1.0
     max_tokens: int = 8192

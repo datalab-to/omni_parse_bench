@@ -16,7 +16,7 @@ from omni_bench_core import adapter
 
 from omni_parse_bench.task import Input
 
-from . import budget, contract, errors, raster
+from . import budget, contract, errors, http, raster
 
 # A 403 that refuses this page's content, not the account (OpenRouter's moderation flag).
 PAGE_REFUSALS = ("moderation", "flagged")
@@ -174,3 +174,19 @@ def _send(a: Parser, page: Path, r: contract.Request, timeout: float) -> contrac
     except httpx.HTTPStatusError as exc:
         status, body = exc.response.status_code, exc.response.text
         raise errors.SystemFailed(f"HTTP {status}: {body}", status=status, body=body) from exc
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class Served(Parser, adapter.Served[Input]):
+    """A parser of an open model we serve from its folder in providers/serve/ (`SERVE`), at its `base_url`.
+    `served` names the weights and their revision, its folder's defaults unless given: it is part of the run's
+    question, so two checkpoints are two runs, and before any call the server must say the same at its /served
+    route (`omni_bench_core.adapter.check_served`)."""
+
+    def server(self, *, timeout: float) -> dict[str, Any]:
+        """What the server at `base_url` says it serves, {weights, revision}."""
+        try:
+            return http.served_by(self.base_url, budget.Budget(timeout))
+        except Exception as exc:
+            if errors.refused(exc): errors.no_server(exc, self.base_url, self.provider, self.SERVE)
+            raise

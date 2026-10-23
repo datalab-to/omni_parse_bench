@@ -128,6 +128,7 @@ class Handler(BaseHTTPRequestHandler):
     was given).
 
         GET  /health    200 once up
+        GET  /served    what it serves: {weights, revision}, as each answer says
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
                         "settings": {"temperature", "top_p", "max_tokens" (the first attempt's), "dpi",
                         "max_retries"}}
@@ -135,6 +136,7 @@ class Handler(BaseHTTPRequestHandler):
                         attempts, "blocks": [{"label", "raw": the block's inner HTML as the model wrote it,
                         "html": parse_html of the block}], "vendor": {"chandra-ocr": its commit}}"""
     def do_GET(self):
+        if self.path == "/served": return self._send(200, SERVED)
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 
     def do_POST(self):

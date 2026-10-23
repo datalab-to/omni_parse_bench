@@ -1,6 +1,7 @@
 """A JSON POST to a model server, within a call's time budget:
 
 - `parse`: one page to an opb model server's /parse route (providers/serve/);
+- `served_by` and `served`: what a model server, or a vLLM alone, says it serves;
 - `post`: any JSON POST, its failures mapped to the harness's errors; and
 - `page` and `settings`: what a model server is sent.
 
@@ -29,10 +30,10 @@ def page(path: Path) -> dict:
 
 
 def settings(config: Any, *local: str) -> dict:
-    """An open model adapter's options as its server takes them: every field but `base_url`, `model` (checked
-    against the answer) and those the adapter applies itself (`local`)."""
+    """An open model adapter's options as its server takes them: every field but `base_url`, `model` and
+    `served` (checked against what the server says) and those the adapter applies itself (`local`)."""
     out = {f.name: getattr(config, f.name) for f in dataclasses.fields(config)}
-    return {k: v for k, v in out.items() if k not in ("base_url", "model", *local)}
+    return {k: v for k, v in out.items() if k not in ("base_url", "model", "served", *local)}
 
 
 def parse(config: Any, path: Path, timeout: float, body: dict | None = None) -> dict:
@@ -48,6 +49,23 @@ def parse(config: Any, path: Path, timeout: float, body: dict | None = None) -> 
         raise ValueError(f"the server at {config.base_url} doesn't say what it serves (no \"served\" in its "
                          "reply); rebuild it from its serve folder, whose server.py reports it")
     return reply
+
+
+def served_by(base_url: str, deadline: budget.Budget) -> dict:
+    """What an opb model server says it serves, at its /served route: {weights, revision}, as each answer
+    says."""
+    key = os.environ.get("OPB_ENDPOINT_KEY")
+    try:
+        r = httpx.get(f"{base_url.rstrip('/')}/served", timeout=max(1.0, deadline.remaining()),
+                      headers={"Authorization": f"Bearer {key}"} if key else {}, follow_redirects=True)
+    except httpx.TransportError as exc:
+        if errors.refused(exc): raise
+        raise errors.transport(exc, "connection failed") from exc
+    if r.status_code != 200:
+        raise ValueError(f"the server at {base_url} doesn't say what it serves (GET /served: HTTP "
+                         f"{r.status_code}, {r.text[:200]}); rebuild it from its serve folder, whose "
+                         "server.py has the route")
+    return r.json()
 
 
 def served(base_url: str, deadline: budget.Budget) -> tuple[str, dict]:

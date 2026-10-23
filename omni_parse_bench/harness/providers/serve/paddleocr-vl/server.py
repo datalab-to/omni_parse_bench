@@ -94,6 +94,11 @@ def health() -> dict:
     return {"ready": _pipeline is not None}
 
 
+@app.get("/served")
+def served() -> dict:
+    return SERVED
+
+
 @app.post("/parse")
 def parse(page: Page, authorization: str | None = Header(default=None)) -> dict:
     """PaddleOCR's `PaddleOCRVL` pipeline (pipeline_version v1.6, the VLM through its vllm-server backend),
@@ -101,6 +106,7 @@ def parse(page: Page, authorization: str | None = Header(default=None)) -> dict:
     One pipeline per uvicorn worker, reading one page at a time.
 
         GET  /health    {"ready": true} once the pipeline is loaded
+        GET  /served    what it serves: {weights, revision}, as each answer says
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's, "settings": {"dpi"}}
                         -> the pipeline's result for the page (`parsing_res_list`: each block's label, box
                         in the pixels of the page as loaded, and content), "width" and "height" of that
