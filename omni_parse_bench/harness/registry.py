@@ -36,6 +36,7 @@ try:
         mineru,
         mistral,
         nanonets,
+        nemotron_parse,
         olmocr,
         paddleocr_vl,
         reducto,
@@ -61,7 +62,8 @@ ADAPTERS: dict[str, type[Parser]] = {a.name: a for a in (
     # Open models, each served from its folder in providers/serve/: the vendor's own code on a server of ours,
     # or vLLM alone where the vendor offers only the model.
     chandra_ocr.ChandraOcr, deepseek_ocr.DeepseekOcr, dots.Dots, glm_ocr.GlmOcr, hunyuan.Hunyuan,
-    indra_ocr.IndraOcr, infinity.Infinity, lighton.LightOn, mineru.MinerU, nanonets.Nanonets, olmocr.OlmOcr,
+    indra_ocr.IndraOcr, infinity.Infinity, lighton.LightOn, mineru.MinerU, nanonets.Nanonets,
+    nemotron_parse.NemotronParse, olmocr.OlmOcr,
     paddleocr_vl.PaddleOcrVl, surya_ocr.SuryaOcr, unlimited.UnlimitedOcr)}
 
 

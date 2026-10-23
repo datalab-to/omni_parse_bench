@@ -348,6 +348,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
 | Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
 | Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets-ocr` | html |
+| Nemotron 3.5 Parse | `nemotron-parse` | `nemotron-parse` | html, blocks |
 
 olmOCR-2 and Nanonets-OCR2 return no layout, so they have no blocks. Indra OCR runs on CPU (ONNX Runtime),
 no GPU: its server reads pages in one worker process per core, and its image runs without `--gpus`.
@@ -515,6 +516,21 @@ Indra OCR (`providers/indra_ocr.py`):
 | Footnote | footnote |
 | Table | table |
 | Form | form |
+
+Nemotron 3.5 Parse (`providers/nemotron_parse.py`; its class tokens, and Chart):
+
+| Nemotron 3.5 Parse class | label |
+| --- | --- |
+| Text, TOC, Bibliography | text |
+| Title, Section-header | heading |
+| Page-header, Page-footer | page_furniture |
+| List-item | list |
+| Caption | caption |
+| Footnote | footnote |
+| Formula | equation |
+| Code | code |
+| Table | table |
+| Picture, Chart | figure |
 
 ## What differs between vendors, by necessity
 
