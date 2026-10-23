@@ -262,9 +262,11 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
                                       "nemotron-parse", "olmocr", "paddleocr-vl", "surya-ocr",
                                       "unlimited-ocr"])
 def test_a_served_model_run_is_named_by_every_option(provider):
-    """Every option names the run, the server's address included: a new address is a new run folder."""
+    """Every option names the run but the server's address: the same model at another address is the same
+    question, and other weights another."""
     a = folder(provider)
-    assert folder(provider, base_url="https://one.example") != a
+    assert folder(provider, base_url="https://one.example") == a
+    assert folder(provider, served={"weights": "org/other", "revision": "main"}) != a
     if "max_tokens" in harness.system(provider).options(): assert folder(provider, max_tokens=7) != a
 
 
