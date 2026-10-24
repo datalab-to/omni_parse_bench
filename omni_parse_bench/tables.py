@@ -232,7 +232,7 @@ def _grid(specs: list[list[tuple[str, int, int, bool]]]) -> Table | None:
 
     def first(cell: Cell, cells: Iterator[tuple[int, int]]) -> Cell | None:
         for r, c in cells:
-            if (x := grid[r][c]) is not None and x != cell:
+            if r < height and (x := grid[r][c]) is not None and x != cell:
                 return x
         return None
 
