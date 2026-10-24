@@ -6,7 +6,9 @@ or newer (1.0.0rc1 gives the same 16,288 verdicts on the Nemotron 3.5 Parse run)
 numbers is in the dataset's `results.parquet`, one row per system and test, so any number here can be
 recomputed; the same table is on the [dataset card](https://huggingface.co/datasets/datalab-to/omni_parse_bench#results).
 Nemotron 3.5 Parse's verdicts are not on the dataset yet: a dataset update adds them to `results.parquet` and
-its row to the card.
+its row to the card. The same holds for Datalab accurate and balanced, which are a rerun of Datalab's
+production API on 2026-10-23 on the same 16,288 tests; the dataset card still shows the earlier Datalab
+rows (accurate 92.9, balanced 91.6).
 
 ## Headline and families
 
@@ -15,9 +17,9 @@ The headline is the mean of three family scores: text (`present`, `order` and `r
 
 | parser | weights | parameters | headline | text | tables | layout |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| **Datalab accurate** | closed |  | 92.9 | 91.2 | 92.0 | 95.6 |
+| **Datalab accurate** | closed |  | 94.1 | 92.0 | 94.2 | 96.0 |
 | Gemini 3.8 Flash* | closed |  | 92.9 | 91.3 | 95.2 | 92.2 |
-| **Datalab balanced** | closed |  | 91.6 | 90.0 | 89.2 | 95.5 |
+| **Datalab balanced** | closed |  | 92.6 | 90.1 | 91.6 | 96.2 |
 | Reducto | closed |  | 90.8 | 85.4 | 91.2 | 95.8 |
 | LlamaParse | closed |  | 90.4 | 88.2 | 92.6 | 90.4 |
 | **chandra-ocr-2** | open | 4.5B | 90.1 | 87.4 | 87.4 | 95.4 |
@@ -64,9 +66,9 @@ Tests per tag: handwriting 923, math 3,316, table 6,767, form 1,028, multi-colum
 
 | parser | handwriting | math | table | form | multi-column | tiny text | rotated | degraded | not English |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **Datalab accurate** | 72.4 | 97.0 | 94.5 | 81.0 | 93.9 | 92.9 | 92.2 | 89.6 | 81.0 |
+| **Datalab accurate** | 76.7 | 98.0 | 95.6 | 84.3 | 94.9 | 90.5 | 95.1 | 89.7 | 83.0 |
 | Gemini 3.8 Flash* | 79.4 | 98.3 | 93.8 | 85.0 | 92.3 | 88.5 | 92.5 | 85.4 | 83.8 |
-| **Datalab balanced** | 65.0 | 97.1 | 92.5 | 76.4 | 91.9 | 87.7 | 82.4 | 87.8 | 76.7 |
+| **Datalab balanced** | 65.7 | 97.0 | 94.2 | 78.5 | 92.7 | 90.8 | 88.1 | 87.4 | 77.1 |
 | Reducto | 67.3 | 97.9 | 92.7 | 79.8 | 91.3 | 88.6 | 88.8 | 85.8 | 71.3 |
 | LlamaParse | 64.2 | 86.7 | 93.7 | 79.1 | 91.4 | 86.2 | 92.6 | 77.1 | 76.7 |
 | **chandra-ocr-2** | 66.8 | 96.1 | 90.7 | 74.6 | 90.4 | 89.1 | 82.2 | 85.9 | 74.6 |
