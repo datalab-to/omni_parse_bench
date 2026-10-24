@@ -50,16 +50,17 @@ headline is. It is only used to query tests and rerank.
 
 ## Results
 
-Every system on the published dataset (revision `961c0f89`, plus Nemotron 3.5 Parse; omni-parse-bench 0.1.2 or newer). The
+Every system on the published dataset (revision `961c0f89`, plus Nemotron 3.5 Parse; omni-parse-bench 0.1.2 or newer).
+Datalab's two rows are from a rerun of its production API on 2026-10-23. The
 scores per tag (handwriting, math, tables, forms, rotated pages, ...), how parameters are counted and how
 each open model is served are in [`docs/results.md`](./docs/results.md); every verdict is in the dataset's
-`results.parquet` (Nemotron 3.5 Parse's once the dataset update that adds them is merged).
+`results.parquet` (Nemotron 3.5 Parse's and the Datalab rerun's once the dataset update that adds them is merged).
 
 | parser | weights | parameters | headline | text | tables | layout |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| **Datalab accurate** | closed |  | 92.9 | 91.2 | 92.0 | 95.6 |
+| **Datalab accurate** | closed |  | 94.1 | 92.0 | 94.2 | 96.0 |
 | Gemini 3.8 Flash* | closed |  | 92.9 | 91.3 | 95.2 | 92.2 |
-| **Datalab balanced** | closed |  | 91.6 | 90.0 | 89.2 | 95.5 |
+| **Datalab balanced** | closed |  | 92.6 | 90.1 | 91.6 | 96.2 |
 | Reducto | closed |  | 90.8 | 85.4 | 91.2 | 95.8 |
 | LlamaParse | closed |  | 90.4 | 88.2 | 92.6 | 90.4 |
 | **chandra-ocr-2** | open | 4.5B | 90.1 | 87.4 | 87.4 | 95.4 |
