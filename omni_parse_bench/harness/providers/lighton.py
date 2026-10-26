@@ -1,4 +1,5 @@
-"""LightOnOCR-3 (lightonai/LightOnOCR-3-4B, -0.8B), served from providers/serve/lightonocr/ on any GPU host."""
+"""LightOnOCR-3 (lightonai/LightOnOCR-3-4B, -0.8B), served from providers/serve/lightonocr/ on any GPU
+host."""
 from __future__ import annotations
 
 import dataclasses
@@ -41,8 +42,8 @@ class LightOn(Served):
     client's for LightOnOCR-3 by default, temperature as its benchmark sets it).
 
     Run as LightOn runs it for its own benchmark (github.com/lightonai/LightOnOCR at 36755d4, its
-    `lightonocr` client and benchmarks/ocr_bench). Steps 1 to 4 run on the server (serve/lightonocr/server.py);
-    step 5 runs here, with no vendor code.
+    `lightonocr` client and benchmarks/ocr_bench). Steps 1 to 4 run on the server
+    (serve/lightonocr/server.py); step 5 runs here, with no vendor code.
 
     How a page is processed:
 

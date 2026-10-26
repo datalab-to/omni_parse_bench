@@ -26,8 +26,8 @@ class Hunyuan(Served):
     client's by default).
 
     Run as its repository's client runs it (github.com/Tencent-Hunyuan/HunyuanOCR at 1ef4179,
-    inference/vLLM/infer_vllm_client.py). Steps 3 and 4 run on the server (serve/hunyuan-ocr/server.py); steps 1
-    and 5 run here, with no vendor code.
+    inference/vLLM/infer_vllm_client.py). Steps 3 and 4 run on the server (serve/hunyuan-ocr/server.py);
+    steps 1 and 5 run here, with no vendor code.
 
     How a page is processed:
 

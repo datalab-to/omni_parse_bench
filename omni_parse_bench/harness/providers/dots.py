@@ -27,7 +27,8 @@ class Dots(Served):
     """Where the dots.mocr server (serve/dots-mocr/) answers, and its sampling (the parser's by default).
 
     Run as its repository's parser, `DotsMOCRParser`, runs it (github.com/rednote-hilab/dots.mocr at
-    23f3e56). Steps 1 to 4 run on the server (serve/dots-mocr/server.py); step 5 runs here, with no vendor code.
+    23f3e56). Steps 1 to 4 run on the server (serve/dots-mocr/server.py); step 5 runs here, with no vendor
+    code.
 
     How a page is processed:
 

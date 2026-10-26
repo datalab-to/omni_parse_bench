@@ -1,5 +1,5 @@
-"""Infinity-Parser2 (infly/Infinity-Parser2-Pro, -Flash), served from providers/serve/infinity-parser2/ on a GPU
-host.
+"""Infinity-Parser2 (infly/Infinity-Parser2-Pro, -Flash), served from providers/serve/infinity-parser2/ on a
+GPU host.
 """
 from __future__ import annotations
 
@@ -31,12 +31,12 @@ LABELS = {
 
 @dataclasses.dataclass(frozen=True)
 class Infinity(Served):
-    """Where the Infinity-Parser2 server (serve/infinity-parser2/) answers, the model it serves, and its sampling
-    (the SDK's by default).
+    """Where the Infinity-Parser2 server (serve/infinity-parser2/) answers, the model it serves, and its
+    sampling (the SDK's by default).
 
     Run as the vendor's `infinity_parser2` SDK (0.4.0, github.com/infly-ai/INF-MLLM) runs it through its
-    vLLM backends. Steps 1 to 4 run on the server (serve/infinity-parser2/server.py); step 5 runs here, with no vendor
-    code.
+    vLLM backends. Steps 1 to 4 run on the server (serve/infinity-parser2/server.py); step 5 runs here, with
+    no vendor code.
 
     How a page is processed:
 

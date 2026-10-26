@@ -334,8 +334,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                    help="continue the run of this folder name under --out, asking the same question; it pays "
                         "only for pages with no answer yet (default: a new run)")
     r.add_argument("--retry-failed", action="store_true",
-                   help="with --resume, predict again pages whose failure may not recur: timeouts, outages, 429 "
-                        "and 5xx")
+                   help="with --resume, predict again pages whose failure may not recur: timeouts, outages, "
+                        "429 and 5xx")
     r.add_argument("-y", "--yes", action="store_true", help="don't ask before calling systems")
 
     g = sub.add_parser("grade", help="grade a folder of predictions/<page_id>.json: yours, or a run's")
@@ -404,7 +404,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         renamed(a)
         return cmd(a)
     except KeyboardInterrupt:
-        print(f"opb {a.cmd}: interrupted" + ("; continue it with --resume <its folder name>" if a.cmd == "run" else ""), file=sys.stderr)
+        hint = "; continue it with --resume <its folder name>" if a.cmd == "run" else ""
+        print(f"opb {a.cmd}: interrupted{hint}", file=sys.stderr)
         return 130
 
 
