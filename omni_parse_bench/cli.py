@@ -139,7 +139,7 @@ def cmd_init(a: argparse.Namespace) -> int:
 
     from omni_parse_bench import harness
 
-    c = config.template(harness.system, a.system, dataset=a.dataset, manifest=a.manifest,
+    c = config.template(harness.system, a.system, dataset=data.DEFAULT_DATASET, manifest=data.MANIFEST,
                         scorers={unit_tests.UnitTests.name: {}}, timeout=900)
     sys.stdout.write(yaml.safe_dump(c, sort_keys=False, width=1000, allow_unicode=True))
     return 0
@@ -321,8 +321,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     n = sub.add_parser("init", help="a config for one system, as YAML on stdout")
     n.add_argument("system", help="a system (`opb systems`), or an OpenRouter model id")
-    n.add_argument("--dataset", default=data.DEFAULT_DATASET, help=dataset_help)
-    n.add_argument("--manifest", default=data.MANIFEST, help=manifest_help)
 
     r = sub.add_parser("run", help="predict every page with one config's system, then grade; a new run, or "
                                    "--resume one")

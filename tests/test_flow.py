@@ -25,6 +25,7 @@ pq = pytest.importorskip("pyarrow.parquet")
 from omni_bench_core import config  # noqa: E402
 
 from omni_parse_bench import benchmark, cli, harness  # noqa: E402
+from omni_parse_bench import data as opb_data  # noqa: E402
 from omni_parse_bench.harness import contract  # noqa: E402
 from omni_parse_bench.harness import errors as harness_errors  # noqa: E402
 
@@ -310,7 +311,7 @@ def test_how_a_model_is_served_is_its_runs_question_and_its_server_must_say_so(t
     finally:
         srv.shutdown()
         NOW.clear()
-    assert cli.main(["init", "chandra-ocr", "--dataset", data]) == 0
+    assert cli.main(["init", "chandra-ocr"]) == 0
     assert "weights: datalab-to/chandra-ocr-2" in capsys.readouterr().out
 
 
@@ -570,8 +571,9 @@ def test_opb_init_writes_a_config_and_a_run_folder_keeps_it(tmp_path, capsys, mo
     back, asks the same question."""
     monkeypatch.setitem(harness.ADAPTERS, "tagged", Tagged)
     data = dataset(tmp_path / "data", 1)
-    assert cli.main(["init", "tagged", "--dataset", data]) == 0
-    (c := tmp_path / "tagged.yaml").write_text(capsys.readouterr().out)
+    assert cli.main(["init", "tagged"]) == 0
+    said = capsys.readouterr().out
+    (c := tmp_path / "tagged.yaml").write_text(said.replace(opb_data.DEFAULT_DATASET, data))
     assert "tag: x" in c.read_text() and "timeout: 900.0" in c.read_text()
     argv = ["run", "--config", str(c), "--out", str(tmp_path / "runs"), "-y"]
     assert cli.main([*argv, "--set", "system.tagged.tag=y", "--set", "workers=2"]) == 0

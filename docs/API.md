@@ -86,8 +86,8 @@ A run is one config, omni-bench-core's (its `config` module): `dataset`, `manife
 (`sample` N evenly spaced, `limit` the first N, 0 for every page, or `only` these ids), `timeout`, `workers`
 and `system`, one system and every option it has. Nothing has a default and nothing comes from another file,
 so the file says the whole run; a missing key, an unknown one or a value of the wrong kind is refused at its
-key. `opb init <system>` writes one with every option at its default (`--dataset` and `--manifest` for another
-dataset). `--set path=value` changes one value the file has, read as YAML; a path it hasn't is refused, with the
+key. `opb init <system>` writes one with every option at its default, on our dataset; `--set dataset=<folder>`
+runs it on another. `--set path=value` changes one value the file has, read as YAML; a path it hasn't is refused, with the
 nearest one it has. The run folder keeps the config, every `--set` applied, as `config.yaml`.
 
 `opb run` also takes `--out`, `--resume RUN` and `--retry-failed` (with `--resume`). It shows the plan and asks
