@@ -21,10 +21,9 @@ Contents:
 4. [Grade](#grade): a run again, or predictions of your own;
 5. [Score on your own](#score-on-your-own): the scorer on its own, in code or from the command line;
 6. [Predict one page](#predict-one-page): one page through one system;
-7. [Documentation](#documentation);
-8. [Results](#results): every system we ran on the published dataset;
-9. [License](#license); and
-10. [Citation](#citation).
+7. [Results](#results): every system we ran on the published dataset;
+8. [License](#license); and
+9. [Citation](#citation).
 
 ## How scoring works
 
@@ -322,24 +321,6 @@ unit_tests.score(record["output"], unit_tests.tests.read("gold/<page_id>.json"))
 ```bash
 opb predict --system datalab --page pages/<page_id>.pdf --options '{"mode": "accurate"}'
 ```
-
-## Documentation
-
-- [`docs/API.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/API.md): every function and
-  command, the dataset, and what a run writes;
-- [`docs/design.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/design.md): each test type, tag
-  and derivation, and the data layout;
-- [`docs/results.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/results.md): every system's
-  scores, by family and by tag;
-- [`docs/building-tests.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/building-tests.md): how
-  the tests were built, and where each one's answer comes from;
-- [`docs/providers.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/providers.md): the adapter
-  for each system, and how to serve each open model; and
-- [`docs/tagging.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/tagging.md): how the tests'
-  tags were made.
-
-Found a test that's wrong, or a page you hold rights in?
-[Open an issue](https://github.com/datalab-to/omni_parse_bench/issues).
 
 ## Results
 
