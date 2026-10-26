@@ -6,38 +6,31 @@
 [![Data: per source](https://img.shields.io/badge/data-per%20source-lightgrey)](https://github.com/datalab-to/omni_parse_bench/tree/main/licenses)
 [![Dataset on Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20dataset-omni__parse__bench-yellow)](https://huggingface.co/datasets/datalab-to/omni_parse_bench)
 
-Omni Parse Bench measures how well a system parses a document page: its text, its tables and its layout. A system
-is sent a page, and returns its html and, if it can, its layout blocks. The answer is graded by unit tests: each
-test is a yes/no question about the page, such as whether this text is in the output, or this cell sits under
-these headings.
+This repository contains a way to benchmark document-parsing systems using our unit-test scorer and dataset as well as your own. Concretely, this repository holds:
 
-This repository holds:
-
-- the scorer, which works on its own: one page's output and its tests in, a verdict per test out;
-- the benchmark: our dataset on [Hugging Face](https://huggingface.co/datasets/datalab-to/omni_parse_bench), or
-  your own, run through a system and graded; and
-- the adapters: one per vendor, one for any model on OpenRouter, and one per open model, with a folder to serve
-  it on a GPU.
+- the scorer, which works on its own: a page's output and its tests as input, a verdict per test as output;
+- the benchmark: run over our dataset on [Hugging Face](https://huggingface.co/datasets/datalab-to/omni_parse_bench), or
+  your own; and
+- the systems: different registered systems that you can easily evaluate, including open models with a folder to serve each on a GPU.
 
 Contents:
 
-- [How scoring works](#how-scoring-works): tests, families, the headline and tags;
-- [Results](#results): every system we ran on the published dataset;
-- [Install](#install): the scorer alone, or with the adapters and the dataset;
-- [Run the benchmark](#run-the-benchmark): one system on the dataset, from a config;
-- [Grade](#grade): a run again, or predictions of your own, and how to read a summary;
-- [Score one page](#score-one-page): the scorer on its own, in code or from the command line;
-- [Predict one page](#predict-one-page): one page through one system;
-- [Documentation](#documentation);
-- [License](#license); and
-- [Citation](#citation).
+1. [How scoring works](#how-scoring-works): tests, families, the headline and tags;
+2. [Results](#results): every system we ran on the published dataset;
+3. [Install](#install): the scorer alone, or with the adapters and the dataset;
+4. [Run the benchmark](#run-the-benchmark): one system on the dataset, from a config;
+5. [Grade](#grade): a run again, or predictions of your own;
+6. [Score on your own](#score-on-your-own): the scorer on its own, in code or from the command line;
+7. [Predict one page](#predict-one-page): one page through one system;
+8. [Documentation](#documentation);
+9. [License](#license); and
+10. [Citation](#citation).
 
 ## How scoring works
 
 ![The benchmark's design: headline, families, tests, args and tags](https://raw.githubusercontent.com/datalab-to/omni_parse_bench/main/docs/assets/design.svg)
 
-A test is a yes/no question about one page. There are five types of test, and each type belongs to one of three
-families:
+A test is a yes/no question about one page. Each test type belongs to one of three families:
 
 | test type | checks | family |
 |---|---|---|
@@ -47,9 +40,9 @@ families:
 | `table_cell` | this cell sits under these headings and beside these neighbors | tables |
 | `layout_kind` | the block holding this line is a heading, text or table | layout |
 
-A family's score is the share of its tests that pass. The headline is the mean of the three family scores.
+A family's score is the share of its tests that pass, and the headline is the mean of the three family scores.
 
-A test checks one or more args, each of which is the content at one place on the page. Each arg is tagged:
+Each test is tagged by what it checks:
 
 - structure: `table`, `math`, `form` and `multi_column`;
 - rendering: `handwriting`, `tiny`, `rotated` and `degraded`;
@@ -57,16 +50,14 @@ A test checks one or more args, each of which is the content at one place on the
 - script: ISO 15924 codes (`Latn`, `Hani`, `Deva`, ...); and
 - language: ISO 639-3 codes (`eng`, `fra`, `tha`, ...).
 
-A test's tags are the union of its args' tags. Tags never decide whether a test passes, or the headline. They are
-only for slicing the results, such as the score on handwriting alone.
+Tags never decide whether a test passes, or the headline. They are only for slicing the results, such as the score
+on handwriting alone. The full design is [`docs/design.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/design.md).
 
 ## Results
 
 Every system on the published dataset (revision `961c0f89`, plus Nemotron 3.5 Parse; omni-parse-bench 0.1.2 or
-newer). Datalab's two rows are from a rerun of its production API on 2026-10-23. The scores per tag
-(handwriting, math, tables, forms, rotated pages, ...), how parameters are counted and how each open model is
-served are in [`docs/results.md`](./docs/results.md). Every verdict is in the dataset's `results.parquet`
-(Nemotron 3.5 Parse's and the Datalab rerun's once the dataset update that adds them is merged).
+newer). Datalab's two rows are from a rerun of its production API on 2026-10-23. The scores per tag, how
+parameters are counted and how each open model is served are in [`docs/results.md`](./docs/results.md).
 
 | parser | weights | parameters | headline | text | tables | layout |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
@@ -100,49 +91,44 @@ served are in [`docs/results.md`](./docs/results.md). Every verdict is in the da
 | Tesseract | open | n/a | none | 17.6 | 0.0 | unsupported |
 
 \* Used in creating and verifying at least some tests. † See [`docs/results.md`](./docs/results.md). A system with
-no layout blocks has no layout score, so no headline; [Grade](#grade) says how to read it.
+no layout blocks has no layout score, so no headline ([Grade](#grade)).
 
 ## Install
 
 ```bash
-uv pip install omni-parse-bench                 # score and grade: no network, no API keys
-uv pip install 'omni-parse-bench[harness]'      # + the systems' adapters, to predict
-uv pip install 'omni-parse-bench[benchmark]'    # [harness] + the Hugging Face client, to download the dataset
+uv pip install omni-parse-bench                 # the scorer, and grading a dataset folder on disk
+uv pip install 'omni-parse-bench[harness]'      # + the adapters, to get predictions
+uv pip install 'omni-parse-bench[benchmark]'    # + the Hugging Face client, to download our dataset
 ```
-
-The base install scores pages, and grades and checks a dataset folder on disk (`opb grade`, `opb check`).
-Reading the published dataset (`hf://...`) needs the Hugging Face client, which `[benchmark]` brings.
-`[benchmark]` includes `[harness]`, so it is the one extra to install to run the benchmark end to end. Python 3.12
-or newer.
 
 ## Run the benchmark
 
 A run is one system on one dataset. It works in three stages:
 
-1. Plan: check the config, the system's keys and the dataset's files, before any call;
+1. Plan: check the config, the system's keys and the dataset's files before any call;
 2. Predict: send each page to the system and save each answer in the run's folder; and
 3. Grade: score the saved answers. Grading calls no system, so it can be done again for free.
 
 ### A config
 
-A run is one config: a YAML file with every key written out. `opb init` writes one for a system, every option at
-its default, on our dataset:
+A run is one config: a YAML file with every key written out. `opb init` writes one for a registered system, every
+option at its default, and on our dataset:
 
 ```bash
 opb init datalab > datalab.yaml
 ```
 
 ```yaml
-dataset: hf://datasets/datalab-to/omni_parse_bench
-manifest: manifest.parquet
+dataset: hf://datasets/datalab-to/omni_parse_bench   # a folder, or a Hugging Face dataset
+manifest: manifest.parquet                           # which of its pages, with which files
 scorers:
   unit_tests: {}
-rows:            # sample N evenly spaced, or limit to the first N (0 for every page), or only these ids
+rows:
   sample: 0
   limit: 0
   only: null
-timeout: 900.0   # seconds each page may take
-workers: 0       # pages in flight at once; 0 for the system's own
+timeout: 900.0           # seconds
+workers: 0               # pages in flight at once; 0 for the system's default
 system:
   datalab:
     mode: accurate
@@ -150,20 +136,14 @@ system:
 ```
 
 `--set path=value` changes one value the file has, read as YAML, and refuses a path it hasn't. This runs Datalab
-on 5 pages, spread over the suites:
+on 5 pages:
 
 ```bash
 export DATALAB_API_KEY=...
 opb run --config datalab.yaml --set rows.sample=5 --out runs/
 ```
 
-`opb run` shows the plan and asks before calling any system. With no terminal to ask (a pipe, a notebook, CI), it
-goes ahead without asking, so a script runs as written; `-y` skips the question at a terminal too. It then
-predicts, showing a live table of the run's progress, and grades. The grading is JSON on stdout, and in the run's
-folder.
-
-Every system gets the same time per page, and its most accurate settings by default. `opb systems <name>` prints
-a system's options and their defaults.
+`opb run` shows the plan and asks before calling any system.
 
 ### Keys
 
@@ -177,126 +157,52 @@ Calling a system costs money, and each system reads its key from the environment
 | `llamaparse` | `LLAMA_CLOUD_API_KEY` |
 | `azure` | `AZURE_CU_KEY`, and its resource as the `endpoint` option |
 | `mistral` | `MISTRAL_API_KEY` |
-| any OpenRouter model id, such as `openai/gpt-5.6-sol` | `OPENROUTER_API_KEY` (or `OPENAI_API_KEY`); none with another `base_url` |
+| an OpenRouter model id, such as `openai/gpt-5.6-sol` | `OPENROUTER_API_KEY` (or `OPENAI_API_KEY`) |
 | `tesseract` | none; it runs locally |
 | a model you serve (`chandra-ocr`, `mineru`, `olmocr`, ...) | none; `OPB_ENDPOINT_KEY`, if set, is sent to your server as its bearer token |
 
-A missing key stops the run before any call, and says which `export` to type. `opb systems` lists every system,
-its outputs and its key.
-
-### Choosing the pages
-
-`dataset` is a folder, or `hf://datasets/<repo>[@revision]` (ours, as `opb init` writes it). The first run
-downloads the whole dataset once (about 1.5 GB, 5,903 files) into the Hugging Face cache, even for 5 pages,
-because grading needs it; later runs read the copy. Set `HF_TOKEN` (or run `hf auth login`) to download faster
-and avoid the Hub's rate limits. `manifest` picks which of the dataset's pages a run can ask about.
-
-`rows` picks which of the manifest's pages this run asks about:
-
-- `sample: N`: N pages evenly spaced over the manifest; two systems run with the same N get the same pages;
-- `limit: N`: the first N pages; and
-- `only: [ids]`: only these page ids. To run one suite, list its pages (`opb tests` gives each test's page and
-  suite).
-
-Each page asks a system for the outputs its tests read, limited to those the system can produce. A system that
-draws no layout blocks (such as `tesseract`, `nanonets-ocr` and `olmocr`) runs the same way.
-
-To check a dataset of your own before a run, or to list its tests as JSON lines for querying:
-`opb check --dataset <folder>` and `opb tests --dataset <folder> > tests.jsonl`
-([docs/API.md](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/API.md#the-dataset)).
-
-### Comparing systems
-
-A run is one system. To compare systems, or two settings of one system, write one config per system, with the
-same `rows`, so they answer the same pages:
-
-```bash
-export OPENROUTER_API_KEY=...
-opb init openai/gpt-5.6-sol > gpt.yaml
-opb run --config datalab.yaml --set rows.sample=5 --out runs/ -y
-opb run --config gpt.yaml --set rows.sample=5 --out runs/ -y
-```
-
-### The run folder
-
-Each run is a folder under `--out`, named after its system and a run id: `datalab-20261021-160012-3f9a`. It holds:
-
-- `config.yaml`: the config, every `--set` applied and every option written out, so
-  `opb run --config runs/<run>/config.yaml` asks the same question again;
-- `settings.json`: the question the run answers (the system and its options, the dataset, the manifest and the
-  pages chosen), and when and how it was launched;
-- `server.json`, for a model you serve: what its server said it serves, at each launch;
-- `records/` and `predictions/`: each page's answer as the system gave it, and as it is graded; and
-- `unit_tests/`: the grading.
-
-A run folder answers one exact question. So:
-
-- every `opb run` is a new run in a new folder, so a system redeployed since an earlier run is never mixed into it;
-  and
-- `opb resume <its folder>` continues that run ([Resuming a run](#resuming-a-run)).
-
 ### Models you serve
 
-Each open model has a folder, `omni_parse_bench/harness/providers/serve/<model>/`, that serves it on any GPU host.
-Which weights answer is part of the run: the system's `served` option names the weights and their revision, and
-before any call opb asks the server what it serves and refuses a run whose server serves something else.
+Each open model has a folder, `omni_parse_bench/harness/providers/serve/<model>/`, that serves it on any GPU host:
+
+```bash
+docker build -t opb-chandra-ocr omni_parse_bench/harness/providers/serve/chandra-ocr
+docker run --gpus all -p 8001:8001 opb-chandra-ocr
+opb init chandra-ocr > chandra.yaml
+opb run --config chandra.yaml --set system.chandra-ocr.base_url=http://<host>:8001
+```
+
+The system's `served` option names the weights and their revision. Before any call, opb asks the server what it
+serves, and refuses a run whose server serves something else.
 [`docs/providers.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/providers.md#serving-an-open-model)
-says how to start one and point a run at it.
+has more information.
 
-### When something goes wrong
+### Run folder shape
 
-One rule decides what counts as 0, the same for every system:
-
-    A page counts 0 only when code says, on purpose, that the system failed, by raising `SystemFailed`.
-    Any other exception stops the run and is raised as it is.
-
-Case by case, what you see, how the page counts, and what to do:
-
-- a failure that is the system's (`SystemFailed`, or its kinds `SystemTimeout` and `SystemUnreachable`) counts 0.
-  Its record keeps the error with a `traceback`, which shows the line that decided the system failed;
-- an answer the adapter says it can't read is recorded as `Unreadable` and counts 0, keeping the raw answer;
-- a bug in an adapter or in the scorer stops the run with its traceback. When it is in reading an answer, the
-  answer is kept, unread (`"unread": true` in its record), and resuming the run (`opb resume`) after the fix
-  reads it with no call;
-- a failure of the setup stops the run with nothing recorded for that page, so resuming the run continues it. Each
-  is a native exception: a missing key is a `ValueError`, an account that can't pay a `PermissionError`, and a
-  model server that isn't running the connection error itself, with a note saying how to start it;
-- after a fix to an adapter that read answers wrongly without raising, `opb reread RUN_DIR` reads the saved
-  answers again with no call, and `opb grade RUN_DIR` grades the run again; and
-- a run that stopped part way isn't graded until it is finished.
-
-### Resuming a run
-
-A run that stopped part way is continued with `opb resume <its folder>`. A run stops when you press Ctrl-C, when
-its key is refused or its account runs out, when a model server you serve isn't running, or when an adapter has a
-bug. Resuming asks only for the pages with no record yet, so no page is paid for twice:
-
-```bash
-opb resume runs/datalab-20261021-160012-3f9a
+```
+runs/datalab-20261026-185915-9c9e/
+  config.yaml                         # resolved config; point to this to rerun
+  settings.json                       # the question it answers and the launch; resume checks against it
+  server.json                         # for a model you serve: what its server said it serves
+  records/<id>.json                   # response from the system in full (cost, raw response)
+  predictions/<id>.json               # prediction portion of the response
+  unit_tests/summary.json             # summary of scores
+  unit_tests/scores.jsonl             # scores (line-per-page)
+  unit_tests/details/<id>.jsonl       # detailed info (verdict per test) per page
 ```
 
-It reads the run's own `config.yaml`, so it asks the same question. `--set` may change what isn't part of the
-question, `timeout` and `workers`. A change to anything else (the system, its options, including `served`, the
-dataset, the manifest, `rows`) is refused, naming the keys that differ: a different question is a new run. The
-address of a model server, `base_url`, may change between attempts.
+[`docs/API.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/API.md) has more information,
+including [how to run on your own dataset](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/API.md#the-dataset).
 
-A failed page has a record, so a resume doesn't ask for it again, unless you add `--retry-failed`. That asks
-again for the pages whose failure may not happen a second time: a timeout, a system that couldn't be reached, a
-rate limit (429) or a server error (5xx). A refusal (such as a 400) or an answer that couldn't be read stays
-failed, since asking again would give the same answer. Rate limits are the common case: two runs on one key at
-once can exceed a system's limit, and a page still refused after the core's retries is recorded as failed. Run
-them one after the other, then:
+### Resume
+
+You can resume a run by giving a path to its folder.
 
 ```bash
-opb resume runs/datalab-20261021-160012-3f9a --retry-failed
+opb resume runs/<run>                                         # continue where it stopped
+opb resume runs/<run> --retry-failed                          # also ask again for timeouts, etc.
+opb resume runs/<run> --retry-failed --set timeout=1800       # increase timeout
 ```
-
-To give pages that timed out more time, add `--set timeout=1800`. Each page's record keeps the timeout it was
-asked with.
-
-A run whose answers were read wrongly needs no resume. After a fix to an adapter's reading,
-`opb reread runs/<run>` reads the saved answers again with no call, and `opb grade runs/<run>` grades the run
-again.
 
 ### In Python
 
@@ -304,43 +210,28 @@ again.
 from omni_parse_bench import benchmark, harness
 
 if __name__ == "__main__":
-    b = benchmark.default()                    # the published dataset, every test graded
-    b.run(harness.system("datalab", {"mode": "accurate"}), out="runs", sample=5)
+    bench = benchmark.default()
+    results = bench.run(harness.system("datalab", {"mode": "accurate"}), out="runs", sample=5)
 ```
 
-`b.run(system, ...)` takes one system, and returns its grading, whose `run` is the run folder's name. With the
-adapter class itself, it is `b.run(Datalab(mode="accurate"), out="runs", sample=5)`
-(`from omni_parse_bench.harness.providers.datalab import Datalab`). To compare systems, call it once per system
-with the same `sample` (or `limit`, `only`). To resume a run, give its name as `resume`, and `retry_failed=True`
-to ask again for its failures that may not recur.
-
-Every Python snippet that runs a benchmark here sits under `if __name__ == "__main__":`. A scorer or an executor
-that works in several processes starts each one by importing your script again (on macOS and Windows), and the
-guard keeps that import from starting the run a second time.
+Code that runs or grades a benchmark goes under `if __name__ == "__main__":`. A scorer or an executor that works in
+several processes imports your script again in each one on macOS and Windows, and the guard keeps that from
+starting the run a second time.
 
 ## Grade
 
-Grading compares saved answers with the tests, and calls no system. `opb run` grades its run when it finishes; to
-grade again, or to grade predictions you made yourself:
+`opb run` grades its run when it finishes. To grade a run again, or a folder of your own predictions:
 
 ```bash
-opb grade runs/datalab-20261021-160012-3f9a            # a run: graded on the pages it chose
-opb grade mine/                                        # your own: mine/predictions/<page_id>.json, every page
-opb grade runs/datalab-20261021-160012-3f9a --partial  # an unfinished run, its missing pages counted as 0
+opb grade runs/datalab-20261021-160012-3f9a        # a run knows its own dataset
+opb grade mine/ --dataset my-dataset/              # your predictions on your own dataset
 ```
 
-A run is graded only when it is finished: every page it chose has an answer or a recorded failure. Otherwise
-`opb grade` refuses and names the pages. Resume the run to finish them, or grade with `--partial`, which counts
-them as 0 and says how many in the summary under `partial`. A folder of your own is graded over the whole
-manifest, and a missing prediction is refused the same way.
-
-Every test of a page is graded. The grading is written to `<run>/unit_tests/`: `summary.json`, `scores.jsonl`
-(one line per page) and `details/<page_id>.jsonl` (one line per test). A summary looks like this:
+A summary looks like this:
 
 ```json
 {
   "scorer": "unit_tests",
-  "options": {},
   "run": "datalab-20261021-160012-3f9a",
   "headline": 0.648,
   "headline_is": "scored.headline × coverage",
@@ -359,30 +250,16 @@ Every test of a page is graded. The grading is written to `<run>/unit_tests/`: `
 }
 ```
 
-It reads in three parts:
+`coverage` is the share of pages that didn't fail, and everything under `scored` is over those pages. The
+headline at the top is `scored.headline` times coverage, so a page that failed counts as 0.
 
-- `coverage` is the share of pages that didn't fail;
-- everything under `scored` is over the pages that didn't fail: each family's score, and their mean,
-  `scored.headline`; and
-- the `headline` at the top is that mean times coverage, so a page that failed counts as 0.
+A system that produces html only (such as `tesseract`, `nanonets-ocr` and `olmocr`) is never asked for layout
+blocks, so its layout family is 0 and its headline is at most two thirds. Compare it with other systems on its
+text and tables families.
 
-A system that produces html only (such as `tesseract`, `nanonets-ocr` and `olmocr`) is read differently. The
-families map onto outputs: html gives text and tables, and blocks give layout. Such a system is never asked for
-blocks, and a page whose tests read blocks alone is not sent to it. Its blocks tests fail as "no blocks output",
-which is not a failed page, so coverage stays as it is. So its layout family is 0, and its headline is at most
-two thirds. Compare it with other systems on its text and tables families, which say how well it reads the page.
+## Score on your own
 
-Any other breakdown (by tag, test type, suite, derivation) comes from the files: each test's verdict, with its
-test type, tags and derivation, is in `details/<page_id>.jsonl`, and `opb tests` lists every test with its page
-and suite ([docs/API.md](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/API.md#a-slice-of-the-benchmark)).
-
-To grade another way, write your own scorer: a frozen dataclass with `gold(row)`, `score(pred, gold)` and
-`summarize(lines)`, given to the benchmark beside `UnitTests`.
-
-## Score one page
-
-`unit_tests` is the benchmark's scorer: it owns what a test is, and how one is graded. Here is one page with three
-tests, written inline with `unit_tests.tests.parse` so the gold file's shape is visible:
+The scorer works on its own, with no dataset and no network. Here is one page with three tests:
 
 ```python
 from omni_parse_bench import data
@@ -453,23 +330,19 @@ verdicts = unit_tests.score(pred, tests)
 {'headline': 0.0, 'families': {'tables': {'score': 0.0, 'tests': 1, 'documents': 1}}}
 ```
 
-A verdict is `pass` or `fail`, with `why` saying what went wrong. A test whose output is missing fails. A test
-whose grading raises is a bug in our scorer: it is raised, naming the page and the test, not scored.
+A verdict is `pass` or `fail`, with `why` saying what went wrong.
 
-From the command line, this prints the verdicts:
+The same from the command line, which prints the verdicts:
 
 ```bash
 opb score --pred outputs.json --gold gold/<page_id>.json
 ```
 
-A score over many pages is `summarize` in your code, or `summary.json` from `opb run` and `opb grade`
-([Grade](#grade)).
-
 ## Predict one page
 
-With `[harness]` installed, `harness.system` makes a system's adapter from its name and options, and
-`harness.predict` sends one page under the same rules a run uses (one time budget, retries, failures recorded) and
-returns its record:
+With `[harness]` installed, each system is an adapter class. `harness.system` makes one from a system name and its
+options and `harness.predict` sends one page under the same rules a run uses (one time budget, retries, failures
+recorded) and returns its record:
 
 ```python
 from pathlib import Path
@@ -477,19 +350,17 @@ from pathlib import Path
 from omni_parse_bench import harness
 from omni_parse_bench.scorers import unit_tests
 
-system = harness.system("datalab", {"mode": "balanced"})
-record = harness.predict(system, harness.Input(Path("pages/<page_id>.pdf"), frozenset({"html", "blocks"})))
-record["output"]        # {"pages": [{"html": "...", "blocks": [...]}]}: one entry per page of the document
-record["error"]         # why the page failed (type, status, message, traceback), or None
-record["cost"]          # what it cost, its wall time and attempts
+datalab = harness.system("datalab", {"mode": "accurate"})
+record = harness.predict(datalab, harness.Input(Path("pages/<page_id>.pdf"), frozenset({"html", "blocks"})))
+record["output"]    # {"pages": [{"html": "...", "blocks": [...]}]}
+record["raw"]       # the answer as the system gave it
+record["cost"]      # what it cost, its wall time and attempts
 
 unit_tests.score(record["output"], unit_tests.tests.read("gold/<page_id>.json"))
 ```
 
-From the command line:
-
 ```bash
-opb predict --system openai/gpt-5.6-sol --page pages/<page_id>.pdf --outputs html   # html alone: one call
+opb predict --system datalab --page pages/<page_id>.pdf --options '{"mode": "accurate"}'
 ```
 
 ## Documentation
