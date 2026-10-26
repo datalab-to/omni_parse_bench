@@ -147,20 +147,6 @@ opb resume runs/<run> --retry-failed                          # also ask again f
 opb resume runs/<run> --retry-failed --set timeout=1800       # increase timeout
 ```
 
-### In Python
-
-```python
-from omni_parse_bench import benchmark, harness
-
-if __name__ == "__main__":
-    bench = benchmark.default()
-    results = bench.run(harness.system("datalab", {"mode": "accurate"}), out="runs", sample=5)
-```
-
-Code that runs or grades a benchmark goes under `if __name__ == "__main__":`. A scorer or an executor that works in
-several processes imports your script again in each one on macOS and Windows, and the guard keeps that from
-starting the run a second time.
-
 ## Grade
 
 `opb run` grades its run when it finishes. To grade a run again, or a folder of your own predictions:
