@@ -16,13 +16,13 @@ This repository contains a way to benchmark document-parsing systems using our u
 Contents:
 
 1. [How scoring works](#how-scoring-works): tests, families, the headline and tags;
-2. [Results](#results): every system we ran on the published dataset;
-3. [Install](#install): the scorer alone, or with the adapters and the dataset;
-4. [Run the benchmark](#run-the-benchmark): one system on the dataset, from a config;
-5. [Grade](#grade): a run again, or predictions of your own;
-6. [Score on your own](#score-on-your-own): the scorer on its own, in code or from the command line;
-7. [Predict one page](#predict-one-page): one page through one system;
-8. [Documentation](#documentation);
+2. [Install](#install): the scorer alone, or with the adapters and the dataset;
+3. [Run the benchmark](#run-the-benchmark): one system on the dataset, from a config;
+4. [Grade](#grade): a run again, or predictions of your own;
+5. [Score on your own](#score-on-your-own): the scorer on its own, in code or from the command line;
+6. [Predict one page](#predict-one-page): one page through one system;
+7. [Documentation](#documentation);
+8. [Results](#results): every system we ran on the published dataset;
 9. [License](#license); and
 10. [Citation](#citation).
 
@@ -52,46 +52,6 @@ Each test is tagged by what it checks:
 
 Tags never decide whether a test passes, or the headline. They are only for slicing the results, such as the score
 on handwriting alone. The full design is [`docs/design.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/design.md).
-
-## Results
-
-Every system on the published dataset (revision `961c0f89`, plus Nemotron 3.5 Parse; omni-parse-bench 0.1.2 or
-newer). Datalab's two rows are from a rerun of its production API on 2026-10-23. The scores per tag, how
-parameters are counted and how each open model is served are in [`docs/results.md`](./docs/results.md).
-
-| parser | weights | parameters | headline | text | tables | layout |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Datalab accurate | closed |  | 94.1 | 92.0 | 94.2 | 96.0 |
-| Gemini 3.8 Flash * | closed |  | 92.9 | 91.3 | 95.2 | 92.2 |
-| Datalab balanced | closed |  | 92.6 | 90.1 | 91.6 | 96.2 |
-| Reducto | closed |  | 90.8 | 85.4 | 91.2 | 95.8 |
-| LlamaParse | closed |  | 90.4 | 88.2 | 92.6 | 90.4 |
-| chandra-ocr-2 (Datalab) | open | 4.5B | 90.1 | 87.4 | 87.4 | 95.4 |
-| Mistral OCR | closed |  | 89.5 | 82.8 | 91.9 | 93.8 |
-| Claude Sonnet 5.5 * | closed |  | 88.7 | 93.1 | 95.4 | 77.5 |
-| dots.mocr | open | 3.0B | 87.9 | 82.5 | 88.6 | 92.5 |
-| GPT-5.6 Sol | closed |  | 87.8 | 85.4 | 91.6 | 86.5 |
-| MinerU2.5-Pro | open | 1.2B | 87.1 | 77.4 | 92.1 | 91.7 |
-| Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | 83.3 | 84.1 | 93.5 |
-| Extend | closed |  | 83.3 | 64.1 | 92.5 | 93.4 |
-| Surya OCR 2 (Datalab) | open | 0.67B | 83.1 | 80.6 | 74.3 | 94.3 |
-| Azure | closed |  | 83.0 | 74.6 | 81.7 | 92.8 |
-| LightOnOCR-3-4B | open | 4.5B | 82.9 | 83.9 | 70.8 | 94.0 |
-| LightOnOCR-3-0.8B | open | 0.85B | 81.6 | 81.1 | 72.1 | 91.7 |
-| GLM-OCR | open | 1.3B | 81.5 | 71.0 | 84.2 | 89.3 |
-| Nemotron 3.5 Parse | open | 0.63B | 80.0 | 72.4 | 77.3 | 90.2 |
-| Unlimited-OCR | open | 3.3B | 79.3 | 70.2 | 76.5 | 91.1 |
-| PaddleOCR-VL-1.6 | open | 0.96B | 78.7 | 61.7 | 83.7 | 90.7 |
-| Infinity-Parser2-Flash | open | 2.2B | 78.4 | 78.4 | 66.5 | 90.4 |
-| DeepSeek-OCR-2 | open | 3.4B | 75.2 | 64.2 | 70.0 | 91.4 |
-| Indra OCR (Datalab) | open | about 12M † | 69.5 | 60.3 | 58.1 | 90.1 |
-| HunyuanOCR-1.5 | open | 1.0B | 64.6 | 50.5 | 61.9 | 81.4 |
-| olmOCR-2 | open | 8.3B | none | 71.3 | 56.6 | unsupported |
-| Nanonets-OCR2-3B | open | 3.8B | none | 68.2 | 62.6 | unsupported |
-| Tesseract | open | n/a | none | 17.6 | 0.0 | unsupported |
-
-\* Used in creating and verifying at least some tests. † See [`docs/results.md`](./docs/results.md). A system with
-no layout blocks has no layout score, so no headline ([Grade](#grade)).
 
 ## Install
 
@@ -380,6 +340,46 @@ opb predict --system datalab --page pages/<page_id>.pdf --options '{"mode": "acc
 
 Found a test that's wrong, or a page you hold rights in?
 [Open an issue](https://github.com/datalab-to/omni_parse_bench/issues).
+
+## Results
+
+Every system on the published dataset (revision `961c0f89`, plus Nemotron 3.5 Parse; omni-parse-bench 0.1.2 or
+newer). Datalab's two rows are from a rerun of its production API on 2026-10-23. The scores per tag, how
+parameters are counted and how each open model is served are in [`docs/results.md`](./docs/results.md).
+
+| parser | weights | parameters | headline | text | tables | layout |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Datalab accurate | closed |  | 94.1 | 92.0 | 94.2 | 96.0 |
+| Gemini 3.8 Flash * | closed |  | 92.9 | 91.3 | 95.2 | 92.2 |
+| Datalab balanced | closed |  | 92.6 | 90.1 | 91.6 | 96.2 |
+| Reducto | closed |  | 90.8 | 85.4 | 91.2 | 95.8 |
+| LlamaParse | closed |  | 90.4 | 88.2 | 92.6 | 90.4 |
+| chandra-ocr-2 (Datalab) | open | 4.5B | 90.1 | 87.4 | 87.4 | 95.4 |
+| Mistral OCR | closed |  | 89.5 | 82.8 | 91.9 | 93.8 |
+| Claude Sonnet 5.5 * | closed |  | 88.7 | 93.1 | 95.4 | 77.5 |
+| dots.mocr | open | 3.0B | 87.9 | 82.5 | 88.6 | 92.5 |
+| GPT-5.6 Sol | closed |  | 87.8 | 85.4 | 91.6 | 86.5 |
+| MinerU2.5-Pro | open | 1.2B | 87.1 | 77.4 | 92.1 | 91.7 |
+| Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | 83.3 | 84.1 | 93.5 |
+| Extend | closed |  | 83.3 | 64.1 | 92.5 | 93.4 |
+| Surya OCR 2 (Datalab) | open | 0.67B | 83.1 | 80.6 | 74.3 | 94.3 |
+| Azure | closed |  | 83.0 | 74.6 | 81.7 | 92.8 |
+| LightOnOCR-3-4B | open | 4.5B | 82.9 | 83.9 | 70.8 | 94.0 |
+| LightOnOCR-3-0.8B | open | 0.85B | 81.6 | 81.1 | 72.1 | 91.7 |
+| GLM-OCR | open | 1.3B | 81.5 | 71.0 | 84.2 | 89.3 |
+| Nemotron 3.5 Parse | open | 0.63B | 80.0 | 72.4 | 77.3 | 90.2 |
+| Unlimited-OCR | open | 3.3B | 79.3 | 70.2 | 76.5 | 91.1 |
+| PaddleOCR-VL-1.6 | open | 0.96B | 78.7 | 61.7 | 83.7 | 90.7 |
+| Infinity-Parser2-Flash | open | 2.2B | 78.4 | 78.4 | 66.5 | 90.4 |
+| DeepSeek-OCR-2 | open | 3.4B | 75.2 | 64.2 | 70.0 | 91.4 |
+| Indra OCR (Datalab) | open | about 12M † | 69.5 | 60.3 | 58.1 | 90.1 |
+| HunyuanOCR-1.5 | open | 1.0B | 64.6 | 50.5 | 61.9 | 81.4 |
+| olmOCR-2 | open | 8.3B | none | 71.3 | 56.6 | unsupported |
+| Nanonets-OCR2-3B | open | 3.8B | none | 68.2 | 62.6 | unsupported |
+| Tesseract | open | n/a | none | 17.6 | 0.0 | unsupported |
+
+\* Used in creating and verifying at least some tests. † See [`docs/results.md`](./docs/results.md). A system with
+no layout blocks has no layout score, so no headline ([Grade](#grade)).
 
 ## License
 
