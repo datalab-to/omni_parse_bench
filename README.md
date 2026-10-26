@@ -233,8 +233,7 @@ A run folder answers one exact question. So:
 
 - every `opb run` is a new run in a new folder, so a system redeployed since an earlier run is never mixed into it;
   and
-- `--resume <a run's folder name>` continues that run, and pays for no page twice. It refuses a run of another
-  question.
+- `opb resume <its folder>` continues that run ([Resuming a run](#resuming-a-run)).
 
 ### Models you serve
 
@@ -257,14 +256,47 @@ Case by case, what you see, how the page counts, and what to do:
   Its record keeps the error with a `traceback`, which shows the line that decided the system failed;
 - an answer the adapter says it can't read is recorded as `Unreadable` and counts 0, keeping the raw answer;
 - a bug in an adapter or in the scorer stops the run with its traceback. When it is in reading an answer, the
-  answer is kept, unread (`"unread": true` in its record), and resuming the run (`--resume`) after the fix reads
-  it with no call;
+  answer is kept, unread (`"unread": true` in its record), and resuming the run (`opb resume`) after the fix
+  reads it with no call;
 - a failure of the setup stops the run with nothing recorded for that page, so resuming the run continues it. Each
   is a native exception: a missing key is a `ValueError`, an account that can't pay a `PermissionError`, and a
   model server that isn't running the connection error itself, with a note saying how to start it;
 - after a fix to an adapter that read answers wrongly without raising, `opb reread RUN_DIR` reads the saved
   answers again with no call, and `opb grade RUN_DIR` grades the run again; and
 - a run that stopped part way isn't graded until it is finished.
+
+### Resuming a run
+
+A run that stopped part way is continued with `opb resume <its folder>`. A run stops when you press Ctrl-C, when
+its key is refused or its account runs out, when a model server you serve isn't running, or when an adapter has a
+bug. Resuming asks only for the pages with no record yet, so no page is paid for twice:
+
+```bash
+opb resume runs/datalab-20261021-160012-3f9a
+```
+
+It reads the run's own `config.yaml`, so it asks the same question. `--set` may change what isn't part of the
+question, `timeout` and `workers`. A change to anything else (the system, its options, including `served`, the
+dataset, the manifest, `rows`) is refused, naming the keys that differ: a different question is a new run. The
+address of a model server, `base_url`, may change between attempts.
+
+A failed page has a record, so a resume doesn't ask for it again, unless you add `--retry-failed`. That asks
+again for the pages whose failure may not happen a second time: a timeout, a system that couldn't be reached, a
+rate limit (429) or a server error (5xx). A refusal (such as a 400) or an answer that couldn't be read stays
+failed, since asking again would give the same answer. Rate limits are the common case: two runs on one key at
+once can exceed a system's limit, and a page still refused after the core's retries is recorded as failed. Run
+them one after the other, then:
+
+```bash
+opb resume runs/datalab-20261021-160012-3f9a --retry-failed
+```
+
+To give pages that timed out more time, add `--set timeout=1800`. Each page's record keeps the timeout it was
+asked with.
+
+A run whose answers were read wrongly needs no resume. After a fix to an adapter's reading,
+`opb reread runs/<run>` reads the saved answers again with no call, and `opb grade runs/<run>` grades the run
+again.
 
 ### In Python
 
@@ -279,7 +311,8 @@ if __name__ == "__main__":
 `b.run(system, ...)` takes one system, and returns its grading, whose `run` is the run folder's name. With the
 adapter class itself, it is `b.run(Datalab(mode="accurate"), out="runs", sample=5)`
 (`from omni_parse_bench.harness.providers.datalab import Datalab`). To compare systems, call it once per system
-with the same `sample` (or `limit`, `only`).
+with the same `sample` (or `limit`, `only`). To resume a run, give its name as `resume`, and `retry_failed=True`
+to ask again for its failures that may not recur.
 
 Every Python snippet that runs a benchmark here sits under `if __name__ == "__main__":`. A scorer or an executor
 that works in several processes starts each one by importing your script again (on macOS and Windows), and the

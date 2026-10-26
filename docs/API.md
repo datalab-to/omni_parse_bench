@@ -51,8 +51,8 @@ says how to read its results). `Benchmark.plan` refuses, before any call, a syst
 
 `Benchmark.plan` takes `limit`, `sample` and `only` (page ids) to choose pages, `timeout` (seconds
 per page), `workers` (pages at once; 0, the default, for the adapter's own) and `retry_failed`. `sample` takes pages evenly
-spaced over the manifest, and `limit` takes the first ones; give one or the other. A run's folder is named for the whole
-question: the system and its options, the dataset, the manifest, the task and the pages chosen, then a run id. Every launch is a new run in a new folder;
+spaced over the manifest, and `limit` takes the first ones; give one or the other. A run's folder is named after its
+system and a run id; it answers one question: the system and its options, the dataset, the manifest, the task and the pages chosen. Every launch is a new run in a new folder;
 `resume=<a run's name>` continues that run instead, for the same question only: a page is predicted only when its run
 has no record of it, and an answer is never paid for twice.
 
@@ -61,7 +61,7 @@ systems, or settings of one system, run each with the same choice of pages (`sam
 `only`), so every run is graded on the same pages. `Benchmark.run` grades the run once it is predicted, and
 returns the grading: `run` (the run folder's name), `cost` and `scorers`. A run that stops part way (a
 missing key, an account that can't pay, a model server that isn't running, a bug in an adapter, Ctrl-C)
-isn't graded: resume it (`resume=`, `--resume`) to finish it. A bug in an adapter's `parse` stops the run with
+isn't graded: resume it (`resume=`, `opb resume`) to finish it. A bug in an adapter's `parse` stops the run with
 the answer kept, unread (`"unread": true` in its record); resuming after the fix reads it with no
 call. `Benchmark.reread(folder, system)` reads every saved answer of a run again, with no call, after a fix
 to a `parse` that gave wrong outputs without raising; `opb reread RUN_DIR` does the same from the command
@@ -90,7 +90,8 @@ key. `opb init <system>` writes one with every option at its default, on our dat
 runs it on another. `--set path=value` changes one value the file has, read as YAML; a path it hasn't is refused, with the
 nearest one it has. The run folder keeps the config, every `--set` applied, as `config.yaml`.
 
-`opb run` also takes `--out`, `--resume RUN` and `--retry-failed` (with `--resume`). It shows the plan and asks
+`opb run` also takes `--out`, and is always a new run; `opb resume <its folder>` continues one, with
+`--retry-failed` and `--set` for `timeout` and `workers`. Each shows the plan and asks
 before calling a system, unless given `-y` or run with no terminal; any answer but yes (Ctrl-D too) prints "not
 run" and exits 1. It then shows a live table of the run's progress, and prints its grading as JSON. `opb
 --version` prints the version.

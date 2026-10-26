@@ -2,6 +2,7 @@
 
     opb init datalab > datalab.yaml                                # a config: one run, every key written out
     opb run --config datalab.yaml --set rows.sample=20             # predict its system, then grade: a new run
+    opb resume RUN_DIR [--retry-failed] [--set timeout=...]        # continue a run where it stopped
     opb grade RUN_DIR [--partial]                                  # a folder of predictions/, yours or a run
     opb reread RUN_DIR [RUN_DIR ...]                               # read saved answers again, after a fix
     opb score --pred outputs.json --gold gold/<page_id>.json       # one page's verdicts
@@ -146,17 +147,32 @@ def cmd_init(a: argparse.Namespace) -> int:
 
 
 def cmd_run(a: argparse.Namespace) -> int:
-    """Plans the run a config asks, shows the plan and asks, predicts, then grades: a new run, or the one
-    `--resume` names."""
+    """Plans the run a config asks, shows the plan and asks, predicts, then grades: always a new run. A run
+    that stops part way is continued with `opb resume <its folder>`."""
+    return launched(a, config.load(a.config, a.set), a.out)
+
+
+def cmd_resume(a: argparse.Namespace) -> int:
+    """Continues the run in a folder where it stopped, asking the question it answers: its own config.yaml,
+    with `--set` for what a resume may change (`timeout`, `workers`). Only pages with no record are asked, or,
+    with `--retry-failed`, also those whose failure may not recur."""
+    folder = Path(a.folder)
+    if not (folder / config.FILE).is_file():
+        raise ValueError(f"{folder} has no {config.FILE}; give a run folder that `opb run` made")
+    return launched(a, config.load(folder / config.FILE, a.set), folder.parent, folder.name)
+
+
+def launched(a: argparse.Namespace, c: config.Config, out: Path, resume: str | None = None) -> int:
+    """Plans the run `c` asks under `out` (resuming `resume`), shows the plan and asks, predicts, then grades
+    it and prints the grading."""
     from omni_parse_bench import harness, task
 
-    c = config.load(a.config, a.set)
     b = config.benchmark(c, task.Parse(), {unit_tests.UnitTests.name: unit_tests.UnitTests})
     system = config.system(c, harness.system)
-    p = config.plan(c, b, system, a.out, resume=a.resume, retry_failed=a.retry_failed)
+    p = config.plan(c, b, system, out, resume=resume, retry_failed=getattr(a, "retry_failed", False))
     print(b.describe(p), file=sys.stderr)
     if not a.yes and sys.stdin.isatty() and not proceed():
-        print("opb run: not run", file=sys.stderr)
+        print(f"opb {a.cmd}: not run", file=sys.stderr)
         return 1
     config.write(c, b, system, p.run.folder)
     b.predict(p)
@@ -322,21 +338,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     n = sub.add_parser("init", help="a config for one system, as YAML on stdout")
     n.add_argument("system", help="a system (`opb systems`), or an OpenRouter model id")
 
-    r = sub.add_parser("run", help="predict every page with one config's system, then grade; a new run, or "
-                                   "--resume one")
+    r = sub.add_parser("run", help="predict every page with one config's system, then grade; a new run")
     r.add_argument("--config", required=True, metavar="YAML",
                    help="the run: a config, as `opb init` writes one")
     r.add_argument("--set", action="append", default=[], metavar="PATH=VALUE",
                    help="change one value the config has, read as YAML, e.g. rows.sample=20; repeatable")
     r.add_argument("--out", type=Path, default=Path("runs"),
                    help="where run folders go (default: %(default)s)")
-    r.add_argument("--resume", metavar="RUN",
-                   help="continue the run of this folder name under --out, asking the same question; it pays "
-                        "only for pages with no answer yet (default: a new run)")
-    r.add_argument("--retry-failed", action="store_true",
-                   help="with --resume, predict again pages whose failure may not recur: timeouts, outages, "
-                        "429 and 5xx")
     r.add_argument("-y", "--yes", action="store_true", help="don't ask before calling systems")
+
+    u = sub.add_parser("resume", help="continue a run where it stopped, then grade")
+    u.add_argument("folder", help="the run's folder, as opb run made it")
+    u.add_argument("--set", action="append", default=[], metavar="PATH=VALUE",
+                   help="change what a resume may change, timeout or workers, e.g. timeout=1800; repeatable")
+    u.add_argument("--retry-failed", action="store_true",
+                   help="predict again pages whose failure may not recur: timeouts, outages, 429 and 5xx")
+    u.add_argument("-y", "--yes", action="store_true", help="don't ask before calling systems")
 
     g = sub.add_parser("grade", help="grade a folder of predictions/<page_id>.json: yours, or a run's")
     g.add_argument("run", help="the folder holding predictions/")
@@ -397,14 +414,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     if a.cmd == "providers":
         deprecated("`opb providers`", "`opb systems`")
         a.cmd = "systems"
-    cmd = {"init": cmd_init, "run": cmd_run, "grade": cmd_grade,
+    cmd = {"init": cmd_init, "run": cmd_run, "resume": cmd_resume, "grade": cmd_grade,
            "score": cmd_score, "predict": cmd_predict, "check": cmd_check,
            "tests": cmd_tests, "systems": cmd_systems, "reread": cmd_reread, "reparse": cmd_reread}[a.cmd]
     try:
         renamed(a)
         return cmd(a)
     except KeyboardInterrupt:
-        hint = "; continue it with --resume <its folder name>" if a.cmd == "run" else ""
+        hint = "; continue it with opb resume <its folder>" if a.cmd in ("run", "resume") else ""
         print(f"opb {a.cmd}: interrupted{hint}", file=sys.stderr)
         return 130
 

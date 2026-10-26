@@ -468,7 +468,7 @@ def test_a_bug_in_parse_stops_the_run_and_resuming_reads_it_again(tmp_path, caps
     assert not (run / "predictions" / "a-p0.json").exists() and CALLS == ["a-p0"]
     BROKEN.clear()
     CALLS.clear()
-    assert cli.main([*argv, "--resume", run.name]) == 0
+    assert cli.main(["resume", str(run), "-y"]) == 0
     [s] = json.loads(capsys.readouterr().out)["scorers"].values()
     assert CALLS == [] and (s["failed"], s["headline"]) == (0, 0.5), s
     assert "unread" not in json.loads((run / "records" / "a-p0.json").read_text())
@@ -583,9 +583,11 @@ def test_opb_init_writes_a_config_and_a_run_folder_keeps_it(tmp_path, capsys, mo
     said = json.loads((tmp_path / "runs" / g["run"] / "settings.json").read_text())
     assert said["options"] == {"tag": "y"}, said
     kept = tmp_path / "runs" / g["run"] / "config.yaml"
-    assert cli.main(["run", "--config", str(kept), "--out", str(tmp_path / "runs"), "-y",
-                     "--resume", g["run"]]) == 0
-    assert json.loads(capsys.readouterr().out)["run"] == g["run"], "the kept config is the same question"
+    assert cli.main(["resume", str(kept.parent), "-y", "--set", "timeout=60", "--retry-failed"]) == 0
+    out, err = capsys.readouterr()
+    assert json.loads(out)["run"] == g["run"] and "nothing to predict" in err, "the same question"
+    assert "differs in options" in raised(["resume", str(kept.parent), "-y", "--set", "system.tagged.tag=z"])
+    assert "has no config.yaml" in raised(["resume", str(tmp_path), "-y"])
     assert "did you mean system.tagged.tag?" in raised([*argv, "--set", "system.tagged.tga=y"])
     assert "workers:" in raised([*argv, "--set", "workers=two"])
 
