@@ -40,7 +40,8 @@ class Datalab(Parser):
 
     Auth: DATALAB_API_KEY.
 
-        opb run --system datalab --options '{"mode": "balanced"}' --sample 20
+        opb init datalab > config.yaml
+        opb run --config config.yaml --set system.datalab.mode=balanced --set rows.sample=20
     """
 
     mode: str = dataclasses.field(

@@ -56,8 +56,9 @@ class Dots(Served):
 
         docker build -t opb-dots-mocr omni_parse_bench/harness/providers/serve/dots-mocr
         docker run --gpus all -p 8001:8001 opb-dots-mocr
-        opb run --system dots-mocr --sample 20 \\
-            --options '{"base_url": "http://localhost:8001"}'
+        opb init dots-mocr > config.yaml
+        opb run --config config.yaml --set system.dots-mocr.base_url=http://localhost:8001 \\
+            --set rows.sample=20
     """
 
     base_url: str = "http://127.0.0.1:8001"

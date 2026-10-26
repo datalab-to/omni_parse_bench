@@ -319,7 +319,7 @@ runs/datalab-20261021-160012-3f9a/
                                 with its traceback, the cost, and the adapter's package and version; and
                                 `"unread": true` for an answer a bug in `parse` left unread
   predictions/<page_id>.json    each page's outputs alone, which is all that grading reads
-  unit_tests-<digest>/          the scorer's results
+  unit_tests/                   the scorer's results
     scores.jsonl                one line per page: id, status, row.document, tests, passed and
                                 per_family; or a failed page's error, with a traceback when the scorer
                                 said the prediction is unusable

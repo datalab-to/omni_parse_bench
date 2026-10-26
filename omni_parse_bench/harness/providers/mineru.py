@@ -66,7 +66,8 @@ class MinerU(Served):
 
         docker build -t opb-mineru omni_parse_bench/harness/providers/serve/mineru
         docker run --gpus all -p 8001:8001 opb-mineru
-        opb run --system mineru --options '{"base_url": "http://localhost:8001"}' --sample 20
+        opb init mineru > config.yaml
+        opb run --config config.yaml --set system.mineru.base_url=http://localhost:8001 --set rows.sample=20
     """
 
     base_url: str = "http://127.0.0.1:8001"

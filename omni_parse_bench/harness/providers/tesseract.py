@@ -36,7 +36,8 @@ class Tesseract(Parser):
     0.0) and needs no key, only the binary and its script models:
 
         brew install tesseract tesseract-lang     # or: apt install tesseract-ocr tesseract-ocr-script-*
-        opb run --system tesseract --sample 20
+        opb init tesseract > config.yaml
+        opb run --config config.yaml --set rows.sample=20
     """
 
     render_dpi: int = dataclasses.field(default=300,

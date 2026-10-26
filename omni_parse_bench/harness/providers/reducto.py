@@ -41,7 +41,8 @@ class Reducto(Parser):
 
     Auth: REDUCTO_API_KEY.
 
-        opb run --system reducto --options '{"model": "legacy"}' --sample 20
+        opb init reducto > config.yaml
+        opb run --config config.yaml --set system.reducto.model=legacy --set rows.sample=20
     """
 
     model: str = dataclasses.field(

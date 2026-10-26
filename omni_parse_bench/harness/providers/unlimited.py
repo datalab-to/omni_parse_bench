@@ -67,8 +67,9 @@ class UnlimitedOcr(Served):
 
         docker build -t opb-unlimited-ocr omni_parse_bench/harness/providers/serve/unlimited-ocr
         docker run --gpus all -p 8001:8001 opb-unlimited-ocr
-        opb run --system unlimited-ocr --sample 20 \\
-            --options '{"base_url": "http://localhost:8001"}'
+        opb init unlimited-ocr > config.yaml
+        opb run --config config.yaml --set system.unlimited-ocr.base_url=http://localhost:8001 \\
+            --set rows.sample=20
     """
 
     base_url: str = "http://127.0.0.1:8001"

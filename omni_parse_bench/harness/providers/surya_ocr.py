@@ -60,8 +60,9 @@ class SuryaOcr(Served):
 
         docker build -t opb-surya-ocr omni_parse_bench/harness/providers/serve/surya-ocr
         docker run --gpus all -p 8001:8001 opb-surya-ocr
-        opb run --system surya-ocr --sample 20 \\
-            --options '{"base_url": "http://localhost:8001"}'
+        opb init surya-ocr > config.yaml
+        opb run --config config.yaml --set system.surya-ocr.base_url=http://localhost:8001 \\
+            --set rows.sample=20
     """
 
     base_url: str = "http://127.0.0.1:8001"

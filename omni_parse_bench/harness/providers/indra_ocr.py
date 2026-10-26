@@ -59,8 +59,9 @@ class IndraOcr(Served):
 
         docker build -t opb-indra-ocr omni_parse_bench/harness/providers/serve/indra-ocr
         docker run -p 8001:8001 opb-indra-ocr
-        opb run --system indra-ocr --sample 20 \\
-            --options '{"base_url": "http://localhost:8001"}'
+        opb init indra-ocr > config.yaml
+        opb run --config config.yaml --set system.indra-ocr.base_url=http://localhost:8001 \\
+            --set rows.sample=20
     """
 
     base_url: str = "http://127.0.0.1:8001"

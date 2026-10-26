@@ -41,7 +41,8 @@ class Mistral(Parser):
 
     Auth: MISTRAL_API_KEY.
 
-        opb run --system mistral --sample 20
+        opb init mistral > config.yaml
+        opb run --config config.yaml --set rows.sample=20
     """
 
     # Note: a dated model, not mistral-ocr-latest, so a run records the model it used.

@@ -4,7 +4,8 @@
 #
 #     docker build -t opb-glm-ocr omni_parse_bench/harness/providers/serve/glm-ocr
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-glm-ocr
-#     opb run --system glm-ocr --options '{"base_url": "http://localhost:8001"}'
+#     opb init glm-ocr > config.yaml
+#     opb run --config config.yaml --set system.glm-ocr.base_url=http://localhost:8001
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set
 # OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb sends it; GLM_SDK_CONFIG

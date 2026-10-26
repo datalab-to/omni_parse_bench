@@ -69,7 +69,8 @@ class GlmOcr(Served):
 
         docker build -t opb-glm-ocr omni_parse_bench/harness/providers/serve/glm-ocr
         docker run --gpus all -p 8001:8001 opb-glm-ocr
-        opb run --system glm-ocr --options '{"base_url": "http://localhost:8001"}' --sample 20
+        opb init glm-ocr > config.yaml
+        opb run --config config.yaml --set system.glm-ocr.base_url=http://localhost:8001 --set rows.sample=20
     """
 
     base_url: str = "http://127.0.0.1:8001"

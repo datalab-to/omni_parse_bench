@@ -43,8 +43,9 @@ class Azure(Parser):
 
     Auth: AZURE_CU_KEY.
 
-        opb run --system azure --sample 20 \\
-            --options '{"endpoint": "https://<resource>.services.ai.azure.com"}'
+        opb init azure > config.yaml
+        opb run --config config.yaml --set system.azure.endpoint=https://<resource>.services.ai.azure.com \\
+            --set rows.sample=20
     """
 
     endpoint: str = dataclasses.field(

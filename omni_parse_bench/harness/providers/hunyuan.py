@@ -62,8 +62,9 @@ class Hunyuan(Served):
 
         docker build -t opb-hunyuan-ocr omni_parse_bench/harness/providers/serve/hunyuan-ocr
         docker run --gpus all -p 8001:8001 opb-hunyuan-ocr
-        opb run --system hunyuan-ocr --sample 20 \\
-            --options '{"base_url": "http://localhost:8001"}'
+        opb init hunyuan-ocr > config.yaml
+        opb run --config config.yaml --set system.hunyuan-ocr.base_url=http://localhost:8001 \\
+            --set rows.sample=20
     """
 
     base_url: str = "http://127.0.0.1:8001"

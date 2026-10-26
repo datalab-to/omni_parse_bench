@@ -48,7 +48,8 @@ class Extend(Parser):
 
     Auth: EXTEND_API_KEY, and EXTEND_WORKSPACE_ID when the key spans several workspaces.
 
-        opb run --system extend --options '{"engine": "parse_light"}' --sample 20
+        opb init extend > config.yaml
+        opb run --config config.yaml --set system.extend.engine=parse_light --set rows.sample=20
     """
 
     engine: str = dataclasses.field(

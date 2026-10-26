@@ -68,8 +68,9 @@ class ChandraOcr(Served):
 
         docker build -t opb-chandra-ocr omni_parse_bench/harness/providers/serve/chandra-ocr
         docker run --gpus all -p 8001:8001 opb-chandra-ocr
-        opb run --system chandra-ocr --sample 20 \\
-            --options '{"base_url": "http://localhost:8001"}'
+        opb init chandra-ocr > config.yaml
+        opb run --config config.yaml --set system.chandra-ocr.base_url=http://localhost:8001 \\
+            --set rows.sample=20
     """
 
     base_url: str = "http://127.0.0.1:8001"

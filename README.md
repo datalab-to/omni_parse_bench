@@ -249,7 +249,7 @@ Otherwise `opb grade` refuses and names the pages; run the same `opb run` comman
 grade with `--partial`, which counts them as 0 and says how many in the summary under `partial`. A folder of
 your own is graded over the whole manifest, and a missing prediction is refused the same way.
 
-Every test of a page is graded. Each run's grading is written to `<run>/unit_tests-<digest>/`:
+Every test of a page is graded. Each run's grading is written to `<run>/unit_tests/`:
 `summary.json`, `scores.jsonl` (one line per page) and `details/<page_id>.jsonl` (one line per test). A
 summary looks like this:
 

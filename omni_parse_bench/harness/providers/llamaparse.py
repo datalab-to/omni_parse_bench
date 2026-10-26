@@ -46,7 +46,8 @@ class LlamaParse(Parser):
 
     Auth: LLAMA_CLOUD_API_KEY.
 
-        opb run --system llamaparse --options '{"tier": "agentic"}' --sample 20
+        opb init llamaparse > config.yaml
+        opb run --config config.yaml --set system.llamaparse.tier=agentic --set rows.sample=20
     """
 
     tier: str = dataclasses.field(

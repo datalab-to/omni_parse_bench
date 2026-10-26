@@ -4,7 +4,8 @@
 #
 #     docker build -t opb-lightonocr omni_parse_bench/harness/providers/serve/lightonocr
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-lightonocr
-#     opb run --system lightonocr --options '{"base_url": "http://localhost:8001"}'
+#     opb init lightonocr > config.yaml
+#     opb run --config config.yaml --set system.lightonocr.base_url=http://localhost:8001
 #
 # WEIGHTS picks the model (docker run -e WEIGHTS=lightonai/LightOnOCR-3-0.8B; the 4B by default); REVISION its checkpoint (start.sh pins each). The weights download when it starts, into HF_HOME; mount a cache
 # there to keep them. Set OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb

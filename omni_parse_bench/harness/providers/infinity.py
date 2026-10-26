@@ -69,8 +69,9 @@ class Infinity(Served):
 
         docker build -t opb-infinity-parser2 omni_parse_bench/harness/providers/serve/infinity-parser2
         docker run --gpus all -p 8001:8001 opb-infinity-parser2
-        opb run --system infinity-parser2 --sample 20 \\
-            --options '{"base_url": "http://localhost:8001"}'
+        opb init infinity-parser2 > config.yaml
+        opb run --config config.yaml --set system.infinity-parser2.base_url=http://localhost:8001 \\
+            --set rows.sample=20
     """
 
     base_url: str = "http://127.0.0.1:8001"

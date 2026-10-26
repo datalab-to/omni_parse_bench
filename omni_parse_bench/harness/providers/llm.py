@@ -78,7 +78,8 @@ class LLM(Parser):
     Auth: OPENROUTER_API_KEY (or OPENAI_API_KEY) for OpenRouter; for another `base_url`, OPB_ENDPOINT_KEY if
     set. `chat`, `answer` and the helpers below are shared with the open models' adapters.
 
-        opb run --system openai/gpt-5.6-sol --sample 20
+        opb init openai/gpt-5.6-sol > config.yaml
+        opb run --config config.yaml --set rows.sample=20
     """
 
     model: str = dataclasses.field(metadata={"help": "an OpenRouter org/model id"})

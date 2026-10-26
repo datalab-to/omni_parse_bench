@@ -66,8 +66,9 @@ class PaddleOcrVl(Served):
 
         docker build -t opb-paddleocr-vl omni_parse_bench/harness/providers/serve/paddleocr-vl
         docker run --gpus all -p 8001:8001 opb-paddleocr-vl
-        opb run --system paddleocr-vl --sample 20 \\
-            --options '{"base_url": "http://localhost:8001"}'
+        opb init paddleocr-vl > config.yaml
+        opb run --config config.yaml --set system.paddleocr-vl.base_url=http://localhost:8001 \\
+            --set rows.sample=20
     """
 
     base_url: str = "http://127.0.0.1:8001"

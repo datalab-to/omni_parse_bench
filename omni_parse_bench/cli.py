@@ -287,7 +287,9 @@ def cmd_systems(a: argparse.Namespace) -> int:
         return 0
     c = harness.adapter_class(a.system)
     for f in dataclasses.fields(c):
-        default = "(required)" if f.default is dataclasses.MISSING else repr(f.default)
+        if f.default is not dataclasses.MISSING: default = repr(f.default)
+        elif f.default_factory is not dataclasses.MISSING: default = repr(f.default_factory())
+        else: default = "(required)"
         print(f"{f.name:24} {default:24} {adapter.option_help(f)}")
     print("\nenvironment: " + (" and ".join(f"export {k}=..." for k in c.keys) or "no key needed"))
     if c.ENV: print(f"             {c.ENV}")

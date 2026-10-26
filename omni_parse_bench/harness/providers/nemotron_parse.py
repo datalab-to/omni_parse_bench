@@ -73,7 +73,9 @@ class NemotronParse(Served):
 
         docker build -t opb-nemotron-parse omni_parse_bench/harness/providers/serve/nemotron-parse
         docker run --gpus all -p 8001:8001 opb-nemotron-parse
-        opb run --system nemotron-parse --sample 20 --options '{"base_url": "http://localhost:8001"}'
+        opb init nemotron-parse > config.yaml
+        opb run --config config.yaml --set system.nemotron-parse.base_url=http://localhost:8001 \\
+            --set rows.sample=20
 
     OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
     """
