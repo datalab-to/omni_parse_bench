@@ -4,7 +4,8 @@
 #
 #     docker build -t opb-mineru omni_parse_bench/harness/providers/serve/mineru
 #     docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-mineru
-#     opb benchmark --providers mineru --options '{"mineru": {"base_url": "http://localhost:8001"}}'
+#     opb init mineru > config.yaml
+#     opb run --config config.yaml --set system.mineru.base_url=http://localhost:8001
 #
 # The weights download when it starts, into HF_HOME; mount a cache there to keep them. Set
 # OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb sends it.

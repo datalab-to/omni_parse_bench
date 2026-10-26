@@ -1,31 +1,4 @@
-"""Single-shot LLM parsing: the page image goes to the model, one call per output.
-
-Used for vision-language models (GPT, Claude, ...) through any OpenAI-compatible endpoint. The
-published runs use OpenRouter, which returns billed cost (`usage.cost`) rather than only a token
-count. Every model gets the same prompts:
-
-    html      transcribe the page as HTML, keeping everything printed on it
-    blocks    the page's layout blocks, one JSON object per line, boxes on a 0-1000 grid as
-              [ymin, xmin, ymax, xmax]
-
-A reply that is markdown rather than HTML is converted by `markdown.to_html`, the same converter
-every provider's markdown goes through. A reply that doesn't parse is asked for again.
-
-No sampling setting is sent: each model runs at its own default temperature and reasoning, as every
-vendor runs at its own settings (Google, for one, advises against lowering Gemini 3's temperature,
-which can make it loop). The page image is sent at high detail, so no endpoint downscales it.
-
-Another endpoint is selected with the `base_url` option, so the record says which endpoint
-answered. Auth: OPENROUTER_API_KEY (or OPENAI_API_KEY) for OpenRouter; for any other endpoint
-OPB_ENDPOINT_KEY if set, else none.
-
-The open OCR models are providers of their own (providers/serve/); `chat`, `answer` and the small
-helpers below are what they share with this adapter.
-
-    opb predict --provider openai/gpt-5.6-sol --page page.pdf
-
-The model is the provider name; `--options {"model": ...}` is refused.
-"""
+"""Single-shot LLM parsing: the page image goes to the model, one call per output."""
 from __future__ import annotations
 
 import base64
@@ -39,11 +12,14 @@ import re
 import time
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, ClassVar
 
 import openai
+from omni_bench_core import adapter
 
 from ... import markdown
 from .. import budget, contract, errors, layout, raster
+from ..adapter import Parser
 
 SUPPORTS = frozenset({"html", "blocks"})
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
@@ -86,16 +62,61 @@ LABELS = {k: k for k in ("heading", "page_furniture", "text", "list", "caption",
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """What a raw-model leg can be asked. `model` has no default: it IS the provider name."""
+class LLM(Parser):
+    """A vision-language model (GPT, Claude, ...) through any OpenAI-compatible endpoint; the published runs
+    use OpenRouter, which returns billed cost (`usage.cost`). `model` is the provider name, never an option.
+
+    One call per output, the page image at high detail, the same prompts for every model:
+
+        html      transcribe the page as HTML, keeping everything printed on it
+        blocks    the page's layout blocks, one JSON object per line, boxes on a 0-1000 grid as
+                  [ymin, xmin, ymax, xmax]
+
+    A markdown reply goes through `markdown.to_html`, as every system's markdown does; a reply that doesn't
+    parse is asked for again. No sampling setting is sent, so each model runs at its own defaults.
+
+    Auth: OPENROUTER_API_KEY (or OPENAI_API_KEY) for OpenRouter; for another `base_url`, OPB_ENDPOINT_KEY if
+    set. `chat`, `answer` and the helpers below are shared with the open models' adapters.
+
+        opb init openai/gpt-5.6-sol > config.yaml
+        opb run --config config.yaml --set rows.sample=20
+    """
 
     model: str = dataclasses.field(metadata={"help": "an OpenRouter org/model id"})
-    max_output_tokens: int = 32000
+    max_output_tokens: int = dataclasses.field(default=32000, metadata={
+        "help": "the most tokens the model may write for one output; a reply cut there fails the page"})
     base_url: str = DEFAULT_BASE_URL
-    attempts: int = 3
+    attempts: int = dataclasses.field(default=3, metadata={
+        "help": "how many times one output is asked for when a reply is unusable (it doesn't parse)"})
+
+    name: ClassVar[str] = "llm"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    keys: ClassVar[tuple[str, ...]] = ("OPENROUTER_API_KEY",)
+    ENV: ClassVar[str] = ("OPENAI_API_KEY can stand in for OPENROUTER_API_KEY; with another base_url, no key "
+                          "is needed, and OPB_ENDPOINT_KEY, if set, is sent as the endpoint's bearer token")
+
+    def missing_keys(self) -> list[str]:
+        """None for an endpoint other than OpenRouter, or when OPENAI_API_KEY stands in for its key."""
+        if self.base_url != DEFAULT_BASE_URL or os.environ.get("OPENAI_API_KEY"): return []
+        return super().missing_keys()
+
+    @property
+    def provider(self) -> str:
+        """The model id: one adapter stands for every model behind the endpoint, so the model names the
+        run."""
+        return self.model
+
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
 
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+def requests(wants: frozenset[str], config: LLM) -> list[contract.Request]:
     """One call per output, each with its own prompt."""
     # Note: the prompt's digest is part of what was sent, so a changed prompt is a different run.
     sha = lambda o: hashlib.sha256(PROMPTS[o].encode()).hexdigest()[:12]  # noqa: E731
@@ -209,16 +230,10 @@ def _cost(usage: dict) -> contract.Cost:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
-         config: Config) -> contract.Call:
-    """One completion for one output, asked again only for an answer that isn't usable.
-
-    Only a reply that finished (`stop`) and parses is kept. One cut off by an error is asked again,
-    and if every attempt is, the call fails for good: `predict` doesn't ask again. One cut at
-    max_output_tokens is final, since a retry at the same limit can't fit either; one the provider
-    refused (`content_filter`) is final too. The cost counts every attempt. Transport failures are
-    not retried here, and the SDK's retries are off: `predict`'s retry decides, so the loops can't
-    multiply.
-    """
+         config: LLM) -> contract.Call:
+    """One completion for one output, asked again only while the reply isn't usable: one cut off by an
+    error is asked again; one cut at `max_output_tokens` or refused (`content_filter`) is final. The cost
+    counts every attempt. Transport failures aren't retried here: the core's retry decides."""
     deadline = budget.Budget(timeout)
     usage = {"extra_body": {"usage": {"include": True}}} if config.base_url == DEFAULT_BASE_URL else {}
     b64 = base64.b64encode(image(page)).decode("ascii")
@@ -233,20 +248,22 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         deadline.check(f"after {attempt} attempt(s) that produced no usable answer")
         ask = {"model": config.model, "messages": messages, "max_tokens": config.max_output_tokens, **usage}
         body = last = chat(config.base_url, ask, deadline, spent)
-        spent.append(_cost(body.get("usage") or {}))
-        finish = ((body.get("choices") or [{}])[0]).get("finish_reason")
+        with adapter.reading("the reply's usage and finish reason"):
+            spent.append(_cost(body.get("usage") or {}))
+            finish = ((body.get("choices") or [{}])[0]).get("finish_reason")
         if finish == "length":
-            raise errors.VendorError(f"the reply hit max_output_tokens ({config.max_output_tokens})",
-                                     status=200, raw=body, cost=contract.total(spent), job_id=body.get("id"))
+            raise errors.SystemFailed(f"the reply hit max_output_tokens ({config.max_output_tokens})",
+                                     status=200, body=body, cost=contract.Cost.total(spent),
+                                     job_id=body.get("id"))
         if finish == "content_filter":
-            raise errors.VendorError("the provider refused the page (content_filter)", status=200, raw=body,
-                                     cost=contract.total(spent), job_id=body.get("id"))
+            raise errors.SystemFailed("the provider refused the page (content_filter)", status=200, body=body,
+                                     cost=contract.Cost.total(spent), job_id=body.get("id"))
         cut = cut or finish != "stop"
         if finish == "stop" and _usable(body, output):
-            return contract.Call(body, cost=contract.total(spent), job_id=body.get("id"))
-    raise errors.VendorError(f"no usable {output} after {config.attempts} attempts"
+            return contract.Call(body, cost=contract.Cost.total(spent), job_id=body.get("id"))
+    raise errors.SystemFailed(f"no usable {output} after {config.attempts} attempts"
                              + (" (a reply was cut off by an error)" if cut else ""),
-                             status=200, raw=last, cost=contract.total(spent))
+                             status=200, body=last, cost=contract.Cost.total(spent))
 
 
 def key(base_url: str) -> str:
@@ -254,28 +271,27 @@ def key(base_url: str) -> str:
     reaches an opb model server (providers/serve/)."""
     if base_url != DEFAULT_BASE_URL:
         return os.environ.get("OPB_ENDPOINT_KEY", "EMPTY")
-    if not (got := os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY")):
-        raise errors.MissingCredential("OPENROUTER_API_KEY (or OPENAI_API_KEY) must be set")
-    return got
+    # Note: `keys` (with `missing_keys`) is checked before any call, so one of the two is set.
+    return os.environ.get("OPENROUTER_API_KEY") or os.environ["OPENAI_API_KEY"]
 
 
 def chat(base_url: str, body: dict, deadline: budget.Budget, spent: Sequence[contract.Cost] = ()) -> dict:
-    """One chat completion's answer, as JSON: every chat call of every provider goes through here, so
-    their failures map alike. `body` is `chat.completions.create`'s arguments; `spent` is what earlier
-    attempts cost, kept on a failure. The SDK's own retries are off: `predict` retries every vendor the
-    same way, so the loops can't multiply."""
+    """One chat completion's answer as JSON; every chat call of every adapter goes through here, so their
+    failures map alike. `body` is `chat.completions.create`'s arguments; `spent`, what earlier attempts
+    cost, is kept on a failure. The SDK's own retries are off, so retries don't multiply."""
     client = openai.OpenAI(base_url=base_url, api_key=key(base_url), max_retries=0)
     try:
         return client.chat.completions.create(**body, timeout=max(1.0, deadline.remaining())).model_dump()
-    except openai.APITimeoutError:
-        raise errors.VendorTimeout(f"no answer within {deadline.total:.0f} s",
-                                   cost=contract.total(list(spent))) from None
+    except openai.APITimeoutError as exc:
+        raise errors.SystemTimeout(f"no answer within {deadline.total:g} s",
+                                   cost=contract.Cost.total(list(spent))) from exc
     except openai.APIStatusError as exc:
-        raise errors.VendorError(f"HTTP {exc.status_code}: {str(exc)[:300]}", status=exc.status_code,
-                                 body=str(exc.body), cost=contract.total(list(spent))) from None
+        raise errors.SystemFailed(f"HTTP {exc.status_code}: {str(exc)}", status=exc.status_code,
+                                 body=str(exc.body), cost=contract.Cost.total(list(spent))) from exc
     except openai.APIConnectionError as exc:
-        raise errors.VendorUnreachable(f"connection failed: {exc}"[:300],
-                                       cost=contract.total(list(spent))) from None
+        if errors.refused(exc): raise
+        raise errors.SystemUnreachable(f"connection failed: {exc}",
+                                       cost=contract.Cost.total(list(spent))) from exc
 
 
 def image_part(png: bytes) -> dict:
@@ -292,33 +308,39 @@ def finish(body: dict) -> str | None:
 def content(body: dict) -> str:
     """A chat completion's text, finished or cut at its token limit (read as it is, as a vendor's own
     client reads it); empty for a page the model read as blank."""
-    if finish(body) not in ("stop", "length"):
-        raise errors.VendorError(f"the reply didn't finish: {finish(body)}", status=200)
-    return ((body["choices"][0].get("message")) or {}).get("content") or ""
+    with adapter.reading("the reply's text"):
+        if finish(body) not in ("stop", "length"):
+            raise errors.SystemFailed(f"the reply didn't finish: {finish(body)}", status=200)
+        return ((body["choices"][0].get("message")) or {}).get("content") or ""
 
 
 def tokens(bodies: list[dict]) -> contract.Cost:
     """The tokens of several chat completions, summed where any states them."""
     usages = [b.get("usage") or {} for b in bodies]
-    return contract.total([contract.Cost(tokens_in=u.get("prompt_tokens"),
+    return contract.Cost.total([contract.Cost(tokens_in=u.get("prompt_tokens"),
                                          tokens_out=u.get("completion_tokens")) for u in usages])
 
 
 def _usable(body: dict, output: str) -> bool:
+    """Whether the reply holds a usable `output`: `parse` doesn't raise `SystemFailed` on it. One that does is
+    asked again; anything else `parse` raises is a bug, and stops the run."""
     try:
         return bool(parse(body, contract.Request(frozenset({output}), {}), None)[0].get(output))
-    except errors.VendorError:
+    except errors.SystemFailed:
         return False
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: LLM | None = None) -> tuple[dict, dict]:
     """The one output in a finished reply: its text as HTML (`as_html`) or as blocks (`as_blocks`)."""
     (output,) = request.outputs
-    choice = (raw.get("choices") or [{}])[0]
-    if choice.get("finish_reason") != "stop":
-        raise errors.VendorError(f"the reply didn't finish: {choice.get('finish_reason')}", status=200)
-    text = (choice.get("message") or {}).get("content")
+    with adapter.reading("the reply's text"):
+        choice = (raw.get("choices") or [{}])[0]
+        if choice.get("finish_reason") != "stop":
+            raise errors.SystemFailed(f"the reply didn't finish: {choice.get('finish_reason')}", status=200)
+        text = (choice.get("message") or {}).get("content")
+        if text is not None and not isinstance(text, str):
+            raise errors.SystemFailed(f"the reply's content is a {type(text).__name__}, not text", status=200)
     value = (as_blocks(text) if output == "blocks" else as_html(text)) if text else None
     if not value:
-        raise errors.VendorError(f"no usable {output} in the reply", status=200)
+        raise errors.SystemFailed(f"no usable {output} in the reply", status=200)
     return {output: value}, {}

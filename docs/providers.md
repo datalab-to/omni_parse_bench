@@ -1,17 +1,25 @@
 # Providers
 
 How each vendor becomes an adapter in `omni_parse_bench/harness/providers/`: one module per vendor,
-with five names (`contract.Adapter`):
+each defining one `Parser` class (`harness/adapter.py`), the omni-bench-core core's `Adapter` for one
+page. The class has:
 
-- `Config`: its options;
+- its fields: the vendor's options;
 - `SUPPORTS`: the output types it can produce;
-- `requests(wants, config)`: the calls a page needs;
-- `call(page, request, *, timeout, config)`: make one call and return the vendor's answer as
-  received, with its cost; and
-- `parse(raw, request, config)`: read the outputs from an answer.
+- `keys`: the environment variables it needs, such as its API key, checked before any call; `ENV`
+  says in words what else the environment can hold for it (an optional bearer token); and `SERVE`, for
+  a model you serve, names its folder in `providers/serve/`;
+- `requests(wants)`: the calls a page needs, for the outputs it wants that the adapter supports; it is
+  never given an empty set;
+- `send(page, request, *, timeout)`: make one call and return the vendor's answer as received, with
+  its cost. It is called from `workers` threads at once, one page each, so a library that isn't
+  thread-safe needs a lock: pdfium is one, so render pages with `raster`, which holds its lock; and
+- `parse(raw, request)`: read the outputs from an answer.
 
+`Parser` turns these into the core's `call` and `read`: `call` makes every request for a page
+within the page's one time budget and keeps each answer, and `read` parses each saved answer.
 `registry.ADAPTERS` lists the vendors and the open-weight models with adapters of their own; any
-model id goes to `llm.py`.
+model id goes to `llm.LLM`.
 
 1. [The two outputs, and how an adapter produces them](#the-two-outputs-and-how-an-adapter-produces-them): html and blocks, and the format changes an adapter may make;
 2. [Block labels](#block-labels): each vendor's block types, mapped onto the labels;
@@ -45,20 +53,29 @@ adapter makes are format changes, and each is checked to lose nothing:
   Extend's and Reducto's are listed here;
 - blocks go through `layout.block` (the box in the vendor's frame, divided by the frame) and
   `layout.label` (the vendor's block type onto `views.LABELS`);
-- a vendor with no typed layout doesn't support `blocks`, and those tests score unsupported for it
-  rather than fail;
-- every vendor gets the same retries: a transient failure (a rate limit, a 5xx, a dropped
-  connection) is tried 4 times with backoff, within the same timeout per call. A model's reply that
-  is cut off by an error or doesn't parse is asked again within the call, up to 3 times. A page a
-  vendor still doesn't answer scores 0 on every test that reads the missing output, whatever the
-  cause: answering is part of what a product does. A failure that is
-  ours (an adapter that can't read an answer) counts as 0 like any other missing output until the
-  adapter is fixed and `opb reparse` reads the answer again; and
+- a vendor with no typed layout doesn't support `blocks`. It is never asked for them: a page asks it
+  only for html, and a page whose tests read blocks alone is not sent. Its blocks tests fail as "no
+  blocks output", so its layout family is 0 and its text and tables families say how it reads;
+- every vendor gets the same retries: a transient failure (a rate limit, a 5xx) is tried 4 times with
+  backoff, the whole page again, within the same time per page. A transport failure (a connection, a
+  read, a client timeout) of any request (an upload, a submit, a poll, once a poll's own retries are
+  spent) is the page's failure, `SystemUnreachable` or `SystemTimeout`, which a page asks again only
+  under `--retry-failed`; its record's traceback shows the httpx error underneath. A refused connection
+  stops the run instead. A model's reply that is cut off by an error or doesn't parse is asked again within the call, up to 3
+  times. A page a vendor still doesn't answer counts as 0, whatever the cause: answering is part of
+  what a product does. Under the core's one rule ([omni-bench-core's "The rules"](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules)),
+  a page counts 0 only when the adapter raises `SystemFailed` on purpose, or reads the answer inside
+  `omni_bench_core.adapter.reading`, which raises it for a malformed one. The record keeps the failure
+  with its `traceback`. Any other exception is the adapter's bug, not the vendor's:
+  - a bug in `parse` stops the run with its traceback; the raw answer is kept, unread (`"unread":
+    true`), and resuming the run (`opb resume`) after the fix reads it with no call; and
+  - a bug elsewhere in the adapter stops the run too, printing its whole traceback and whose code it
+    is; and
 - cost is what the response states, else `Cost()` (unknown). Credits go in `credits`, never
   converted to dollars.
 
 Each vendor's request and response shapes below are from its documentation and are confirmed with
-one live call per adapter (`opb predict --raw`) before a run.
+one live call per adapter (`opb predict --system <name> --page <file> --raw`) before a run.
 
 ## Block labels
 
@@ -77,7 +94,7 @@ Value`, Extend's `key_value` and LlamaParse's `key-value-region` are a single ke
 also appears outside forms (an invoice's "Total: $5", a letterhead's "Tel: ..."). All of them map to
 `form`. The label is not the `form` tag, which marks content that sits on a form.
 
-Datalab (its `BLOCK_TYPES`; Diagram and ChemicalBlock reach the API as Figure, Bibliography as
+Datalab (its block types; Diagram and ChemicalBlock reach the API as Figure, Bibliography as
 ListGroup):
 
 | Datalab type | label |
@@ -194,7 +211,10 @@ ending in `+` continues the block before it and is read without the `+`):
 
 ## The vendors
 
-| provider | API | outputs | headers | auth |
+Each system's environment variables are in the last column, and `opb systems NAME` prints them. A key
+that is missing stops a run before any call and says which `export` to type.
+
+| provider | API | outputs | headers | auth (environment variables) |
 | --- | --- | --- | --- | --- |
 | `datalab` | /api/v1/convert | html, blocks | native switch, set to keep them | DATALAB_API_KEY |
 | model ids (GPT, Claude, ...) | OpenRouter chat | html, blocks | its prompt asks to keep them | OPENROUTER_API_KEY (or OPENAI_API_KEY) |
@@ -203,13 +223,16 @@ ending in `+` continues the block before it and is read without the `+`):
 | `llamaparse` | /api/v2/parse/upload, poll, expand=markdown,items,usage | html, blocks | header and footer fields beside the markdown, put back | LLAMA_CLOUD_API_KEY |
 | `azure` | Content Understanding, prebuilt-layout | html, blocks | comments in its markdown, unwrapped | AZURE_CU_KEY, and the `endpoint` option |
 | `mistral` | /v1/ocr (mistral-ocr-4-1) | html, blocks | header and footer fields beside the markdown, put back | MISTRAL_API_KEY |
-| a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2: html) | kept: vendor defaults that leave them out turned off | OPB_ENDPOINT_KEY, when the server has one |
+| a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2: html) | kept: vendor defaults that leave them out turned off | none; OPB_ENDPOINT_KEY, when the server has one |
 | `tesseract` | the local `tesseract` binary, no model of the page | html | kept: it has no notion of them | none |
 
-A vendor's tiers are runs of their own: `--options '{"datalab": [{"mode": "balanced"}, {"mode":
-"accurate"}], "llamaparse": [{"tier": "agentic"}, {"tier": "agentic_plus"}]}'` makes four runs in one
-invocation. `opb providers` lists each vendor's options. Any OpenRouter model id works
-(`openai/gpt-5.6-sol`, ...).
+A vendor's tiers are runs of their own, one config each (or one config and `--set`), with the same pages:
+
+    opb init datalab > datalab.yaml
+    opb run --config datalab.yaml --set system.datalab.mode=balanced --set rows.sample=20
+    opb run --config datalab.yaml --set system.datalab.mode=accurate --set rows.sample=20
+
+`opb systems` lists each vendor's options. Any OpenRouter model id works (`openai/gpt-5.6-sol`, ...).
 
 Per vendor:
 
@@ -257,7 +280,8 @@ Per vendor:
   cost. A PDF page is rendered at 300 dpi (pypdfium2); Tesseract detects the page's script itself
   (`--psm 0`) and reads it with that script's model, English when it detects none it has a model
   for, so it is told nothing about the page. Its text is written as html inside `<pre>`, escaped,
-  and it gives no layout blocks. Needs `brew install tesseract tesseract-lang` (or the
+  and it gives no layout blocks. It is free, so its cost is recorded as `usd` 0.0. A tesseract that
+  exits with an error fails the page as a `SystemFailed` with its stderr. Needs `brew install tesseract tesseract-lang` (or the
   distribution's tesseract and its script models).
 
 ## Serving an open model
@@ -265,9 +289,22 @@ Per vendor:
 Serving and benchmarking are separate. Each open model has a folder, `omni_parse_bench/harness/providers/serve/<model>/`,
 that deploys it on any GPU host, and opb then benchmarks it from anywhere, pointed at its URL:
 
-    docker build -t opb-dots omni_parse_bench/harness/providers/serve/dots
-    docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-dots
-    opb benchmark --providers dots-mocr --options '{"dots-mocr": {"base_url": "http://<host>:8001"}}'
+    docker build -t opb-dots-mocr omni_parse_bench/harness/providers/serve/dots-mocr
+    docker run --gpus all -p 8001:8001 -v ~/.cache/huggingface:/root/.cache/huggingface opb-dots-mocr
+    opb init dots-mocr > dots.yaml
+    opb run --config dots.yaml --set system.dots-mocr.base_url=http://<host>:8001
+
+Which model answers is part of the run: the system's `served` option names the weights and their revision
+(`opb init` writes the folder's defaults), so another checkpoint is another run. Before any call, opb asks the
+server what it serves (its `/served` route; a vLLM alone, its `/v1/models`) and refuses a run whose server
+serves something else, so a run folder always names the weights that answered. To serve other weights, start
+the folder with `WEIGHTS` and `REVISION` and give the same in `served`.
+
+If nothing listens at `base_url` (the server isn't started, or the address is wrong), the connection is
+refused and the run stops before recording anything, with a message naming the address and the model's
+folder here. Start the server, or fix the address, and resume the run (`opb resume`). A server that is up
+but slow is different: a page it doesn't answer in time is recorded as a timeout, which counts 0 and is
+tried again with `opb resume <its folder> --retry-failed`.
 
 A folder holds:
 
@@ -275,8 +312,9 @@ A folder holds:
   version, the vendor's repository at a full commit. apt packages aren't pinned: `poppler-utils` (LightOn,
   olmOCR), `libcairo2` (dots.mocr) and olmOCR's fonts come from the base image's Ubuntu release when the
   image is built, so a later build may get newer ones, which can change how a page is rendered;
-- `start.sh`: vLLM with the vendor's flags and the weights at a pinned revision, then server.py if
-  there is one; one port out, 8001; and
+- `start.sh`: vLLM with the vendor's flags and the weights WEIGHTS and REVISION name, by default the
+  pinned ones opb's numbers come from (`docker run -e WEIGHTS=... -e REVISION=...` serves others), then
+  server.py if there is one; one port out, 8001; and
 - `server.py`, for a model whose vendor's code takes part in reading a page (loading the file,
   preparing the image, asking, retrying, its pipeline or post-processing): that code, per page,
   behind one route, taking the page file and answering with the vendor's output and the model's raw
@@ -299,24 +337,26 @@ once than it reads at once, for the same reason.
 ## Open-weight models
 
 Each model runs with the defaults its vendor recommends; each adapter's docstring lists where it differs.
+Two differences hold for every model, and aren't repeated there: each page has the benchmark's 900 s,
+and a picture's contents (a description, a chart's data) become an image's alt text.
 
 | model | provider | serve/ | outputs |
 | --- | --- | --- | --- |
-| LightOnOCR-3 (4B, 0.8B) | `lightonocr` (`model`) | `lighton` | html, blocks |
-| dots.mocr | `dots-mocr` | `dots` | html, blocks |
-| Unlimited-OCR | `unlimited-ocr` | `unlimited` | html, blocks |
-| Infinity-Parser2 (Pro, Flash) | `infinity-parser2` (`model`) | `infinity` | html, blocks |
-| chandra-ocr-2 | `chandra-ocr` | `chandra` | html, blocks |
+| LightOnOCR-3 (4B, 0.8B) | `lightonocr` | `lightonocr` | html, blocks |
+| dots.mocr | `dots-mocr` | `dots-mocr` | html, blocks |
+| Unlimited-OCR | `unlimited-ocr` | `unlimited-ocr` | html, blocks |
+| Infinity-Parser2 (Pro, Flash) | `infinity-parser2` | `infinity-parser2` | html, blocks |
+| chandra-ocr-2 | `chandra-ocr` | `chandra-ocr` | html, blocks |
 | olmOCR-2 | `olmocr` | `olmocr` | html |
-| HunyuanOCR-1.5 | `hunyuan-ocr` | `hunyuan` | html, blocks |
-| DeepSeek-OCR-2 | `deepseek-ocr` | `deepseek` | html, blocks |
-| Surya OCR 2 | `surya-ocr` | `surya` | html, blocks |
+| HunyuanOCR-1.5 | `hunyuan-ocr` | `hunyuan-ocr` | html, blocks |
+| DeepSeek-OCR-2 | `deepseek-ocr` | `deepseek-ocr` | html, blocks |
+| Surya OCR 2 | `surya-ocr` | `surya-ocr` | html, blocks |
 | MinerU2.5-Pro | `mineru` | `mineru` | html, blocks |
-| GLM-OCR | `glm-ocr` | `glm_ocr` | html, blocks |
-| PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr_vl` | html, blocks |
-| Indra OCR | `indra-ocr` | `indra` | html, blocks |
-| Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets` | html |
-| Nemotron 3.5 Parse | `nemotron-parse` | `nemotron_parse` | html, blocks |
+| GLM-OCR | `glm-ocr` | `glm-ocr` | html, blocks |
+| PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
+| Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
+| Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets-ocr` | html |
+| Nemotron 3.5 Parse | `nemotron-parse` | `nemotron-parse` | html, blocks |
 
 olmOCR-2 and Nanonets-OCR2 return no layout, so they have no blocks. Indra OCR runs on CPU (ONNX Runtime),
 no GPU: its server reads pages in one worker process per core, and its image runs without `--gpus`.
@@ -515,8 +555,26 @@ Nemotron 3.5 Parse (`providers/nemotron_parse.py`; its class tokens, and Chart):
 
 ## Every adapter: fetch, then parse
 
-`call` returns the vendor's answer as received, and `parse` reads the outputs from it. Every answer
-is saved in the run's records (`raw`), even when parsing it fails, and a paid failure keeps its
-answer, cost and job id. So a parsing fix reaches a finished run with `opb reparse RUN_DIR`, and
-never needs the vendor again. `--retry-failed` predicts again only the outputs whose failure may
-not recur: a timeout, an outage, a 429 or 5xx, or no HTTP status; never a 400 or a vendor's answer.
+`send` returns the vendor's answer as received, and `parse` reads the outputs from it. Every answer
+is saved in the run's records (`raw`), even when parsing it fails. `parse` says on purpose when an
+answer is the vendor's failure, and every adapter writes it the same way:
+
+- an answer that holds no usable page (no chunks, no markdown, a page the vendor marked failed, a reply
+  that didn't finish) raises `SystemFailed` with a message saying what was missing;
+- the vendor's own structures (a job's chunks, a page's markdown) are read inside `adapter.reading`, so
+  a malformed one is the vendor's failure too;
+- in either case the page is recorded as `Unreadable`, which counts 0 and keeps the message and its
+  traceback, so the record says what couldn't be read; it is never scored as an empty page;
+- `blocks` are read apart from the page, inside `reading` within a `try` that leaves them out: a
+  malformed block, or a block type the adapter's `LABELS` lacks, fails the page's blocks output only;
+  its html is still graded. A key missing from our own model server's answer (`completion`, `text`,
+  `markdown`, `blocks`) is a bug, not a malformed block; and
+- anything else `parse` raises is a bug in it: the run stops, the answer is kept unread, and the same
+  command reads it again after the fix.
+
+A fix to a `parse` that gave wrong outputs without raising reaches a finished run with `opb reread
+RUN_DIR` (`Benchmark.reread(folder, system)`), and never needs the vendor again; grade the run again
+afterwards. What happens in every other case is
+omni-bench-core's rules ([the table](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules)). `--retry-failed` predicts again only
+the pages whose failure may not recur: a timeout, an outage, a 429 or 5xx; never a 400 or a vendor's
+answer.

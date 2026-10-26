@@ -1,12 +1,13 @@
 [project]
 name = "omni-parse-bench"
-version = "1.0.0rc1"
+version = "1.0.0"
 description = "A document-parsing benchmark: yes/no tests on single pages, graded against a provider's outputs."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Datalab" }]
 dependencies = [
+    "omni-bench-core>=0.10,<0.11",  # the shared core: tasks, adapters, scorers, runs and the loop over them
     "beautifulsoup4>=4.12",  # table structure
     "fuzzysearch>=0.7",      # positional near-matches for order tests
     "mini-racer>=0.12",      # an embedded V8 that runs KaTeX, which equations are compared by
@@ -22,13 +23,12 @@ harness = [
     "openai>=1.0",
     "pypdfium2>=4.30",
     "pillow>=10.0",
-    "rich>=13.0",
 ]
-# Running the published benchmark end to end: fetch the dataset and read its manifest.
+# Running the published benchmark end to end: the adapters, and the Hugging Face Hub client that downloads
+# the dataset (the core's [hub] extra, so the two never disagree on its version).
 benchmark = [
     "omni-parse-bench[harness]",
-    "huggingface_hub>=0.23",
-    "pyarrow>=15.0.0",
+    "omni-bench-core[hub]>=0.10,<0.11",
 ]
 dev = [
     "omni-parse-bench[benchmark]",
@@ -56,7 +56,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 110
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "UP"]

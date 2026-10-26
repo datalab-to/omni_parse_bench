@@ -1,30 +1,5 @@
-"""Equations as what they render: the math runner's comparison.
-
-An equation is compared by what KaTeX renders it to, never by how its LaTeX is written. KaTeX turns
-the LaTeX into MathML (`katex/katex.js`, run in one embedded V8 per process), where every
-symbol is its final character (`\\to` and `\\rightarrow` are both →) and the structure is explicit:
-fractions, scripts, roots, rows of an array. `symbols` walks that MathML into a flat sequence,
-leaving out what doesn't change the equation:
-
-    spacing                  \\quad, \\, and friends: dropped
-    alignment                `&`, and how rows are split into cells: dropped; rows are kept
-    fonts                    upright, italic and bold: dropped; blackboard, script and fraktur kept
-    invisible operators      function application, invisible times: dropped
-    look-alikes              ⩽ and ≤, ⩾ and ≥, ∥ and ‖, − and -, ′ and ', … and ⋯, ≔ and :=,
-                             ∖ and a backslash, ♯ and #, ⋆ and *, a multiplying . and ·
-    negations                a relation with a slash through it (\\not\\in) and its negated character (∉)
-    restrictions             a | opening a subscript and a | just before it (φ_{|S} and φ|_S)
-    constructions            `cases` and `\\left\\{ \\begin{aligned} … \\right.` render alike already
-
-These equivalences were decided on real disagreements between the gold and vendors' outputs; the
-differences judged real stay differences: \\bar and \\overline, \\setminus and a minus, one letter
-font for another, a dropped blackboard font.
-
-`appears(test, html)` says whether a test's equation is in an output: every math span of the
-output (`$…$`, `$$…$$`, `\\(…\\)`, `\\[…\\]`, and `<math>` holding LaTeX or MathML) in order,
-their sequences joined, must hold the test's sequence unbroken. A comma, semicolon or full stop
-of the test's may fall between two of the output's spans instead ("$\\rho_{AB}$, $\\sigma$").
-A different symbol, a missing or added index, exponent or term, or a dropped condition fails.
+"""Equations compared by what they render, not by how their LaTeX is written: `symbols` turns an equation into
+what it renders, `spans` finds the math in an output, and `appears` says whether a test's equation is in it.
 """
 from __future__ import annotations
 
@@ -86,7 +61,24 @@ def _katex() -> _KaTeX:
 
 @functools.lru_cache(maxsize=200_000)
 def symbols(tex: str, display: bool = False) -> tuple[str, ...] | None:
-    """What `tex` renders to, as a flat sequence of symbols and structure; None if it doesn't parse."""
+    r"""What `tex` renders to, as a flat sequence of symbols and structure; None if it doesn't parse.
+
+    KaTeX (one embedded V8 per process) turns the LaTeX into MathML, where every symbol is its final character
+    (`\to` and `\rightarrow` are both →) and the structure is explicit: fractions, scripts, roots, rows of an
+    array. This walks that MathML into a flat sequence, leaving out what doesn't change the equation:
+
+        spacing                  \quad, \, and friends: dropped
+        alignment                `&`, and how rows are split into cells: dropped; rows are kept
+        fonts                    upright, italic and bold: dropped; blackboard, script and fraktur kept
+        invisible operators      function application, invisible times: dropped
+        look-alikes              ⩽ and ≤, ⩾ and ≥, ∥ and ‖, − and -, ′ and ', … and ⋯, ≔ and :=,
+                                 ∖ and a backslash, ♯ and #, ⋆ and *, a multiplying . and ·
+        negations                a relation with a slash through it (\not\in) and its negated character (∉)
+        restrictions             a | opening a subscript and a | just before it (φ_{|S} and φ|_S)
+        constructions            `cases` and `\left\{ \begin{aligned} … \right.` render alike already
+
+    These stay differences: \bar and \overline, \setminus and a minus, one letter font for another, and a
+    dropped blackboard font."""
     mathml = _katex().mathml(tex, display)
     return None if mathml is None else _from_mathml(mathml)
 
@@ -184,7 +176,13 @@ def _span_symbols(tex: str, display: bool) -> tuple[str, ...]:
 
 
 def appears(test_tex: str, html: str) -> tuple[bool, str]:
-    """Whether the test's equation is in the output's math, and why not."""
+    r"""Whether the test's equation is in the output's math, and why not.
+
+    Every math span of the output (`$…$`, `$$…$$`, `\(…\)`, `\[…\]`, and `<math>` holding LaTeX or MathML),
+    in order and with their sequences joined, must hold the test's sequence unbroken. A comma, semicolon or
+    full stop of the test's may fall between two of the output's spans instead ("$\rho_{AB}$, $\sigma$"). A
+    different symbol, a missing or added index, exponent or term, or a dropped condition fails.
+    """
     want = symbols(test_tex, True)
     if want is None:
         return False, "the test's LaTeX doesn't render"

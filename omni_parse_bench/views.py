@@ -1,36 +1,9 @@
-"""What a reader sees in a page's HTML.
+"""What a reader sees in an output, built once per output:
 
-Runners read an output through a view, built once per output. An HTML runner reads a
-`views.Html`, and never raw HTML for text:
-
-    v = views.html("<p>Let <b>x</b> be</p>")
-    v.html    # the HTML itself: table_cell tests parse it
-    v.text    # the text view: what a reader sees
-    v.seen    # the text view without image alt text
-
-The text view is the HTML with these rewrites, in this order:
-
-    <math>..</math>           -> $..$, or $$..$$ when display="block"
-    <ol> items                -> each item's number written before it
-    checkbox / radio input    -> ☒ if checked, else ☐
-    <checked>, <unchecked>    -> ☒, ☐ (a vendor's own checkbox tags)
-    <input value="v">         -> v
-    <img alt="a">, ![a](..)   -> a
-    comments, doctype, script, style, head, title -> removed
-    <sup>                     -> a space, so a superscript never joins what it follows ("1,240 1")
-    block tags                -> a space
-    inline tags               -> removed
-    entities                  -> unescaped
-
-A layout runner reads a tuple of `views.Block`s, built by `views.blocks` from the provider's list:
-each block's label is one of `LABELS`, and its box is checked to be within the page, from 0 to 1.
-
-A view checks the output's shape: HTML that isn't a string, or a block that isn't `{label, bbox[,
-text]}` as above, raises `MalformedOutput`. That is the provider's fault, so its tests fail; any other
-exception while grading is the scorer's (`scorers.unit_tests.score`).
-
-`hold` and `release` swap spans for private-use placeholders and back, so a rewrite can step
-around text it must not touch.
+- `html` and `Html`: an HTML output's three views;
+- `blocks` and `Block`: a layout output's blocks;
+- `MalformedOutput`: an output of the wrong shape, which fails that output's tests; and
+- `hold` and `release`: let a rewrite step around spans it must not touch.
 """
 from __future__ import annotations
 
@@ -80,7 +53,9 @@ Box = tuple[float, float, float, float]   # x0, y0, x1, y1, from 0 to 1, origin 
 
 
 class MalformedOutput(ValueError):
-    """An output whose shape a view can't read: the provider's fault, not the scorer's."""
+    """An output whose shape a view can't read (HTML that isn't a string, a block that isn't `{label,
+    bbox[, text]}`): the system's fault, so that output's tests fail. Any other exception while grading is
+    a bug in the scorer."""
 
 
 class Html(NamedTuple):
@@ -96,21 +71,36 @@ class Block(NamedTuple):
 
 
 def html(s: str) -> Html:
-    """The three views of one HTML output.
+    """The three views of one HTML output; raises `MalformedOutput` when `s` isn't a string. A runner reads
+    these, never raw HTML for text:
 
-    Alt text is where an output puts an image's printed words (a logo's name) or a description of
-    it. Tests that credit text read `text`, which holds it, so printed words count wherever they are
-    written; tests that fault extra text read `seen`, which doesn't, so a description never costs.
-    Raises MalformedOutput when `s` isn't a string."""
+        v = views.html("<p>Let <b>x</b> be</p>")
+        v.html    # the HTML itself: table_cell tests parse it
+        v.text    # what a reader sees, image alt text included: tests that credit text read it
+        v.seen    # the text view without alt text: tests that fault extra text read it
+
+    The text view is the HTML with these rewrites, in this order:
+
+        <math>..</math>           -> $..$, or $$..$$ when display="block"
+        <ol> items                -> each item's number written before it
+        checkbox / radio input    -> ☒ if checked, else ☐
+        <checked>, <unchecked>    -> ☒, ☐ (a vendor's own checkbox tags)
+        <input value="v">         -> v
+        <img alt="a">, ![a](..)   -> a
+        comments, doctype, script, style, head, title -> removed
+        <sup>                     -> a space, so a superscript never joins what it follows ("1,240 1")
+        block tags                -> a space
+        inline tags               -> removed
+        entities                  -> unescaped"""
     if not isinstance(s, str):
         raise MalformedOutput(f"html must be a string, not {type(s).__name__}: {s!r:.80}")
     return Html(s, text(s), text(s, alt=False))
 
 
 def blocks(raw: list) -> tuple[Block, ...]:
-    """The blocks of one `blocks` output, each `{label, bbox[, text]}`; raises MalformedOutput on an
-    output that isn't a list of such objects, or a block whose label isn't one of LABELS, whose box
-    isn't four numbers from 0 to 1, or whose text isn't a string."""
+    """The blocks of one `blocks` output, each `{label, bbox[, text]}`, as `Block`s. Raises
+    `MalformedOutput` on an output that isn't a list of such objects, or a block whose label isn't one of
+    `LABELS`, whose box isn't four numbers from 0 to 1, or whose text isn't a string."""
     if not isinstance(raw, list):
         raise MalformedOutput(f"blocks must be a list, not {type(raw).__name__}: {raw!r:.80}")
     out = []

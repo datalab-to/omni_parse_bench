@@ -1,15 +1,16 @@
-"""score and summarize: the four results, the score per output type, tag and test type, the documents."""
+"""score and summarize: the results, the families and their documents, the headline, and what a page's line
+and details hold."""
 from __future__ import annotations
-
-import pytest
 
 import dataclasses
 
+import pytest
+
 from omni_parse_bench import data, score, summarize, views
-from omni_parse_bench.scorers.unit_tests import tests as gold
 from omni_parse_bench.scorers import unit_tests as scorer
-from omni_parse_bench.scorers.unit_tests import runners
 from omni_parse_bench.scorers.unit_tests import lines as _lines
+from omni_parse_bench.scorers.unit_tests import runners
+from omni_parse_bench.scorers.unit_tests import tests as gold
 
 PAGE = data.Page("p", "d", "s", "pages/p.pdf", "gold/p.json", ("html",))
 
@@ -46,26 +47,56 @@ def test_results():
     assert vs == {"a": "pass", "b": "pass", "c": "fail", "d": "fail", "m": "fail"}
 
 
-def test_missing_output_fails_and_unsupported_output_is_excluded():
+def test_a_missing_output_fails_its_tests():
     assert {v.result for v in score({"html": None}, TESTS[:4])} == {"fail"}
-    assert {v.result for v in score({}, TESTS[:4], unsupported={"html"})} == {"unsupported"}
+    assert {v.result for v in score({}, TESTS[:4])} == {"fail"}
 
 
-def test_score_is_the_mean_of_tests_and_each_tag_scores_its_own():
-    s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS))["html"]
-    assert s["score"] == 2 / 5
-    assert (s["tests"], s["unsupported"]) == (5, 0)
-    assert s["per_tag"]["eng"] == {"score": 2 / 3, "tests": 3, "pages": 1, "documents": 1}
-    assert s["per_tag"]["table"] == {"score": 0.0, "tests": 1, "pages": 1, "documents": 1}
-    assert s["per_tag"]["math"] == {"score": 0.0, "tests": 1, "pages": 1, "documents": 1}
-    assert s["per_test_type"] == {"present": 2 / 5}
+def test_the_summary_is_the_headline_and_the_families_alone():
+    s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS))
+    assert s == {"headline": 2 / 5, "families": {"text": {"score": 2 / 5, "tests": 5, "documents": 1}}}
+
+
+def test_a_slice_of_test_lines_is_summarized_the_same_way():
+    """Any other breakdown, such as one tag, is the same summary over the lines selected."""
+    eng = [x for x in lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS) if "eng" in x["tags"]]
+    assert summarize(eng)["families"]["text"] == {"score": 2 / 3, "tests": 3, "documents": 1}
 
 
 def test_scores_are_floats_even_when_every_test_agrees():
     s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS[:2]), TESTS))
-    assert type(s["html"]["score"]) is float and type(s["html"]["per_test_type"]["present"]) is float
-    assert type(s["html"]["per_tag"]["eng"]["score"]) is float
-    assert type(s["headline"]) is float and type(s["per_derivation"]["authored"]) is float
+    assert type(s["headline"]) is float and type(s["families"]["text"]["score"]) is float
+
+
+def test_a_pages_line_holds_its_counts_and_its_details_every_verdict():
+    s = scorer.UnitTests().score({"html": "<p>alpha beta</p>"}, TESTS)
+    assert s.result == {"tests": 5, "passed": 2, "per_family": {"text": {"tests": 5, "passed": 2}}}
+    assert s.details[2] == {"test_id": "c", "test_type": "present", "output_type": "html",
+                            "derivation": "authored", "tags": ["eng", "table"], "result": "fail",
+                            "why": s.details[2]["why"]}
+
+
+def test_unit_tests_names_its_headline():
+    line = {"id": "p", "row": {"document": "d"}, "tests": 1, "passed": 1,
+            "per_family": {"text": {"tests": 1, "passed": 1}}}
+    assert scorer.UnitTests().summarize([line]) == {
+        "headline": 1.0, "headline_is": "the mean of the families' scores",
+        "families": {"text": {"score": 1.0, "tests": 1, "documents": 1}}}
+
+
+def test_the_families_come_in_a_fixed_order_whatever_the_order_met():
+    tests = on_one_page(
+        {"id": "k", "test_type": "layout_kind", "output_type": "blocks", "tags": [],
+         "args": {"content": {"text": "x", "max_diffs": 0, "place": [[0.1, 0.1, 0.5, 0.2]]}},
+         "settings": {"kind": "text"}},
+        {"id": "k2", "test_type": "layout_kind", "output_type": "blocks", "tags": [],
+         "args": {"content": {"text": "y", "max_diffs": 0, "place": [[0.1, 0.3, 0.5, 0.4]]}},
+         "settings": {"kind": "text"}},
+        {"id": "t", "test_type": "table_cell", "tags": [], "args": {"cell": {"text": "1", "max_diffs": 0}}},
+        {"id": "a", "test_type": "present", "tags": [], "args": text("alpha")},
+    )
+    s = summarize(lines(score({"html": "<p>alpha</p>"}, tests), tests))
+    assert list(s["families"]) == ["text", "tables", "layout"]
 
 
 @pytest.mark.parametrize("output, why", [
@@ -112,14 +143,9 @@ def test_a_runner_raising_on_a_well_formed_output_is_raised_naming_its_test(monk
 def test_a_view_raising_on_a_well_formed_output_is_raised(monkeypatch):
     def broken(s):
         raise RecursionError("deep")
-    monkeypatch.setitem(scorer.VIEWS, "html", broken)
+    monkeypatch.setitem(scorer.compare.VIEWS, "html", broken)
     with pytest.raises(RecursionError):
         score({"html": "<p>alpha</p>"}, TESTS)
-
-
-def test_an_output_type_with_nothing_scored_says_how_many_were_unsupported():
-    s = summarize(lines(score({}, TESTS, unsupported={"html"}), TESTS))["html"]
-    assert s["score"] is None and s["tests"] == 0 and s["unsupported"] == len(TESTS)
 
 
 def pages_and_tests(documents: int, per: int = 4, test_type: str = "present") -> tuple[list, list]:
@@ -141,11 +167,9 @@ def half(tests: list, per: int = 4) -> list:
 def test_each_score_counts_the_documents_its_tests_are_from():
     pages, tests = pages_and_tests(9)
     s = summarize(lines(half(tests), tests, pages))
-    assert s["html"]["documents"] == s["html"]["per_tag"]["table"]["documents"] == 9
-    assert s["documents"] == 9 and s["families"]["text"]["documents"] == 9
+    assert s["families"]["text"]["documents"] == 9
     one = [dataclasses.replace(p, document="d") for p in pages]
-    assert summarize(lines(half(tests), tests, one))["html"]["documents"] == 1
-    assert "interval" not in s["html"]
+    assert summarize(lines(half(tests), tests, one))["families"]["text"]["documents"] == 1
 
 
 def test_every_test_type_has_a_family():
@@ -166,9 +190,3 @@ def test_headline_is_the_mean_of_the_graded_families():
     assert h["headline"] == (2 / 3 + 0) / 2   # each family weighs the same, however many tests it has
     only_text = summarize(lines(score({"html": "<p>alpha beta</p>"}, tests[:3]), tests))
     assert set(only_text["families"]) == {"text"}   # a family with no verdicts isn't in it
-
-
-def test_headline_is_none_when_a_family_is_all_unsupported():
-    tests = on_one_page({"id": "a", "test_type": "present", "tags": [], "args": text("alpha")})
-    assert summarize(lines(score({}, tests, unsupported={"html"}), tests))["headline"] is None
-

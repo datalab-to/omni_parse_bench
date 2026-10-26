@@ -1,17 +1,6 @@
 """MinerU2.5-Pro's server: steps 1 to 4 of providers/mineru.py, with MinerU's own code.
 
-MinerU's page render (its docvortex package) and its client's two-step extraction and `json2md`, around
-the vLLM serving the model; how a page is processed is set out step by step in the adapter's docstring.
-The client is made on the first page, as making it asks vLLM for the model's name.
-
-    GET  /health    200 once up
-    POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's}
-                    -> {"blocks": the client's blocks {type, bbox, angle, content}, boxes from 0 to 1,
-                    "markdown": json2md of them, "vendor"}
-
-A client error keeps its HTTP status. With OPB_ENDPOINT_KEY set, a request needs it as its bearer token.
-It runs in this folder's image, beside the vLLM serving the model (start.sh); the Dockerfile says how to
-build and run it.
+`Handler` says what the server answers and how it runs.
 """
 from __future__ import annotations
 
@@ -25,18 +14,21 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import httpx
-from PIL import Image
-
 from docvortex.document.pdf.images import load_images_from_pdf_core
 from mineru_vl_utils import MinerUClient
 from mineru_vl_utils.post_process import json2md
 from mineru_vl_utils.vlm_client.base_client import HttpResponseError
+from PIL import Image
 
 VLLM = os.environ.get("VLLM_URL", "http://127.0.0.1:8000")
 KEY = os.environ.get("OPB_ENDPOINT_KEY")
 VERSION = importlib.metadata.version("mineru-vl-utils")
 _client: MinerUClient | None = None
 _lock = threading.Lock()
+
+
+# What it serves, as start.sh started it; in every reply.
+SERVED = {"weights": os.environ.get("WEIGHTS"), "revision": os.environ.get("REVISION")}
 
 
 def client() -> MinerUClient:
@@ -63,7 +55,19 @@ def parse(data: bytes, suffix: str) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    """MinerU's page render (its docvortex package) and its client's two-step extraction and `json2md`, around
+    the vLLM serving the model; how a page is processed is set out step by step in the adapter's docstring.
+    The client is made on the first page, as making it asks vLLM for the model's name.
+
+        GET  /health    200 once up
+        GET  /served    what it serves: {weights, revision}, as each answer says
+        POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's}
+                        -> {"blocks": the client's blocks {type, bbox, angle, content}, boxes from 0 to 1,
+                        "markdown": json2md of them, "vendor"}
+
+    A client error keeps its HTTP status."""
     def do_GET(self):
+        if self.path == "/served": return self._send(200, SERVED)
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})
 
     def do_POST(self):
@@ -73,7 +77,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(401, {"error": "a bearer token (OPB_ENDPOINT_KEY) is needed"})
         try:
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            self._send(200, parse(base64.b64decode(body["page"]), body["suffix"]))
+            self._send(200, {**parse(base64.b64decode(body["page"]), body["suffix"]), "served": SERVED})
         except httpx.TimeoutException as exc:
             self._send(504, {"error": f"vLLM timed out: {exc}"})
         except HttpResponseError as exc:

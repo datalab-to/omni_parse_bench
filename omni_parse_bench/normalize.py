@@ -1,30 +1,5 @@
-"""The comparison normal form: both sides of every comparison go through `fold`.
-
-A test's string and a provider's text view are compared only after `fold`, the same function on
-both sides, so a rule can never favour one side. `fold` applies, in this order:
-
-    LaTeX spans      $..$ carrying LaTeX markup, one to three letters, or digits -> its text, without
-                     the spaces math mode doesn't render ("$c_{\\text{MC}}$" -> "cMC", "$U$" -> "U",
-                     "$$2 . 5 5$$" -> "2.55")
-    line-end hyphens a word broken by a hyphen at a line end -> joined ("develop-\\ners" and "develop- ers"
-                     -> "developers"), when a lowercase letter follows
-    superscripts     superscript digits after a digit set apart ("1,240¹" -> "1,240 1"), as views.text
-                     sets apart a <sup>, so a footnote marker never joins the number it follows
-    NFKC             compatibility forms -> canonical ("ﬁ" -> "fi")
-    invisibles       private-use characters and format characters (Unicode category Cf: zero-width,
-                     bidi controls, soft hyphen, word joiner, ...) removed, except the visible
-                     number signs that are Cf (Arabic, Syriac, Kaithi: `_VISIBLE_FORMAT`)
-    checkboxes       every checked glyph -> ☒, every unchecked glyph -> ☐; so are [x], [checked],
-                     [ ] and [unchecked]
-    markers          a footnote marker [1] or [^1] -> " 1"; a bullet glyph starting a line -> a space
-    leaders          runs of 3+ dots, dashes or underscores -> a space
-    typography       dash, quote (with primes), space and arrow families unified; the fraction slash
-                     -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII
-    case, spacing    lowercased; whitespace collapsed and trimmed
-
-Casing is folded because it isn't what a parse is paid for; digits, letters and their order are.
-`squeeze` is `fold` with every space removed, for text layers that glue a footnote marker to its
-word ("Probiotic1") where providers write a space or a <sup>.
+"""The comparison normal form: a test's string and an output's text are compared only after `fold`, the same
+function on both sides, so no rule favours one side. `squeeze` is `fold` with every space removed.
 """
 from __future__ import annotations
 
@@ -114,7 +89,31 @@ _LINE_HYPHEN = re.compile(r"(?<=[^\W\d_])[-\u2010\u2011]\s+([^\W\d_])")
 
 
 def fold(s: str) -> str:
-    """The canonical form of `s` for comparison."""
+    r"""The canonical form of `s` for comparison.
+
+    It applies, in this order:
+
+        LaTeX spans      $..$ carrying LaTeX markup, one to three letters, or digits -> its text, without
+                         the spaces math mode doesn't render ("$c_{\text{MC}}$" -> "cMC", "$U$" -> "U",
+                         "$$2 . 5 5$$" -> "2.55")
+        line-end hyphens a word broken by a hyphen at a line end -> joined ("develop-\ners" and "develop- ers"
+                         -> "developers"), when a lowercase letter follows
+        superscripts     superscript digits after a digit set apart ("1,240¹" -> "1,240 1"), as views.text
+                         sets apart a <sup>, so a footnote marker never joins the number it follows
+        NFKC             compatibility forms -> canonical ("ﬁ" -> "fi")
+        invisibles       private-use characters and format characters (Unicode category Cf: zero-width,
+                         bidi controls, soft hyphen, word joiner, ...) removed, except the visible
+                         number signs that are Cf (Arabic, Syriac, Kaithi: `_VISIBLE_FORMAT`)
+        checkboxes       every checked glyph -> ☒, every unchecked glyph -> ☐; so are [x], [checked],
+                         [ ] and [unchecked]
+        markers          a footnote marker [1] or [^1] -> " 1"; a bullet glyph starting a line -> a space
+        leaders          runs of 3+ dots, dashes or underscores -> a space
+        typography       dash, quote (with primes), space and arrow families unified; the fraction slash
+                         -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII
+        case, spacing    lowercased; whitespace collapsed and trimmed
+
+    Case is folded because it isn't what a parse is paid for; digits, letters and their order are.
+    """
     s = _latex_to_text(s)
     # Note: only before a lowercase letter, so a line ending "-" before a capital or a digit stays.
     s = _LINE_HYPHEN.sub(lambda m: m[1] if m[1].islower() else m[0], s)
@@ -158,7 +157,8 @@ def typography(s: str) -> str:
 
 
 def squeeze(s: str) -> str:
-    """`fold` with every space removed."""
+    """`fold` with every space removed, for text layers that glue a footnote marker to its word
+    ("Probiotic1")."""
     return _WHITESPACE.sub("", fold(s))
 
 

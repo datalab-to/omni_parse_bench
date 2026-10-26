@@ -1,50 +1,17 @@
-"""DeepSeek-OCR-2 (deepseek-ai/DeepSeek-OCR-2), served from providers/serve/deepseek/ on any GPU host.
-
-Run as its repository runs it (github.com/deepseek-ai/DeepSeek-OCR-2 at 2f3699e, DeepSeek-OCR2-vllm),
-which it does only as batch scripts; the server wraps that engine in one route. Steps 1 to 4 run on the
-server (serve/deepseek/server.py); step 5 runs here, with no vendor code.
-
-How a page is processed:
-
-  1. Input loading        opb sends the page file. A PDF is rendered as run_dpsk_ocr2_pdf.py renders
-                          one (PyMuPDF at 144 DPI); an image file is opened as run_dpsk_ocr2_image.py
-                          opens one, its EXIF rotation applied.
-  2. Image preprocessing  the repository's image processor in crop mode: one 1024 px global view plus
-                          768 px tiles (2 to 6, by the page's shape).
-  3. Model inference      vLLM 0.8.5 with the V0 engine and the repository's own model code registered
-                          (the engine arguments of run_dpsk_ocr2_eval_batch.py); the prompt
-                          `<image>\n<|grounding|>Convert the document to markdown.`, temperature 0, at
-                          most 8192 tokens, special tokens kept, and its no-repeat n-gram logits
-                          processor at ngram_size 40, window_size 90, `<td>` and `</td>` whitelisted
-                          (the values of run_dpsk_ocr2_eval_batch.py).
-  4. Vendor output parsing  the reply is markdown in blocks, each opened by
-                          `<|ref|>label<|/ref|><|det|>[[x1, y1, x2, y2]]<|/det|>`, boxes on a 0-999
-                          grid; the page is the repository's evaluation post-processing
-                          (run_dpsk_ocr2_eval_batch.py: display formulas cleaned of `\\quad (n)` tags,
-                          every marker removed).
-  5. Mapping to opb outputs  html is that page through `markdown.to_html`; blocks are the markers, each
-                          label from LABELS, with the text up to the next marker.
-
-Differences from the vendor:
-
-  - each page has the benchmark's 900 s.
-
-    docker build -t opb-deepseek omni_parse_bench/harness/providers/serve/deepseek
-    docker run --gpus all -p 8001:8001 opb-deepseek
-    opb predict --provider deepseek-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
-
-OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
-"""
+"""DeepSeek-OCR-2 (deepseek-ai/DeepSeek-OCR-2), served from providers/serve/deepseek-ocr/ on any GPU host."""
 from __future__ import annotations
 
 import ast
 import dataclasses
 import re
 from pathlib import Path
+from typing import Any, ClassVar
 
+from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
+from ..adapter import Served
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "deepseek-ai/DeepSeek-OCR-2"
@@ -68,11 +35,48 @@ LABELS = {
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """Where the DeepSeek-OCR-2 server (serve/deepseek/) answers, and its sampling (the repository's
-    scripts' by default; top_p, which they leave unset, at vLLM's 1.0)."""
+class DeepseekOcr(Served):
+    """Where the DeepSeek-OCR-2 server (serve/deepseek-ocr/) answers, and its sampling (the repository's
+    scripts' by default; top_p, which they leave unset, at vLLM's 1.0).
 
-    base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
+    Run as its repository runs it (github.com/deepseek-ai/DeepSeek-OCR-2 at 2f3699e, DeepSeek-OCR2-vllm),
+    which it does only as batch scripts; the server wraps that engine in one route. Steps 1 to 4 run on the
+    server (serve/deepseek-ocr/server.py); step 5 runs here, with no vendor code.
+
+    How a page is processed:
+
+      1. Input loading        opb sends the page file. A PDF is rendered as run_dpsk_ocr2_pdf.py renders
+                              one (PyMuPDF at 144 DPI); an image file is opened as run_dpsk_ocr2_image.py
+                              opens one, its EXIF rotation applied.
+      2. Image preprocessing  the repository's image processor in crop mode: one 1024 px global view plus
+                              768 px tiles (2 to 6, by the page's shape).
+      3. Model inference      vLLM 0.8.5 with the V0 engine and the repository's own model code registered
+                              (the engine arguments of run_dpsk_ocr2_eval_batch.py); the prompt
+                              `<image>\\n<|grounding|>Convert the document to markdown.`, temperature 0, at
+                              most 8192 tokens, special tokens kept, and its no-repeat n-gram logits
+                              processor at ngram_size 40, window_size 90, `<td>` and `</td>` whitelisted
+                              (the values of run_dpsk_ocr2_eval_batch.py).
+      4. Vendor output parsing  the reply is markdown in blocks, each opened by
+                              `<|ref|>label<|/ref|><|det|>[[x1, y1, x2, y2]]<|/det|>`, boxes on a 0-999
+                              grid; the page is the repository's evaluation post-processing
+                              (run_dpsk_ocr2_eval_batch.py: display formulas cleaned of `\\quad (n)` tags,
+                              every marker removed).
+      5. Mapping to opb outputs  html is that page through `markdown.to_html`; blocks are the markers, each
+                              label from LABELS, with the text up to the next marker.
+
+
+        docker build -t opb-deepseek-ocr omni_parse_bench/harness/providers/serve/deepseek-ocr
+        docker run --gpus all -p 8001:8001 opb-deepseek-ocr
+        opb init deepseek-ocr > config.yaml
+        opb run --config config.yaml --set system.deepseek-ocr.base_url=http://localhost:8001 \\
+            --set rows.sample=20
+    """
+
+    base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "deepseek-ai/DeepSeek-OCR-2",
+                                 "revision": "aaa02f3811945a91062062994c5c4a3f4c0af2b0"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     temperature: float = 0.0
     top_p: float = 1.0
     max_tokens: int = 8192
@@ -80,8 +84,22 @@ class Config:
     ngram_size: int = 40
     window_size: int = 90
 
+    name: ClassVar[str] = "deepseek-ocr"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "deepseek-ocr"
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: DeepseekOcr) -> list[contract.Request]:
     """One call answers both outputs."""
     if not wants: return []
     sent = {"weights": WEIGHTS, "prompt": PROMPT, "vllm": "0.8.5 (V0 engine)",
@@ -90,7 +108,8 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
     return [contract.Request(frozenset(wants) & SUPPORTS, sent)]
 
 
-def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
+def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
+         config: DeepseekOcr) -> contract.Call:
     raw = http.parse(config, page, timeout)
     return contract.Call(raw, cost=contract.Cost(tokens_out=raw.get("tokens")))
 
@@ -122,18 +141,19 @@ def blocks(said: str) -> list[dict]:
     return out
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
-    """The page and its blocks. A block type LABELS lacks fails the blocks only."""
+def parse(raw: dict, request: contract.Request, config: DeepseekOcr | None = None) -> tuple[dict, dict]:
+    """The page and its blocks."""
     # Note: a reply cut at the token limit is read as it is, as the repository's scripts read it.
     if raw.get("finish_reason") not in ("stop", "length"):
-        raise errors.VendorError(f"the reply didn't finish: {raw.get('finish_reason')}", status=200)
+        raise errors.SystemFailed(f"the reply didn't finish: {raw.get('finish_reason')}", status=200)
     said = raw.get("raw") or ""
     outputs, errs = {}, {}
     if "html" in request.outputs:
         outputs["html"] = markdown.to_html(page_markdown(said))
     if "blocks" in request.outputs:
         try:
-            outputs["blocks"] = blocks(said)
-        except errors.VendorError as exc:
+            with adapter.reading("the reply's boxes"):
+                outputs["blocks"] = blocks(said)
+        except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

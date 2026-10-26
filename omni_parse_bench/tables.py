@@ -1,23 +1,5 @@
-"""HTML tables as grids of cells, for the table test types.
-
-`parse(html)` reads every <table> into a `Table`: each cell's text keyed by its top-left grid
-position, which cells are headings, and each cell's neighbours in the four directions:
-
-    <table><tr><th>Year</th><th>Total</th></tr>
-           <tr><td>2024</td><td>1,240</td></tr></table>
-
-    text      {(0, 0): "Year", (0, 1): "Total", (1, 0): "2024", (1, 1): "1,240"}
-    headings  {(0, 0), (0, 1)}
-    up        {(1, 1): {(0, 1)}, ...}
-
-A cell spanning several rows or columns occupies each grid slot it covers but is stored once, so
-it can have several neighbours in one direction. `heading(table, cell, "up")` walks up from a cell
-to the heading cells above it, or, when there are none, to the cells at the edge of the table.
-
-`above`, `beside` and `section` read a cell's place off the grid: the cells over its columns (top
-to bottom), the cells to its left in its rows (left to right), and the run of section rows nearest
-above it. A section row is a row of one label, in its first column followed by empty cells
-(`label_rows`) or merged across the table; an empty slot in one reads as its label.
+"""HTML tables as grids of cells, for the table test types: `parse` reads every table of an output into a
+`Table`; `heading`, `above`, `beside` and `section` read a cell's place off the grid.
 
 A rewrite of olmOCR-bench's table parser (https://github.com/allenai/olmocr, Apache-2.0; see NOTICE).
 """
@@ -35,6 +17,19 @@ MAX_SPAN = 1000   # a colspan or rowspan past this is read as this: no page's ta
 
 
 class Table(NamedTuple):
+    """One table: each cell's text keyed by its top-left grid position, which cells are headings, and each
+    cell's neighbours in the four directions:
+
+        <table><tr><th>Year</th><th>Total</th></tr>
+               <tr><td>2024</td><td>1,240</td></tr></table>
+
+        text      {(0, 0): "Year", (0, 1): "Total", (1, 0): "2024", (1, 1): "1,240"}
+        headings  {(0, 0), (0, 1)}
+        up        {(1, 1): {(0, 1)}, ...}
+
+    A cell spanning several rows or columns occupies every grid slot it covers but is stored once, so it
+    can have several neighbours in one direction. A section row is a row of one label, in its first column
+    followed by empty cells (`label_rows`), or merged across the table."""
     text: dict[Cell, str]
     headings: frozenset[Cell]
     up: dict[Cell, frozenset[Cell]]

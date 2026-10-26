@@ -1,11 +1,9 @@
-"""A vendor's layout blocks as the `blocks` output: `{label, bbox, text}`, boxes from 0 to 1.
+"""A vendor's layout blocks as the `blocks` output, `{label, bbox, text}` with boxes from 0 to 1:
 
-Every vendor names its block types its own way. Each adapter states how its types map onto
-`views.LABELS` in a table, and `label` looks a type up in it: a type the table doesn't have fails
-the page, so a new type is decided by a person rather than guessed. The label is what a
-`layout_kind` test grades (docs/providers.md has every vendor's table).
-
-`guess` is for a vendor with no fixed set of types, an LLM, whose types are free text.
+- `label`: a vendor's block type as one of `views.LABELS`, from the adapter's table. A type the table lacks
+  fails the page, so a new type is decided by a person (docs/providers.md has every table);
+- `guess`: a free-text block type (an LLM's), by its words; and
+- `block` and `unturned`: one block, and a box on a page the vendor turned upright.
 """
 from __future__ import annotations
 
@@ -22,7 +20,7 @@ FORM = re.compile(r"form|key.?value", re.I)
 def label(labels: Mapping[str, str], vendor_type: str) -> str:
     """A vendor's block type as one of views.LABELS, from the adapter's table."""
     if vendor_type not in labels:
-        raise errors.VendorError(f"block type {vendor_type!r} isn't in the adapter's LABELS: decide its "
+        raise errors.SystemFailed(f"block type {vendor_type!r} isn't in the adapter's LABELS: decide its "
                                  f"label and add it (docs/providers.md)", status=200)
     return labels[vendor_type]
 
@@ -53,7 +51,7 @@ def block(label: str, box: Sequence[float], frame: Sequence[float], text: str) -
 def unturned(box: Sequence[float], turned: int) -> list[float]:
     """A box `[x0, y0, x1, y1]` (fractions) in a frame turned `turned` degrees clockwise, in the frame
     before: for a vendor that turned the page upright and gave its boxes on the upright page."""
-    if turned % 90: raise errors.VendorError(f"a turn of {turned} degrees isn't a quarter turn", status=200)
+    if turned % 90: raise errors.SystemFailed(f"a turn of {turned} degrees isn't a quarter turn", status=200)
     x0, y0, x1, y1 = box
     # Note: undoing one clockwise quarter turn sends the upright point (u, v) to (v, 1 - u) on the page.
     for _ in range(turned // 90 % 4): x0, y0, x1, y1 = y0, 1 - x1, y1, 1 - x0

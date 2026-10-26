@@ -1,137 +1,121 @@
-"""The adapter contract, and predict and the benchmark loop over a stub vendor (no network)."""
+"""The adapters: each one's requests and parsing, and the rules every call follows, over a stub system (no
+network)."""
 from __future__ import annotations
 
 import dataclasses
 import json
-import sys
 import types
+from typing import ClassVar
 
 import pytest
 
 pytest.importorskip("httpx")
 pytest.importorskip("openai")
 
-from omni_parse_bench import benchmark, harness  # noqa: E402
-from omni_parse_bench.harness import contract, errors, page, registry  # noqa: E402
+from omni_bench_core import adapter as core  # noqa: E402
+
+from omni_parse_bench import harness  # noqa: E402
+from omni_parse_bench.harness import contract, errors  # noqa: E402
 from omni_parse_bench.harness.providers import (  # noqa: E402
-    azure, datalab, extend, llamaparse, llm, mistral, reducto, tesseract)
+    datalab,
+    extend,
+    llamaparse,
+    llm,
+    mistral,
+    tesseract,
+)
 
 
-ADAPTERS = [datalab, llm, reducto, extend, llamaparse, azure, tesseract, mistral]
-
-
-@pytest.mark.parametrize("api", ADAPTERS)
-def test_every_adapter_has_the_contract(api):
-    assert dataclasses.is_dataclass(api.Config)
-    assert api.SUPPORTS <= {"html", "blocks"}
-    assert callable(api.requests) and callable(api.call) and callable(api.parse)
+@pytest.mark.parametrize("cls", list(harness.ADAPTERS.values()), ids=list(harness.ADAPTERS))
+def test_every_adapter_is_a_page_adapter(cls):
+    assert dataclasses.is_dataclass(cls) and issubclass(cls, harness.Parser)
+    assert cls.SUPPORTS and cls.SUPPORTS <= {"html", "blocks"}
+    assert cls().requests(cls.SUPPORTS), "every adapter asks for something"
 
 
 def test_datalab_asks_one_call_with_headers_kept():
-    (r,) = datalab.requests(frozenset({"html", "blocks"}), datalab.Config())
+    (r,) = datalab.Datalab().requests(frozenset({"html", "blocks"}))
     assert sorted(r.outputs) == ["blocks", "html"] and r.sent["output_format"] == "html,chunks"
     assert r.sent["additional_config"]["keep_pageheader_in_output"] is True
 
 
 def test_an_unknown_option_is_refused_by_name():
     with pytest.raises(ValueError, match="mode"):
-        registry.config_for("datalab", {"mdoe": "fast"})
+        harness.system("datalab", {"mdoe": "fast"})
 
 
-def stub(fail: set[str] = frozenset()) -> types.ModuleType:
-    """A vendor producing html only, one call per output, failing the outputs in `fail`."""
-    m = types.ModuleType("stub")
+@dataclasses.dataclass(frozen=True)
+class Stub(harness.Parser):
+    """A system producing html only, in one call, answering with whatever `ANSWER[0]` returns."""
 
-    @dataclasses.dataclass(frozen=True)
-    class Config:
-        pass
+    SUPPORTS: ClassVar[frozenset[str]] = frozenset({"html"})
+    retries: ClassVar[int] = 0
 
-    m.Config, m.SUPPORTS = Config, frozenset({"html"})
-    m.requests = lambda wants, config: [contract.Request(frozenset({o}), {}) for o in sorted(wants)]
+    def requests(self, wants):
+        return [contract.Request(frozenset({o}), {}) for o in sorted(wants)]
 
-    def call(p, request, *, timeout, config):
-        if request.outputs & fail: raise errors.VendorError("bad request", status=400)
-        return contract.Call({"html": "<p>alpha beta</p>"}, cost=contract.Cost(usd=0.01))
+    def send(self, page, request, *, timeout):
+        with core.reading("the stub's answer"):
+            return ANSWER[0]()
 
-    m.call = call
-    m.parse = lambda raw, request, config: ({o: raw[o] for o in request.outputs}, {})
-    return m
+    def parse(self, raw, request):
+        return {o: raw[o] for o in request.outputs}, {}
 
 
-def test_predict_records_unsupported_and_failed_outputs(tmp_path, monkeypatch):
-    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
-    for m in (page, registry): monkeypatch.setattr(m, "adapter", lambda provider: stub())
-    r = harness.predict("stub", pdf, {"html", "blocks"})
-    assert r["outputs"] == {"html": "<p>alpha beta</p>"} and r["errors"] == {"blocks": "unsupported"}
-    for m in (page, registry): monkeypatch.setattr(m, "adapter", lambda provider: stub(fail={"html"}))
-    r = harness.predict("stub", pdf, {"html"})
-    assert r["outputs"] == {"html": None} and "bad request" in r["errors"]["html"]
-
-
-def test_benchmark_predicts_grades_and_resumes(tmp_path, monkeypatch):
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-
-    data = tmp_path / "dataset"
-    (data / "gold").mkdir(parents=True)
-    (data / "pages").mkdir()
-    (data / "pages" / "a-p1.pdf").write_bytes(b"%PDF")
-    tests = [{"id": "t1", "test_type": "present", "output_type": "html", "derivation": "authored", "tags": [],
-              "args": {"content": {"text": "alpha", "max_diffs": 0}}, "settings": {}},
-             {"id": "t2", "test_type": "layout_kind", "output_type": "blocks", "derivation": "text_layer",
-              "tags": [], "args": {"content": {"text": "alpha", "max_diffs": 0, "place": [[0, 0, 1, 1]]}},
-              "settings": {"kind": "text"}}]
-    (data / "gold" / "a-p1.json").write_text(json.dumps({"tests": tests}))
-    row = {"page_id": "a-p1", "document": "a", "suite": "a", "doc_path": "pages/a-p1.pdf",
-           "gt_path": "gold/a-p1.json", "outputs": ["blocks", "html"]}
-    pq.write_table(pa.Table.from_pylist([row]), data / "manifest.parquet")
-    module = stub()
-    monkeypatch.setattr(page, "adapter", lambda provider: module)
-    monkeypatch.setattr(registry, "adapter", lambda provider: module)
-    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=str(data))
-    summaries = benchmark.execute(p, say=lambda s: None)
-    (s,) = summaries.values()
-    assert s["html"]["score"] == 1.0 and s.get("blocks", {}).get("score") is None and s["pages"] == 1
-    (run,) = p.runs
-    assert json.loads((run.predictions / "a-p1.json").read_text()) == {"html": "<p>alpha beta</p>"}
-    calls = []
-    monkeypatch.setattr(module, "call", lambda *a, **k: calls.append(1))
-    benchmark.execute(p, say=lambda s: None)
-    assert not calls, "a recorded page is not predicted again"
+ANSWER = {0: lambda: contract.Call({"html": "<p>alpha beta</p>"}, cost=contract.Cost(usd=0.01))}
 
 
 def test_opb_providers_lists_an_adapters_options(capsys):
     from omni_parse_bench import cli
 
-    assert cli.main(["providers", "datalab"]) == 0
+    assert cli.main(["systems", "datalab"]) == 0
     assert "datalab" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("argv, module, extra", [
-    (["providers"], "rich", "harness"),
-    (["tests", "--dataset", "hf://datasets/x/y"], "huggingface_hub", "benchmark"),
-])
-def test_opb_names_the_extra_a_core_install_lacks(monkeypatch, argv, module, extra):
-    """On an install without the command's extra, opb's error says which extra to add."""
-    from omni_parse_bench import cli
-
-    monkeypatch.setitem(sys.modules, module, None)   # importing it now raises ImportError
-    with pytest.raises(ImportError) as e:
-        cli.main(argv)
-    assert f"opb {argv[0]} needs {module}" in str(e.value)
-    assert f"pip install 'omni-parse-bench[{extra}]'" in str(e.value)
-
-
 def test_tesseract_writes_its_text_as_escaped_html():
-    r = tesseract.requests(frozenset({"html", "blocks"}), tesseract.Config())
+    r = tesseract.Tesseract().requests(frozenset({"html", "blocks"}))
     assert [sorted(x.outputs) for x in r] == [["html"]]
     outs, errs = tesseract.parse({"text": "a < b & c"}, r[0])
     assert outs == {"html": "<pre>a &lt; b &amp; c</pre>"}
     assert errs == {}
 
 
+def test_tesseract_output_that_isnt_utf8_is_decoded_not_a_crash():
+    import sys
+
+    from omni_parse_bench.harness import budget
+
+    bad = ("import sys; sys.stdout.buffer.write(b'ok \\xff'); sys.stderr.buffer.write(b'no \\xfe'); "
+           "sys.exit(1)")
+    clock = budget.Budget(60)
+    assert tesseract.run([sys.executable, "-c", bad], clock, check=False).stdout == "ok \ufffd"
+    with pytest.raises(errors.SystemFailed, match="tesseract exited 1: no \ufffd"):
+        tesseract.run([sys.executable, "-c", bad], clock)
+
+
+def test_tesseract_is_free_and_says_so(monkeypatch, tmp_path):
+    import subprocess
+
+    monkeypatch.setattr(tesseract.shutil, "which", lambda _: "/bin/tesseract")
+    answered = lambda cmd, deadline, check=True: subprocess.CompletedProcess(cmd, 0, "hi", "")  # noqa: E731
+    monkeypatch.setattr(tesseract, "run", answered)
+    monkeypatch.setattr(tesseract, "version", lambda: "tesseract 5")
+    [r] = tesseract.Tesseract(model="eng").requests(frozenset({"html"}))
+    got = tesseract.call(tmp_path / "p.png", r, config=tesseract.Tesseract(model="eng"))
+    assert got.cost.usd == 0.0 and got.raw["text"] == "hi"
+
+
+def test_a_timeout_is_printed_with_its_decimals():
+    from omni_parse_bench.harness import budget
+
+    clock = budget.Budget(0.1)
+    while not clock.expired(): pass
+    with pytest.raises(errors.SystemTimeout, match="the 0.1 s limit"):
+        clock.check("the job")
+
+
 def test_mistral_puts_tables_in_place_and_headers_back():
-    r, = mistral.requests(mistral.SUPPORTS, mistral.Config())
+    r, = mistral.Mistral().requests(mistral.SUPPORTS)
     page = {"markdown": "# Title\n\n![img-0.jpeg](img-0.jpeg)\n\n[tbl-0.html](tbl-0.html)",
             "header": "Journal 12", "footer": "3",
             "tables": [{"id": "tbl-0.html", "content": "<table><tr><td>a</td></tr></table>"}],
@@ -145,89 +129,186 @@ def test_mistral_puts_tables_in_place_and_headers_back():
     assert outs["blocks"] == [{"label": "table", "bbox": [0.1, 0.1, 0.5, 0.5], "text": "a"}]
 
 
-
-def dataset(root, n: int = 1) -> str:
-    """A dataset of `n` one-test pages, each passing when its html holds "alpha"."""
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-
-    (root / "gold").mkdir(parents=True)
-    (root / "pages").mkdir()
-    rows = []
-    for i in range(n):
-        pid = f"a-p{i}"
-        (root / "pages" / f"{pid}.pdf").write_bytes(b"%PDF")
-        t = {"id": f"t{i}", "test_type": "present", "output_type": "html", "derivation": "authored",
-             "tags": [], "args": {"content": {"text": "alpha", "max_diffs": 0}}, "settings": {}}
-        (root / "gold" / f"{pid}.json").write_text(json.dumps({"tests": [t]}))
-        rows.append({"page_id": pid, "document": "a", "suite": "a", "doc_path": f"pages/{pid}.pdf",
-                     "gt_path": f"gold/{pid}.json", "outputs": ["html"]})
-    pq.write_table(pa.Table.from_pylist(rows), root / "manifest.parquet")
-    return str(root)
-
-
-def use(monkeypatch, modules: dict[str, types.ModuleType]) -> None:
-    for m in (page, registry): monkeypatch.setattr(m, "adapter", lambda provider: modules[provider])
-
-
-def test_a_page_predicted_again_is_graded_again(tmp_path, monkeypatch):
-    module = stub()
-    use(monkeypatch, {"stub": module})
-    answers = iter([errors.VendorTimeout("slow"), contract.Call({"html": "<p>alpha</p>"})])
-
-    def call(*a, **k):
-        if isinstance(got := next(answers), Exception): raise got
-        return got
-
-    monkeypatch.setattr(module, "call", call)
-    p = benchmark.plan(["stub"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data"))
-    (s,) = benchmark.execute(p, say=lambda s: None).values()
-    assert s["html"]["score"] == 0.0
-    (s,) = benchmark.execute(p._replace(retry_failed=True), say=lambda s: None).values()
-    assert s["html"]["score"] == 1.0, "the new record's verdict, not the one graded before"
-
-
-def test_an_interrupt_stops_every_run(tmp_path, monkeypatch):
-    import time
-
-    a, b, calls = stub(), stub(), []
-
-    def interrupted(*args, **kwargs):
-        raise KeyboardInterrupt
-
-    def slow(*args, **kwargs):
-        calls.append(1)
-        time.sleep(0.05)
-        return contract.Call({"html": "<p>alpha</p>"})
-
-    monkeypatch.setattr(a, "call", interrupted)
-    monkeypatch.setattr(b, "call", slow)
-    use(monkeypatch, {"a": a, "b": b})
-    p = benchmark.plan(["a", "b"], out=tmp_path / "runs", dataset=dataset(tmp_path / "data", 60), workers=2)
-    with pytest.raises(KeyboardInterrupt):
-        benchmark.execute(p, say=lambda s: None)
-    assert len(calls) < 10, f"run b went on after the interrupt: {len(calls)} of 60 pages"
-
-
-def test_the_same_run_twice_is_refused():
-    for providers, options in ((["datalab", "datalab"], None),
-                               (["datalab"], {"datalab": [{"mode": "accurate"}, {}]})):
-        with pytest.raises(ValueError, match="more than once"):
-            benchmark.plan(providers, options=options, dataset="unused")
-
-
 def test_an_answer_that_doesnt_parse_is_recorded(tmp_path, monkeypatch):
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
-    module = stub()
-    use(monkeypatch, {"stub": module})
+    monkeypatch.setitem(ANSWER, 0, lambda: json.loads("<html>"))
+    r = core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
+    assert r["output"] is None and "JSONDecodeError" in r["error"]["message"]
+    assert r["cost"]["attempts"] == 1
 
-    def call(*a, **k):
-        return json.loads("<html>")
 
-    monkeypatch.setattr(module, "call", call)
-    r = harness.predict("stub", pdf, {"html"})
-    assert r["outputs"] == {"html": None} and "JSONDecodeError" in r["errors"]["html"]
-    assert r["calls"][0]["attempts"] == 1
+@pytest.mark.parametrize("exc, kind", [("ConnectError", "SystemUnreachable"),
+                                       ("ReadError", "SystemUnreachable"),
+                                       ("ReadTimeout", "SystemTimeout")])
+def test_a_transport_failure_is_the_pages_failure_with_its_cause(tmp_path, monkeypatch, exc, kind):
+    import httpx
+
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+
+    def fails():
+        raise getattr(httpx, exc)("the network went away")
+
+    monkeypatch.setitem(ANSWER, 0, fails)
+    r = core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
+    assert r["error"]["type"] == kind and f"httpx.{exc}: the network went away" in r["error"]["traceback"], r
+
+
+def test_a_refused_connection_stops_the_run(tmp_path, monkeypatch):
+    import httpx
+
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+
+    def refused():
+        raise httpx.ConnectError("refused") from ConnectionRefusedError(61, "Connection refused")
+
+    monkeypatch.setitem(ANSWER, 0, refused)
+    with pytest.raises(httpx.ConnectError) as got:      # raised as it is, with a note saying how to start it
+        core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
+    assert errors.refused(got.value), "the refusal stays in the chain"
+    assert any("the connection was refused" in n for n in got.value.__notes__), got.value.__notes__
+
+
+def test_a_failure_that_is_the_accounts_stops_the_run(tmp_path, monkeypatch):
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+
+    def refused():
+        raise errors.SystemFailed("invalid key", status=401)
+
+    monkeypatch.setitem(ANSWER, 0, refused)
+    with pytest.raises(PermissionError):
+        core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
+
+
+def test_a_saved_answer_is_read_again_without_a_call(tmp_path):
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    x = harness.Input(pdf, frozenset({"html"}))
+    r = core.predict(Stub(), x)
+    assert r["output"] == {"pages": [{"html": "<p>alpha beta</p>"}]} and r["cost"]["usd"] == 0.01
+    assert core.reread(Stub(), x, r | {"output": None})["output"] == r["output"]
+
+
+
+def pdf(path, texts):
+    """A PDF with one page per text, each page's text layer that text, written out by hand."""
+    font = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    objs = [b"<< /Type /Catalog /Pages 2 0 R >>", None, font]
+    kids = []
+    for t in texts:
+        stream = f"BT /F1 12 Tf 20 50 Td ({t}) Tj ET".encode()
+        objs.append(b"<< /Length %d >>\nstream\n%s\nendstream" % (len(stream), stream))
+        objs.append(b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] "
+                    b"/Resources << /Font << /F1 3 0 R >> >> /Contents %d 0 R >>" % len(objs))
+        kids.append(len(objs))
+    objs[1] = b"<< /Type /Pages /Kids [%s] /Count %d >>" % (b" ".join(b"%d 0 R" % k for k in kids), len(kids))
+    out, offsets = bytearray(b"%PDF-1.4\n"), []
+    for i, o in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n%s\nendobj\n" % (i, o)
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    out += b"".join(b"%010d 00000 n \n" % x for x in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    path.write_bytes(bytes(out))
+    return path
+
+
+def text(page):
+    """A one-page PDF's text layer."""
+    import pypdfium2 as pdfium
+
+    doc = pdfium.PdfDocument(page)
+    try:
+        assert len(doc) == 1
+        return doc[0].get_textpage().get_text_range().strip()
+    finally:
+        doc.close()
+
+
+@dataclasses.dataclass(frozen=True)
+class Reads(Stub):
+    """The stub, answering with its page's own text; a page whose text is "bad" is a failed call."""
+
+    def send(self, page, request, *, timeout):
+        said = text(page)
+        if said == "bad":
+            raise errors.SystemFailed("the vendor refused this page", status=400)
+        return contract.Call({"html": f"<p>{said}</p>"}, cost=contract.Cost(usd=0.01))
+
+
+def test_a_document_is_parsed_page_by_page_in_order_and_fails_whole(tmp_path):
+    x = harness.Input(pdf(tmp_path / "doc.pdf", ["one", "two", "three"]), frozenset({"html"}))
+    r = core.predict(Reads(), x)
+    assert r["output"] == {"pages": [{"html": f"<p>{t}</p>"} for t in ("one", "two", "three")]}
+    assert r["cost"]["usd"] == 0.03 and len(r["raw"]) == 3, r  # one list of answers per page
+    # each page is sent as a one-page file, its text layer copied with it
+    assert [text(p) for p in harness.raster.pages(x.doc, tmp_path)] == ["one", "two", "three"]
+    # read again with no call, as a run's is
+    assert core.reread(Reads(), x, r | {"output": None})["output"] == r["output"]
+    # a page that fails fails the document, with what the pages before it cost
+    bad_doc = pdf(tmp_path / "bad.pdf", ["one", "bad", "three"])
+    bad = core.predict(Reads(), harness.Input(bad_doc, frozenset({"html"})))
+    assert bad["output"] is None and bad["error"]["message"] == "the vendor refused this page"
+    assert bad["cost"]["usd"] == 0.01, bad
+
+
+def test_an_image_is_a_document_of_one_page_and_a_page_is_never_read_as_its_first_page(tmp_path):
+    (png := tmp_path / "p.png").write_bytes(b"png")
+    assert harness.raster.pages(png, tmp_path) == [png]
+    with pytest.raises(ValueError, match="has 2 pages; a page is one: split it with raster.pages"):
+        harness.raster.render(pdf(tmp_path / "two.pdf", ["a", "b"]), lambda size: 1.0)
+
+
+def test_a_parse_that_raises_a_bug_keeps_the_answer_unread(tmp_path, monkeypatch):
+    """A KeyError in `parse` is a bug, not the system's failure: it isn't counted 0, and the answer is kept,
+    unread, for the fixed `parse` to read."""
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    monkeypatch.setitem(ANSWER, 0, lambda: contract.Call({"text": "alpha"}))
+    with pytest.raises(KeyError) as got:       # parse's own exception, carrying the record to save
+        core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
+    r = got.value.unread
+    assert (r["output"], r["error"], r["unread"]) == (None, None, True)
+    assert r["raw"][0][0]["raw"] == {"text": "alpha"}
+
+
+def test_a_parse_raising_system_failed_is_recorded_as_unreadable(tmp_path, monkeypatch):
+    """`parse` raising `SystemFailed` on purpose: the page counts 0, and the record says where, and keeps the
+    answer to read again."""
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+
+    def parse(self, raw, request):
+        raise errors.SystemFailed("no page in the answer", status=200)
+
+    monkeypatch.setattr(Stub, "parse", parse)
+    r = core.predict(Stub(), harness.Input(pdf, frozenset({"html"})))
+    assert r["output"] is None and r["error"]["type"] == "Unreadable", r
+    assert "no page in the answer" in r["error"]["message"] and "in parse" in r["error"]["traceback"]
+    assert r["raw"][0][0]["raw"] == {"html": "<p>alpha beta</p>"}
+
+
+@pytest.mark.parametrize("name, key", [("datalab", "DATALAB_API_KEY"), ("reducto", "REDUCTO_API_KEY"),
+                                       ("extend", "EXTEND_API_KEY"), ("llamaparse", "LLAMA_CLOUD_API_KEY"),
+                                       ("azure", "AZURE_CU_KEY"), ("mistral", "MISTRAL_API_KEY"),
+                                       ("openai/gpt-5.6-sol", "OPENROUTER_API_KEY")])
+def test_every_vendor_declares_its_key(name, key, monkeypatch):
+    for k in (key, "OPENAI_API_KEY"): monkeypatch.delenv(k, raising=False)
+    assert harness.system(name).missing_keys() == [key]
+    monkeypatch.setenv(key, "x")
+    assert harness.system(name).missing_keys() == []
+
+
+def test_an_llm_needs_no_openrouter_key_elsewhere_or_with_an_openai_key(monkeypatch):
+    for k in ("OPENROUTER_API_KEY", "OPENAI_API_KEY"): monkeypatch.delenv(k, raising=False)
+    assert harness.system("openai/gpt-5.6-sol", {"base_url": "http://localhost:8000/v1"}).missing_keys() == []
+    monkeypatch.setenv("OPENAI_API_KEY", "x")
+    assert harness.system("openai/gpt-5.6-sol").missing_keys() == []
+
+
+def test_an_option_without_help_of_its_own_has_the_shared_help():
+    from omni_parse_bench.harness import adapter
+
+    for name in (*harness.PROVIDERS, "openai/gpt-5.6-sol"):
+        for f in dataclasses.fields(harness.adapter_class(name)):
+            assert adapter.option_help(f), (name, f.name)
 
 
 def test_an_llm_reply_cut_off_every_time_is_asked_for_attempts_times_only(tmp_path, monkeypatch):
@@ -249,9 +330,9 @@ def test_an_llm_reply_cut_off_every_time_is_asked_for_attempts_times_only(tmp_pa
     monkeypatch.setattr(llm.openai, "OpenAI", Client)
     monkeypatch.setattr(llm, "image", lambda p: b"png")
     monkeypatch.setattr(time, "sleep", lambda s: None)
-    r = harness.predict("org/model", pdf, {"html"})
-    assert len(completions) == llm.Config(model="org/model").attempts
-    assert r["outputs"] == {"html": None} and r["calls"][0]["attempts"] == 1
+    r = core.predict(harness.system("org/model"), harness.Input(pdf, frozenset({"html"})))
+    assert len(completions) == llm.LLM(model="org/model").attempts
+    assert r["output"] is None and r["cost"]["attempts"] == 1
 
 
 def test_a_request_timeout_never_outlasts_the_budget():
@@ -302,7 +383,7 @@ def test_a_llamaparse_item_nested_in_another_gives_its_own_box():
 
 def test_a_llamaparse_page_that_failed_is_an_error_not_an_empty_page():
     raw = {"markdown": {"pages": [{"page_number": 1, "success": False, "error": "timeout"}]}}
-    with pytest.raises(errors.VendorError, match="timeout"):
+    with pytest.raises(errors.SystemFailed, match="timeout"):
         llamaparse.parse(raw, contract.Request(frozenset({"html"}), {}))
 
 
@@ -325,7 +406,7 @@ It held.
 def test_a_lighton_reply_is_read_as_its_blocks_and_their_markdown():
     from omni_parse_bench.harness.providers import lighton
 
-    request = lighton.requests(frozenset({"html", "blocks"}), lighton.Config())[0]
+    request = lighton.LightOn().requests(frozenset({"html", "blocks"}))[0]
     completion = {"choices": [{"finish_reason": "stop", "message": {"content": LIGHTON_REPLY}}]}
     out, errs = lighton.parse({"completion": completion, "text": LIGHTON_REPLY}, request)
     assert errs == {}
@@ -342,3 +423,12 @@ def test_a_lighton_reply_without_placeholders_is_one_unlabelled_block():
     from omni_parse_bench.harness.providers import lighton
 
     assert lighton.split("# Just text") == [("", (), "# Just text")]
+
+
+def test_a_run_is_graded_against_the_dataset_commit_it_ran_on():
+    from omni_parse_bench import cli
+
+    said = {"dataset": "hf://datasets/datalab-to/omni_parse_bench", "dataset_commit": "abc123",
+            "manifest": "m.parquet"}
+    assert cli.recorded(said) == ("hf://datasets/datalab-to/omni_parse_bench@abc123", "m.parquet")
+    assert cli.recorded(said, "other") == ("other", "m.parquet")  # a dataset given is graded as given

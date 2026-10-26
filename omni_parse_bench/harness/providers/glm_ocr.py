@@ -1,53 +1,17 @@
-"""GLM-OCR (zai-org/GLM-OCR), through its SDK's self-hosted pipeline, served from providers/serve/glm_ocr/.
-
-Run as its SDK documents it (github.com/zai-org/GLM-OCR, "Self-host with vLLM / SGLang" and "SDK Server",
-`glmocr[selfhosted,server]` 0.1.5). Steps 1 to 4 run on the server (serve/glm_ocr/server.py); step 5
-runs here, with no vendor code.
-
-How a page is processed:
-
-  1. Input loading        opb sends the page file; the server hands it to an SDK server as a file path,
-                          and the SDK's own page loader opens it: a PDF at its pdf_dpi, 200 DPI, its
-                          long edge at most 3500 px; an image as it is.
-  2. Image preprocessing  the SDK's: PP-DocLayoutV3 layout detection on the page, then each region
-                          cropped for recognition, at its config.yaml settings.
-  3. Model inference      vLLM 0.19.0 as the SDK's README serves it (MTP speculation, 3 tokens); each
-                          region recognised by the model at the SDK's sampling (temperature 0, top_k 1,
-                          repetition penalty 1.1, 8192 tokens). One SDK server shares one pipeline
-                          between concurrent requests, and concurrent requests to one server came back
-                          empty, so the server runs 12 SDK servers, each reading one page at a time.
-  4. Vendor output parsing  the SDK formats the page: its markdown (`markdown_result`) and its regions
-                          (`json_result`: `{label, native_label, content, bbox_2d}`, boxes on a 0-1000
-                          grid). A region the SDK failed to read, which it would leave out silently,
-                          fails the page instead.
-  5. Mapping to opb outputs  html is that markdown, its image placeholders (`![Image 0-0](imgs/...)`,
-                          files the server would write) dropped, as for Mistral, through
-                          `markdown.to_html`; blocks are the regions, each `native_label` mapped by
-                          LABELS.
-
-Differences from the vendor:
-
-  - the SDK's default config abandons the regions it labels header, footer, number, footnote,
-    aside_text, reference and header/footer images; the server's `keep` config (its default) reads them,
-    since the benchmark scores the whole page, headers and footers included, for every system; its
-    answer says which config read it (`sdk_config`); and
-  - each page has the benchmark's 900 s.
-
-    docker build -t opb-glm_ocr omni_parse_bench/harness/providers/serve/glm_ocr
-    docker run --gpus all -p 8001:8001 opb-glm_ocr
-    opb predict --provider glm-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
-
-OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
-"""
+"""GLM-OCR (zai-org/GLM-OCR), through its SDK's self-hosted pipeline, served from providers/serve/glm-ocr/."""
 from __future__ import annotations
 
 import dataclasses
 import json
 import re
 from pathlib import Path
+from typing import Any, ClassVar
+
+from omni_bench_core import adapter
 
 from ... import markdown
 from .. import contract, errors, http, layout
+from ..adapter import Served
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "zai-org/GLM-OCR"
@@ -68,13 +32,69 @@ _TAG = re.compile(r"<[^>]+>")
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """Where the GLM-OCR server (serve/glm_ocr/) answers."""
+class GlmOcr(Served):
+    """Where the GLM-OCR server (serve/glm-ocr/) answers.
 
-    base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
+    Run as its SDK documents it (github.com/zai-org/GLM-OCR, "Self-host with vLLM / SGLang" and "SDK Server",
+    `glmocr[selfhosted,server]` 0.1.5). Steps 1 to 4 run on the server (serve/glm-ocr/server.py); step 5
+    runs here, with no vendor code.
+
+    How a page is processed:
+
+      1. Input loading        opb sends the page file; the server hands it to an SDK server as a file path,
+                              and the SDK's own page loader opens it: a PDF at its pdf_dpi, 200 DPI, its
+                              long edge at most 3500 px; an image as it is.
+      2. Image preprocessing  the SDK's: PP-DocLayoutV3 layout detection on the page, then each region
+                              cropped for recognition, at its config.yaml settings.
+      3. Model inference      vLLM 0.19.0 as the SDK's README serves it (MTP speculation, 3 tokens); each
+                              region recognised by the model at the SDK's sampling (temperature 0, top_k 1,
+                              repetition penalty 1.1, 8192 tokens). One SDK server shares one pipeline
+                              between concurrent requests, and concurrent requests to one server came back
+                              empty, so the server runs 12 SDK servers, each reading one page at a time.
+      4. Vendor output parsing  the SDK formats the page: its markdown (`markdown_result`) and its regions
+                              (`json_result`: `{label, native_label, content, bbox_2d}`, boxes on a 0-1000
+                              grid). A region the SDK failed to read, which it would leave out silently,
+                              fails the page instead.
+      5. Mapping to opb outputs  html is that markdown, its image placeholders (`![Image 0-0](imgs/...)`,
+                              files the server would write) dropped, as for Mistral, through
+                              `markdown.to_html`; blocks are the regions, each `native_label` mapped by
+                              LABELS.
+
+    Differences from the vendor:
+
+      - the SDK's default config abandons the regions it labels header, footer, number, footnote,
+        aside_text, reference and header/footer images; the server's `keep` config (its default) reads them,
+        since the benchmark scores the whole page, headers and footers included, for every system; its
+        answer says which config read it (`sdk_config`).
+
+        docker build -t opb-glm-ocr omni_parse_bench/harness/providers/serve/glm-ocr
+        docker run --gpus all -p 8001:8001 opb-glm-ocr
+        opb init glm-ocr > config.yaml
+        opb run --config config.yaml --set system.glm-ocr.base_url=http://localhost:8001 --set rows.sample=20
+    """
+
+    base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "zai-org/GLM-OCR",
+                                 "revision": "2e85a62840ccac27daa451df36c736c4636b8628"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
+
+    name: ClassVar[str] = "glm-ocr"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "glm-ocr"
+
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
 
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+def requests(wants: frozenset[str], config: GlmOcr) -> list[contract.Request]:
     """One call answers both outputs."""
     if not wants: return []
     sent = {"weights": WEIGHTS, "pipeline": "glmocr SDK 0.1.5 self-hosted",
@@ -82,7 +102,7 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
     return [contract.Request(frozenset(wants) & SUPPORTS, sent)]
 
 
-def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
+def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: GlmOcr) -> contract.Call:
     raw = http.parse(config, page, timeout, body=http.page(page))
     return contract.Call(raw, job_id=raw.get("id"))
 
@@ -103,16 +123,16 @@ def _block(region: dict) -> dict:
     return layout.block(kind, region["bbox_2d"], (1000, 1000), text)
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
-    """The page from `markdown_result`; the blocks from `json_result`. A label LABELS lacks fails the
-    blocks only."""
+def parse(raw: dict, request: contract.Request, config: GlmOcr | None = None) -> tuple[dict, dict]:
+    """The page from `markdown_result`; the blocks from `json_result`."""
     outputs, errs = {}, {}
     if "html" in request.outputs:
         md = _IMAGE_PLACEHOLDER.sub("", raw.get("markdown_result") or "")
         outputs["html"] = markdown.to_html(md)
     if "blocks" in request.outputs:
         try:
-            outputs["blocks"] = [_block(r) for r in _regions(raw) if r.get("bbox_2d")]
-        except errors.VendorError as exc:
+            with adapter.reading("the SDK's regions"):
+                outputs["blocks"] = [_block(r) for r in _regions(raw) if r.get("bbox_2d")]
+        except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

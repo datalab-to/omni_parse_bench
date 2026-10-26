@@ -1,46 +1,15 @@
-"""Surya OCR 2 (datalab-to/surya-ocr-2), served from providers/serve/surya/ on any GPU host.
-
-Run as the public `surya-ocr` package (0.22.1) runs it with its `surya_ocr` command. Steps 1 to 4 run on
-the server (serve/surya/server.py); step 5 runs here, with no vendor code.
-
-How a page is processed:
-
-  1. Input loading        opb sends the page file. A PDF is rendered by the package's `load_from_file`
-                          at IMAGE_DPI_HIGHRES, 192 DPI, the resolution its command uses for
-                          recognition; an image file is opened as it is.
-  2. Image preprocessing  the package's own, inside its predictor (`scale_to_fit` to its pixel limits).
-  3. Model inference      vLLM 0.20.1 with the flags the package's own launcher sets at
-                          VLLM_GPU_TYPE=h100 (MTP speculation, 2 tokens); one full-page call through
-                          `RecognitionPredictor(full_page=True)`, at the package's prompt, sampling
-                          and token limit. A page whose output loops or does not parse is asked again
-                          at rising temperature, up to 6 times (SURYA_FULLPAGE_REGEN, which the package
-                          calls its setting for benchmarking), then falls back, as the package does, to
-                          layout plus OCR per block.
-  4. Vendor output parsing  the package's result: the page as layout blocks in reading order, each
-                          with a canonical label, a box in the image's pixels and its HTML.
-  5. Mapping to opb outputs  html is the blocks' HTML in reading order, page headers and footers
-                          kept, skipped (visual) blocks adding no text; blocks are each block's label
-                          (LABELS) and box divided by the page image's size.
-
-Differences from the vendor:
-
-  - SURYA_FULLPAGE_REGEN is on (the package's default is off; it names it as the setting for
-    benchmarking); and
-  - each page has the benchmark's 900 s.
-
-    docker build -t opb-surya omni_parse_bench/harness/providers/serve/surya
-    docker run --gpus all -p 8001:8001 opb-surya
-    opb predict --provider surya-ocr --page page.pdf --options '{"base_url": "http://localhost:8001"}'
-
-OPB_ENDPOINT_KEY, if set, is sent as the bearer token the server requires.
-"""
+"""Surya OCR 2 (datalab-to/surya-ocr-2), served from providers/serve/surya-ocr/ on any GPU host."""
 from __future__ import annotations
 
 import dataclasses
 import re
 from pathlib import Path
+from typing import Any, ClassVar
+
+from omni_bench_core import adapter
 
 from .. import contract, errors, http, layout
+from ..adapter import Served
 
 SUPPORTS = frozenset({"html", "blocks"})
 WEIGHTS = "datalab-to/surya-ocr-2"
@@ -58,15 +27,67 @@ _TAG = re.compile(r"<[^>]+>")
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """Where the Surya OCR 2 server (serve/surya/) answers, and the DPI a PDF is loaded at (the
-    `surya_ocr` command's, IMAGE_DPI_HIGHRES, by default)."""
+class SuryaOcr(Served):
+    """Where the Surya OCR 2 server (serve/surya-ocr/) answers, and the DPI a PDF is loaded at (the
+    `surya_ocr` command's, IMAGE_DPI_HIGHRES, by default).
 
-    base_url: str = dataclasses.field(default="http://127.0.0.1:8001", metadata={"names_run": False})
+    Run as the public `surya-ocr` package (0.22.1) runs it with its `surya_ocr` command. Steps 1 to 4 run on
+    the server (serve/surya-ocr/server.py); step 5 runs here, with no vendor code.
+
+    How a page is processed:
+
+      1. Input loading        opb sends the page file. A PDF is rendered by the package's `load_from_file`
+                              at IMAGE_DPI_HIGHRES, 192 DPI, the resolution its command uses for
+                              recognition; an image file is opened as it is.
+      2. Image preprocessing  the package's own, inside its predictor (`scale_to_fit` to its pixel limits).
+      3. Model inference      vLLM 0.20.1 with the flags the package's own launcher sets at
+                              VLLM_GPU_TYPE=h100 (MTP speculation, 2 tokens); one full-page call through
+                              `RecognitionPredictor(full_page=True)`, at the package's prompt, sampling
+                              and token limit. A page whose output loops or does not parse is asked again
+                              at rising temperature, up to 6 times (SURYA_FULLPAGE_REGEN, which the package
+                              calls its setting for benchmarking), then falls back, as the package does, to
+                              layout plus OCR per block.
+      4. Vendor output parsing  the package's result: the page as layout blocks in reading order, each
+                              with a canonical label, a box in the image's pixels and its HTML.
+      5. Mapping to opb outputs  html is the blocks' HTML in reading order, page headers and footers
+                              kept, skipped (visual) blocks adding no text; blocks are each block's label
+                              (LABELS) and box divided by the page image's size.
+
+    Differences from the vendor:
+
+      - SURYA_FULLPAGE_REGEN is on (the package's default is off; it names it as the setting for
+        benchmarking).
+
+        docker build -t opb-surya-ocr omni_parse_bench/harness/providers/serve/surya-ocr
+        docker run --gpus all -p 8001:8001 opb-surya-ocr
+        opb init surya-ocr > config.yaml
+        opb run --config config.yaml --set system.surya-ocr.base_url=http://localhost:8001 \\
+            --set rows.sample=20
+    """
+
+    base_url: str = "http://127.0.0.1:8001"
+    served: dict[str, Any] = dataclasses.field(
+        default_factory=lambda: {"weights": "datalab-to/surya-ocr-2",
+                                 "revision": "3b3d4cdf88d6928b0acdc75181b13206ea67c4a3"},
+        metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     dpi: int = 192
 
+    name: ClassVar[str] = "surya-ocr"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    ENV: ClassVar[str] = http.ENDPOINT_KEY
+    SERVE: ClassVar[str | None] = "surya-ocr"
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: SuryaOcr) -> list[contract.Request]:
     """One call answers both outputs."""
     if not wants: return []
     sent = {"weights": WEIGHTS, "package": PACKAGE, "mode": "RecognitionPredictor(full_page=True)",
@@ -75,12 +96,12 @@ def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
     return [contract.Request(frozenset(wants) & SUPPORTS, sent)]
 
 
-def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Config) -> contract.Call:
+def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: SuryaOcr) -> contract.Call:
     return contract.Call(http.parse(config, page, timeout))
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
-    """The page in reading order, and its blocks. A label LABELS lacks fails the blocks only."""
+def parse(raw: dict, request: contract.Request, config: SuryaOcr | None = None) -> tuple[dict, dict]:
+    """The page in reading order, and its blocks."""
     blocks = sorted(raw.get("blocks") or [], key=lambda b: b.get("reading_order", 0))
     _, _, w, h = raw.get("image_bbox") or [0, 0, 1, 1]
     outputs, errs = {}, {}
@@ -88,9 +109,10 @@ def parse(raw: dict, request: contract.Request, config: Config | None = None) ->
         outputs["html"] = "\n".join(b.get("html") or "" for b in blocks if not b.get("skipped"))
     if "blocks" in request.outputs:
         try:
-            outputs["blocks"] = [layout.block(layout.label(LABELS, b["label"]), b["bbox"], (w, h),
-                                              " ".join(_TAG.sub(" ", b.get("html") or "").split()))
-                                 for b in blocks if b.get("label") != "BlankPage"]
-        except errors.VendorError as exc:
+            with adapter.reading("the result's blocks"):
+                outputs["blocks"] = [layout.block(layout.label(LABELS, b["label"]), b["bbox"], (w, h),
+                                                  " ".join(_TAG.sub(" ", b.get("html") or "").split()))
+                                     for b in blocks if b.get("label") != "BlankPage"]
+        except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

@@ -1,21 +1,23 @@
-"""The two kinds of error a user meets, so a caller (the `opb` command) tells them from our bugs:
+"""The exceptions code raises on purpose, which are the core's (`omni_bench_core.errors`):
 
-    UsageError   what was asked is wrong: a bad flag, option, dataset, manifest or gold; fix it and ask again
-    Stop         a run can't go on: an account that can't pay, a missing key or dependency; fix it and rerun
+    SystemFailed       the system failed on one page, which counts 0; raised on purpose. `SystemTimeout`,
+                       `SystemUnreachable` and `Unreadable` are its kinds
+    Unscored           a scorer couldn't score a page (a judge that didn't answer): raised from `score`, or
+                       returned in the page's place from `score_all`; the page waits for a later grading
 
-Anything else raised is a bug of ours. Defined here, with nothing imported, so the command catches both
-without importing the harness, which `opb score` doesn't need. `counted` words a count in a message.
+Everything else a user meets is a native exception, raised as it is with its traceback: a `ValueError` for
+what was asked wrong (a flag, an option, a dataset, a manifest, a gold, a missing key, a run graded before it
+is finished), a `PermissionError` for an account that can't pay, an `ImportError` for a missing package, and
+a refused connection as the connection error it is, with a note saying how to start the server. A bug is
+raised as it is, with a note naming the class and the page. `counted` writes a count in a message.
 """
+from omni_bench_core.errors import (
+    SystemFailed,
+    SystemTimeout,
+    SystemUnreachable,
+    Unreadable,
+    Unscored,
+    counted,
+)
 
-
-class UsageError(ValueError):
-    """What was asked is wrong; the message says what, the offending value, and the fix."""
-
-
-class Stop(Exception):
-    """A run can't go on, the same for every page: not a fact about one, so raised, never recorded."""
-
-
-def counted(n: int, noun: str) -> str:
-    """`1 page`, `2 pages`: a count in a message, which "1 pages" would make read as a bug."""
-    return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
+__all__ = ["SystemFailed", "SystemTimeout", "SystemUnreachable", "Unreadable", "Unscored", "counted"]

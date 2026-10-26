@@ -1,23 +1,4 @@
-"""Markdown to HTML: the one converter every provider's markdown goes through.
-
-    markdown.to_html("# Title\\n\\n29. Item")   # -> "<h1>Title</h1>\\n<p>29. Item</p>\\n"
-
-It's markdown-it (commonmark, with tables, strikethrough and raw HTML) plus repairs for page text
-a plain conversion loses, applied in this order:
-
-    a fence around the page   removed: LLMs often open with ```markdown and never close it,
-                              which would turn the whole page into one code block; a fenced
-                              code listing inside the page is kept, as code
-    YAML front matter         removed: it's transport, not page text; a page that opens with a
-                              rule (---) is not front matter
-    page-wide indentation     removed: a page indented inside its fence isn't a code block
-    "29." / "1)" / "- "       escaped: the marker is page text, but commonmark moves a number
-                              into <ol start> and drops a bullet; not inside code or a raw
-                              HTML block, where markdown-it would leave the backslash
-    <name@host>               escaped: an address printed in brackets is text, not a mail link
-    [1]: url                  kept: a reference list is page text, not link definitions
-    <table>..</table>, $..$   held while markdown-it runs: a blank line ends its HTML block, and
-                              it eats the braces of $\\{x\\}$; in a table row, only LaTeX spans a |
+"""Markdown to HTML: the one converter every provider's markdown goes through (`to_html`).
 """
 from __future__ import annotations
 
@@ -49,7 +30,27 @@ _ROWS = re.compile(r"(?m)((?:^[ \t]*\|.*(?:\n|$))+)")  # runs of table-row lines
 
 
 def to_html(md: str) -> str:
-    """HTML for a page given as markdown."""
+    r"""HTML for a page given as markdown.
+
+        markdown.to_html("# Title\n\n29. Item")   # -> "<h1>Title</h1>\n<p>29. Item</p>\n"
+
+    It is markdown-it (commonmark, with tables, strikethrough and raw HTML) plus repairs for page text a plain
+    conversion loses, applied in this order:
+
+        a fence around the page   removed: LLMs often open with ```markdown and never close it,
+                                  which would turn the whole page into one code block; a fenced
+                                  code listing inside the page is kept, as code
+        YAML front matter         removed: it's transport, not page text; a page that opens with a
+                                  rule (---) is not front matter
+        page-wide indentation     removed: a page indented inside its fence isn't a code block
+        "29." / "1)" / "- "       escaped: the marker is page text, but commonmark moves a number
+                                  into <ol start> and drops a bullet; not inside code or a raw
+                                  HTML block, where markdown-it would leave the backslash
+        <name@host>               escaped: an address printed in brackets is text, not a mail link
+        [1]: url                  kept: a reference list is page text, not link definitions
+        <table>..</table>, $..$   held while markdown-it runs: a blank line ends its HTML block, and
+                                  it eats the braces of $\{x\}$; in a table row, only LaTeX spans a |
+    """
     md = unwrapped(md)
     md = _FRONT_MATTER.sub("", md, count=1)
     md = textwrap.dedent(md)

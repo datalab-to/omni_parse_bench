@@ -1,6 +1,6 @@
 """The published dataset's invariants. Needs a dataset: set OPB_DATASET to its root.
 
-    OPB_DATASET=~/parse_bench/dataset-v2 pytest tests/test_dataset.py
+    OPB_DATASET=path/to/omni_parse_bench pytest tests/test_dataset.py
 
 `unit_tests.check` already checks every manifest row and test, unique ids, and every
 page's tests; this checks what only the folder can say: that it loads, and that pages/ holds each
@@ -14,8 +14,8 @@ from pathlib import Path
 import pytest
 
 from omni_parse_bench import data
-from omni_parse_bench.scorers.unit_tests import tests as gold
 from omni_parse_bench.scorers import unit_tests as scorer
+from omni_parse_bench.scorers.unit_tests import tests as gold
 
 ROOT = Path(os.environ.get("OPB_DATASET", "")).expanduser()
 pytestmark = pytest.mark.skipif(not (ROOT / data.MANIFEST).exists(),

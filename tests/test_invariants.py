@@ -5,7 +5,7 @@ published dataset when OPB_DATASET is set to its root.
     answer     a test's own answer written as the output (`answer`) passes it; and
     determined scoring a page twice, caches cleared, gives the same verdicts.
 
-    OPB_DATASET=~/parse_bench/dataset-v2 pytest tests/test_invariants.py
+    OPB_DATASET=path/to/omni_parse_bench pytest tests/test_invariants.py
 """
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ from typing import Any
 import pytest
 
 from omni_parse_bench import data, equations, tables, views
-from omni_parse_bench.scorers.unit_tests import tests as gold
 from omni_parse_bench.scorers import unit_tests as scorer
 from omni_parse_bench.scorers.unit_tests import runners
+from omni_parse_bench.scorers.unit_tests import tests as gold
 
 FIXTURE = Path(__file__).parent / "fixtures" / "invariants"
 DATASET = Path(os.environ.get("OPB_DATASET", "")).expanduser()

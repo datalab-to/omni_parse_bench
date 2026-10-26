@@ -1,24 +1,4 @@
-"""Azure Content Understanding adapter: the prebuilt layout analyzer, POST :analyzeBinary, poll.
-
-One call produces both outputs. Azure returns the page as markdown, tables as html, with page
-headers, footers and page numbers written in place as comments (`<!-- PageHeader: ... -->`), which
-a reader never sees. So:
-
-- `html` is that markdown with those comments unwrapped into their text, where Azure put them: the
-  header is in Azure's document, marked as one, and the unwrapping moves and rebuilds nothing; and
-- `blocks` are its paragraphs (with their `role`: title, sectionHeading, pageHeader, pageFooter,
-  pageNumber, footnote, or none), tables and figures. A paragraph inside a table's span is a cell's
-  text, already in the table's block, and is left out.
-
-Boxes come as `source`, `D(page,x1,y1,...,x4,y4)`, in the page's unit (inches for a PDF). Azure
-states pages used, not a cost, so the cost is unknown.
-
-Auth: AZURE_CU_KEY. The resource is the `endpoint` option, not an environment variable: it
-decides where the page is analyzed, so it is a setting the run records.
-
-    opb predict --provider azure --page page.pdf \
-        --options '{"endpoint": "https://<resource>.services.ai.azure.com"}'
-"""
+"""Azure Content Understanding: the prebuilt layout analyzer, POST :analyzeBinary, poll."""
 from __future__ import annotations
 
 import dataclasses
@@ -26,11 +6,14 @@ import os
 import re
 import time
 from pathlib import Path
+from typing import Any, ClassVar
 
 import httpx
+from omni_bench_core import adapter
 
 from ... import markdown
 from .. import budget, contract, errors, layout
+from ..adapter import Parser
 
 API_VERSION = "2025-11-01"
 SUPPORTS = frozenset({"html", "blocks"})
@@ -48,11 +31,21 @@ TERMINAL = frozenset({"succeeded", "failed", "canceled", "cancelled"})
 
 
 @dataclasses.dataclass(frozen=True)
-class Config:
-    """What azure can be asked.
+class Azure(Parser):
+    """Azure Content Understanding, one call for html and blocks. `endpoint`, the resource, is required: it is
+    an option, not an environment variable, since it decides where the page is analyzed.
 
-    `endpoint` has no default to give, since every Azure resource has its own; it is empty here, so
-    a `Config` can be built (`opb providers`, a run's name), and `call` refuses it.
+    - `html`: its markdown, tables as html, with the page header, footer and number comments
+      (`<!-- PageHeader: ... -->`) unwrapped into their text where Azure put them;
+    - `blocks`: its paragraphs (by `role`), tables and figures, from `source` boxes in the page's unit; a
+      paragraph inside a table is a cell's text and is left out; and
+    - cost: unknown, since Azure states pages used.
+
+    Auth: AZURE_CU_KEY.
+
+        opb init azure > config.yaml
+        opb run --config config.yaml --set system.azure.endpoint=https://<resource>.services.ai.azure.com \\
+            --set rows.sample=20
     """
 
     endpoint: str = dataclasses.field(
@@ -65,8 +58,22 @@ class Config:
     def __post_init__(self):
         object.__setattr__(self, "endpoint", self.endpoint.rstrip("/"))
 
+    name: ClassVar[str] = "azure"
+    SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
+    keys: ClassVar[tuple[str, ...]] = ("AZURE_CU_KEY",)
+    workers: ClassVar[int] = 3
 
-def requests(wants: frozenset[str], config: Config) -> list[contract.Request]:
+    def requests(self, wants: frozenset[str]) -> list[contract.Request]:
+        return requests(wants, self)
+
+    def send(self, page: Path, request: contract.Request, *, timeout: float) -> contract.Call:
+        return call(page, request, timeout=timeout, config=self)
+
+    def parse(self, raw: Any, request: contract.Request) -> tuple[dict, dict]:
+        return parse(raw, request, self)
+
+
+def requests(wants: frozenset[str], config: Azure) -> list[contract.Request]:
     """One call for every output: headers are comments in Azure's markdown, unwrapped for html."""
     sent = {"analyzer": config.analyzer, "api_version": config.api_version}
     if "html" in wants:
@@ -87,7 +94,7 @@ def layout_blocks(content: dict) -> list[dict]:
     """Paragraphs outside tables, tables and figures as the `blocks` output, in the page's frame."""
     pages = {p["pageNumber"]: p for p in content.get("pages") or []}
     if not (page := pages.get(1)) or not (page.get("width") and page.get("height")):
-        raise errors.VendorError(f"no size for page 1: {str(list(pages.values()))[:200]}", status=200)
+        raise errors.SystemFailed(f"no size for page 1: {str(list(pages.values()))}", status=200)
     frame = (page["width"], page["height"])
     tables = [t.get("span") or {} for t in content.get("tables") or []]
 
@@ -110,14 +117,14 @@ def layout_blocks(content: dict) -> list[dict]:
 
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
-         config: Config | None = None) -> contract.Call:
+         config: Azure | None = None) -> contract.Call:
     """Analyze the page, poll until it is done, return the analysis."""
-    config = config or Config()
-    key = os.environ.get("AZURE_CU_KEY")
-    if not key or not config.endpoint:
-        raise errors.MissingCredential(
-            "azure needs AZURE_CU_KEY in the environment and its resource in the options: "
-            """--options '{"azure": {"endpoint": "https://<resource>.services.ai.azure.com"}}'""")
+    config = config or Azure()
+    key = os.environ["AZURE_CU_KEY"]
+    if not config.endpoint:
+        raise ValueError(
+"azure needs its resource, which is an option, not an environment variable: "
+"--set system.azure.endpoint=https://<resource>.services.ai.azure.com")
     deadline = budget.Budget(timeout)
     url = (f"{config.endpoint}/contentunderstanding/analyzers/{config.analyzer}:analyzeBinary"
            f"?api-version={config.api_version}")
@@ -127,9 +134,10 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
         r = client.post(url, content=page.read_bytes(), headers={"Content-Type": media},
                         timeout=deadline.timeout(300))
         if r.status_code >= 400 or not (op := r.headers.get("Operation-Location")):
-            raise errors.VendorError(f"analyze HTTP {r.status_code}: {r.text[:300]}",
+            raise errors.SystemFailed(f"analyze HTTP {r.status_code}: {r.text}",
                                      status=r.status_code, body=r.text)
-        job_id = r.json().get("id")
+        with adapter.reading("the analysis's id"):
+            job_id = contract.json_object(r).get("id")
         retry = budget.PollRetry(deadline)
         with errors.job(job_id):
             while True:
@@ -138,33 +146,37 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
                     r = client.get(op, timeout=deadline.timeout(120))
                 except httpx.TransportError as exc:
                     if retry.again(): continue
-                    raise errors.VendorError(f"polling failed: {exc}"[:300], status=None) from None
+                    raise errors.transport(exc, "polling failed") from exc
                 if r.status_code != 200:
                     if retry.again(r.status_code): continue
-                    raise errors.VendorError(f"HTTP {r.status_code}: {r.text[:300]}",
+                    raise errors.SystemFailed(f"HTTP {r.status_code}: {r.text}",
                                              status=r.status_code, body=r.text)
-                retry.ok()
+                retry.reset()
                 polls += 1
-                body = r.json()
+                with adapter.reading("the analysis's status"):
+                    body = contract.json_object(r)
                 if str(body.get("status")).lower() in TERMINAL: break
                 time.sleep(min(config.poll_interval, deadline.remaining()))
-            if str(body["status"]).lower() != "succeeded":
-                raise errors.VendorError(f"analysis {body['status']}: {str(body.get('error'))[:300]}",
-                                         status=200, raw=body)
+            if str(body.get("status")).lower() != "succeeded":
+                raise errors.SystemFailed(f"analysis {body.get('status')}: {str(body.get('error'))}",
+                                         status=200, body=body)
     return contract.Call(body, cost=contract.Cost(), job_id=job_id)
 
 
-def parse(raw: dict, request: contract.Request, config: Config | None = None) -> tuple[dict, dict]:
+def parse(raw: dict, request: contract.Request, config: Azure | None = None) -> tuple[dict, dict]:
     """The outputs in a finished analysis: markdown with header comments unwrapped, and blocks."""
-    contents = (raw.get("result") or {}).get("contents") or []
-    if not contents:
-        raise errors.VendorError(f"succeeded with no contents: {str(raw)[:300]}", status=200)
-    md = contents[0].get("markdown") or ""
+    with adapter.reading("the analysis's contents"):
+        contents = (raw.get("result") or {}).get("contents") or []
+        if not contents:
+            raise errors.SystemFailed(f"succeeded with no contents: {str(raw)}", status=200)
+        md = PAGE_MARKER.sub(lambda m: m[1], contents[0].get("markdown") or "")
     outputs, errs = {}, {}
     for o in request.outputs:
-        if o == "html": outputs[o] = markdown.to_html(PAGE_MARKER.sub(lambda m: m[1], md))
+        if o == "html": outputs[o] = markdown.to_html(md)
         if o == "blocks":
-            try: outputs[o] = layout_blocks(contents[0])
-            except (errors.VendorError, KeyError, TypeError, ValueError) as exc:
+            try:
+                with adapter.reading("the analysis's paragraphs, tables and figures"):
+                    outputs[o] = layout_blocks(contents[0])
+            except errors.SystemFailed as exc:
                 errs[o] = errors.unread(exc)
     return outputs, errs
