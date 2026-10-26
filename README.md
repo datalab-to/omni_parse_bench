@@ -104,22 +104,6 @@ opb run --config datalab.yaml --set rows.sample=5 --out runs/
 
 `opb run` shows the plan and asks before calling any system.
 
-### Keys
-
-Calling a system costs money, and each system reads its key from the environment:
-
-| system | environment variable |
-| --- | --- |
-| `datalab` | `DATALAB_API_KEY` |
-| `reducto` | `REDUCTO_API_KEY` |
-| `extend` | `EXTEND_API_KEY`, and `EXTEND_WORKSPACE_ID` when the key spans several workspaces |
-| `llamaparse` | `LLAMA_CLOUD_API_KEY` |
-| `azure` | `AZURE_CU_KEY`, and its resource as the `endpoint` option |
-| `mistral` | `MISTRAL_API_KEY` |
-| an OpenRouter model id, such as `openai/gpt-5.6-sol` | `OPENROUTER_API_KEY` (or `OPENAI_API_KEY`) |
-| `tesseract` | none; it runs locally |
-| a model you serve (`chandra-ocr`, `mineru`, `olmocr`, ...) | none; `OPB_ENDPOINT_KEY`, if set, is sent to your server as its bearer token |
-
 ### Models you serve
 
 Each open model has a folder, `omni_parse_bench/harness/providers/serve/<model>/`, that serves it on any GPU host:
