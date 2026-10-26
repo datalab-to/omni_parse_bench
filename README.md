@@ -179,12 +179,6 @@ A summary looks like this:
 }
 ```
 
-`coverage` is the share of pages that didn't fail, and everything under `scored` is over those pages. The
-headline at the top is `scored.headline` times coverage, so a page that failed counts as 0.
-
-A system that produces html only (such as `tesseract`, `nanonets-ocr` and `olmocr`) is never asked for layout
-blocks, so its layout family is 0 and its headline is at most two thirds. Compare it with other systems on its
-text and tables families.
 
 ## Score on your own
 
@@ -294,9 +288,7 @@ opb predict --system datalab --page pages/<page_id>.pdf --options '{"mode": "acc
 
 ## Results
 
-Every system on the published dataset (revision `961c0f89`, plus Nemotron 3.5 Parse; omni-parse-bench 0.1.2 or
-newer). Datalab's two rows are from a rerun of its production API on 2026-10-23. The scores per tag, how
-parameters are counted and how each open model is served are in [`docs/results.md`](./docs/results.md).
+Every system on our dataset.
 
 | parser | weights | parameters | headline | text | tables | layout |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
