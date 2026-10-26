@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="496" viewBox="0 0 760 496" font-size="15" role="img" aria-label="The headline averages families; tags only select tests">
 <style><![CDATA[@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap');
-/* Datalab design system -- tokens from svelte/src/styles/datalab-system.css, converted from
+/* Datalab design system colors, converted from
    oklch to hex so the figures render identically outside a browser. The system is light-only;
    this guard stops a viewer's auto dark mode inverting them on its own. */
 :root{color-scheme:only light}

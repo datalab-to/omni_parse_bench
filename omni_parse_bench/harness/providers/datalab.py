@@ -17,7 +17,7 @@ from ..adapter import Parser
 
 DEFAULT_BASE_URL = "https://www.datalab.to"
 SUPPORTS = frozenset({"html", "blocks"})
-# Note: Datalab's own list (steps/core/document/block.py). Diagram and ChemicalBlock reach the API
+# Note: Datalab's block types, as its API returns them. Diagram and ChemicalBlock reach the API
 # as Figure and Bibliography as ListGroup; ComplexRegion is mostly a drawing with labels in it.
 LABELS = {
     "Text": "text", "SectionHeader": "heading", "ListGroup": "list", "Caption": "caption",

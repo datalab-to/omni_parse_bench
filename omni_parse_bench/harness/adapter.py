@@ -83,7 +83,8 @@ class Parser(adapter.Adapter[Input]):
     A 403 is an account failure too, unless it is a moderation flag on this page's content. A refused
     connection stops the run, with a note on how to start the server (`errors.no_server`). `send` runs on
     `workers` threads at once, so render a PDF with `raster`, which holds pdfium's lock. A change to the
-    adapter's code, such as a prompt, doesn't rename its run folder: start the new run with another `out`."""
+    adapter's code, such as a prompt, isn't part of a run's question: start a new run after one, never resume
+    a run made before it."""
 
     SUPPORTS: ClassVar[frozenset[str]] = frozenset()
     ENV: ClassVar[str] = ""

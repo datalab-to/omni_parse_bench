@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # vLLM serves surya-ocr-2 on 8000 under the model id the package asks for, with the flags the package's
 # launcher sets at VLLM_GPU_TYPE=h100 (MTP speculation, 2 tokens); server.py answers on $PORT once vLLM is up.
-# MTP_TOKENS is how many draft tokens MTP speculation proposes (2, as the package sets); 0 serves without it,
-# for a checkpoint with no MTP head, which vLLM otherwise refuses to load. It changes speed only.
+# MTP_TOKENS is how many draft tokens MTP speculation proposes (2, as the package sets); 0 serves without it.
+# It changes speed only.
 # Either exiting stops the container.
 set -euo pipefail
 # Note: WEIGHTS and REVISION pick the checkpoint; the defaults are the pinned weights opb's numbers come from,

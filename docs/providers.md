@@ -94,7 +94,7 @@ Value`, Extend's `key_value` and LlamaParse's `key-value-region` are a single ke
 also appears outside forms (an invoice's "Total: $5", a letterhead's "Tel: ..."). All of them map to
 `form`. The label is not the `form` tag, which marks content that sits on a form.
 
-Datalab (its `BLOCK_TYPES`; Diagram and ChemicalBlock reach the API as Figure, Bibliography as
+Datalab (its block types; Diagram and ChemicalBlock reach the API as Figure, Bibliography as
 ListGroup):
 
 | Datalab type | label |
