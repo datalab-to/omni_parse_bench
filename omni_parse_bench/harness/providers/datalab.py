@@ -34,7 +34,7 @@ MEDIA = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", "
 class Datalab(Parser):
     """Datalab, one call for html and blocks (`output_format=html,chunks`), page headers and footers kept.
 
-    - `mode`: the tier, `fast`, `balanced` or `accurate`;
+    - `mode`: the tier, `lite`, `fast`, `balanced` or `accurate`; `lite` is Indra OCR on CPU, with no LLM pass;
     - `blocks`: its chunks, each `block_type` mapped by `LABELS`, boxes in the page's frame (`page_info`); and
     - cost: stated in cents, recorded in dollars.
 
@@ -46,7 +46,7 @@ class Datalab(Parser):
 
     mode: str = dataclasses.field(
         default="accurate",
-        metadata={"choices": ["fast", "balanced", "accurate"],
+        metadata={"choices": ["lite", "fast", "balanced", "accurate"],
                   "help": "conversion tier; the published runs use balanced and accurate"})
     base_url: str = DEFAULT_BASE_URL
     poll_interval: float = 2.0
