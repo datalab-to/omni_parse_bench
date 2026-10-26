@@ -279,7 +279,7 @@ record["output"]    # {"pages": [{"html": "...", "blocks": [...]}]}
 record["raw"]       # the answer as the system gave it
 record["cost"]      # what it cost, its wall time and attempts
 
-unit_tests.score(record["output"], unit_tests.tests.read("gold/<page_id>.json"))
+unit_tests.score(record["output"]["pages"][0], unit_tests.tests.read("gold/<page_id>.json"))   # one page's outputs
 ```
 
 ```bash
