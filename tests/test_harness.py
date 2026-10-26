@@ -423,3 +423,12 @@ def test_a_lighton_reply_without_placeholders_is_one_unlabelled_block():
     from omni_parse_bench.harness.providers import lighton
 
     assert lighton.split("# Just text") == [("", (), "# Just text")]
+
+
+def test_a_run_is_graded_against_the_dataset_commit_it_ran_on():
+    from omni_parse_bench import cli
+
+    said = {"dataset": "hf://datasets/datalab-to/omni_parse_bench", "dataset_commit": "abc123",
+            "manifest": "m.parquet"}
+    assert cli.recorded(said) == ("hf://datasets/datalab-to/omni_parse_bench@abc123", "m.parquet")
+    assert cli.recorded(said, "other") == ("other", "m.parquet")  # a dataset given is graded as given

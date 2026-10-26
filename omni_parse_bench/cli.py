@@ -76,7 +76,7 @@ def recorded(said: dict[str, Any], dataset: str | None = None,
     """The dataset (at the commit it was run on) and the manifest a run's settings.json names, unless given;
     ours for a folder that names none."""
     d = dataset or said.get("dataset") or data.DEFAULT_DATASET
-    if dataset is None and said.get("commit"): d = f"{d}@{said['commit']}"
+    if dataset is None and said.get("dataset_commit"): d = f"{d}@{said['dataset_commit']}"
     return d, manifest or said.get("manifest") or data.MANIFEST
 
 
