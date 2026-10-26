@@ -94,6 +94,8 @@ system:
     ...
 ```
 
+`opb systems` lists every system you can run; `opb systems <name>` shows its options and the key it needs.
+
 `--set path=value` changes one value the file has, read as YAML, and refuses a path it hasn't. This runs Datalab
 on 5 pages:
 
