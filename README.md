@@ -346,6 +346,15 @@ verdicts and archived failure records under the same coverage rule, without new 
 tests. [Machine-readable LLM run summaries](docs/llm-run-summaries.json) give the exact scores, denominators
 and failed/refused page IDs.
 
+### Headline versus latency
+
+![Headline against latency](docs/assets/latency.svg)
+
+The new LLM points († diamonds) use the full-page recorded wall time: HTML plus layout when requested,
+including failed pages and retries, with 32 workers per model. Both medians are 18.5 seconds; p90 is
+37.3 seconds for Opus 5.5 and 43.1 seconds for GPT-6.1 Sol. Historical circles retain the earlier median of
+successful, unretried HTML calls only. These timing definitions differ and are not directly comparable.
+
 ### Price per 1,000 pages
 
 | Model | Headline | Reported USD / 1,000 pages | Refusals |
