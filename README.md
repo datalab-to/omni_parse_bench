@@ -340,6 +340,19 @@ verdicts and archived failure records under the same coverage rule, without new 
 tests. [Machine-readable LLM run summaries](docs/llm-run-summaries.json) give the exact scores, denominators
 and failed/refused page IDs.
 
+### Price per 1,000 pages
+
+| Model | Headline | Reported USD / 1,000 pages | Refusals |
+| --- | ---: | ---: | ---: |
+| Claude Opus 5.5 | 90.75 | $68.45† | 40 |
+| GPT-6.1 Sol | 91.41 | $30.95 | 17 |
+
+One full run per model, 2,937 pages each. Prices include all page outputs requested by the benchmark and
+response-reported upstream model charges under OpenRouter BYOK. † Opus's price is a reported subtotal:
+12 refused pages returned no usage or cost. The earlier systems' chart prices are unchanged.
+
+![Headline against price per 1,000 pages](docs/assets/cost.svg)
+
 ## License
 
 The code is Apache 2.0: see [`LICENSE`](https://github.com/datalab-to/omni_parse_bench/blob/main/LICENSE), and
