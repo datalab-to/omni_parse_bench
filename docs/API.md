@@ -125,8 +125,9 @@ our dataset. `--manifest` picks another manifest inside the dataset.
 A prediction that isn't `{"pages": [one object of outputs]}` is the system's failure: the page counts 0. An
 output of the wrong shape inside it fails only that output's tests.
 
-The summary's top `headline` is `scored.headline` times `coverage`, the share of pages that didn't fail, so a page
-that failed counts as 0. Under `scored`, the headline and the families are over the scored pages only.
+A page that failed counts with every test failed (`UnitTests.zero`), so it costs its tests, not a page's share
+of the headline. The summary's `zeroed` counts those pages, `coverage` stays 1, and the top `headline` is
+`scored.headline`.
 
 ## Score
 
@@ -349,5 +350,4 @@ lines = [json.loads(x) for f in glob.glob("runs/<run>/unit_tests/details/*.jsonl
 unit_tests.summarize([x for x in lines if x["suite"] == "tables"])
 ```
 
-A failed page has no details, so a slice leaves it out: its headline has no coverage factor, and can be higher
-than the run's.
+A failed page's details are its tests, each failed, so a slice counts them as the headline does.

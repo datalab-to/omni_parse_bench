@@ -33,9 +33,9 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     - A page's line in scores.jsonl holds `tests`, `passed` and `per_family` (each family's `tests` and
       `passed`);
     - its details (`details/<page_id>.jsonl`) hold one test line per test (`lines`); and
-    - the summary is `summarize` over the scored pages: the families in the order text, tables, layout, and
-      their mean as the headline. Any other breakdown (by tag, test type, suite or derivation) is `summarize`
-      of a slice of the details."""
+    - the summary is `summarize` over every page, a failed one with all its tests failed (`zero`): the
+      families in the order text, tables, layout, and their mean as the headline. Any other breakdown (by tag,
+      test type, suite or derivation) is `summarize` of a slice of the details."""
 
     name: ClassVar[str] = "unit_tests"
 
@@ -73,16 +73,20 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
         are test lines that `summarize` reads."""
         out = []
         for r, x in zip(rows, super().score_all(rows, preds, golds), strict=True):
-            on = {"page_id": r.page_id, "suite": r.suite, "document": r.document}
             scored = isinstance(x, scorer.Score) and x.details is not None
-            out.append(x._replace(details=[on | d for d in x.details]) if scored else x)
+            out.append(_on(r, x) if scored else x)
         return out
+
+    def zero(self, row: data.Page, tests: Sequence[_tests.Test]) -> scorer.Score:
+        """A failed page: the score of a prediction with no outputs, so every test fails and the page costs
+        its tests, not a page's share of the headline."""
+        return _on(row, self.score({}, tests))
 
     def row_fields(self, row: data.Page) -> dict[str, Any]:
         return {"document": row.document}
 
     def summarize(self, lines: Sequence[Line]) -> dict[str, Any]:
-        """The headline and `families`, over the scored pages' counts (the core gives only those)."""
+        """The headline and `families`, over every page's counts, a failed page's from `zero`."""
         s = _summary((f, x["row"]["document"], c["passed"], c["tests"])
                      for x in lines for f, c in x["per_family"].items())
         return {"headline": s["headline"], "headline_is": HEADLINE, "families": s["families"]}
@@ -90,6 +94,12 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     def check_gold(self, rows: Sequence[data.Page]) -> None:
         """Every page's tests read and checked (`check`), before any call."""
         check(rows)
+
+
+def _on(r: data.Page, x: scorer.Score) -> scorer.Score:
+    """`x` with each detail line on its page (`page_id`, `suite`, `document`)."""
+    on = {"page_id": r.page_id, "suite": r.suite, "document": r.document}
+    return x._replace(details=[on | d for d in x.details])
 
 
 def gold(page: data.Page) -> tuple[_tests.Test, ...]:

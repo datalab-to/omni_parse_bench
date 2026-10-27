@@ -216,22 +216,26 @@ A summary looks like this:
 {
   "scorer": "unit_tests",
   "run": "datalab-20261021-160012-3f9a",
-  "headline": 0.648,
+  "headline": 0.657,
   "headline_is": "scored.headline × coverage",
   "rows": 5,
   "failed": 1,
-  "coverage": 0.8,
+  "zeroed": 1,
+  "coverage": 1.0,
   "scored": {
-    "headline": 0.81,
+    "headline": 0.657,
     "headline_is": "the mean of the families' scores",
     "families": {
-      "text": {"score": 0.9, "tests": 96, "documents": 4},
-      "tables": {"score": 0.74, "tests": 32, "documents": 2},
-      "layout": {"score": 0.79, "tests": 24, "documents": 4}
+      "text": {"score": 0.72, "tests": 120, "documents": 5},
+      "tables": {"score": 0.59, "tests": 40, "documents": 3},
+      "layout": {"score": 0.66, "tests": 30, "documents": 5}
     }
   }
 }
 ```
+
+A failed page counts with all its tests failed (`zeroed`), so `coverage` stays 1 and the headline is
+`scored.headline`.
 
 ## Score on your own
 

@@ -210,7 +210,7 @@ def test_every_page_failing_has_headline_0(tmp_path, monkeypatch):
     b = benchmark.default(dataset(tmp_path / "data"))
     g = b.run(Alpha(), tmp_path / "runs")
     [s] = g["scorers"].values()
-    assert (s["headline"], s["failed"], s["coverage"]) == (0.0, 3, 0.0), s
+    assert (s["headline"], s["failed"], s["zeroed"], s["coverage"]) == (0.0, 3, 3, 1.0), s
 
 
 @dataclasses.dataclass(frozen=True)
@@ -488,7 +488,7 @@ def test_a_parse_raising_system_failed_counts_the_page_0_as_unreadable(tmp_path,
     b = benchmark.default(dataset(tmp_path / "data", 2))
     name = (g := b.run(Alpha(), tmp_path / "runs"))["run"]
     [s] = g["scorers"].values()
-    assert (s["failed"], s["coverage"], s["headline"]) == (2, 0.0, 0.0), s
+    assert (s["failed"], s["zeroed"], s["coverage"], s["headline"]) == (2, 2, 1.0, 0.0), s
     err = json.loads((tmp_path / "runs" / name / "records" / "a-p0.json").read_text())["error"]
     assert err["type"] == "Unreadable" and "the answer holds no page" in err["message"]
     assert "in parse" in err["traceback"], err
@@ -517,7 +517,8 @@ def test_a_prediction_that_isnt_an_object_counts_0_with_its_traceback(tmp_path):
     run = tmp_path / "runs" / name
     (run / "predictions" / "a-p0.json").write_text("[]")
     [s] = b.grade(run)["scorers"].values()
-    assert (s["failed"], s["coverage"]) == (1, 0.5), s
+    assert (s["failed"], s["zeroed"], s["coverage"]) == (1, 1, 1.0), s
+    assert s["scored"]["families"]["text"]["tests"] == 2 and s["headline"] == 0.25, s
     lines = (run / b.scorers[0].folder_name / "scores.jsonl").read_text().splitlines()
     line = next(x for x in map(json.loads, lines) if x["id"] == "a-p0")
     assert "a row is one page" in line["error"] and "in prediction" in line["traceback"], line

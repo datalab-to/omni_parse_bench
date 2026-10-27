@@ -98,7 +98,7 @@ response-reported upstream model charges under OpenRouter BYOK. † Opus's price
 
 Each tag's score is the mean of the family scores on the tests with that tag
 (for a system with no layout, the mean of the families it has). A test with several tags counts in each.
-These per-test slices do not apply the run-level page-coverage factor. Tests per tag: handwriting 923, math 3,316, table 6,767, form 1,028, multi-column 3,517, tiny text 832, rotated 824, degraded 655, not English 1,950. _Not English_ is a test with a language tag other than English.
+As in the headline, a failed page's tests count as failed. Tests per tag: handwriting 923, math 3,316, table 6,767, form 1,028, multi-column 3,517, tiny text 832, rotated 824, degraded 655, not English 1,950. _Not English_ is a test with a language tag other than English.
 
 | parser | handwriting | math | table | form | multi-column | tiny text | rotated | degraded | not English |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
