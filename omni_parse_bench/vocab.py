@@ -6,7 +6,8 @@ can be selected; grading never reads them.
 """
 from __future__ import annotations
 
-OUTPUT_TYPES = ("html", "blocks")
+# currently markdown not requested for any test
+OUTPUT_TYPES = ("html", "blocks", "markdown")
 
 DERIVATIONS = (
     "text_layer", "upstream_olmocr", "authored", "publisher_markup", "model_panel",

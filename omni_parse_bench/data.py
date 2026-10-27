@@ -14,7 +14,7 @@ DEFAULT_DATASET = "hf://datasets/datalab-to/omni_parse_bench"
 MANIFEST = core.MANIFEST
 NO_SUITE = "other"   # the suite of a page whose manifest gives none
 COLUMNS = ("document", "outputs")       # what opb's rows hold besides the core's
-OUTPUTS = frozenset(vocab.READS.values())     # the output types a test can read: html, blocks
+OUTPUTS = frozenset(vocab.OUTPUT_TYPES)     # the output types a page can ask for: html, blocks, markdown
 
 
 @dataclasses.dataclass(frozen=True)
