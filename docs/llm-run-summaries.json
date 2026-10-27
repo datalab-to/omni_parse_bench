@@ -276,7 +276,10 @@
         "tables_derived-PMC9297761.1_doc-p6",
         "tables_derived-PMC9865142.1_doc-p3"
       ],
-      "measurement": "One stock OpenRouter run, 2026-10-27; omni-parse-bench 1.0.0; default reasoning; separate HTML/layout requests; 2048px image long edge; max_output_tokens 32000; timeout 900s."
+      "measurement": "One stock OpenRouter run, 2026-10-27; omni-parse-bench 1.0.0; default reasoning; separate HTML/layout requests; 2048px image long edge; max_output_tokens 32000; timeout 900s.",
+      "reported_cost_usd": 201.0377,
+      "reported_cost_per_1000_pages": 68.4500224719101,
+      "cost_unknown_pages": 12
     },
     "GPT-6.1 Sol": {
       "headline": 0.9140751292075959,
@@ -341,7 +344,10 @@
         "synth_copies-images_sv21de3d34-p1",
         "synth_copies-sv21de3d34-p1"
       ],
-      "measurement": "One stock OpenRouter run, 2026-10-27; omni-parse-bench 1.0.0; default reasoning; separate HTML/layout requests; 2048px image long edge; max_output_tokens 32000; timeout 900s."
+      "measurement": "One stock OpenRouter run, 2026-10-27; omni-parse-bench 1.0.0; default reasoning; separate HTML/layout requests; 2048px image long edge; max_output_tokens 32000; timeout 900s.",
+      "reported_cost_usd": 90.901,
+      "reported_cost_per_1000_pages": 30.950299965951654,
+      "cost_unknown_pages": 0
     }
   }
 }

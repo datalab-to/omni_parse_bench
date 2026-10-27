@@ -65,6 +65,19 @@ defaults each vendor recommends; each adapter's docstring lists where it differs
 reads PDFs gets the page file and renders it as its vendor does; a model whose vendor code takes images only
 (HunyuanOCR, Nanonets-OCR2, Nemotron 3.5 Parse) gets the page as a PNG at most 2,048 px on its long edge.
 
+### Price per 1,000 pages
+
+| Model | Headline | Reported USD / 1,000 pages | Refusals |
+| --- | ---: | ---: | ---: |
+| Claude Opus 5.5 | 90.75 | $68.45† | 40 |
+| GPT-6.1 Sol | 91.41 | $30.95 | 17 |
+
+One full run per model, 2,937 pages each. Prices include all page outputs requested by the benchmark and
+response-reported upstream model charges under OpenRouter BYOK. † Opus's price is a reported subtotal:
+12 refused pages returned no usage or cost. The earlier systems' chart prices are unchanged.
+
+![Headline against price per 1,000 pages](./assets/cost.svg)
+
 ## Hard slices
 
 Each tag's score is the mean of the family scores on the tests with that tag
