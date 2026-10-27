@@ -71,6 +71,15 @@ defaults each vendor recommends; each adapter's docstring lists where it differs
 reads PDFs gets the page file and renders it as its vendor does; a model whose vendor code takes images only
 (HunyuanOCR, Nanonets-OCR2, Nemotron 3.5 Parse) gets the page as a PNG at most 2,048 px on its long edge.
 
+### Headline versus latency
+
+![Headline against latency](./assets/latency.svg)
+
+The new LLM points († diamonds) use the full-page recorded wall time: HTML plus layout when requested,
+including failed pages and retries, with 32 workers per model. Both medians are 18.5 seconds; p90 is
+37.3 seconds for Opus 5.5 and 43.1 seconds for GPT-6.1 Sol. Historical circles retain the earlier median of
+successful, unretried HTML calls only. These timing definitions differ and are not directly comparable.
+
 ### Price per 1,000 pages
 
 | Model | Headline | Reported USD / 1,000 pages | Refusals |

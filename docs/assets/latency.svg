@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="560" viewBox="0 0 760 560" font-size="15" role="img" aria-label="Headline against latency with historical HTML-call times and separately marked full-page LLM times">
+<style>@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap');
+/* Datalab design system -- tokens from svelte/src/styles/datalab-system.css, converted from
+   oklch to hex so the figures render identically outside a browser. The system is light-only;
+   this guard stops a viewer's auto dark mode inverting them on its own. */
+:root{color-scheme:only light}
+text{font-family:Geist,ui-sans-serif,system-ui,sans-serif;fill:#0f1217}
+.h2{font-weight:500;font-size:18px;letter-spacing:-.09px;font-feature-settings:"ss01" 1}
+.cap{font-size:13px;fill:#595e66}
+.hd{font-size:11.5px;font-weight:500;fill:#595e66;letter-spacing:.35px;text-transform:uppercase}
+.nm{font-family:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px;fill:#3a3d44}
+.num{font-family:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;fill:#3a3d44;
+  font-feature-settings:"tnum" 1}
+.halo{paint-order:stroke;stroke:#f9fafd;stroke-width:5px;stroke-linejoin:round}
+.cell{font-family:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;font-size:10px;
+  font-feature-settings:"tnum" 1;text-anchor:middle}
+</style>
+<rect width="760" height="560" fill="#f9fafd" />
+<text class="h2" x="24" y="38" text-anchor="start">Headline against latency</text>
+<text class="cap" x="24" y="60" text-anchor="start">Historical HTML-call median; new LLM full-page medians marked †</text>
+<line x1="64" x2="610" y1="412.0" y2="412.0" stroke="#e9ebf0" />
+<text class="num" x="56" y="416" text-anchor="end">80</text>
+<line x1="64" x2="610" y1="305.3" y2="305.3" stroke="#e9ebf0" />
+<text class="num" x="56" y="309.333" text-anchor="end">85</text>
+<line x1="64" x2="610" y1="198.7" y2="198.7" stroke="#e9ebf0" />
+<text class="num" x="56" y="202.667" text-anchor="end">90</text>
+<line x1="64" x2="610" y1="92.0" y2="92.0" stroke="#e9ebf0" />
+<text class="num" x="56" y="96" text-anchor="end">95</text>
+<line x1="64.0" x2="64.0" y1="92" y2="412" stroke="#e9ebf0" />
+<text class="num" x="64" y="430" text-anchor="middle">0</text>
+<line x1="142.0" x2="142.0" y1="92" y2="412" stroke="#e9ebf0" />
+<text class="num" x="142" y="430" text-anchor="middle">5</text>
+<line x1="220.0" x2="220.0" y1="92" y2="412" stroke="#e9ebf0" />
+<text class="num" x="220" y="430" text-anchor="middle">10</text>
+<line x1="298.0" x2="298.0" y1="92" y2="412" stroke="#e9ebf0" />
+<text class="num" x="298" y="430" text-anchor="middle">15</text>
+<line x1="376.0" x2="376.0" y1="92" y2="412" stroke="#e9ebf0" />
+<text class="num" x="376" y="430" text-anchor="middle">20</text>
+<line x1="454.0" x2="454.0" y1="92" y2="412" stroke="#e9ebf0" />
+<text class="num" x="454" y="430" text-anchor="middle">25</text>
+<line x1="532.0" x2="532.0" y1="92" y2="412" stroke="#e9ebf0" />
+<text class="num" x="532" y="430" text-anchor="middle">30</text>
+<line x1="610.0" x2="610.0" y1="92" y2="412" stroke="#e9ebf0" />
+<text class="num" x="610" y="430" text-anchor="middle">35</text>
+<text class="cap" x="337" y="452" text-anchor="middle">median seconds per page</text>
+<text class="cap" transform="translate(20 252) rotate(-90)" text-anchor="middle">headline</text>
+<polyline points="101.4,347.1 109.2,347.1 109.2,208.9 157.6,208.9 157.6,181.8 214.5,181.8 214.5,142.4 294.1,142.4 294.1,111.8 610.0,111.8" fill="none" stroke="#595e66" stroke-width="1.5" stroke-dasharray="4 3" />
+<circle cx="393.2" cy="140.147" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" />
+<text class="cap halo" x="402.16" y="144.147" text-anchor="start" style="fill:#9a9fa7">Gemini 3.8 Flash*</text>
+<circle cx="294.1" cy="111.8" r="5" fill="#001dbe" />
+<text class="nm halo" x="285.1" y="115.768" text-anchor="end" style="fill:#001dbe">Datalab accurate</text>
+<circle cx="214.5" cy="142.4" r="5" fill="#001dbe" />
+<text class="nm halo" x="223.54" y="146.428" text-anchor="start" style="fill:#001dbe">Datalab balanced</text>
+<circle cx="157.6" cy="181.8" r="5" fill="#3a3d44" />
+<text class="nm halo" x="166.6" y="185.757" text-anchor="start">Reducto</text>
+<circle cx="578.0" cy="190.2" r="5" fill="#3a3d44" />
+<text class="nm halo" x="587.02" y="194.245" text-anchor="start">LlamaParse</text>
+<circle cx="109.2" cy="208.9" r="5" fill="#3a3d44" />
+<text class="nm halo" x="118.24" y="212.934" text-anchor="start">Mistral OCR</text>
+<circle cx="254.3" cy="226.949" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" />
+<text class="cap halo" x="263.32" y="230.949" text-anchor="start" style="fill:#9a9fa7">Claude Sonnet 5.5*</text>
+<circle cx="519.5" cy="247.056" r="5" fill="#3a3d44" />
+<text class="nm halo" x="528.52" y="251.056" text-anchor="start">GPT-5.6 Sol</text>
+<circle cx="262.1" cy="340.7" r="5" fill="#3a3d44" />
+<text class="nm halo" x="271.12" y="344.694" text-anchor="start">Extend</text>
+<circle cx="101.4" cy="347.1" r="5" fill="#3a3d44" />
+<text class="nm halo" x="110.44" y="351.141" text-anchor="start">Azure</text>
+<text class="cap" x="24" y="486" text-anchor="start">* Used in creating and verifying at least some tests.</text>
+<g data-model="GPT-6.1 Sol" data-latency-median="18.5" data-headline="91.40751292075959" data-timing="full-page"><title>GPT-6.1 Sol: headline 91.41, full-page median 18.5s (HTML plus layout when requested; includes failures and retries)</title><polygon points="352.600,163.640 357.600,168.640 352.600,173.640 347.600,168.640" fill="#3a3d44" /><text class="nm halo" x="361.600" y="162.640">GPT-6.1 Sol†</text></g><g data-model="Claude Opus 5.5" data-latency-median="18.5" data-headline="90.74715233948695" data-timing="full-page"><title>Claude Opus 5.5: headline 90.75, full-page median 18.5s (HTML plus layout when requested; includes failures and retries)</title><polygon points="352.600,177.727 357.600,182.727 352.600,187.727 347.600,182.727" fill="#3a3d44" /><text class="nm halo" x="361.600" y="195.727">Claude Opus 5.5†</text></g><text class="cap" x="24" y="508">† Diamonds: all requested page outputs, failures and retries included; 32 workers per model.</text><text class="cap" x="24" y="529">Historical circles: successful, unretried HTML calls only. Timing definitions differ.</text><text class="cap" x="24" y="550">New LLM runs: 2,937 pages each, 2026-10-27. Both full-page medians are 18.5 seconds.</text></svg>
