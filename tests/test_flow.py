@@ -605,3 +605,15 @@ def test_a_page_with_no_suite_is_in_other():
     assert data.page(row | {"extra": {"suite": "tables", "lang": "en"}}).extra == {"lang": "en"}
     with pytest.raises(ValueError, match="suite must be a string"):
         data.page(row | {"extra": {"suite": 3}})
+
+
+def test_a_page_may_ask_for_markdown_but_not_an_unknown_output():
+    from pathlib import Path
+
+    from omni_parse_bench import data
+
+    row = {"page_id": "p1", "document": "d", "outputs": ["markdown"], "doc_path": Path("pages/p1.pdf"),
+           "gt_path": Path("gold/p1.json"), "extra": {}}
+    assert data.page(row).outputs == ("markdown",)
+    with pytest.raises(ValueError, match="outputs must be a non-empty list of distinct output types"):
+        data.page(row | {"outputs": ["htlm"]})
