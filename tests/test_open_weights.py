@@ -123,6 +123,17 @@ def test_an_unknown_label_fails_the_blocks_only():
     assert "Also kept" in views.text(outs["html"]) and "blocks" in errs and "blocks" not in outs
 
 
+def test_unlimited_ocr_2_asks_its_own_weights_and_reads_as_unlimited_ocr():
+    from omni_parse_bench.harness.providers import unlimited, unlimited_ocr2
+
+    api = harness.system("unlimited-ocr-2")
+    request = api.requests(frozenset({"html", "blocks"}))[0]
+    assert request.sent["model"] == "baidu/Unlimited-OCR-2" and api.SERVE == "unlimited-ocr-2"
+    assert api.served["weights"] == unlimited_ocr2.MODEL
+    assert {k: v for k, v in request.sent.items() if k != "model"} == \
+        {k: v for k, v in unlimited.UnlimitedOcr().requests(request.outputs)[0].sent.items() if k != "model"}
+
+
 def test_an_open_models_malformed_block_or_unknown_label_fails_the_blocks_only():
     """A block with no box, or a type LABELS lacks, fails the blocks output only; the html is still graded."""
     from omni_parse_bench.harness.providers import dots, mineru
@@ -261,7 +272,7 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
 @pytest.mark.parametrize("provider", ["chandra-ocr", "deepseek-ocr", "dots-mocr", "glm-ocr", "hunyuan-ocr",
                                       "infinity-parser2", "lightonocr", "mineru", "nanonets-ocr",
                                       "nemotron-parse", "olmocr", "paddleocr-vl", "surya-ocr",
-                                      "unlimited-ocr"])
+                                      "unlimited-ocr", "unlimited-ocr-2"])
 def test_a_served_model_run_is_named_by_every_option(provider):
     """Every option names the run but the server's address: the same model at another address is the same
     question, and other weights another."""

@@ -345,6 +345,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | LightOnOCR-3 (4B, 0.8B) | `lightonocr` | `lightonocr` | html, blocks |
 | dots.mocr | `dots-mocr` | `dots-mocr` | html, blocks |
 | Unlimited-OCR | `unlimited-ocr` | `unlimited-ocr` | html, blocks |
+| Unlimited-OCR 2 | `unlimited-ocr-2` | `unlimited-ocr-2` | html, blocks |
 | Infinity-Parser2 (Pro, Flash) | `infinity-parser2` | `infinity-parser2` | html, blocks |
 | chandra-ocr-2 | `chandra-ocr` | `chandra-ocr` | html, blocks |
 | olmOCR-2 | `olmocr` | `olmocr` | html |
