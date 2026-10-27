@@ -1,0 +1,347 @@
+{
+  "dataset_revision": "838b4e956c17e38f3f3d1762400c9425afac7987",
+  "pages": 2937,
+  "headline_rule": "mean of text, tables and layout scores on answered pages multiplied by answered-page coverage",
+  "refusal_rule": "Unique pages where a required output was refused: content_filter, provider content-filter error, or RECITATION. Other failures are counted separately. A partial answer followed by a failed required request fails the page.",
+  "systems": {
+    "Gemini 3.8 Flash": {
+      "headline": 0.9274310010151077,
+      "scored_headline": 0.9337898011591947,
+      "families": {
+        "text": {
+          "score": 0.9192266635037362,
+          "tests": 8431
+        },
+        "tables": {
+          "score": 0.9531511433351925,
+          "tests": 5379
+        },
+        "layout": {
+          "score": 0.9289915966386555,
+          "tests": 2380
+        }
+      },
+      "coverage": 0.993190330268982,
+      "pages": 2937,
+      "failed_pages": 20,
+      "refused_pages": 8,
+      "other_failed_pages": 12,
+      "refusal_page_ids": [
+        "multiling_finepdfs-hbo_Hebr_64070277-p1",
+        "multiling_finepdfs-images_hbo_Hebr_64070277-p1",
+        "multiling_finepdfs-images_mni_Mtei_42830838-p1",
+        "multiling_finepdfs-lis_Lisu_02548283-p1",
+        "multiling_finepdfs-sat_Olck_74281726-p1",
+        "multilingual-scan_fr_cerfa_12485_p1-p1",
+        "olmo_multi_column-00945e98ea0970dcffb8f548336df3a0137f_page_3_pg1-p1",
+        "parsebench_docs-9aa9fe3a_docs_chart_pdf_f270146f8ca7_p4-p1"
+      ],
+      "failed_page_ids": [
+        "forms_federal-scan_irs_9465-p1",
+        "forms_filled-filled_irs_2848-p2",
+        "forms_filled-filled_irs_8822-p1",
+        "forms_filled-scan_irs_2848_p2-p1",
+        "multiling_finepdfs-hbo_Hebr_64070277-p1",
+        "multiling_finepdfs-images_hbo_Hebr_64070277-p1",
+        "multiling_finepdfs-images_mni_Mtei_42830838-p1",
+        "multiling_finepdfs-lis_Lisu_02548283-p1",
+        "multiling_finepdfs-sat_Olck_74281726-p1",
+        "multilingual-scan_fr_cerfa_12485_p1-p1",
+        "olmo_multi_column-00945e98ea0970dcffb8f548336df3a0137f_page_3_pg1-p1",
+        "parsebench_docs-9aa9fe3a_docs_chart_pdf_f270146f8ca7_p4-p1",
+        "realdoc_pages-images_56e1f89c_images_d31632e4-365f-4a4f-bc6a-c637aadbbc5e-p1",
+        "realdoc_pdfs-c0a98b4f_docs_medical_healthcare_52-p1",
+        "rotation_skew-images_rs7be77657_skew2-p1",
+        "rotation_skew-rs206c5e19_rot270-p1",
+        "rotation_skew-rs54f62b0a_rot180-p1",
+        "synth_copies-images_sv4122f1ec-p1",
+        "synth_copies-sv16788ad9-p1",
+        "tables_derived-PMC2352872.1_doc-p10"
+      ],
+      "measurement": "Archived published verdicts, required-output failures verified against archived responses; normalized to the current page-coverage rule. No inference rerun."
+    },
+    "Claude Sonnet 5.5": {
+      "headline": 0.8867426403662904,
+      "scored_headline": 0.8897721676651161,
+      "families": {
+        "text": {
+          "score": 0.9328147100424328,
+          "tests": 8484
+        },
+        "tables": {
+          "score": 0.9610851262862489,
+          "tests": 5345
+        },
+        "layout": {
+          "score": 0.7754166666666666,
+          "tests": 2400
+        }
+      },
+      "coverage": 0.996595165134491,
+      "pages": 2937,
+      "failed_pages": 10,
+      "refused_pages": 7,
+      "other_failed_pages": 3,
+      "refusal_page_ids": [
+        "multilingual-filled_fr_cerfa_12485-p1",
+        "multilingual-source_fr_cerfa_12485-p1",
+        "tables_derived-PMC3390688.1_doc-p7",
+        "tables_derived-PMC4719693.1_doc-p4",
+        "tables_derived-PMC6090577.1_doc-p4",
+        "tables_derived-PMC7646516.1_doc-p7",
+        "tables_derived-PMC8833170.1_doc-p2"
+      ],
+      "failed_page_ids": [
+        "multilingual-filled_fr_cerfa_12485-p1",
+        "multilingual-source_fr_cerfa_12485-p1",
+        "olmo_arxiv_math-2503.06969_pg11-p1",
+        "rotation_skew-images_rs206c5e19_skew2-p1",
+        "synth_copies-sva208005b-p1",
+        "tables_derived-PMC3390688.1_doc-p7",
+        "tables_derived-PMC4719693.1_doc-p4",
+        "tables_derived-PMC6090577.1_doc-p4",
+        "tables_derived-PMC7646516.1_doc-p7",
+        "tables_derived-PMC8833170.1_doc-p2"
+      ],
+      "measurement": "Archived published verdicts, required-output failures verified against archived responses; normalized to the current page-coverage rule. No inference rerun."
+    },
+    "GPT-5.6 Sol": {
+      "headline": 0.8773176079829443,
+      "scored_headline": 0.8824252789883245,
+      "families": {
+        "text": {
+          "score": 0.8624212902459308,
+          "tests": 8417
+        },
+        "tables": {
+          "score": 0.915707389528407,
+          "tests": 5386
+        },
+        "layout": {
+          "score": 0.8691471571906354,
+          "tests": 2392
+        }
+      },
+      "coverage": 0.9942117807286347,
+      "pages": 2937,
+      "failed_pages": 17,
+      "refused_pages": 17,
+      "other_failed_pages": 0,
+      "refusal_page_ids": [
+        "forms_documentcloud-493872-obamacare-individual-mandate-tax-compliance-form-p1",
+        "forms_filled-filled_irs_1040-p1",
+        "forms_filled-filled_irs_1040-p2",
+        "forms_filled-scan_irs_1040_p1-p1",
+        "forms_filled-scan_irs_1040_p2-p1",
+        "olmo_long_tiny_text-15a_pg1-p1",
+        "parsebench_docs-cd76ef5f_docs_table_SERFF_TX_random_pages_1_page1065-p1",
+        "parsebench_docs-ed1a3d1a_docs_text_text_multilang__discrimination-p1",
+        "realdoc_pdfs-143c9b84_docs_mortgage_159-p1",
+        "realdoc_pdfs-c995f21e_docs_mortgage_212-p1",
+        "rotation_skew-images_rs2e269222_skew2-p1",
+        "rotation_skew-images_rsbff67ca4_skew2-p1",
+        "rotation_skew-images_rsd523b021_skew2-p1",
+        "rotation_skew-rs2e269222_rot180-p1",
+        "rotation_skew-rsbff67ca4_rot90-p1",
+        "rotation_skew-rsd523b021_rot270-p1",
+        "synth_copies-sv21de3d34-p1"
+      ],
+      "failed_page_ids": [
+        "forms_documentcloud-493872-obamacare-individual-mandate-tax-compliance-form-p1",
+        "forms_filled-filled_irs_1040-p1",
+        "forms_filled-filled_irs_1040-p2",
+        "forms_filled-scan_irs_1040_p1-p1",
+        "forms_filled-scan_irs_1040_p2-p1",
+        "olmo_long_tiny_text-15a_pg1-p1",
+        "parsebench_docs-cd76ef5f_docs_table_SERFF_TX_random_pages_1_page1065-p1",
+        "parsebench_docs-ed1a3d1a_docs_text_text_multilang__discrimination-p1",
+        "realdoc_pdfs-143c9b84_docs_mortgage_159-p1",
+        "realdoc_pdfs-c995f21e_docs_mortgage_212-p1",
+        "rotation_skew-images_rs2e269222_skew2-p1",
+        "rotation_skew-images_rsbff67ca4_skew2-p1",
+        "rotation_skew-images_rsd523b021_skew2-p1",
+        "rotation_skew-rs2e269222_rot180-p1",
+        "rotation_skew-rsbff67ca4_rot90-p1",
+        "rotation_skew-rsd523b021_rot270-p1",
+        "synth_copies-sv21de3d34-p1"
+      ],
+      "measurement": "Archived published verdicts, required-output failures verified against archived responses; normalized to the current page-coverage rule. No inference rerun."
+    },
+    "Claude Opus 5.5": {
+      "headline": 0.9074715233948695,
+      "scored_headline": 0.9200013338663209,
+      "families": {
+        "text": {
+          "score": 0.9450757575757576,
+          "tests": 8448,
+          "documents": 1783
+        },
+        "tables": {
+          "score": 0.9716161421123769,
+          "tests": 5179,
+          "documents": 572
+        },
+        "layout": {
+          "score": 0.8433121019108281,
+          "tests": 2355,
+          "documents": 620
+        }
+      },
+      "coverage": 0.9863806605379639,
+      "pages": 2937,
+      "failed_pages": 40,
+      "refused_pages": 40,
+      "other_failed_pages": 0,
+      "refusal_page_ids": [
+        "multiling_finepdfs-images_hbo_Hebr_64070277-p1",
+        "multiling_finepdfs-images_kyu_Kali_39131631-p1",
+        "multiling_finepdfs-images_mni_Mtei_88175467-p1",
+        "multiling_finepdfs-images_sat_Olck_74281726-p1",
+        "multiling_finepdfs-kyu_Kali_39131631-p1",
+        "multiling_finepdfs-mni_Mtei_88175467-p1",
+        "multiling_finepdfs-sat_Olck_74281726-p1",
+        "olmo_multi_column-05aa71fa77e07bccb443ef4fd28dde3ecfd6_page_12_pg1-p1",
+        "olmo_multi_column-05aa71fa77e07bccb443ef4fd28dde3ecfd6_page_4_pg1-p1",
+        "olmo_multi_column-05aa71fa77e07bccb443ef4fd28dde3ecfd6_page_7_pg1-p1",
+        "parsebench_docs-055bee53_docs_layout_20190601_ECR_UKPB_081_p1-p1",
+        "rotation_skew-rs54f62b0a_rot180-p1",
+        "synth_copies-images_sv16788ad9-p1",
+        "synth_copies-images_svefb02291-p1",
+        "synth_copies-sv16788ad9-p1",
+        "synth_copies-sv77fd1adc-p1",
+        "synth_copies-svefb02291-p1",
+        "tables_derived-PMC10914731.1_doc-p5",
+        "tables_derived-PMC10914731.1_doc-p9",
+        "tables_derived-PMC11411994.1_doc-p12",
+        "tables_derived-PMC12016962.1_doc-p11",
+        "tables_derived-PMC12077087.1_doc-p8",
+        "tables_derived-PMC12077129.1_doc-p11",
+        "tables_derived-PMC12109834.1_doc-p11",
+        "tables_derived-PMC1448171.1_doc-p2",
+        "tables_derived-PMC1513382.1_doc-p8",
+        "tables_derived-PMC1513391.1_doc-p7",
+        "tables_derived-PMC1766931.1_doc-p5",
+        "tables_derived-PMC1974800.1_doc-p5",
+        "tables_derived-PMC1974823.1_doc-p2",
+        "tables_derived-PMC2657108.1_doc-p7",
+        "tables_derived-PMC3390688.1_doc-p7",
+        "tables_derived-PMC4719670.1_doc-p7",
+        "tables_derived-PMC4719693.1_doc-p4",
+        "tables_derived-PMC6057498.1_doc-p5",
+        "tables_derived-PMC6090577.1_doc-p4",
+        "tables_derived-PMC8316060.1_doc-p3",
+        "tables_derived-PMC8833170.1_doc-p2",
+        "tables_derived-PMC9297761.1_doc-p6",
+        "tables_derived-PMC9865142.1_doc-p3"
+      ],
+      "failed_page_ids": [
+        "multiling_finepdfs-images_hbo_Hebr_64070277-p1",
+        "multiling_finepdfs-images_kyu_Kali_39131631-p1",
+        "multiling_finepdfs-images_mni_Mtei_88175467-p1",
+        "multiling_finepdfs-images_sat_Olck_74281726-p1",
+        "multiling_finepdfs-kyu_Kali_39131631-p1",
+        "multiling_finepdfs-mni_Mtei_88175467-p1",
+        "multiling_finepdfs-sat_Olck_74281726-p1",
+        "olmo_multi_column-05aa71fa77e07bccb443ef4fd28dde3ecfd6_page_12_pg1-p1",
+        "olmo_multi_column-05aa71fa77e07bccb443ef4fd28dde3ecfd6_page_4_pg1-p1",
+        "olmo_multi_column-05aa71fa77e07bccb443ef4fd28dde3ecfd6_page_7_pg1-p1",
+        "parsebench_docs-055bee53_docs_layout_20190601_ECR_UKPB_081_p1-p1",
+        "rotation_skew-rs54f62b0a_rot180-p1",
+        "synth_copies-images_sv16788ad9-p1",
+        "synth_copies-images_svefb02291-p1",
+        "synth_copies-sv16788ad9-p1",
+        "synth_copies-sv77fd1adc-p1",
+        "synth_copies-svefb02291-p1",
+        "tables_derived-PMC10914731.1_doc-p5",
+        "tables_derived-PMC10914731.1_doc-p9",
+        "tables_derived-PMC11411994.1_doc-p12",
+        "tables_derived-PMC12016962.1_doc-p11",
+        "tables_derived-PMC12077087.1_doc-p8",
+        "tables_derived-PMC12077129.1_doc-p11",
+        "tables_derived-PMC12109834.1_doc-p11",
+        "tables_derived-PMC1448171.1_doc-p2",
+        "tables_derived-PMC1513382.1_doc-p8",
+        "tables_derived-PMC1513391.1_doc-p7",
+        "tables_derived-PMC1766931.1_doc-p5",
+        "tables_derived-PMC1974800.1_doc-p5",
+        "tables_derived-PMC1974823.1_doc-p2",
+        "tables_derived-PMC2657108.1_doc-p7",
+        "tables_derived-PMC3390688.1_doc-p7",
+        "tables_derived-PMC4719670.1_doc-p7",
+        "tables_derived-PMC4719693.1_doc-p4",
+        "tables_derived-PMC6057498.1_doc-p5",
+        "tables_derived-PMC6090577.1_doc-p4",
+        "tables_derived-PMC8316060.1_doc-p3",
+        "tables_derived-PMC8833170.1_doc-p2",
+        "tables_derived-PMC9297761.1_doc-p6",
+        "tables_derived-PMC9865142.1_doc-p3"
+      ],
+      "measurement": "One stock OpenRouter run, 2026-10-27; omni-parse-bench 1.0.0; default reasoning; separate HTML/layout requests; 2048px image long edge; max_output_tokens 32000; timeout 900s."
+    },
+    "GPT-6.1 Sol": {
+      "headline": 0.9140751292075959,
+      "scored_headline": 0.9193967994803799,
+      "families": {
+        "text": {
+          "score": 0.9069408129308296,
+          "tests": 8414,
+          "documents": 1782
+        },
+        "tables": {
+          "score": 0.9561826958782027,
+          "tests": 5386,
+          "documents": 591
+        },
+        "layout": {
+          "score": 0.895066889632107,
+          "tests": 2392,
+          "documents": 627
+        }
+      },
+      "coverage": 0.9942117807286347,
+      "pages": 2937,
+      "failed_pages": 17,
+      "refused_pages": 17,
+      "other_failed_pages": 0,
+      "refusal_page_ids": [
+        "forms_documentcloud-493872-obamacare-individual-mandate-tax-compliance-form-p1",
+        "forms_filled-filled_irs_1040-p2",
+        "forms_filled-scan_irs_1040_p1-p1",
+        "forms_filled-scan_irs_1040_p2-p1",
+        "olmo_long_tiny_text-15a_pg1-p1",
+        "parsebench_docs-cd76ef5f_docs_table_SERFF_TX_random_pages_1_page1065-p1",
+        "parsebench_docs-ed1a3d1a_docs_text_text_multilang__discrimination-p1",
+        "realdoc_pdfs-143c9b84_docs_mortgage_159-p1",
+        "realdoc_pdfs-c995f21e_docs_mortgage_212-p1",
+        "rotation_skew-images_rs2e269222_skew2-p1",
+        "rotation_skew-images_rsbff67ca4_skew2-p1",
+        "rotation_skew-images_rsd523b021_skew2-p1",
+        "rotation_skew-rs2e269222_rot180-p1",
+        "rotation_skew-rsbff67ca4_rot90-p1",
+        "rotation_skew-rsd523b021_rot270-p1",
+        "synth_copies-images_sv21de3d34-p1",
+        "synth_copies-sv21de3d34-p1"
+      ],
+      "failed_page_ids": [
+        "forms_documentcloud-493872-obamacare-individual-mandate-tax-compliance-form-p1",
+        "forms_filled-filled_irs_1040-p2",
+        "forms_filled-scan_irs_1040_p1-p1",
+        "forms_filled-scan_irs_1040_p2-p1",
+        "olmo_long_tiny_text-15a_pg1-p1",
+        "parsebench_docs-cd76ef5f_docs_table_SERFF_TX_random_pages_1_page1065-p1",
+        "parsebench_docs-ed1a3d1a_docs_text_text_multilang__discrimination-p1",
+        "realdoc_pdfs-143c9b84_docs_mortgage_159-p1",
+        "realdoc_pdfs-c995f21e_docs_mortgage_212-p1",
+        "rotation_skew-images_rs2e269222_skew2-p1",
+        "rotation_skew-images_rsbff67ca4_skew2-p1",
+        "rotation_skew-images_rsd523b021_skew2-p1",
+        "rotation_skew-rs2e269222_rot180-p1",
+        "rotation_skew-rsbff67ca4_rot90-p1",
+        "rotation_skew-rsd523b021_rot270-p1",
+        "synth_copies-images_sv21de3d34-p1",
+        "synth_copies-sv21de3d34-p1"
+      ],
+      "measurement": "One stock OpenRouter run, 2026-10-27; omni-parse-bench 1.0.0; default reasoning; separate HTML/layout requests; 2048px image long edge; max_output_tokens 32000; timeout 900s."
+    }
+  }
+}

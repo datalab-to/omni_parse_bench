@@ -1,52 +1,59 @@
 # Results
 
-Every system's score on the published dataset, `hf://datasets/datalab-to/omni_parse_bench` at revision
-`961c0f89` (16,288 tests on 2,937 pages), plus Nemotron 3.5 Parse, graded with omni-parse-bench 0.1.2
-or newer (1.0.0rc1 gives the same 16,288 verdicts on the Nemotron 3.5 Parse run). Every verdict behind these
-numbers is in the dataset's `results.parquet`, one row per system and test, so any number here can be
-recomputed; the same table is on the [dataset card](https://huggingface.co/datasets/datalab-to/omni_parse_bench#results).
-Nemotron 3.5 Parse's verdicts are not on the dataset yet: a dataset update adds them to `results.parquet` and
-its row to the card. The same holds for Datalab accurate and balanced, which are a rerun of Datalab's
-production API on 2026-10-23 on the same 16,288 tests; the dataset card still shows the earlier Datalab
-rows (accurate 92.9, balanced 91.6).
+Every system's score on the published dataset, `hf://datasets/datalab-to/omni_parse_bench` (16,288 tests on 2,937 pages). The 2026-10-27 Opus 5.5 and GPT-6.1 Sol runs used dataset revision `838b4e956c17e38f3f3d1762400c9425afac7987` and omni-parse-bench 1.0.0. Every system's per-test verdicts are in the dataset's `results.parquet`; the LLM run summaries also record page coverage and refusals. The headline table is mirrored on the [dataset card](https://huggingface.co/datasets/datalab-to/omni_parse_bench#results).
 
 ## Headline and families
 
 The headline is the mean of three family scores: text (`present`, `order` and `repeat` tests), tables
 (`table_cell`) and layout (`layout_kind`). A system that returns no layout has no headline.
 
-| parser | weights | parameters | headline | text | tables | layout |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| **Datalab accurate** | closed |  | 94.1 | 92.0 | 94.2 | 96.0 |
-| Gemini 3.8 Flash* | closed |  | 92.9 | 91.3 | 95.2 | 92.2 |
-| **Datalab balanced** | closed |  | 92.6 | 90.1 | 91.6 | 96.2 |
-| Reducto | closed |  | 90.8 | 85.4 | 91.2 | 95.8 |
-| LlamaParse | closed |  | 90.4 | 88.2 | 92.6 | 90.4 |
-| **chandra-ocr-2** | open | 4.5B | 90.1 | 87.4 | 87.4 | 95.4 |
-| Mistral OCR | closed |  | 89.5 | 82.8 | 91.9 | 93.8 |
-| Claude Sonnet 5.5* | closed |  | 88.7 | 93.1 | 95.4 | 77.5 |
-| dots.mocr | open | 3.0B | 87.9 | 82.5 | 88.6 | 92.5 |
-| GPT-5.6 Sol | closed |  | 87.8 | 85.4 | 91.6 | 86.5 |
-| MinerU2.5-Pro | open | 1.2B | 87.1 | 77.4 | 92.1 | 91.7 |
-| Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | 83.3 | 84.1 | 93.5 |
-| Extend | closed |  | 83.3 | 64.1 | 92.5 | 93.4 |
-| **Surya OCR 2** | open | 0.67B | 83.1 | 80.6 | 74.3 | 94.3 |
-| Azure | closed |  | 83.0 | 74.6 | 81.7 | 92.8 |
-| LightOnOCR-3-4B | open | 4.5B | 82.9 | 83.9 | 70.8 | 94.0 |
-| LightOnOCR-3-0.8B | open | 0.85B | 81.6 | 81.1 | 72.1 | 91.7 |
-| GLM-OCR | open | 1.3B | 81.5 | 71.0 | 84.2 | 89.3 |
-| Nemotron 3.5 Parse | open | 0.63B | 80.0 | 72.4 | 77.3 | 90.2 |
-| Unlimited-OCR | open | 3.3B | 79.3 | 70.2 | 76.5 | 91.1 |
-| PaddleOCR-VL-1.6 | open | 0.96B | 78.7 | 61.7 | 83.7 | 90.7 |
-| Infinity-Parser2-Flash | open | 2.2B | 78.4 | 78.4 | 66.5 | 90.4 |
-| DeepSeek-OCR-2 | open | 3.4B | 75.2 | 64.2 | 70.0 | 91.4 |
-| **Indra OCR** | open | about 12M † | 69.5 | 60.3 | 58.1 | 90.1 |
-| HunyuanOCR-1.5 | open | 1.0B | 64.6 | 50.5 | 61.9 | 81.4 |
-| olmOCR-2 | open | 8.3B | none | 71.3 | 56.6 | unsupported |
-| Nanonets-OCR2-3B | open | 3.8B | none | 68.2 | 62.6 | unsupported |
-| Tesseract | open | n/a | none | 17.6 | 0.0 | unsupported |
+| parser | weights | parameters | headline | text | tables | layout | refusals |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| **Datalab accurate** | closed |  | 94.1 | 92.0 | 94.2 | 96.0 | — |
+| Gemini 3.8 Flash* | closed |  | 92.7 | 91.9 | 95.3 | 92.9 | 8 |
+| **Datalab balanced** | closed |  | 92.6 | 90.1 | 91.6 | 96.2 | — |
+| GPT-6.1 Sol | closed |  | 91.4 | 90.7 | 95.6 | 89.5 | 17 |
+| Reducto | closed |  | 90.8 | 85.4 | 91.2 | 95.8 | — |
+| Claude Opus 5.5 | closed |  | 90.7 | 94.5 | 97.2 | 84.3 | 40 |
+| LlamaParse | closed |  | 90.4 | 88.2 | 92.6 | 90.4 | — |
+| **chandra-ocr-2** | open | 4.5B | 90.1 | 87.4 | 87.4 | 95.4 | — |
+| Mistral OCR | closed |  | 89.5 | 82.8 | 91.9 | 93.8 | — |
+| Claude Sonnet 5.5* | closed |  | 88.7 | 93.3 | 96.1 | 77.5 | 7 |
+| dots.mocr | open | 3.0B | 87.9 | 82.5 | 88.6 | 92.5 | — |
+| GPT-5.6 Sol | closed |  | 87.7 | 86.2 | 91.6 | 86.9 | 17 |
+| MinerU2.5-Pro | open | 1.2B | 87.1 | 77.4 | 92.1 | 91.7 | — |
+| Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | 83.3 | 84.1 | 93.5 | — |
+| Extend | closed |  | 83.3 | 64.1 | 92.5 | 93.4 | — |
+| **Surya OCR 2** | open | 0.67B | 83.1 | 80.6 | 74.3 | 94.3 | — |
+| Azure | closed |  | 83.0 | 74.6 | 81.7 | 92.8 | — |
+| LightOnOCR-3-4B | open | 4.5B | 82.9 | 83.9 | 70.8 | 94.0 | — |
+| LightOnOCR-3-0.8B | open | 0.85B | 81.6 | 81.1 | 72.1 | 91.7 | — |
+| GLM-OCR | open | 1.3B | 81.5 | 71.0 | 84.2 | 89.3 | — |
+| Nemotron 3.5 Parse | open | 0.63B | 80.0 | 72.4 | 77.3 | 90.2 | — |
+| Unlimited-OCR | open | 3.3B | 79.3 | 70.2 | 76.5 | 91.1 | — |
+| PaddleOCR-VL-1.6 | open | 0.96B | 78.7 | 61.7 | 83.7 | 90.7 | — |
+| Infinity-Parser2-Flash | open | 2.2B | 78.4 | 78.4 | 66.5 | 90.4 | — |
+| DeepSeek-OCR-2 | open | 3.4B | 75.2 | 64.2 | 70.0 | 91.4 | — |
+| **Indra OCR** | open | about 12M † | 69.5 | 60.3 | 58.1 | 90.1 | — |
+| HunyuanOCR-1.5 | open | 1.0B | 64.6 | 50.5 | 61.9 | 81.4 | — |
+| olmOCR-2 | open | 8.3B | none | 71.3 | 56.6 | unsupported | — |
+| Nanonets-OCR2-3B | open | 3.8B | none | 68.2 | 62.6 | unsupported | — |
+| Tesseract | open | n/a | none | 17.6 | 0.0 | unsupported | — |
 
 \* Used in creating and verifying at least some tests. Datalab's own systems are in bold.
+
+Refusals count distinct pages with at least one required output refused by the provider, including content
+filtering and Gemini's `RECITATION` stop; `—` means not audited, rather than zero. The five LLM rows use the
+current run rule: the mean of the family scores on answered pages, multiplied by page coverage. A failed
+required request fails its page; the family columns describe answered pages only. Gemini has 8 refusals and 12
+other failed pages; Sonnet 5.5 has 7 refusals and 3 other failed pages. GPT-5.6 Sol has 17 refusals; Opus 5.5
+has 40; GPT-6.1 Sol has 17, with no other failed pages in those three runs.
+
+Opus 5.5 and GPT-6.1 Sol were each run once on 2026-10-27 using omni-parse-bench 1.0.0, the stock OpenRouter
+adapter and each model's default reasoning. The three earlier LLM rows were recomputed from their published
+verdicts and archived failure records under the same coverage rule, without new inference or changes to the
+tests. [Machine-readable LLM run summaries](./llm-run-summaries.json) give the exact scores, denominators and
+failed/refused page IDs.
 
 Parameters are those used at inference, counted from each model's weight files: an output layer tied to the
 embeddings counts once, and multi-token-prediction heads are left out. † Indra OCR's is the total of its
@@ -60,9 +67,9 @@ reads PDFs gets the page file and renders it as its vendor does; a model whose v
 
 ## Hard slices
 
-Each tag's score is computed as the headline is, the mean of the family scores on the tests with that tag
+Each tag's score is the mean of the family scores on the tests with that tag
 (for a system with no layout, the mean of the families it has). A test with several tags counts in each.
-Tests per tag: handwriting 923, math 3,316, table 6,767, form 1,028, multi-column 3,517, tiny text 832, rotated 824, degraded 655, not English 1,950. _Not English_ is a test with a language tag other than English.
+These per-test slices do not apply the run-level page-coverage factor. Tests per tag: handwriting 923, math 3,316, table 6,767, form 1,028, multi-column 3,517, tiny text 832, rotated 824, degraded 655, not English 1,950. _Not English_ is a test with a language tag other than English.
 
 | parser | handwriting | math | table | form | multi-column | tiny text | rotated | degraded | not English |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
