@@ -291,38 +291,44 @@ opb predict --system datalab --page pages/<page_id>.pdf --options '{"mode": "acc
 
 Every system on our dataset.
 
-| parser | weights | parameters | headline | text | tables | layout | refusals |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Datalab accurate | closed |  | 94.1 | 92.0 | 94.2 | 96.0 | — |
-| Gemini 3.8 Flash * | closed |  | 92.7 | 91.9 | 95.3 | 92.9 | 8 |
-| Datalab balanced | closed |  | 92.6 | 90.1 | 91.6 | 96.2 | — |
-| GPT-6.1 Sol | closed |  | 91.4 | 90.7 | 95.6 | 89.5 | 17 |
-| Reducto | closed |  | 90.8 | 85.4 | 91.2 | 95.8 | — |
-| Claude Opus 5.5 | closed |  | 90.7 | 94.5 | 97.2 | 84.3 | 40 |
-| LlamaParse | closed |  | 90.4 | 88.2 | 92.6 | 90.4 | — |
-| chandra-ocr-2 (Datalab) | open | 4.5B | 90.1 | 87.4 | 87.4 | 95.4 | — |
-| Mistral OCR | closed |  | 89.5 | 82.8 | 91.9 | 93.8 | — |
-| Claude Sonnet 5.5 * | closed |  | 88.7 | 93.3 | 96.1 | 77.5 | 7 |
-| dots.mocr | open | 3.0B | 87.9 | 82.5 | 88.6 | 92.5 | — |
-| GPT-5.6 Sol | closed |  | 87.7 | 86.2 | 91.6 | 86.9 | 17 |
-| MinerU2.5-Pro | open | 1.2B | 87.1 | 77.4 | 92.1 | 91.7 | — |
-| Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | 83.3 | 84.1 | 93.5 | — |
-| Extend | closed |  | 83.3 | 64.1 | 92.5 | 93.4 | — |
-| Surya OCR 2 (Datalab) | open | 0.67B | 83.1 | 80.6 | 74.3 | 94.3 | — |
-| Azure | closed |  | 83.0 | 74.6 | 81.7 | 92.8 | — |
-| LightOnOCR-3-4B | open | 4.5B | 82.9 | 83.9 | 70.8 | 94.0 | — |
-| LightOnOCR-3-0.8B | open | 0.85B | 81.6 | 81.1 | 72.1 | 91.7 | — |
-| GLM-OCR | open | 1.3B | 81.5 | 71.0 | 84.2 | 89.3 | — |
-| Nemotron 3.5 Parse | open | 0.63B | 80.0 | 72.4 | 77.3 | 90.2 | — |
-| Unlimited-OCR | open | 3.3B | 79.3 | 70.2 | 76.5 | 91.1 | — |
-| PaddleOCR-VL-1.6 | open | 0.96B | 78.7 | 61.7 | 83.7 | 90.7 | — |
-| Infinity-Parser2-Flash | open | 2.2B | 78.4 | 78.4 | 66.5 | 90.4 | — |
-| DeepSeek-OCR-2 | open | 3.4B | 75.2 | 64.2 | 70.0 | 91.4 | — |
-| Indra OCR (Datalab) | open | about 12M † | 69.5 | 60.3 | 58.1 | 90.1 | — |
-| HunyuanOCR-1.5 | open | 1.0B | 64.6 | 50.5 | 61.9 | 81.4 | — |
-| olmOCR-2 | open | 8.3B | none | 71.3 | 56.6 | unsupported | — |
-| Nanonets-OCR2-3B | open | 3.8B | none | 68.2 | 62.6 | unsupported | — |
-| Tesseract | open | n/a | none | 17.6 | 0.0 | unsupported | — |
+| parser | weights | parameters | headline | USD / 1,000 pages | text | tables | layout | refusals |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Datalab accurate | closed |  | 94.1 | $7.50 | 92.0 | 94.2 | 96.0 | — |
+| Gemini 3.8 Flash * | closed |  | 92.7 | ≈$37.08 | 91.9 | 95.3 | 92.9 | 8 |
+| Datalab balanced | closed |  | 92.6 | $3.00 | 90.1 | 91.6 | 96.2 | — |
+| GPT-6.1 Sol | closed |  | 91.4 | $30.95 | 90.7 | 95.6 | 89.5 | 17 |
+| Reducto | closed |  | 90.8 | $10.00 | 85.4 | 91.2 | 95.8 | — |
+| Claude Opus 5.5 | closed |  | 90.7 | $68.45‡ | 94.5 | 97.2 | 84.3 | 40 |
+| LlamaParse | closed |  | 90.4 | ≈$56.25 | 88.2 | 92.6 | 90.4 | — |
+| chandra-ocr-2 (Datalab) | open | 4.5B | 90.1 | — | 87.4 | 87.4 | 95.4 | — |
+| Mistral OCR | closed |  | 89.5 | $4.00 | 82.8 | 91.9 | 93.8 | — |
+| Claude Sonnet 5.5 * | closed |  | 88.7 | ≈$34.30 | 93.3 | 96.1 | 77.5 | 7 |
+| dots.mocr | open | 3.0B | 87.9 | — | 82.5 | 88.6 | 92.5 | — |
+| GPT-5.6 Sol | closed |  | 87.7 | ≈$94.49 | 86.2 | 91.6 | 86.9 | 17 |
+| MinerU2.5-Pro | open | 1.2B | 87.1 | — | 77.4 | 92.1 | 91.7 | — |
+| Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | — | 83.3 | 84.1 | 93.5 | — |
+| Extend | closed |  | 83.3 | ≈$33.75 | 64.1 | 92.5 | 93.4 | — |
+| Surya OCR 2 (Datalab) | open | 0.67B | 83.1 | — | 80.6 | 74.3 | 94.3 | — |
+| Azure | closed |  | 83.0 | $5.00 | 74.6 | 81.7 | 92.8 | — |
+| LightOnOCR-3-4B | open | 4.5B | 82.9 | — | 83.9 | 70.8 | 94.0 | — |
+| LightOnOCR-3-0.8B | open | 0.85B | 81.6 | — | 81.1 | 72.1 | 91.7 | — |
+| GLM-OCR | open | 1.3B | 81.5 | — | 71.0 | 84.2 | 89.3 | — |
+| Nemotron 3.5 Parse | open | 0.63B | 80.0 | — | 72.4 | 77.3 | 90.2 | — |
+| Unlimited-OCR | open | 3.3B | 79.3 | — | 70.2 | 76.5 | 91.1 | — |
+| PaddleOCR-VL-1.6 | open | 0.96B | 78.7 | — | 61.7 | 83.7 | 90.7 | — |
+| Infinity-Parser2-Flash | open | 2.2B | 78.4 | — | 78.4 | 66.5 | 90.4 | — |
+| DeepSeek-OCR-2 | open | 3.4B | 75.2 | — | 64.2 | 70.0 | 91.4 | — |
+| Indra OCR (Datalab) | open | about 12M † | 69.5 | — | 60.3 | 58.1 | 90.1 | — |
+| HunyuanOCR-1.5 | open | 1.0B | 64.6 | — | 50.5 | 61.9 | 81.4 | — |
+| olmOCR-2 | open | 8.3B | none | — | 71.3 | 56.6 | unsupported | — |
+| Nanonets-OCR2-3B | open | 3.8B | none | — | 68.2 | 62.6 | unsupported | — |
+| Tesseract | open | n/a | none | — | 17.6 | 0.0 | unsupported | — |
+
+Costs are USD per 1,000 pages. Opus 5.5 and GPT-6.1 Sol use the measured full-run reported costs.
+‡ Opus is a reported subtotal: 12 refused pages returned no usage or cost. Historical prices retain the
+existing price chart’s 2026-10-08 basis; `≈` marks values read back from that chart rather than remeasured.
+Datalab prices include the chart’s 25% data-retention discount. `—` means self-hosted inference cost was
+not measured; it does not mean free inference.
 
 \* Used in creating and verifying at least some tests. † See [`docs/results.md`](./docs/results.md). A system with
 no layout blocks has no layout score, so no headline ([Grade](#grade)).
