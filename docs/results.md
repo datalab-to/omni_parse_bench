@@ -50,15 +50,13 @@ not measured; it does not mean free inference.
 \* Used in creating and verifying at least some tests. Datalab's own systems are in bold.
 
 Refusals count distinct pages with at least one required output refused by the provider, including content
-filtering and Gemini's `RECITATION` stop; `—` means not audited, rather than zero. Every row uses one rule: a
-page that failed or was refused counts with all its tests failed, in their families, so the family
-columns include those pages and the headline is their mean. Gemini has 8 refusals and 12
+filtering and Gemini's `RECITATION` stop; `—` means not audited, rather than zero. Gemini has 8 refusals and 12
 other failed pages; Sonnet 5.5 has 7 refusals and 3 other failed pages. GPT-5.6 Sol has 17 refusals; Opus 5.5
 has 40; GPT-6.1 Sol has 17, with no other failed pages in those three runs.
 
 Opus 5.5 and GPT-6.1 Sol were each run once on 2026-10-27 using omni-parse-bench 1.0.0, the stock OpenRouter
 adapter and each model's default reasoning. The three earlier LLM rows were recomputed from their published
-verdicts and archived failure records under the same rule, without new inference or changes to the
+verdicts and archived failure records, without new inference or changes to the
 tests. [Machine-readable LLM run summaries](./llm-run-summaries.json) give the exact scores, denominators and
 failed/refused page IDs.
 
