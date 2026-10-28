@@ -12,8 +12,10 @@
 FROM vllm/vllm-openai:v0.25.1@sha256:e4f88a835143cd22aee2397a26ec6bb80b3a4a6fe0c882bcbc63822904766089
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl git && rm -rf /var/lib/apt/lists/*
-RUN git init /app && cd /app && git remote add origin https://github.com/SoMarkAI/OXR.git \
-    && git fetch --depth=1 origin c1a1dcb312ee9f691404f127785510453c0d9350 && git checkout --detach FETCH_HEAD
+# Note: git -C, not cd: a sky run builds these steps in one shell, where a cd would outlast the step.
+RUN git init /app && git -C /app remote add origin https://github.com/SoMarkAI/OXR.git \
+    && git -C /app fetch --depth=1 origin c1a1dcb312ee9f691404f127785510453c0d9350 \
+    && git -C /app checkout --detach FETCH_HEAD
 # Note: the vendor's three environments, as its Dockerfile makes them; only vLLM's sees the base image's runtime pins.
 RUN python3 -m venv --system-site-packages /opt/vllm-venv \
     && /opt/vllm-venv/bin/python -m pip install --no-cache-dir 'setuptools>=69' wheel \
