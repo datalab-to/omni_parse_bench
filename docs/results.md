@@ -1,6 +1,6 @@
 # Results
 
-Every system's score on the published dataset, `hf://datasets/datalab-to/omni_parse_bench` (16,288 tests on 2,937 pages). The 2026-10-27 Opus 5.5 and GPT-6.1 Sol runs used dataset revision `838b4e956c17e38f3f3d1762400c9425afac7987` and omni-parse-bench 1.0.0. The 2026-10-28 Unlimited-OCR 2 run used dataset revision `0c5a40d0f5996dae45202b6c3e13603fea10122b` and omni-parse-bench at commit `458fc57` (after 1.0.0), on one L40S. Every system's per-test verdicts are in the dataset's `results.parquet`; the LLM run summaries also record page coverage and refusals. The headline table is mirrored on the [dataset card](https://huggingface.co/datasets/datalab-to/omni_parse_bench#results).
+Every system's score on the published dataset, `hf://datasets/datalab-to/omni_parse_bench` (16,288 tests on 2,937 pages).
 
 ## Headline and families
 
