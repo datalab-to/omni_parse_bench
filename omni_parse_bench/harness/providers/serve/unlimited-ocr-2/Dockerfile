@@ -11,7 +11,7 @@
 # OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb sends it.
 FROM nvidia/cuda:13.0.1-devel-ubuntu22.04@sha256:93a8d207db5aaa6384f834a6bf70d417433f709e61b57a91e7cc99c16172f49c
 
-RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates libnuma1 \
+RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates libnuma1 python3 \
     && rm -rf /var/lib/apt/lists/*
 # Note: the model card's setup: Python 3.10, the customized SGLang wheel shipped in the weights' repository
 # (at the revision start.sh serves), PyMuPDF and fastokens.
