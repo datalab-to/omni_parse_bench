@@ -43,8 +43,8 @@ text{font-family:Geist,ui-sans-serif,system-ui,sans-serif;fill:#0f1217}
 <text class="cap" x="337" y="452" text-anchor="middle">dollars per 1,000 pages, log scale</text>
 <text class="cap" transform="translate(20 252) rotate(-90)" text-anchor="middle">headline</text>
 <polyline points="194.3,142.4 302.9,142.4 302.9,111.8 610.0,111.8" fill="none" stroke="#595e66" stroke-width="1.5" stroke-dasharray="4 3" />
-<circle cx="492.4" cy="140.147" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" />
-<text class="cap halo" x="501.38" y="144.147" text-anchor="start" style="fill:#9a9fa7">Gemini 3.8 Flash*</text>
+<circle cx="492.4" cy="136.911" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" />
+<text class="cap halo" x="501.38" y="140.911" text-anchor="start" style="fill:#9a9fa7">Gemini 3.8 Flash*</text>
 <circle cx="302.9" cy="111.8" r="5" fill="#001dbe" />
 <text class="nm halo" x="311.892" y="115.768" text-anchor="start" style="fill:#001dbe">Datalab accurate</text>
 <circle cx="194.3" cy="142.4" r="5" fill="#001dbe" />
@@ -57,11 +57,11 @@ text{font-family:Geist,ui-sans-serif,system-ui,sans-serif;fill:#0f1217}
 <text class="nm halo" x="237.362" y="212.934" text-anchor="start">Mistral OCR</text>
 <circle cx="483.1" cy="226.949" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" />
 <text class="cap halo" x="492.145" y="230.949" text-anchor="start" style="fill:#9a9fa7">Claude Sonnet 5.5*</text>
-<circle cx="603.3" cy="247.056" r="5" fill="#3a3d44" />
-<text class="nm halo" x="612.281" y="251.056" text-anchor="start">GPT-5.6 Sol</text>
+<circle cx="603.3" cy="244.907" r="5" fill="#3a3d44" />
+<text class="nm halo" x="612.281" y="248.907" text-anchor="start">GPT-5.6 Sol</text>
 <circle cx="481.2" cy="340.7" r="5" fill="#3a3d44" />
 <text class="nm halo" x="490.219" y="344.694" text-anchor="start">Extend</text>
 <circle cx="254.8" cy="347.1" r="5" fill="#3a3d44" />
 <text class="nm halo" x="263.819" y="351.141" text-anchor="start">Azure</text>
 <text class="cap" x="24" y="486" text-anchor="start">* Used in creating and verifying at least some tests.</text>
-<g data-model="GPT-6.1 Sol" data-cost-per-1000="30.950299965951654" data-headline="91.40751292075959"><title>GPT-6.1 Sol: headline 91.41; reported $30.95 per 1,000 pages; 17 refused pages</title><circle cx="470.952" cy="168.640" r="5" fill="#3a3d44" /><text class="nm halo" x="461.952" y="170.640" text-anchor="end">GPT-6.1 Sol</text></g><g data-model="Claude Opus 5.5" data-cost-per-1000="68.4500224719101" data-headline="90.74715233948695"><title>Claude Opus 5.5: headline 90.75; reported $68.45 per 1,000 pages; 40 refused pages</title><circle cx="565.057" cy="182.727" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" /><text class="cap halo" x="574.057" y="173.727" text-anchor="start" style="fill:#9a9fa7">Claude Opus 5.5*</text></g></svg>
+<g data-model="GPT-6.1 Sol" data-cost-per-1000="30.950299965951654" data-headline="91.5008"><title>GPT-6.1 Sol: headline 91.50; reported $30.95 per 1,000 pages; 17 refused pages</title><circle cx="470.952" cy="166.650" r="5" fill="#3a3d44" /><text class="nm halo" x="461.952" y="168.650" text-anchor="end">GPT-6.1 Sol</text></g><g data-model="Claude Opus 5.5" data-cost-per-1000="68.4500224719101" data-headline="90.0049"><title>Claude Opus 5.5: headline 90.00; reported $68.45 per 1,000 pages; 40 refused pages</title><circle cx="565.057" cy="198.562" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" /><text class="cap halo" x="574.057" y="214.562" text-anchor="start" style="fill:#9a9fa7">Claude Opus 5.5*</text></g></svg>

@@ -45,8 +45,8 @@ text{font-family:Geist,ui-sans-serif,system-ui,sans-serif;fill:#0f1217}
 <text class="cap" x="337" y="452" text-anchor="middle">median seconds per page</text>
 <text class="cap" transform="translate(20 252) rotate(-90)" text-anchor="middle">headline</text>
 <polyline points="101.4,347.1 109.2,347.1 109.2,208.9 157.6,208.9 157.6,181.8 214.5,181.8 214.5,142.4 294.1,142.4 294.1,111.8 610.0,111.8" fill="none" stroke="#595e66" stroke-width="1.5" stroke-dasharray="4 3" />
-<circle cx="393.2" cy="140.147" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" />
-<text class="cap halo" x="402.16" y="144.147" text-anchor="start" style="fill:#9a9fa7">Gemini 3.8 Flash*</text>
+<circle cx="393.2" cy="136.911" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" />
+<text class="cap halo" x="402.16" y="140.911" text-anchor="start" style="fill:#9a9fa7">Gemini 3.8 Flash*</text>
 <circle cx="294.1" cy="111.8" r="5" fill="#001dbe" />
 <text class="nm halo" x="285.1" y="115.768" text-anchor="end" style="fill:#001dbe">Datalab accurate</text>
 <circle cx="214.5" cy="142.4" r="5" fill="#001dbe" />
@@ -59,11 +59,11 @@ text{font-family:Geist,ui-sans-serif,system-ui,sans-serif;fill:#0f1217}
 <text class="nm halo" x="118.24" y="212.934" text-anchor="start">Mistral OCR</text>
 <circle cx="254.3" cy="226.949" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" />
 <text class="cap halo" x="263.32" y="230.949" text-anchor="start" style="fill:#9a9fa7">Claude Sonnet 5.5*</text>
-<circle cx="519.5" cy="247.056" r="5" fill="#3a3d44" />
-<text class="nm halo" x="528.52" y="251.056" text-anchor="start">GPT-5.6 Sol</text>
+<circle cx="519.5" cy="244.907" r="5" fill="#3a3d44" />
+<text class="nm halo" x="528.52" y="248.907" text-anchor="start">GPT-5.6 Sol</text>
 <circle cx="262.1" cy="340.7" r="5" fill="#3a3d44" />
 <text class="nm halo" x="271.12" y="344.694" text-anchor="start">Extend</text>
 <circle cx="101.4" cy="347.1" r="5" fill="#3a3d44" />
 <text class="nm halo" x="110.44" y="351.141" text-anchor="start">Azure</text>
 <text class="cap" x="24" y="486" text-anchor="start">* Used in creating and verifying at least some tests.</text>
-<g data-model="GPT-6.1 Sol" data-latency-median="18.5" data-headline="91.40751292075959" data-timing="full-page"><title>GPT-6.1 Sol: headline 91.41, full-page median 18.5s (HTML plus layout when requested; includes failures and retries)</title><polygon points="352.600,163.640 357.600,168.640 352.600,173.640 347.600,168.640" fill="#3a3d44" /><text class="nm halo" x="361.600" y="162.640">GPT-6.1 Sol</text></g><g data-model="Claude Opus 5.5" data-latency-median="18.5" data-headline="90.74715233948695" data-timing="full-page"><title>Claude Opus 5.5: headline 90.75, full-page median 18.5s (HTML plus layout when requested; includes failures and retries)</title><polygon points="352.600,177.727 357.600,182.727 352.600,187.727 347.600,182.727" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" /><text class="cap halo" x="361.600" y="195.727" style="fill:#9a9fa7">Claude Opus 5.5*</text></g></svg>
+<g data-model="GPT-6.1 Sol" data-latency-median="18.5" data-headline="91.5008" data-timing="full-page"><title>GPT-6.1 Sol: headline 91.50, full-page median 18.5s (HTML plus layout when requested; includes failures and retries)</title><polygon points="352.600,161.650 357.600,166.650 352.600,171.650 347.600,166.650" fill="#3a3d44" /><text class="nm halo" x="361.600" y="160.650">GPT-6.1 Sol</text></g><g data-model="Claude Opus 5.5" data-latency-median="18.5" data-headline="90.0049" data-timing="full-page"><title>Claude Opus 5.5: headline 90.00, full-page median 18.5s (HTML plus layout when requested; includes failures and retries)</title><polygon points="352.600,193.562 357.600,198.562 352.600,203.562 347.600,198.562" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" /><text class="cap halo" x="361.600" y="211.562" style="fill:#9a9fa7">Claude Opus 5.5*</text></g></svg>
