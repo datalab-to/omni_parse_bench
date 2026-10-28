@@ -67,20 +67,15 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
                                       "output_type": t.output_type, "derivation": t.derivation,
                                       "tags": list(t.tags), "result": v.result, "why": v.why} for v in vs])
 
-    def score_all(self, rows: Sequence[data.Page], preds: Sequence[Mapping[str, Any]],
-                  golds: Sequence[Sequence[_tests.Test]]) -> list[scorer.Score | errors.Unscored]:
-        """The core's, with each detail line on its page (`page_id`, `suite`, `document`), so a page's details
-        are test lines that `summarize` reads."""
-        out = []
-        for r, x in zip(rows, super().score_all(rows, preds, golds), strict=True):
-            scored = isinstance(x, scorer.Score) and x.details is not None
-            out.append(_on(r, x) if scored else x)
-        return out
-
     def zero(self, row: data.Page, tests: Sequence[_tests.Test]) -> scorer.Score:
         """A failed page: the score of a prediction with no outputs, so every test fails and the page costs
         its tests, not a page's share of the headline."""
-        return _on(row, self.score({}, tests))
+        return self.score({}, tests)
+
+    def detail_fields(self, row: data.Page) -> dict[str, Any]:
+        """Each detail line's page (`page_id`, `suite`, `document`), so a page's details are test lines that
+        `summarize` reads."""
+        return {"page_id": row.page_id, "suite": row.suite, "document": row.document}
 
     def row_fields(self, row: data.Page) -> dict[str, Any]:
         return {"document": row.document}
@@ -94,12 +89,6 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     def check_gold(self, rows: Sequence[data.Page]) -> None:
         """Every page's tests read and checked (`check`), before any call."""
         check(rows)
-
-
-def _on(r: data.Page, x: scorer.Score) -> scorer.Score:
-    """`x` with each detail line on its page (`page_id`, `suite`, `document`)."""
-    on = {"page_id": r.page_id, "suite": r.suite, "document": r.document}
-    return x._replace(details=[on | d for d in x.details])
 
 
 def gold(page: data.Page) -> tuple[_tests.Test, ...]:

@@ -522,6 +522,9 @@ def test_a_prediction_that_isnt_an_object_counts_0_with_its_traceback(tmp_path):
     lines = (run / b.scorers[0].folder_name / "scores.jsonl").read_text().splitlines()
     line = next(x for x in map(json.loads, lines) if x["id"] == "a-p0")
     assert "a row is one page" in line["error"] and "in prediction" in line["traceback"], line
+    for page in ("a-p0", "a-p1"):     # a failed page's details and a scored page's both say which page
+        details = (run / b.scorers[0].folder_name / "details" / f"{page}.jsonl").read_text().splitlines()
+        assert all(json.loads(x)["page_id"] == page and "document" in json.loads(x) for x in details), details
 
 
 @pytest.mark.parametrize("answer", ["n\n", ""])
