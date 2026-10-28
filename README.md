@@ -15,17 +15,17 @@ Every system on our dataset. [Scoring, run details and charts](#results-details)
 | parser | weights | parameters | headline | USD / 1,000 pages | text | tables | layout | refusals |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Datalab accurate | closed |  | 94.1 | $7.50 | 92.0 | 94.2 | 96.0 | — |
-| Gemini 3.8 Flash * | closed |  | 92.7 | ≈$37.08 | 91.9 | 95.3 | 92.9 | 8 |
+| Gemini 3.8 Flash * | closed |  | 92.9 | ≈$37.08 | 91.3 | 95.2 | 92.2 | 8 |
 | Datalab balanced | closed |  | 92.6 | $3.00 | 90.1 | 91.6 | 96.2 | — |
-| GPT-6.1 Sol | closed |  | 91.4 | $30.95 | 90.7 | 95.6 | 89.5 | 17 |
+| GPT-6.1 Sol | closed |  | 91.5 | $30.95 | 89.8 | 95.6 | 89.1 | 17 |
 | Reducto | closed |  | 90.8 | $10.00 | 85.4 | 91.2 | 95.8 | — |
-| Claude Opus 5.5 | closed |  | 90.7 | $68.45‡ | 94.5 | 97.2 | 84.3 | 40 |
 | LlamaParse | closed |  | 90.4 | ≈$56.25 | 88.2 | 92.6 | 90.4 | — |
 | chandra-ocr-2 (Datalab) | open | 4.5B | 90.1 | — | 87.4 | 87.4 | 95.4 | — |
+| Claude Opus 5.5 | closed |  | 90.0 | $68.45‡ | 93.9 | 93.4 | 82.6 | 40 |
 | Mistral OCR | closed |  | 89.5 | $4.00 | 82.8 | 91.9 | 93.8 | — |
-| Claude Sonnet 5.5 * | closed |  | 88.7 | ≈$34.30 | 93.3 | 96.1 | 77.5 | 7 |
+| Claude Sonnet 5.5 * | closed |  | 88.7 | ≈$34.30 | 93.1 | 95.4 | 77.5 | 7 |
 | dots.mocr | open | 3.0B | 87.9 | — | 82.5 | 88.6 | 92.5 | — |
-| GPT-5.6 Sol | closed |  | 87.7 | ≈$94.49 | 86.2 | 91.6 | 86.9 | 17 |
+| GPT-5.6 Sol | closed |  | 87.8 | ≈$94.49 | 85.4 | 91.6 | 86.5 | 17 |
 | MinerU2.5-Pro | open | 1.2B | 87.1 | — | 77.4 | 92.1 | 91.7 | — |
 | Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | — | 83.3 | 84.1 | 93.5 | — |
 | Extend | closed |  | 83.3 | ≈$33.75 | 64.1 | 92.5 | 93.4 | — |
@@ -34,7 +34,7 @@ Every system on our dataset. [Scoring, run details and charts](#results-details)
 | LightOnOCR-3-4B | open | 4.5B | 82.9 | — | 83.9 | 70.8 | 94.0 | — |
 | LightOnOCR-3-0.8B | open | 0.85B | 81.6 | — | 81.1 | 72.1 | 91.7 | — |
 | GLM-OCR | open | 1.3B | 81.5 | — | 71.0 | 84.2 | 89.3 | — |
-| Unlimited-OCR 2 | open | 3.3B | 81.2 | — | 72.5 | 79.7 | 91.7 | — |
+| Unlimited-OCR 2 | open | 3.3B | 81.2 | — | 72.4 | 79.7 | 91.6 | — |
 | Nemotron 3.5 Parse | open | 0.63B | 80.0 | — | 72.4 | 77.3 | 90.2 | — |
 | Unlimited-OCR | open | 3.3B | 79.3 | — | 70.2 | 76.5 | 91.1 | — |
 | PaddleOCR-VL-1.6 | open | 0.96B | 78.7 | — | 61.7 | 83.7 | 90.7 | — |
@@ -346,15 +346,15 @@ opb predict --system datalab --page pages/<page_id>.pdf --options '{"mode": "acc
 ## Results details
 
 Refusals count distinct pages with at least one required output refused by the provider, including content
-filtering and Gemini's `RECITATION` stop; `—` means not audited, rather than zero. The five LLM rows use the
-current run rule: the mean of the family scores on answered pages, multiplied by page coverage. A failed
-required request fails its page; the family columns describe answered pages only. Gemini has 8 refusals and 12
+filtering and Gemini's `RECITATION` stop; `—` means not audited, rather than zero. Every row uses one rule: a
+page that failed or was refused counts with all its tests failed, in their families, so the family
+columns include those pages and the headline is their mean. Gemini has 8 refusals and 12
 other failed pages; Sonnet 5.5 has 7 refusals and 3 other failed pages. GPT-5.6 Sol has 17 refusals; Opus 5.5
 has 40; GPT-6.1 Sol has 17, with no other failed pages in those three runs.
 
 Opus 5.5 and GPT-6.1 Sol were each run once on 2026-10-27 using omni-parse-bench 1.0.0, the stock OpenRouter
 adapter and each model's default reasoning. The three earlier LLM rows were recomputed from their published
-verdicts and archived failure records under the same coverage rule, without new inference or changes to the
+verdicts and archived failure records under the same rule, without new inference or changes to the
 tests. [Machine-readable LLM run summaries](docs/llm-run-summaries.json) give the exact scores, denominators
 and failed/refused page IDs.
 
@@ -371,8 +371,8 @@ successful, unretried HTML calls only. These timing definitions differ and are n
 
 | Model | Headline | Reported USD / 1,000 pages | Refusals |
 | --- | ---: | ---: | ---: |
-| Claude Opus 5.5 | 90.75 | $68.45† | 40 |
-| GPT-6.1 Sol | 91.41 | $30.95 | 17 |
+| Claude Opus 5.5 | 90.00 | $68.45† | 40 |
+| GPT-6.1 Sol | 91.50 | $30.95 | 17 |
 
 One full run per model, 2,937 pages each. Prices include all page outputs requested by the benchmark and
 response-reported upstream model charges under OpenRouter BYOK. † Opus's price is a reported subtotal:
