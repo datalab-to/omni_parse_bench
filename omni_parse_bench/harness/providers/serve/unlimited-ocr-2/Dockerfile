@@ -14,12 +14,12 @@ FROM nvidia/cuda:13.0.1-devel-ubuntu22.04@sha256:93a8d207db5aaa6384f834a6bf70d41
 RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates libnuma1 python3 \
     && rm -rf /var/lib/apt/lists/*
 # Note: the model card's setup: Python 3.10, the customized SGLang wheel shipped in the weights' repository
-# (at the revision start.sh serves), PyMuPDF and fastokens.
+# (at the revision start.sh serves), and PyMuPDF.
 RUN curl -LsSf https://astral.sh/uv/0.9.5/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv venv /venv --python 3.10 \
     && curl -LsSf -o /tmp/sglang-0.5.20.dev10+g8d62f5fb9c-py3-none-any.whl https://huggingface.co/baidu/Unlimited-OCR-2/resolve/5632329a32e103d5f1add270681e0f5c1233c6e4/wheel/sglang-0.5.20.dev10+g8d62f5fb9c-py3-none-any.whl \
     && uv pip install --python /venv/bin/python --no-cache /tmp/sglang-0.5.20.dev10+g8d62f5fb9c-py3-none-any.whl \
-        pymupdf==1.27.2.2 fastokens==0.3.2 httpx==0.28.1 \
+        pymupdf==1.27.2.2 httpx==0.28.1 \
     && rm /tmp/*.whl
 
 ENV PORT=8001 PYTHONPATH=/srv

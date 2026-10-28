@@ -11,9 +11,11 @@ export SGLANG_UOCR_EANABLE_DOC_LIMIT=1 SGLANG_UOCR_DOC_GUNDAM_PAGE_WINDOW=10 SGL
 export SGLANG_UOCR_MAX_PAGE_TOKENS=20000 SGLANG_OPT_UOCR_SAM_REL_POS_BIAS_MB=64
 export SGLANG_UOCR_SHM_WRAP_MODEL_DATA=1 SGLANG_UOCR_SHM_WRAP_MIN_MB=1 SGLANG_VLM_CACHE_SIZE_MB=0
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+# Note: the card's flags but its `--tokenizer-backend fastokens`: fastokens 0.3.2 can't load this tokenizer
+# ("unsupported pre-tokenizer type: Metaspace"), and the default backend tokenizes the same, more slowly.
 /venv/bin/python -m sglang.launch_server --model-path "$WEIGHTS" --revision "$REVISION" \
     --served-model-name baidu/Unlimited-OCR-2 --chat-template unlimited-ocr \
-    --tokenizer-backend fastokens --tokenizer-worker-num 8 --mem-fraction-static 0.7 \
+    --tokenizer-worker-num 8 --mem-fraction-static 0.7 \
     --max-running-requests 64 --max-prefill-tokens 2048 --enable-custom-logit-processor \
     --enable-streaming-session --allow-auto-truncate --disable-radix-cache --mm-preprocess-cache-size-mb 0 \
     --cuda-graph-backend-decode full --cuda-graph-max-bs-decode 64 --cuda-graph-backend-prefill full \
