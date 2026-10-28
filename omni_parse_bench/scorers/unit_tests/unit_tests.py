@@ -33,9 +33,9 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     - A page's line in scores.jsonl holds `tests`, `passed` and `per_family` (each family's `tests` and
       `passed`);
     - its details (`details/<page_id>.jsonl`) hold one test line per test (`lines`); and
-    - the summary is `summarize` over the scored pages: the families in the order text, tables, layout, and
-      their mean as the headline. Any other breakdown (by tag, test type, suite or derivation) is `summarize`
-      of a slice of the details."""
+    - the summary is `summarize` over every page, a failed one with all its tests failed (`zero`): the
+      families in the order text, tables, layout, and their mean as the headline. Any other breakdown (by tag,
+      test type, suite or derivation) is `summarize` of a slice of the details."""
 
     name: ClassVar[str] = "unit_tests"
 
@@ -67,22 +67,21 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
                                       "output_type": t.output_type, "derivation": t.derivation,
                                       "tags": list(t.tags), "result": v.result, "why": v.why} for v in vs])
 
-    def score_all(self, rows: Sequence[data.Page], preds: Sequence[Mapping[str, Any]],
-                  golds: Sequence[Sequence[_tests.Test]]) -> list[scorer.Score | errors.Unscored]:
-        """The core's, with each detail line on its page (`page_id`, `suite`, `document`), so a page's details
-        are test lines that `summarize` reads."""
-        out = []
-        for r, x in zip(rows, super().score_all(rows, preds, golds), strict=True):
-            on = {"page_id": r.page_id, "suite": r.suite, "document": r.document}
-            scored = isinstance(x, scorer.Score) and x.details is not None
-            out.append(x._replace(details=[on | d for d in x.details]) if scored else x)
-        return out
+    def zero(self, row: data.Page, tests: Sequence[_tests.Test]) -> scorer.Score:
+        """A failed page: the score of a prediction with no outputs, so every test fails and the page costs
+        its tests, not a page's share of the headline."""
+        return self.score({}, tests)
+
+    def detail_fields(self, row: data.Page) -> dict[str, Any]:
+        """Each detail line's page (`page_id`, `suite`, `document`), so a page's details are test lines that
+        `summarize` reads."""
+        return {"page_id": row.page_id, "suite": row.suite, "document": row.document}
 
     def row_fields(self, row: data.Page) -> dict[str, Any]:
         return {"document": row.document}
 
     def summarize(self, lines: Sequence[Line]) -> dict[str, Any]:
-        """The headline and `families`, over the scored pages' counts (the core gives only those)."""
+        """The headline and `families`, over every page's counts, a failed page's from `zero`."""
         s = _summary((f, x["row"]["document"], c["passed"], c["tests"])
                      for x in lines for f, c in x["per_family"].items())
         return {"headline": s["headline"], "headline_is": HEADLINE, "families": s["families"]}

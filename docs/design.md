@@ -240,11 +240,10 @@ The headline is the mean of the families' scores: text (present, order, repeat),
 family's weight never depends on how many tests it has: sampling more layout lines makes the layout
 score more precise without making layout count more. The families are those the graded tests are
 in, so a subset scores on the families it holds, and the summary lists them in a fixed order: text,
-tables, layout (`vocab.FAMILY_ORDER`). A page whose call failed counts as 0: the headline
-is the families' score over the scored pages, times the share of pages that didn't fail (`coverage`, the
-omni-bench-core rule), so a run where every page failed has headline 0. The families and their mean are
-kept under the summary's `scored`, over the scored pages only; the top `headline` is `scored.headline ×
-coverage`.
+tables, layout (`vocab.FAMILY_ORDER`). A page whose call failed counts with every test
+failed (`UnitTests.zero`, the omni-bench-core hook for a failed row's score), so it costs its tests, not a
+page's share, and a run where every page failed has headline 0. The families and their mean are kept under
+the summary's `scored`, over every page; `coverage` stays 1, so the top `headline` is `scored.headline`.
 
 The summary holds the headline and the families alone. Any other breakdown (by output type, test type,
 tag, suite or derivation) is computed from each test's verdict, kept in the run's
