@@ -359,6 +359,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets-ocr` | html |
 | Nemotron 3.5 Parse | `nemotron-parse` | `nemotron-parse` | html, blocks |
 | MiniCPM-OCR 1.0 | `minicpm-ocr` | `minicpm-ocr` | html, markdown, blocks |
+| OXR-1.0 | `oxr` | `oxr` | html, markdown, blocks |
 
 olmOCR-2 and Nanonets-OCR2 return no layout, so they have no blocks. Indra OCR runs on CPU (ONNX Runtime),
 no GPU: its server reads pages in one worker process per core, and its image runs without `--gpus`.
@@ -563,6 +564,20 @@ MiniCPM-OCR 1.0 (`providers/minicpm_ocr.py`):
 | algorithm | code |
 | table | table |
 | chart, seal, image, header_image, footer_image | figure |
+
+OXR-1.0 (`providers/oxr.py`; the types of SoMark's API, `oxr/pipeline/models.py`):
+
+| OXR-1.0 label | label |
+| --- | --- |
+| Text | text |
+| Title | heading |
+| Page-header, Page-footer | page_furniture |
+| Caption | caption |
+| Footnote | footnote |
+| Formula, Chemical Equation | equation |
+| Code Block | code |
+| Table | table |
+| Picture, Stamp, Chemical Structure | figure |
 
 ## What differs between vendors, by necessity
 
