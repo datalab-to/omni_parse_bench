@@ -3,20 +3,33 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import re
 from pathlib import Path
 from typing import Any, ClassVar
 
 from omni_bench_core import adapter
 
-from ... import markdown
-from .. import contract, errors, http
+from ... import markdown, views
+from .. import contract, errors, http, layout
 from ..adapter import Served
 from . import llm, unlimited
 
 SUPPORTS = unlimited.SUPPORTS
 MODEL = "baidu/Unlimited-OCR-2"
 PROMPT = "<PAGE><image>Multi page parsing."
-PAGE = "<PAGE>"
+GRID = 1000
+# A block's marker, as the repository's post-processing reads it (process_unlimitedOCR2.BLOCK_RE): its label,
+# a heading's level before or after its box, and the box.
+BLOCK = re.compile(r"<\s*BLOCK\s*>\s*([a-zA-Z_]+)\s*(?:<\s*/?\s*LEVEL\s*\d*\s*[>}]?\s*)?"
+                   r"\[\s*(-?\d+)\s*[,，]\s*(-?\d+)\s*[,，]\s*(-?\d+)\s*[,，]\s*(-?\d+)[^\]]*\]"
+                   r"\s*(?:<\s*/?\s*LEVEL\s*\d*\s*[>}]?\s*)?(?:<\s*FORK\s*>)?", re.I)
+# The repository's STRAY_TOKEN_RE: the markers left in a block's text.
+STRAY = re.compile(r"<[|｜]/?[a-zA-Z_]+[|｜]>|<image>|<\s*/?\s*PAGE\s*\d*\s*>|<\s*/?\s*BLOCK\s*>"
+                   r"|<\s*/?\s*FORK\s*>|<\s*/?\s*LEVEL\s*\d*\s*[>}]?|<\s*/?\s*MERGE\s*>", re.I)
+# Unlimited-OCR's labels, the ones the repository's post-processing names that it lacks, and `other`, the
+# model's catch-all (seen on section labels, notes and empty form areas), as text. A block that continues on
+# the next page or column is `cross_<label>`, its continuation `append_<label>`.
+LABELS = {**unlimited.LABELS, "figure": "figure", "picture": "figure", "seal": "figure", "other": "text"}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -37,12 +50,13 @@ class UnlimitedOcr2(Served):
                               logit processor at ngram_size 35 and window_size 128 (its values for one page),
                               its page guard at 20000 tokens, at most 8000 tokens (its tokens per page);
                               asked once.
-      4. Vendor output parsing  none on the server: the reply is the page's `<PAGE>` marker, then markdown
-                              in blocks as Unlimited-OCR's, each opened by
-                              `<|det|>label [x0, y0, x1, y1]<|/det|>`.
-      5. Mapping to opb outputs  the `<PAGE>` marker dropped, then as `unlimited.UnlimitedOcr`: html is the
-                              card's post-processing through `markdown.to_html`, blocks each marker's label
-                              and box.
+      4. Vendor output parsing  the reply is the page's `<PAGE>` marker, then blocks, each opened by
+                              `<BLOCK>label[x0,y0,x1,y1]<FORK>` (a heading with `<LEVELn>`), boxes on a
+                              0-1000 grid; the server converts it to markdown with the repository's
+                              `process_unlimitedOCR2.convert` (github.com/baidu/Unlimited-OCR at 48ff432).
+      5. Mapping to opb outputs  html is that markdown through `markdown.to_html`; blocks are each marker's
+                              label (its `cross_`/`append_` prefix dropped, LABELS) and box divided by
+                              1000, with its text up to the next marker.
 
         docker build -t opb-unlimited-ocr-2 omni_parse_bench/harness/providers/serve/unlimited-ocr-2
         docker run --gpus all --shm-size 16g -p 8001:8001 opb-unlimited-ocr-2
@@ -99,23 +113,31 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
     return contract.Call(raw, cost=llm.tokens([completion]), job_id=completion.get("id"))
 
 
-def page(said: str) -> str:
-    """The page's text: what follows its `<PAGE>` marker, as the card's `_uocr_save_results` splits pages."""
-    return said.split(PAGE, 1)[1] if PAGE in said else said
+def blocks(said: str) -> list[dict]:
+    """Each block marker with its box, and the text up to the next marker."""
+    ms = list(BLOCK.finditer(said))
+    out = []
+    for m, end in zip(ms, [n.start() for n in ms[1:]] + [len(said)], strict=True):
+        kind = re.sub(r"^(?:cross|append)_", "", m[1].lower())
+        text = STRAY.sub("", said[m.end():end])
+        out.append(layout.block(layout.label(LABELS, kind), [float(m[i]) for i in range(2, 6)], (GRID, GRID),
+                                " ".join(views.text(markdown.to_html(text)).split())))
+    return out
 
 
 def parse(raw: dict, request: contract.Request, config: UnlimitedOcr2 | None = None) -> tuple[dict, dict]:
     """The page and its blocks."""
-    text = page(llm.content(raw["completion"]))
-    if not text.strip():
+    with adapter.reading("the server's answer"):
+        said, md = llm.content(raw["completion"]), raw["markdown"]
+    if not said.strip():
         raise errors.SystemFailed("the reply is empty", status=200)
     outputs, errs = {}, {}
     if "html" in request.outputs:
-        outputs["html"] = markdown.to_html(unlimited.strip(text))
+        outputs["html"] = markdown.to_html(md)
     if "blocks" in request.outputs:
         try:
             with adapter.reading("the reply's blocks"):
-                outputs["blocks"] = unlimited.blocks(text)
+                outputs["blocks"] = blocks(said)
         except errors.SystemFailed as exc:
             errs["blocks"] = errors.unread(exc)
     return outputs, errs

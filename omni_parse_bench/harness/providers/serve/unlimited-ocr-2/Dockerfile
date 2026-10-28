@@ -1,5 +1,6 @@
 # Unlimited-OCR 2 as its model card serves it, behind one port: the vendor's SGLang build serves the model,
-# server.py loads the page and asks it as the model card's client does (start.sh).
+# server.py loads the page, asks it as the model card's client does and converts the reply to markdown with
+# the repository's post-processing (start.sh).
 # The adapter is providers/unlimited_ocr2.py:
 #
 #     docker build -t opb-unlimited-ocr-2 omni_parse_bench/harness/providers/serve/unlimited-ocr-2
@@ -21,9 +22,13 @@ RUN curl -LsSf https://astral.sh/uv/0.9.5/install.sh | env UV_INSTALL_DIR=/usr/l
     && uv pip install --python /venv/bin/python --no-cache /tmp/sglang-0.5.20.dev10+g8d62f5fb9c-py3-none-any.whl \
         pymupdf==1.27.2.2 httpx==0.28.1 \
     && rm /tmp/*.whl
+# Note: the repository's post-processing (utils/process_unlimitedOCR2.py, MIT), which turns the model's blocks
+# into markdown; it uses the standard library alone.
+RUN git clone -q https://github.com/baidu/Unlimited-OCR /opt/unlimited \
+    && git -C /opt/unlimited checkout -q 48ff432fb68a18ed91f2f70021f29028b1dde354
 
 # Note: the venv first on PATH, as the card activates it: SGLang JIT-compiles kernels with its ninja.
-ENV PORT=8001 PYTHONPATH=/srv PATH=/venv/bin:$PATH
+ENV PORT=8001 PYTHONPATH=/srv:/opt/unlimited/utils PATH=/venv/bin:$PATH
 COPY server.py start.sh /srv/
 EXPOSE 8001
 ENTRYPOINT ["bash", "/srv/start.sh"]

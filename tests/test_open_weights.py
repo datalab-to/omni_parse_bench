@@ -123,16 +123,22 @@ def test_an_unknown_label_fails_the_blocks_only():
     assert "Also kept" in views.text(outs["html"]) and "blocks" in errs and "blocks" not in outs
 
 
-def test_unlimited_ocr_2_drops_its_page_marker_and_reads_as_unlimited_ocr():
+def test_unlimited_ocr_2_reads_the_servers_markdown_and_its_block_markers():
     from omni_parse_bench.harness.providers import unlimited_ocr2
 
     api = harness.system("unlimited-ocr-2")
     request = api.requests(frozenset({"html", "blocks"}))[0]
     assert request.sent["model"] == "baidu/Unlimited-OCR-2" and api.served["weights"] == unlimited_ocr2.MODEL
-    reply = "<PAGE>\n<|det|>text [0, 0, 500, 100]<|/det|>Read"
-    raw = {"completion": {"choices": [{"message": {"content": reply}, "finish_reason": "stop"}]}}
+    reply = ("<PAGE><BLOCK>title<LEVEL1>[100, 50, 900, 80]<FORK>Heading\n"
+             "<BLOCK>cross_text[100, 100, 500, 900]<FORK>Body $x$<MERGE>\n"
+             "<BLOCK>page_number[861, 959, 880, 970]<FORK>21")
+    raw = {"completion": {"choices": [{"message": {"content": reply}, "finish_reason": "stop"}]},
+           "markdown": "# Heading\n\nBody $x$\n\n21"}
     outs, errs = api.parse(raw, request)
-    assert errs == {} and views.text(outs["html"]).strip() == "Read" and len(outs["blocks"]) == 1
+    assert errs == {} and "<h1>" in outs["html"] and "BLOCK" not in outs["html"]
+    assert [(b["label"], b["text"]) for b in outs["blocks"]] == \
+        [("heading", "Heading"), ("text", "Body $x$"), ("page_furniture", "21")], outs["blocks"]
+    assert outs["blocks"][0]["bbox"] == [0.1, 0.05, 0.9, 0.08]
 
 
 def test_an_open_models_malformed_block_or_unknown_label_fails_the_blocks_only():

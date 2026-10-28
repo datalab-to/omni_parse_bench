@@ -409,6 +409,14 @@ Unlimited-OCR (`providers/unlimited.py`):
 | table | table |
 | image, chart | figure |
 
+Unlimited-OCR 2 (`providers/unlimited_ocr2.py`): Unlimited-OCR's labels, with a `cross_` or `append_` prefix
+(a block continued across pages or columns) dropped, and:
+
+| Unlimited-OCR 2 label | label |
+| --- | --- |
+| figure, picture, seal | figure |
+| other | text |
+
 Infinity-Parser2 (`providers/infinity.py`):
 
 | Infinity-Parser2 label | label |
