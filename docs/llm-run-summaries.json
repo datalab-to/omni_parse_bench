@@ -1,24 +1,26 @@
 {
   "dataset_revision": "838b4e956c17e38f3f3d1762400c9425afac7987",
   "pages": 2937,
-  "headline_rule": "mean of text, tables and layout scores on answered pages multiplied by answered-page coverage",
+  "headline_rule": "mean of text, tables and layout scores, a failed or refused page counting with all its tests failed",
   "refusal_rule": "Unique pages where a required output was refused: content_filter, provider content-filter error, or RECITATION. Other failures are counted separately. A partial answer followed by a failed required request fails the page.",
   "systems": {
     "Gemini 3.8 Flash": {
-      "headline": 0.9274310010151077,
-      "scored_headline": 0.9337898011591947,
+      "headline": 0.928947693778524,
       "families": {
         "text": {
-          "score": 0.9192266635037362,
-          "tests": 8431
+          "score": 0.9131662548535122,
+          "tests": 8499,
+          "documents": 1791
         },
         "tables": {
-          "score": 0.9531511433351925,
-          "tests": 5379
+          "score": 0.9519123653917564,
+          "tests": 5386,
+          "documents": 591
         },
         "layout": {
-          "score": 0.9289915966386555,
-          "tests": 2380
+          "score": 0.9217644610903037,
+          "tests": 2403,
+          "documents": 632
         }
       },
       "coverage": 0.993190330268982,
@@ -61,20 +63,22 @@
       "measurement": "Archived published verdicts, required-output failures verified against archived responses; normalized to the current page-coverage rule. No inference rerun."
     },
     "Claude Sonnet 5.5": {
-      "headline": 0.8867426403662904,
-      "scored_headline": 0.8897721676651161,
+      "headline": 0.8867394341489286,
       "families": {
         "text": {
-          "score": 0.9328147100424328,
-          "tests": 8484
+          "score": 0.9311683727497353,
+          "tests": 8499,
+          "documents": 1791
         },
         "tables": {
-          "score": 0.9610851262862489,
-          "tests": 5345
+          "score": 0.9537690308206461,
+          "tests": 5386,
+          "documents": 591
         },
         "layout": {
-          "score": 0.7754166666666666,
-          "tests": 2400
+          "score": 0.7752808988764045,
+          "tests": 2403,
+          "documents": 632
         }
       },
       "coverage": 0.996595165134491,
@@ -106,20 +110,22 @@
       "measurement": "Archived published verdicts, required-output failures verified against archived responses; normalized to the current page-coverage rule. No inference rerun."
     },
     "GPT-5.6 Sol": {
-      "headline": 0.8773176079829443,
-      "scored_headline": 0.8824252789883245,
+      "headline": 0.878325470421315,
       "families": {
         "text": {
-          "score": 0.8624212902459308,
-          "tests": 8417
+          "score": 0.8541004824096953,
+          "tests": 8499,
+          "documents": 1791
         },
         "tables": {
           "score": 0.915707389528407,
-          "tests": 5386
+          "tests": 5386,
+          "documents": 591
         },
         "layout": {
-          "score": 0.8691471571906354,
-          "tests": 2392
+          "score": 0.8651685393258427,
+          "tests": 2403,
+          "documents": 632
         }
       },
       "coverage": 0.9942117807286347,
@@ -168,23 +174,22 @@
       "measurement": "Archived published verdicts, required-output failures verified against archived responses; normalized to the current page-coverage rule. No inference rerun."
     },
     "Claude Opus 5.5": {
-      "headline": 0.9074715233948695,
-      "scored_headline": 0.9200013338663209,
+      "headline": 0.9000485320037904,
       "families": {
         "text": {
-          "score": 0.9450757575757576,
-          "tests": 8448,
-          "documents": 1783
+          "score": 0.9394046358395105,
+          "tests": 8499,
+          "documents": 1791
         },
         "tables": {
-          "score": 0.9716161421123769,
-          "tests": 5179,
-          "documents": 572
+          "score": 0.9342740438173042,
+          "tests": 5386,
+          "documents": 591
         },
         "layout": {
-          "score": 0.8433121019108281,
-          "tests": 2355,
-          "documents": 620
+          "score": 0.8264669163545568,
+          "tests": 2403,
+          "documents": 632
         }
       },
       "coverage": 0.9863806605379639,
@@ -289,13 +294,12 @@
       "latency_definition": "Full-page saved record wall_s over all 2937 pages, including requested HTML and layout, failures and retries; 32 workers. Historical chart values use successful unretried HTML calls and are not directly comparable."
     },
     "GPT-6.1 Sol": {
-      "headline": 0.9140751292075959,
-      "scored_headline": 0.9193967994803799,
+      "headline": 0.9150075516238965,
       "families": {
         "text": {
-          "score": 0.9069408129308296,
-          "tests": 8414,
-          "documents": 1782
+          "score": 0.8978703376867867,
+          "tests": 8499,
+          "documents": 1791
         },
         "tables": {
           "score": 0.9561826958782027,
@@ -303,9 +307,9 @@
           "documents": 591
         },
         "layout": {
-          "score": 0.895066889632107,
-          "tests": 2392,
-          "documents": 627
+          "score": 0.8909696213067,
+          "tests": 2403,
+          "documents": 632
         }
       },
       "coverage": 0.9942117807286347,
