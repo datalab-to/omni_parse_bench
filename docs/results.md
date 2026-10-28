@@ -24,6 +24,7 @@ The headline is the mean of three family scores: text (`present`, `order` and `r
 | MinerU2.5-Pro | open | 1.2B | 87.1 | — | 77.4 | 92.1 | 91.7 | — |
 | Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | — | 83.3 | 84.1 | 93.5 | — |
 | Extend | closed |  | 83.3 | ≈$33.75 | 64.1 | 92.5 | 93.4 | — |
+| MiniCPM-OCR-1.0 | open | 1.3B | 83.2 | — | 72.8 | 89.1 | 87.6 | — |
 | **Surya OCR 2** | open | 0.67B | 83.1 | — | 80.6 | 74.3 | 94.3 | — |
 | Azure | closed |  | 83.0 | $5.00 | 74.6 | 81.7 | 92.8 | — |
 | LightOnOCR-3-4B | open | 4.5B | 82.9 | — | 83.9 | 70.8 | 94.0 | — |
@@ -115,6 +116,7 @@ These per-test slices do not apply the run-level page-coverage factor. Tests per
 | MinerU2.5-Pro | 52.0 | 88.0 | 91.9 | 75.9 | 87.5 | 85.1 | 82.3 | 77.6 | 60.4 |
 | Infinity-Parser2-Pro | 65.2 | 88.5 | 88.2 | 72.6 | 88.8 | 84.1 | 71.7 | 87.0 | 66.0 |
 | Extend | 77.0 | 76.6 | 94.7 | 79.9 | 88.3 | 88.2 | 90.4 | 84.8 | 74.2 |
+| MiniCPM-OCR-1.0 | 52.8 | 94.0 | 87.8 | 68.9 | 80.7 | 77.6 | 72.5 | 73.0 | 52.6 |
 | **Surya OCR 2** | 55.2 | 94.7 | 83.7 | 66.0 | 82.0 | 74.7 | 59.9 | 72.6 | 71.4 |
 | Azure | 60.1 | 92.6 | 86.1 | 73.0 | 83.8 | 85.5 | 86.9 | 65.8 | 65.8 |
 | LightOnOCR-3-4B | 65.4 | 96.4 | 85.5 | 75.2 | 83.0 | 79.5 | 75.7 | 87.8 | 64.8 |

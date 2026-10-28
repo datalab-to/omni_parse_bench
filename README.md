@@ -29,6 +29,7 @@ Every system on our dataset. [Scoring, run details and charts](#results-details)
 | MinerU2.5-Pro | open | 1.2B | 87.1 | — | 77.4 | 92.1 | 91.7 | — |
 | Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | — | 83.3 | 84.1 | 93.5 | — |
 | Extend | closed |  | 83.3 | ≈$33.75 | 64.1 | 92.5 | 93.4 | — |
+| MiniCPM-OCR-1.0 | open | 1.3B | 83.2 | — | 72.8 | 89.1 | 87.6 | — |
 | Surya OCR 2 (Datalab) | open | 0.67B | 83.1 | — | 80.6 | 74.3 | 94.3 | — |
 | Azure | closed |  | 83.0 | $5.00 | 74.6 | 81.7 | 92.8 | — |
 | LightOnOCR-3-4B | open | 4.5B | 82.9 | — | 83.9 | 70.8 | 94.0 | — |
