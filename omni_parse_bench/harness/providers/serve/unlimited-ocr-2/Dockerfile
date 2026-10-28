@@ -22,7 +22,8 @@ RUN curl -LsSf https://astral.sh/uv/0.9.5/install.sh | env UV_INSTALL_DIR=/usr/l
         pymupdf==1.27.2.2 httpx==0.28.1 \
     && rm /tmp/*.whl
 
-ENV PORT=8001 PYTHONPATH=/srv
+# Note: the venv first on PATH, as the card activates it: SGLang JIT-compiles kernels with its ninja.
+ENV PORT=8001 PYTHONPATH=/srv PATH=/venv/bin:$PATH
 COPY server.py start.sh /srv/
 EXPOSE 8001
 ENTRYPOINT ["bash", "/srv/start.sh"]
