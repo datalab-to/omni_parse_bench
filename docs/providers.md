@@ -353,6 +353,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | DeepSeek-OCR-2 | `deepseek-ocr` | `deepseek-ocr` | html, blocks |
 | Surya OCR 2 | `surya-ocr` | `surya-ocr` | html, blocks |
 | MinerU2.5-Pro | `mineru` | `mineru` | html, blocks |
+| MiniCPM-OCR 1.0 | `minicpm-ocr` | `minicpm-ocr` | html, markdown, blocks |
 | GLM-OCR | `glm-ocr` | `glm-ocr` | html, blocks |
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
 | Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
@@ -363,6 +364,13 @@ olmOCR-2 and Nanonets-OCR2 return no layout, so they have no blocks. Indra OCR r
 no GPU: its server reads pages in one worker process per core, and its image runs without `--gpus`.
 
 Their labels (LightOn's table is above):
+
+MiniCPM-OCR (`providers/minicpm_ocr.py`) uses the official SDK and PP-DocLayoutV3. Its label mapping
+is the same as PaddleOCR-VL's table below, including `chart` and `seal` as figures. Native Markdown
+is kept alongside HTML and blocks. Its PDF render is PyMuPDF at 144 DPI; layout runs on CPU. All
+page furniture is kept, with the SDK's own table/formula/repetition postprocessing. DSpark and
+test-time selection are off. The pinned runtime and deployment instructions are in
+[`serve/minicpm-ocr/README.md`](../omni_parse_bench/harness/providers/serve/minicpm-ocr/README.md).
 
 chandra-ocr-2 (`providers/chandra_ocr.py`):
 

@@ -29,7 +29,7 @@ from omni_parse_bench.harness.providers import (  # noqa: E402
 @pytest.mark.parametrize("cls", list(harness.ADAPTERS.values()), ids=list(harness.ADAPTERS))
 def test_every_adapter_is_a_page_adapter(cls):
     assert dataclasses.is_dataclass(cls) and issubclass(cls, harness.Parser)
-    assert cls.SUPPORTS and cls.SUPPORTS <= {"html", "blocks"}
+    assert cls.SUPPORTS and cls.SUPPORTS <= {"html", "markdown", "blocks"}
     assert cls().requests(cls.SUPPORTS), "every adapter asks for something"
 
 
