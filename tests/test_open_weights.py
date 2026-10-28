@@ -141,6 +141,16 @@ def test_unlimited_ocr_2_reads_the_servers_markdown_and_its_block_markers():
     assert outs["blocks"][0]["bbox"] == [0.1, 0.05, 0.9, 0.08]
 
 
+def test_unlimited_ocr_2_reads_its_padded_inline_math_as_math():
+    """The model pads most of its inline math, `$ x $`, which markdown reads as text; prices stay prices."""
+    from omni_parse_bench.harness.providers import unlimited_ocr2
+
+    said = r"time  $ \mathcal{O}(2^{M}) $ . Then"
+    assert unlimited_ocr2.tight(said) == r"time  $\mathcal{O}(2^{M})$ . Then"
+    for same in ("costs $5 and $6", "a $x$ b", "$$ x^2 $$"):
+        assert unlimited_ocr2.tight(same) == same
+
+
 def test_an_open_models_malformed_block_or_unknown_label_fails_the_blocks_only():
     """A block with no box, or a type LABELS lacks, fails the blocks output only; the html is still graded."""
     from omni_parse_bench.harness.providers import dots, mineru

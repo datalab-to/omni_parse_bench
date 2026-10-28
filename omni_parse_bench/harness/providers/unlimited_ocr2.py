@@ -30,6 +30,9 @@ STRAY = re.compile(r"<[|｜]/?[a-zA-Z_]+[|｜]>|<image>|<\s*/?\s*PAGE\s*\d*\s*>|
 # model's catch-all (seen on section labels, notes and empty form areas), as text. A block that continues on
 # the next page or column is `cross_<label>`, its continuation `append_<label>`.
 LABELS = {**unlimited.LABELS, "figure": "figure", "picture": "figure", "seal": "figure", "other": "text"}
+# Inline math as the model pads it, `$ x $`, which markdown.to_html leaves as text: its `$` must touch the
+# math, so that "$5 and $6" stays prices. Not $$ display math.
+PADDED = re.compile(r"(?<![\\$])\$[ \t]+([^$\n]*?[^$\s])[ \t]+\$(?!\$)")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -54,7 +57,8 @@ class UnlimitedOcr2(Served):
                               `<BLOCK>label[x0,y0,x1,y1]<FORK>` (a heading with `<LEVELn>`), boxes on a
                               0-1000 grid; the server converts it to markdown with the repository's
                               `process_unlimitedOCR2.convert` (github.com/baidu/Unlimited-OCR at 48ff432).
-      5. Mapping to opb outputs  html is that markdown through `markdown.to_html`; blocks are each marker's
+      5. Mapping to opb outputs  html is that markdown, its padded inline math (`$ x $`, most of the model's)
+                              made tight (`$x$`), through `markdown.to_html`; blocks are each marker's
                               label (its `cross_`/`append_` prefix dropped, LABELS) and box divided by
                               1000, with its text up to the next marker.
 
@@ -113,6 +117,11 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
     return contract.Call(raw, cost=llm.tokens([completion]), job_id=completion.get("id"))
 
 
+def tight(md: str) -> str:
+    """`md` with its padded inline math made tight, so markdown.to_html reads it as math."""
+    return PADDED.sub(r"$\1$", md)
+
+
 def blocks(said: str) -> list[dict]:
     """Each block marker with its box, and the text up to the next marker."""
     ms = list(BLOCK.finditer(said))
@@ -121,7 +130,7 @@ def blocks(said: str) -> list[dict]:
         kind = re.sub(r"^(?:cross|append)_", "", m[1].lower())
         text = STRAY.sub("", said[m.end():end])
         out.append(layout.block(layout.label(LABELS, kind), [float(m[i]) for i in range(2, 6)], (GRID, GRID),
-                                " ".join(views.text(markdown.to_html(text)).split())))
+                                " ".join(views.text(markdown.to_html(tight(text))).split())))
     return out
 
 
@@ -133,7 +142,7 @@ def parse(raw: dict, request: contract.Request, config: UnlimitedOcr2 | None = N
         raise errors.SystemFailed("the reply is empty", status=200)
     outputs, errs = {}, {}
     if "html" in request.outputs:
-        outputs["html"] = markdown.to_html(md)
+        outputs["html"] = markdown.to_html(tight(md))
     if "blocks" in request.outputs:
         try:
             with adapter.reading("the reply's blocks"):
