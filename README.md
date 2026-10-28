@@ -6,7 +6,7 @@
 [![Data: per source](https://img.shields.io/badge/data-per%20source-lightgrey)](https://github.com/datalab-to/omni_parse_bench/tree/main/licenses)
 [![Dataset on Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20dataset-omni__parse__bench-yellow)](https://huggingface.co/datasets/datalab-to/omni_parse_bench)
 
-A document-parsing benchmark with 16,288 tests on 2,937 pages.
+A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face](https://huggingface.co/datasets/datalab-to/omni_parse_bench).
 
 ## Results
 
@@ -341,9 +341,8 @@ opb predict --system datalab --page pages/<page_id>.pdf --options '{"mode": "acc
 
 ![Headline against latency](docs/assets/latency.svg)
 
-The new LLM points (diamonds) use the full-page recorded wall time: HTML plus layout when requested,
-including failed pages and retries, with 32 workers per model. Both medians are 18.5 seconds; p90 is
-37.3 seconds for Opus 5.5 and 43.1 seconds for GPT-6.1 Sol. Historical circles retain the earlier median of
+*Note*: The new LLM points (diamonds) use the full-page recorded wall time: HTML plus layout when requested,
+including failed pages and retries, with 32 workers per model while historical circles retain the earlier median of
 successful, unretried HTML calls only. These timing definitions differ and are not directly comparable.
 
 ### Price per 1,000 pages
@@ -352,9 +351,8 @@ successful, unretried HTML calls only. These timing definitions differ and are n
 
 ### Hard slices
 
-Each tag's score is the mean of the family scores on the tests with that tag
-(for a system with no layout, the mean of the families it has). A test with several tags counts in each.
-Tests on a page the system refused or failed to answer count as failed. Tests per tag: handwriting 923, math 3,316, table 6,767, form 1,028, multi-column 3,517, tiny text 832, rotated 824, degraded 655, not English 1,950. _Not English_ is a test with a language tag other than English.
+
+Tests on a page the system refused or failed to answer count as failed. _Not English_ is a test with a language tag other than English.
 
 | parser | handwriting | math | table | form | multi-column | tiny text | rotated | degraded | not English |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -390,8 +388,6 @@ Tests on a page the system refused or failed to answer count as failed. Tests pe
 | Nanonets-OCR2-3B | 41.3 | 88.2 | 68.2 | 61.9 | 64.7 | 44.1 | 35.7 | 69.3 | 43.6 |
 | Tesseract | 0.8 | 0.8 | 12.7 | 14.4 | 16.0 | 25.8 | 6.1 | 2.7 | 12.3 |
 
-The math slice has 3,271 text tests, 41 layout tests and 4 table tests, so one table test moves it by
-several points; read it with that in mind.
 
 ## License
 
