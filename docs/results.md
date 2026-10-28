@@ -1,6 +1,6 @@
 # Results
 
-Every system's score on the published dataset, `hf://datasets/datalab-to/omni_parse_bench` (16,288 tests on 2,937 pages). The 2026-10-27 Opus 5.5 and GPT-6.1 Sol runs used dataset revision `838b4e956c17e38f3f3d1762400c9425afac7987` and omni-parse-bench 1.0.0. Every system's per-test verdicts are in the dataset's `results.parquet`; the LLM run summaries also record page coverage and refusals. The headline table is mirrored on the [dataset card](https://huggingface.co/datasets/datalab-to/omni_parse_bench#results).
+Every system's score on the published dataset, `hf://datasets/datalab-to/omni_parse_bench` (16,288 tests on 2,937 pages).
 
 ## Headline and families
 
@@ -29,6 +29,7 @@ The headline is the mean of three family scores: text (`present`, `order` and `r
 | LightOnOCR-3-4B | open | 4.5B | 82.9 | — | 83.9 | 70.8 | 94.0 | — |
 | LightOnOCR-3-0.8B | open | 0.85B | 81.6 | — | 81.1 | 72.1 | 91.7 | — |
 | GLM-OCR | open | 1.3B | 81.5 | — | 71.0 | 84.2 | 89.3 | — |
+| Unlimited-OCR 2 | open | 3.3B | 81.2 | — | 72.5 | 79.7 | 91.7 | — |
 | Nemotron 3.5 Parse | open | 0.63B | 80.0 | — | 72.4 | 77.3 | 90.2 | — |
 | Unlimited-OCR | open | 3.3B | 79.3 | — | 70.2 | 76.5 | 91.1 | — |
 | PaddleOCR-VL-1.6 | open | 0.96B | 78.7 | — | 61.7 | 83.7 | 90.7 | — |
@@ -119,6 +120,7 @@ These per-test slices do not apply the run-level page-coverage factor. Tests per
 | LightOnOCR-3-4B | 65.4 | 96.4 | 85.5 | 75.2 | 83.0 | 79.5 | 75.7 | 87.8 | 64.8 |
 | LightOnOCR-3-0.8B | 57.1 | 87.1 | 85.2 | 73.0 | 81.6 | 78.4 | 77.1 | 76.8 | 60.2 |
 | GLM-OCR | 54.1 | 85.8 | 86.4 | 67.0 | 84.2 | 71.7 | 72.7 | 76.8 | 48.2 |
+| Unlimited-OCR 2 | 47.7 | 85.1 | 83.5 | 65.2 | 80.5 | 69.6 | 51.9 | 70.6 | 54.9 |
 | Nemotron 3.5 Parse | 51.2 | 92.1 | 83.0 | 67.2 | 82.1 | 72.8 | 61.8 | 72.3 | 61.6 |
 | Unlimited-OCR | 43.9 | 95.4 | 79.6 | 64.0 | 79.3 | 67.0 | 36.6 | 65.7 | 51.8 |
 | PaddleOCR-VL-1.6 | 52.3 | 85.4 | 84.8 | 63.8 | 79.2 | 72.2 | 77.7 | 68.9 | 52.9 |
