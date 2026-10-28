@@ -51,8 +51,7 @@ class UnlimitedOcr2(Served):
       3. Model inference      the image, then the prompt `<PAGE><image>Multi page parsing.` (the card's
                               prompt for one page), temperature 0, special tokens kept, the card's n-gram
                               logit processor at ngram_size 35 and window_size 128 (its values for one page),
-                              its page guard at 20000 tokens, at most 8000 tokens (its tokens per page);
-                              asked once.
+                              its page guard at 20000 tokens, and at most 20000 tokens; asked once.
       4. Vendor output parsing  the reply is the page's `<PAGE>` marker, then blocks, each opened by
                               `<BLOCK>label[x0,y0,x1,y1]<FORK>` (a heading with `<LEVELn>`), boxes on a
                               0-1000 grid; the server converts it to markdown with the repository's
@@ -74,7 +73,9 @@ class UnlimitedOcr2(Served):
         default_factory=lambda: {"weights": MODEL, "revision": "5632329a32e103d5f1add270681e0f5c1233c6e4"},
         metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
     temperature: float = 0.0
-    max_tokens: int = 8000
+    # Note: the page guard's 20000, not the card's example 8000 per page: the repository's evaluation
+    # (infer.py) gives a request 0.3 of the context, so one page is bounded by the guard alone.
+    max_tokens: int = 20000
     dpi: int = 300
     crop_mode: bool = dataclasses.field(
         default=True,
