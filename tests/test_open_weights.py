@@ -123,15 +123,16 @@ def test_an_unknown_label_fails_the_blocks_only():
     assert "Also kept" in views.text(outs["html"]) and "blocks" in errs and "blocks" not in outs
 
 
-def test_unlimited_ocr_2_asks_its_own_weights_and_reads_as_unlimited_ocr():
-    from omni_parse_bench.harness.providers import unlimited, unlimited_ocr2
+def test_unlimited_ocr_2_drops_its_page_marker_and_reads_as_unlimited_ocr():
+    from omni_parse_bench.harness.providers import unlimited_ocr2
 
     api = harness.system("unlimited-ocr-2")
     request = api.requests(frozenset({"html", "blocks"}))[0]
-    assert request.sent["model"] == "baidu/Unlimited-OCR-2" and api.SERVE == "unlimited-ocr-2"
-    assert api.served["weights"] == unlimited_ocr2.MODEL
-    assert {k: v for k, v in request.sent.items() if k != "model"} == \
-        {k: v for k, v in unlimited.UnlimitedOcr().requests(request.outputs)[0].sent.items() if k != "model"}
+    assert request.sent["model"] == "baidu/Unlimited-OCR-2" and api.served["weights"] == unlimited_ocr2.MODEL
+    reply = "<PAGE>\n<|det|>text [0, 0, 500, 100]<|/det|>Read"
+    raw = {"completion": {"choices": [{"message": {"content": reply}, "finish_reason": "stop"}]}}
+    outs, errs = api.parse(raw, request)
+    assert errs == {} and views.text(outs["html"]).strip() == "Read" and len(outs["blocks"]) == 1
 
 
 def test_an_open_models_malformed_block_or_unknown_label_fails_the_blocks_only():
@@ -226,7 +227,8 @@ def _changed(config):
 
 
 @pytest.mark.parametrize("name", ["chandra_ocr", "deepseek_ocr", "dots", "hunyuan", "infinity", "lighton",
-                                  "nemotron_parse", "olmocr", "paddleocr_vl", "surya_ocr", "unlimited"])
+                                  "nemotron_parse", "olmocr", "paddleocr_vl", "surya_ocr", "unlimited",
+                                  "unlimited_ocr2"])
 def test_a_server_gets_every_setting_from_the_config(name, tmp_path, monkeypatch):
     """The server holds no setting of its own: the adapter sends its options, so an option changes it,
     and the request records it, so the run is named for it."""
