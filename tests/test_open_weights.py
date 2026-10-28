@@ -123,6 +123,34 @@ def test_an_unknown_label_fails_the_blocks_only():
     assert "Also kept" in views.text(outs["html"]) and "blocks" in errs and "blocks" not in outs
 
 
+def test_unlimited_ocr_2_reads_the_servers_markdown_and_its_block_markers():
+    from omni_parse_bench.harness.providers import unlimited_ocr2
+
+    api = harness.system("unlimited-ocr-2")
+    request = api.requests(frozenset({"html", "blocks"}))[0]
+    assert request.sent["model"] == "baidu/Unlimited-OCR-2" and api.served["weights"] == unlimited_ocr2.MODEL
+    reply = ("<PAGE><BLOCK>title<LEVEL1>[100, 50, 900, 80]<FORK>Heading\n"
+             "<BLOCK>cross_text[100, 100, 500, 900]<FORK>Body $x$<MERGE>\n"
+             "<BLOCK>page_number[861, 959, 880, 970]<FORK>21")
+    raw = {"completion": {"choices": [{"message": {"content": reply}, "finish_reason": "stop"}]},
+           "markdown": "# Heading\n\nBody $x$\n\n21"}
+    outs, errs = api.parse(raw, request)
+    assert errs == {} and "<h1>" in outs["html"] and "BLOCK" not in outs["html"]
+    assert [(b["label"], b["text"]) for b in outs["blocks"]] == \
+        [("heading", "Heading"), ("text", "Body $x$"), ("page_furniture", "21")], outs["blocks"]
+    assert outs["blocks"][0]["bbox"] == [0.1, 0.05, 0.9, 0.08]
+
+
+def test_unlimited_ocr_2_reads_its_padded_inline_math_as_math():
+    """The model pads most of its inline math, `$ x $`, which markdown reads as text; prices stay prices."""
+    from omni_parse_bench.harness.providers import unlimited_ocr2
+
+    said = r"time  $ \mathcal{O}(2^{M}) $ . Then"
+    assert unlimited_ocr2.tight(said) == r"time  $\mathcal{O}(2^{M})$ . Then"
+    for same in ("costs $5 and $6", "a $x$ b", "$$ x^2 $$"):
+        assert unlimited_ocr2.tight(same) == same
+
+
 def test_an_open_models_malformed_block_or_unknown_label_fails_the_blocks_only():
     """A block with no box, or a type LABELS lacks, fails the blocks output only; the html is still graded."""
     from omni_parse_bench.harness.providers import dots, mineru
@@ -215,7 +243,8 @@ def _changed(config):
 
 
 @pytest.mark.parametrize("name", ["chandra_ocr", "deepseek_ocr", "dots", "hunyuan", "infinity", "lighton",
-                                  "nemotron_parse", "olmocr", "paddleocr_vl", "surya_ocr", "unlimited"])
+                                  "nemotron_parse", "olmocr", "paddleocr_vl", "surya_ocr", "unlimited",
+                                  "unlimited_ocr2"])
 def test_a_server_gets_every_setting_from_the_config(name, tmp_path, monkeypatch):
     """The server holds no setting of its own: the adapter sends its options, so an option changes it,
     and the request records it, so the run is named for it."""
@@ -261,7 +290,7 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
 @pytest.mark.parametrize("provider", ["chandra-ocr", "deepseek-ocr", "dots-mocr", "glm-ocr", "hunyuan-ocr",
                                       "infinity-parser2", "lightonocr", "mineru", "nanonets-ocr",
                                       "nemotron-parse", "olmocr", "paddleocr-vl", "surya-ocr",
-                                      "unlimited-ocr"])
+                                      "unlimited-ocr", "unlimited-ocr-2"])
 def test_a_served_model_run_is_named_by_every_option(provider):
     """Every option names the run but the server's address: the same model at another address is the same
     question, and other weights another."""

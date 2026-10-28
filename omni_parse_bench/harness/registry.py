@@ -43,6 +43,7 @@ try:
         surya_ocr,
         tesseract,
         unlimited,
+        unlimited_ocr2,
     )
 except ImportError as exc:
     # Note: only a missing or incompatible package is fixed by installing the extra; a broken import of our
@@ -64,7 +65,8 @@ ADAPTERS: dict[str, type[Parser]] = {a.name: a for a in (
     chandra_ocr.ChandraOcr, deepseek_ocr.DeepseekOcr, dots.Dots, glm_ocr.GlmOcr, hunyuan.Hunyuan,
     indra_ocr.IndraOcr, infinity.Infinity, lighton.LightOn, mineru.MinerU, nanonets.Nanonets,
     nemotron_parse.NemotronParse, olmocr.OlmOcr,
-    paddleocr_vl.PaddleOcrVl, surya_ocr.SuryaOcr, unlimited.UnlimitedOcr)}
+    paddleocr_vl.PaddleOcrVl, surya_ocr.SuryaOcr, unlimited.UnlimitedOcr,
+    unlimited_ocr2.UnlimitedOcr2)}
 
 
 def plugins() -> dict[str, metadata.EntryPoint]:

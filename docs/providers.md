@@ -345,6 +345,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | LightOnOCR-3 (4B, 0.8B) | `lightonocr` | `lightonocr` | html, blocks |
 | dots.mocr | `dots-mocr` | `dots-mocr` | html, blocks |
 | Unlimited-OCR | `unlimited-ocr` | `unlimited-ocr` | html, blocks |
+| Unlimited-OCR 2 | `unlimited-ocr-2` | `unlimited-ocr-2` | html, blocks |
 | Infinity-Parser2 (Pro, Flash) | `infinity-parser2` | `infinity-parser2` | html, blocks |
 | chandra-ocr-2 | `chandra-ocr` | `chandra-ocr` | html, blocks |
 | olmOCR-2 | `olmocr` | `olmocr` | html |
@@ -407,6 +408,14 @@ Unlimited-OCR (`providers/unlimited.py`):
 | code, algorithm | code |
 | table | table |
 | image, chart | figure |
+
+Unlimited-OCR 2 (`providers/unlimited_ocr2.py`): Unlimited-OCR's labels, with a `cross_` or `append_` prefix
+(a block continued across pages or columns) dropped, and:
+
+| Unlimited-OCR 2 label | label |
+| --- | --- |
+| figure, picture, seal | figure |
+| other | text |
 
 Infinity-Parser2 (`providers/infinity.py`):
 
