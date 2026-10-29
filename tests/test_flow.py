@@ -112,7 +112,7 @@ def test_an_html_only_system_is_predicted_graded_and_resumed(tmp_path):
     assert s["families"] == {"text": {"score": 1.0, "tests": 3, "documents": 3},
                              "layout": {"score": 0.0, "tests": 3, "documents": 3}}, s
     assert (s["headline"], s["coverage"], s["failed"]) == (0.5, 1.0, failed()), "no blocks: layout 0"
-    assert s["headline_is"] == "the mean of the families' scores" and "partial" not in s
+    assert s["headline_is"] == "score" and "partial" not in s
     assert g["cost"]["usd"] == 0.03
     CALLS.clear()
     b.run(Alpha(), tmp_path / "runs", resume=name)
@@ -147,7 +147,7 @@ def test_details_lines_are_test_lines_that_summarize_reads(tmp_path):
                                                                           for i in range(3)}
     [s] = g["scorers"].values()
     got = unit_tests.summarize(lines)
-    assert (got["headline"], got["families"]) == (s["headline"], s["families"])
+    assert (got["score"], got["families"]) == (s["headline"], s["families"])
     assert list(got["families"]) == ["text", "layout"]
 
 

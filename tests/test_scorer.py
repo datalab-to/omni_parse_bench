@@ -52,9 +52,9 @@ def test_a_missing_output_fails_its_tests():
     assert {v.result for v in score({}, TESTS[:4])} == {"fail"}
 
 
-def test_the_summary_is_the_headline_and_the_families_alone():
+def test_the_summary_is_the_score_and_the_families_alone():
     s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS))
-    assert s == {"headline": 2 / 5, "families": {"text": {"score": 2 / 5, "tests": 5, "documents": 1}}}
+    assert s == {"score": 2 / 5, "families": {"text": {"score": 2 / 5, "tests": 5, "documents": 1}}}
 
 
 def test_a_slice_of_test_lines_is_summarized_the_same_way():
@@ -65,7 +65,7 @@ def test_a_slice_of_test_lines_is_summarized_the_same_way():
 
 def test_scores_are_floats_even_when_every_test_agrees():
     s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS[:2]), TESTS))
-    assert type(s["headline"]) is float and type(s["families"]["text"]["score"]) is float
+    assert type(s["score"]) is float and type(s["families"]["text"]["score"]) is float
 
 
 def test_a_pages_line_holds_its_counts_and_its_details_every_verdict():
@@ -79,9 +79,9 @@ def test_a_pages_line_holds_its_counts_and_its_details_every_verdict():
 def test_unit_tests_names_its_headline():
     line = {"id": "p", "row": {"document": "d"}, "tests": 1, "passed": 1,
             "per_family": {"text": {"tests": 1, "passed": 1}}}
+    assert scorer.UnitTests.headline == "score"
     assert scorer.UnitTests().summarize([line]) == {
-        "headline": 1.0, "headline_is": "the mean of the families' scores",
-        "families": {"text": {"score": 1.0, "tests": 1, "documents": 1}}}
+        "score": 1.0, "families": {"text": {"score": 1.0, "tests": 1, "documents": 1}}}
 
 
 def test_the_families_come_in_a_fixed_order_whatever_the_order_met():
@@ -187,6 +187,6 @@ def test_headline_is_the_mean_of_the_graded_families():
     h = summarize(lines(score({"html": "<p>alpha beta</p>"}, tests), tests))
     assert h["families"] == {"text": {"score": 2 / 3, "tests": 3, "documents": 1},
                              "tables": {"score": 0, "tests": 1, "documents": 1}}
-    assert h["headline"] == (2 / 3 + 0) / 2   # each family weighs the same, however many tests it has
+    assert h["score"] == (2 / 3 + 0) / 2   # each family weighs the same, however many tests it has
     only_text = summarize(lines(score({"html": "<p>alpha beta</p>"}, tests[:3]), tests))
     assert set(only_text["families"]) == {"text"}   # a family with no verdicts isn't in it

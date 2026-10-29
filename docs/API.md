@@ -133,7 +133,7 @@ of the headline. The summary's `failed` counts those pages by cause, and `covera
 ```python
 unit_tests.score(pred, tests) -> [Verdict(id, result, why)]   # pred: one page's {"html": ..., "blocks": [...]}
 unit_tests.lines(verdicts, tests, page) -> [test line]        # each verdict beside its page and its test
-unit_tests.summarize(lines) -> {"headline", "families"}       # any number of test lines
+unit_tests.summarize(lines) -> {"score", "families"}          # any number of test lines
 unit_tests.UnitTests()                                        # the same, as an omni-bench-core scorer
 ```
 
@@ -142,7 +142,7 @@ opb score --pred outputs.json --gold gold/<page_id>.json     # outputs.json: one
 ```
 
 A verdict is `pass` or `fail`, with `why`. A test whose output is missing or malformed fails. A summary holds
-`headline`, the mean of the families' scores, and `families`, always in the order text, tables, layout: each
+`score`, the mean of the families' scores and the headline, and `families`, always in the order text, tables, layout: each
 family's `score` (the share of its tests passed), `tests` and `documents` (the source documents its tests are
 from). `summarize` of a slice of lines (one tag, one suite) is that slice's summary.
 

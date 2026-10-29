@@ -22,7 +22,6 @@ from . import tests as _tests
 from .compare import Verdict
 
 Line = Mapping[str, Any]   # a test line (`lines`)
-HEADLINE = "the mean of the families' scores"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -38,6 +37,7 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
       tag, test type, suite or derivation) is `summarize` of a slice of the details."""
 
     name: ClassVar[str] = "unit_tests"
+    headline: ClassVar[str] = "score"
 
     def gold(self, row: data.Page) -> tuple[_tests.Test, ...]:
         """The page's tests."""
@@ -81,10 +81,9 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
         return {"document": row.document}
 
     def summarize(self, lines: Sequence[Line]) -> dict[str, Any]:
-        """The headline and `families`, over every page's counts, a failed page's from `score_failure`."""
-        s = _summary((f, x["row"]["document"], c["passed"], c["tests"])
-                     for x in lines for f, c in x["per_family"].items())
-        return {"headline": s["headline"], "headline_is": HEADLINE, "families": s["families"]}
+        """`score` and `families`, over every page's counts, a failed page's from `score_failure`."""
+        return _summary((f, x["row"]["document"], c["passed"], c["tests"])
+                        for x in lines for f, c in x["per_family"].items())
 
     def check_gold(self, rows: Sequence[data.Page]) -> None:
         """Every page's tests read and checked (`check`), before any call."""
@@ -133,9 +132,9 @@ def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.
 
 
 def summarize(lines: Iterable[Line]) -> dict[str, Any]:
-    """Test lines (from `lines`) as one summary: `headline`, the mean of the families' scores, and `families`,
-    each family's `score` (the share of its tests passed), `tests` and `documents`. The headline is None when
-    there are no tests.
+    """Test lines (from `lines`) as one summary: `score`, the mean of the families' scores, and `families`,
+    each family's `score` (the share of its tests passed), `tests` and `documents`. `score` is None when there
+    are no tests.
 
     Note: a mean over families, each flat over its tests, so how many tests a family has never sets its
     weight. A document's tests pass or fail together (one misread table fails all its cells), so
@@ -145,7 +144,7 @@ def summarize(lines: Iterable[Line]) -> dict[str, Any]:
 
 
 def _summary(counts: Iterable[tuple[str, str, int, int]]) -> dict[str, Any]:
-    """`headline` and `families` from (family, document, passed, tests) counts, the families in
+    """`score` and `families` from (family, document, passed, tests) counts, the families in
     `vocab.FAMILY_ORDER`."""
     tests: collections.Counter[str] = collections.Counter()
     passed: collections.Counter[str] = collections.Counter()
@@ -156,5 +155,5 @@ def _summary(counts: Iterable[tuple[str, str, int, int]]) -> dict[str, Any]:
         documents[f].add(d)
     families = {f: {"score": passed[f] / n, "tests": n, "documents": len(documents[f])}
                 for f in vocab.FAMILY_ORDER if (n := tests[f])}
-    return {"headline": float(statistics.fmean(x["score"] for x in families.values())) if families else None,
+    return {"score": float(statistics.fmean(x["score"] for x in families.values())) if families else None,
             "families": families}

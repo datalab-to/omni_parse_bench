@@ -213,7 +213,8 @@ A summary looks like this:
   "failed": {"system": 1, "unusable": 0, "no_answer": 0, "not_scored": 0},
   "coverage": 0.8,
   "headline": 0.657,
-  "headline_is": "the mean of the families' scores",
+  "headline_is": "score",
+  "score": 0.657,
   "families": {
     "text": {"score": 0.72, "tests": 120, "documents": 5},
     "tables": {"score": 0.59, "tests": 40, "documents": 3},
@@ -292,10 +293,10 @@ verdicts = unit_tests.score(pred, tests)
 >>> page = data.Page("example-p1", "example", "example", "pages/example-p1.pdf", "gold/example-p1.json", ("html",))
 >>> lines = unit_tests.lines(verdicts, tests, page)
 >>> unit_tests.summarize(lines)
-{'headline': 0.5, 'families': {'text': {'score': 1.0, 'tests': 2, 'documents': 1},
+{'score': 0.5, 'families': {'text': {'score': 1.0, 'tests': 2, 'documents': 1},
                                'tables': {'score': 0.0, 'tests': 1, 'documents': 1}}}
 >>> unit_tests.summarize([x for x in lines if "table" in x["tags"]])   # one tag: the same summary on a slice
-{'headline': 0.0, 'families': {'tables': {'score': 0.0, 'tests': 1, 'documents': 1}}}
+{'score': 0.0, 'families': {'tables': {'score': 0.0, 'tests': 1, 'documents': 1}}}
 ```
 
 A verdict is `pass` or `fail`, with `why` saying what went wrong.
