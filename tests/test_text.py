@@ -43,6 +43,19 @@ def test_dollar_amounts_in_a_pipe_table_stay_in_their_cells(row, cells):
     assert [c for c in got if c] == cells
 
 
+def test_math_spanning_held_display_math_releases_both():
+    h = markdown.to_html(r"$,$$\lambda$$\text{lambda}$, $n$$\text{lambda}$")
+    assert views.HOLD_OPEN not in h and r"$$\lambda$$" in h
+    normalize.fold(views.text(h))
+
+
+@pytest.mark.parametrize("n", [0, 5])
+def test_markers_the_page_wrote_are_dropped_not_released(n):
+    s = f"$a$ $b{views.HOLD_OPEN}{n}{views.HOLD_CLOSE}$"
+    assert normalize.fold(views.text(markdown.to_html(s))) == f"a b{n}"
+    assert normalize.fold(f"$\\text{{a}} {views.HOLD_OPEN}{n}{views.HOLD_CLOSE}$") == f"a {n}"
+
+
 def test_math_with_a_pipe_outside_a_table_is_held_whole():
     assert "$3 - 2|x| < 2$" in markdown.to_html("The set $3 - 2|x| < 2$ is open\n")
     block = "$$\n\\text{O} \\\\\n| \\quad | \\\\\n$$"

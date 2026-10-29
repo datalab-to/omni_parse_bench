@@ -15,6 +15,7 @@ HOLD_OPEN, HOLD_CLOSE = "\ue000", "\ue001"
 CHECKED, UNCHECKED = "☒", "☐"
 
 _HELD = re.compile(HOLD_OPEN + r"(\d+)" + HOLD_CLOSE)
+_NO_MARKERS = {ord(HOLD_OPEN): None, ord(HOLD_CLOSE): None}
 _LIST_TAG = re.compile(r"<(/?)(ol|ul|li)\b([^<>]*)>", re.I)
 _START = re.compile(r"\bstart=[\"']?(\d+)", re.I)
 _MATH = re.compile(r"<math\b([^<>]*)>(.*?)</math>", re.I | re.S)
@@ -136,7 +137,9 @@ def text(s: str, *, alt: bool = True) -> str:
 
 def hold(s: str, pattern: re.Pattern[str], held: list[str] | None = None) -> tuple[str, list[str]]:
     """Replaces each match of `pattern` with a placeholder; returns the text and what was held."""
-    held = [] if held is None else held
+    # Note: a fresh hold drops the marker characters the text already has, so only ours are ever released;
+    # they are private-use, which `normalize.fold` drops anyway.
+    if held is None: s, held = s.translate(_NO_MARKERS), []
 
     def one(m: re.Match[str]) -> str:
         held.append(m[0])
@@ -147,7 +150,11 @@ def hold(s: str, pattern: re.Pattern[str], held: list[str] | None = None) -> tup
 
 def release(s: str, held: list[str]) -> str:
     """Puts back what `hold` took out."""
-    return _HELD.sub(lambda m: held[int(m[1])], s) if held else s
+    # Note: an item may hold placeholders made before it (inline math `$,$$x$$y$` spans the display math held
+    # first), so items are put back in order, each from the ones already put back.
+    out: list[str] = []
+    for x in held: out.append(_HELD.sub(lambda m: out[int(m[1])], x))
+    return _HELD.sub(lambda m: out[int(m[1])], s) if held else s
 
 
 def _numbered(s: str) -> str:
