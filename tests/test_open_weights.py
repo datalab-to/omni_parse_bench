@@ -39,6 +39,54 @@ def test_a_saved_answer_gives_every_output_its_adapter_supports(fixture):
         assert outs["blocks"] and all(b["label"] in views.LABELS for b in outs["blocks"])
 
 
+def _taken() -> dict[str, frozenset[str]]:
+    """Each serve folder whose server takes exactly its `SETTINGS`, by folder name: those settings, read
+    from its server.py (which imports the vendor's code, so it isn't imported here)."""
+    import ast
+
+    def constant(x: ast.expr) -> bool:
+        kinds = (ast.Tuple, ast.BinOp, ast.Add, ast.Name, ast.Constant, ast.Load)
+        return all(isinstance(n, kinds) for n in ast.walk(x))
+
+    out = {}
+    for p in sorted((Path(harness.__file__).parent / "providers" / "serve").glob("*/server.py")):
+        env: dict = {}  # its module-level tuples of names, in order (`SETTINGS = SAMPLING + ("dpi",)`)
+        for node in ast.parse(p.read_text()).body:
+            named = isinstance(node, ast.Assign) and [type(t) for t in node.targets] == [ast.Name]
+            if named and constant(node.value):
+                env[node.targets[0].id] = eval(compile(ast.Expression(node.value), str(p), "eval"), {}, env)
+        if "SETTINGS" in env:
+            out[p.parent.name] = frozenset(env["SETTINGS"])
+    return out
+
+
+TAKEN = _taken()
+SERVED = sorted(n for n, c in harness.ADAPTERS.items() if getattr(c, "SERVE", None) in TAKEN)
+
+
+@pytest.mark.parametrize("name", SERVED)
+def test_a_served_adapter_sends_exactly_the_settings_its_server_takes(name, monkeypatch, tmp_path):
+    from PIL import Image
+
+    from omni_parse_bench.harness import http
+
+    class Sent(Exception):
+        pass
+
+    bodies = []
+
+    def post(url, body, deadline, key=None):
+        bodies.append(body)
+        raise Sent
+
+    monkeypatch.setattr(http, "post", post)
+    Image.new("RGB", (64, 64), "white").save(page := tmp_path / "page.png")
+    api = harness.ADAPTERS[name]()
+    with pytest.raises(Sent):
+        api.send(page, api.requests(api.SUPPORTS)[0], timeout=10)
+    assert set(bodies[0]["settings"]) == TAKEN[api.SERVE], "an option the adapter applies itself isn't sent"
+
+
 def test_every_open_weight_fixture_names_a_known_provider():
     for p in FIXTURES:
         fx = json.loads(p.read_text())
@@ -51,6 +99,21 @@ def test_a_chandra_picture_description_is_alt_text_not_page_text():
     assert described not in views.text(outs["html"], alt=False)
     assert described in views.text(outs["html"])
     assert "CODE OF FEDERAL" in views.text(outs["html"], alt=False)
+
+
+def test_chandra_markdown_is_the_packages_and_headers_go_only_when_asked():
+    from omni_parse_bench.harness.providers import chandra_ocr
+
+    fx = json.loads((HERE / "chandra_ocr.json").read_text())
+    both = frozenset({"html", "markdown"})
+    (kept,) = chandra_ocr.ChandraOcr().requests(both)
+    outs, errs = chandra_ocr.parse(fx["raw"], kept, chandra_ocr.ChandraOcr())
+    assert not errs and "AUTHENTICATED" in outs["markdown"] and "CODE OF FEDERAL" in outs["markdown"]
+    assert "AUTHENTICATED" in views.text(outs["html"])
+    dropped = chandra_ocr.ChandraOcr(headers_footers=False)
+    outs, _ = chandra_ocr.parse(fx["raw"], dropped.requests(both)[0], dropped)
+    assert "AUTHENTICATED" not in outs["markdown"] and "AUTHENTICATED" not in views.text(outs["html"])
+    assert "CODE OF FEDERAL" in outs["markdown"]
 
 
 def test_a_chandra_diagram_is_alt_text_not_page_text_nor_dropped():
@@ -261,8 +324,8 @@ def test_a_server_gets_every_setting_from_the_config(name, tmp_path, monkeypatch
     monkeypatch.setattr(http, "post", lambda url, body, *a, **k: got.update(body) or answer)
     Image.new("RGB", (64, 64), "white").save(page := tmp_path / "p.png")
     mod.call(page, mod.requests(mod.SUPPORTS, config)[0], config=config)
-    default = http.settings(_adapter(mod)(), "long_edge")
-    assert got["settings"] == http.settings(config, "long_edge") != default
+    default = http.settings(_adapter(mod)())
+    assert got["settings"] == http.settings(config) != default
     assert mod.requests(mod.SUPPORTS, config)[0].sent["settings"] == http.settings(config)
 
 

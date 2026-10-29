@@ -13,7 +13,7 @@ from .. import contract, errors, http, layout
 from ..adapter import Served
 from . import llm
 
-SUPPORTS = frozenset({"html", "blocks"})
+SUPPORTS = frozenset({"html", "markdown", "blocks"})
 WEIGHTS = "datalab-to/chandra-ocr-2"
 # Chandra's labels (its OCR_LAYOUT_PROMPT list, and Picture) onto views.LABELS, as the datalab
 # adapter maps the same types. Blank-Page marks an empty page and holds no block.
@@ -29,6 +29,7 @@ _DIV = re.compile(r'<div\b[^>]*\bdata-label="([^"]*)"[^>]*>', re.I)
 _BBOX = re.compile(r'data-bbox="\s*(-?[\d.]+)[\s,]+(-?[\d.]+)[\s,]+(-?[\d.]+)[\s,]+(-?[\d.]+)\s*"')
 _TAG = re.compile(r"<[^>]+>")
 PICTURES = ("Image", "Figure", "Picture", "Diagram", "Chemical-Block")
+FURNITURE = ("Page-Header", "Page-Footer")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -53,18 +54,22 @@ class ChandraOcr(Served):
                               cut at the token limit is asked again, up to 6 times, temperature 0.2
                               higher each time (at most 0.8), top_p 0.95.
       4. Vendor output parsing  the reply is block HTML, one top-level <div data-label data-bbox> per
-                              block, boxes on a 0-1000 grid; the package's `parse_html` reads each block,
-                              headers and footers kept. A reply cut on every attempt is read as it is.
+                              block, boxes on a 0-1000 grid; the package's `parse_html` and
+                              `parse_markdown` read each block, headers and footers kept. A reply cut on
+                              every attempt is read as it is.
       5. Mapping to opb outputs  html is the blocks' readings in order, except that a picture block
                               (PICTURES) becomes an image whose alt text is its contents (the model's
                               description, a chart's data, a diagram's mermaid): a model's account of a
-                              picture is not page text (docs/providers.md). blocks are the top-level
-                              divs, each label from LABELS, its box divided by 1000.
+                              picture is not page text (docs/providers.md). markdown is the blocks'
+                              `parse_markdown` in order, as the package writes it. Both leave out the
+                              header and footer blocks (FURNITURE) when `headers_footers` is false.
+                              blocks are the top-level divs, each label from LABELS, its box divided by
+                              1000.
 
     Differences from the vendor:
 
-      - headers and footers are kept (the package drops them by default; the benchmark scores the whole
-        page for every system).
+      - headers and footers are kept by default (the package drops them by default; the benchmark scores the
+        whole page for every system). `headers_footers: false` drops them, as the package does.
 
         docker build -t opb-chandra-ocr omni_parse_bench/harness/providers/serve/chandra-ocr
         docker run --gpus all -p 8001:8001 opb-chandra-ocr
@@ -83,6 +88,11 @@ class ChandraOcr(Served):
     max_tokens: int = 12384
     dpi: int = 300
     max_retries: int = 6
+    headers_footers: bool = dataclasses.field(
+        default=True,
+        # Note: local, since the adapter drops the header and footer blocks; the server reads every block.
+        metadata={"local": True,
+                  "help": "keep page headers and footers in html and markdown; false: the package's default"})
 
     name: ClassVar[str] = "chandra-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
@@ -100,7 +110,7 @@ class ChandraOcr(Served):
 
 
 def requests(wants: frozenset[str], config: ChandraOcr) -> list[contract.Request]:
-    """One call answers both outputs."""
+    """One call answers every output."""
     if not wants: return []
     sent = {"weights": WEIGHTS, "prompt": "ocr_layout", "settings": http.settings(config),
             "page": "the file, loaded as its benchmark loads one, then scale_to_fit",
@@ -143,12 +153,19 @@ def picture(block: dict) -> str:
 
 
 def parse(raw: dict, request: contract.Request, config: ChandraOcr | None = None) -> tuple[dict, dict]:
-    """The page from the server's blocks, pictures as alt text; the blocks from the reply."""
+    """The page from the server's blocks, pictures as alt text in html; the blocks from the reply."""
     said = llm.content(raw["completion"])
+    kept = config.headers_footers if config else True
+    page = [b for b in raw["blocks"] if b["label"] != "Blank-Page" and (kept or b["label"] not in FURNITURE)]
     outputs, errs = {}, {}
     if "html" in request.outputs:
-        outputs["html"] = "".join(picture(b) if b["label"] in PICTURES else b["html"] for b in raw["blocks"]
-                                  if b["label"] != "Blank-Page")
+        outputs["html"] = "".join(picture(b) if b["label"] in PICTURES else b["html"] for b in page)
+    if "markdown" in request.outputs:
+        try:
+            with adapter.reading("the blocks' markdown"):
+                outputs["markdown"] = "\n\n".join(b["markdown"] for b in page if b["markdown"])
+        except errors.SystemFailed as exc:
+            errs["markdown"] = errors.unread(exc)
     if "blocks" in request.outputs:
         try:
             with adapter.reading("the reply's blocks"):

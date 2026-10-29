@@ -19,7 +19,7 @@ import httpx
 from bs4 import BeautifulSoup
 from chandra.input import load_image, load_pdf_images
 from chandra.model.util import detect_repeat_token, scale_to_fit
-from chandra.output import parse_html
+from chandra.output import parse_html, parse_markdown
 from chandra.prompts import PROMPT_MAPPING
 from PIL import Image
 
@@ -62,11 +62,13 @@ def finish(completion: dict) -> str | None:
 
 
 def blocks(said: str) -> list[dict]:
-    """Each top-level block: its label, its inner HTML as written, and `parse_html`'s reading of it."""
+    """Each top-level block: its label, its inner HTML as written, and `parse_html`'s and `parse_markdown`'s
+    readings of it, headers and footers kept."""
     out = []
     for div in BeautifulSoup(said, "html.parser").find_all("div", recursive=False):
         out.append({"label": div.get("data-label"), "raw": div.decode_contents(),
-                    "html": parse_html(str(div), include_headers_footers=True, include_images=True)})
+                    "html": parse_html(str(div), include_headers_footers=True, include_images=True),
+                    "markdown": parse_markdown(str(div), include_headers_footers=True, include_images=True)})
     return out
 
 
@@ -134,7 +136,8 @@ class Handler(BaseHTTPRequestHandler):
                         "max_retries"}}
                         -> {"completion": the kept chat completion, "attempts", "usage": summed over
                         attempts, "blocks": [{"label", "raw": the block's inner HTML as the model wrote it,
-                        "html": parse_html of the block}], "vendor": {"chandra-ocr": its commit}}"""
+                        "html": parse_html of the block, "markdown": parse_markdown of the block}],
+                        "vendor": {"chandra-ocr": its commit}}"""
     def do_GET(self):
         if self.path == "/served": return self._send(200, SERVED)
         self._send(200 if self.path == "/health" else 404, {"ok": self.path == "/health"})

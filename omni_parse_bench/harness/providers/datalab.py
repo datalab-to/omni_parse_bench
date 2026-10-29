@@ -16,7 +16,7 @@ from .. import budget, contract, errors, layout
 from ..adapter import Parser
 
 DEFAULT_BASE_URL = "https://www.datalab.to"
-SUPPORTS = frozenset({"html", "blocks"})
+SUPPORTS = frozenset({"html", "markdown", "blocks"})
 # Note: Datalab's block types, as its API returns them. Diagram and ChemicalBlock reach the API
 # as Figure and Bibliography as ListGroup; ComplexRegion is mostly a drawing with labels in it.
 LABELS = {
@@ -32,10 +32,13 @@ MEDIA = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", "
 
 @dataclasses.dataclass(frozen=True)
 class Datalab(Parser):
-    """Datalab, one call for html and blocks (`output_format=html,chunks`), page headers and footers kept.
+    """Datalab, one call for html, markdown and blocks (`output_format=html,markdown,chunks`), page
+    headers and footers kept unless `headers_footers` is false.
 
     - `mode`: the tier, `lite`, `fast`, `balanced` or `accurate`; `lite` is Indra OCR on CPU, no LLM
       pass;
+    - `headers_footers`: whether html and markdown keep page headers and footers (the API's
+      `keep_pageheader_in_output` and `keep_pagefooter_in_output`, which it leaves false by default);
     - `blocks`: its chunks, each `block_type` mapped by `LABELS`, boxes in the page's frame (`page_info`); and
     - cost: stated in cents, recorded in dollars.
 
@@ -49,6 +52,9 @@ class Datalab(Parser):
         default="accurate",
         metadata={"choices": ["lite", "fast", "balanced", "accurate"],
                   "help": "conversion tier; the published runs use balanced and accurate"})
+    headers_footers: bool = dataclasses.field(
+        default=True,
+        metadata={"help": "keep page headers and footers in html and markdown; false is the API's default"})
     base_url: str = DEFAULT_BASE_URL
     poll_interval: float = 2.0
 
@@ -68,12 +74,14 @@ class Datalab(Parser):
 
 
 def requests(wants: frozenset[str], config: Datalab) -> list[contract.Request]:
-    """One call for html and blocks, with headers kept."""
+    """One call for every output, with headers and footers as `headers_footers` says."""
     if not wants: return []
-    formats = ",".join(f for o, f in (("html", "html"), ("blocks", "chunks")) if o in wants)
+    formats = ",".join(f for o, f in (("html", "html"), ("markdown", "markdown"), ("blocks", "chunks"))
+                       if o in wants)
+    kept = config.headers_footers
     sent = {"mode": config.mode, "skip_cache": True, "disable_image_extraction": True,
             "disable_image_captions": True, "output_format": formats,
-            "additional_config": {"keep_pageheader_in_output": True, "keep_pagefooter_in_output": True}}
+            "additional_config": {"keep_pageheader_in_output": kept, "keep_pagefooter_in_output": kept}}
     return [contract.Request(wants, sent)]
 
 
@@ -153,10 +161,10 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
 
 
 def parse(raw: dict, request: contract.Request, config: Datalab | None = None) -> tuple[dict, dict]:
-    """The outputs in a completed conversion: its html, and its chunks as blocks."""
+    """The outputs in a completed conversion: its html and markdown, and its chunks as blocks."""
     outputs, errs = {}, {}
     for o in request.outputs:
-        if o == "html": outputs[o] = raw.get("html")
+        if o in ("html", "markdown"): outputs[o] = raw.get(o)
         if o == "blocks" and raw.get("chunks"):
             try:
                 with adapter.reading("the chunks"):

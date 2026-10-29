@@ -216,7 +216,7 @@ that is missing stops a run before any call and says which `export` to type.
 
 | provider | API | outputs | headers | auth (environment variables) |
 | --- | --- | --- | --- | --- |
-| `datalab` | /api/v1/convert | html, blocks | native switch, set to keep them | DATALAB_API_KEY |
+| `datalab` | /api/v1/convert | html, markdown, blocks | native switch, set to keep them (`headers_footers`) | DATALAB_API_KEY |
 | model ids (GPT, Claude, ...) | OpenRouter chat | html, blocks | its prompt asks to keep them | OPENROUTER_API_KEY (or OPENAI_API_KEY) |
 | `reducto` | /upload, /parse_async, /job | html, blocks | kept in its content | REDUCTO_API_KEY |
 | `extend` | /files/upload, /parse_runs | html, blocks | kept in its content | EXTEND_API_KEY (and EXTEND_WORKSPACE_ID when the key spans several workspaces) |
@@ -237,8 +237,9 @@ A vendor's tiers are runs of their own, one config each (or one config and `--se
 Per vendor:
 
 - datalab: one `/api/v1/convert` call at `mode=accurate`, its most accurate, with
-  `output_format=html,chunks`, cache skipped (`skip_cache`), page headers and footers kept
-  (`keep_pageheader_in_output`, `keep_pagefooter_in_output`), image extraction and captions off,
+  `output_format=html,markdown,chunks` (those the page asks for), cache skipped (`skip_cache`), page
+  headers and footers kept (`keep_pageheader_in_output`, `keep_pagefooter_in_output`; the option
+  `headers_footers: false` leaves them out, the API's default), image extraction and captions off,
   polled. Blocks are its chunks, with boxes in the page's frame. Cost: stated in cents, recorded in
   dollars;
 - models (any OpenRouter id): one chat call per output, each with its own prompt, the page as a PNG
@@ -324,6 +325,11 @@ A server.py stands alone: it imports its vendor's code and what that needs, neve
 and nothing in omni_parse_bench imports it. So the vendor's code (and its license) stays in its image,
 and the adapter that reads the answer needs none of it: a saved answer is read again anywhere.
 
+A server.py takes exactly its `SETTINGS` and refuses any other. Its adapter sends them as its options
+(`http.settings`): every option but `base_url`, `model`, `served`, and one the adapter applies itself,
+which its field marks `metadata={"local": True}` (hunyuan's `long_edge`, chandra-ocr's
+`headers_footers`). A test checks that each adapter sends exactly its server's `SETTINGS`.
+
 A model whose vendor offers only the model, with no code of its own around it (Nanonets-OCR2), has no
 server.py: its port is vLLM's `/v1`, and its adapter asks it directly, through `llm.chat`.
 
@@ -347,7 +353,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | Unlimited-OCR | `unlimited-ocr` | `unlimited-ocr` | html, blocks |
 | Unlimited-OCR 2 | `unlimited-ocr-2` | `unlimited-ocr-2` | html, blocks |
 | Infinity-Parser2 (Pro, Flash) | `infinity-parser2` | `infinity-parser2` | html, blocks |
-| chandra-ocr-2 | `chandra-ocr` | `chandra-ocr` | html, blocks |
+| chandra-ocr-2 | `chandra-ocr` | `chandra-ocr` | html, markdown, blocks |
 | olmOCR-2 | `olmocr` | `olmocr` | html |
 | HunyuanOCR-1.5 | `hunyuan-ocr` | `hunyuan-ocr` | html, blocks |
 | DeepSeek-OCR-2 | `deepseek-ocr` | `deepseek-ocr` | html, blocks |
@@ -358,6 +364,8 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
 | Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets-ocr` | html |
 | Nemotron 3.5 Parse | `nemotron-parse` | `nemotron-parse` | html, blocks |
+| MiniCPM-OCR 1.0 | `minicpm-ocr` | `minicpm-ocr` | html, markdown, blocks |
+| OXR-1.0 | `oxr` | `oxr` | html, markdown, blocks |
 
 olmOCR-2 and Nanonets-OCR2 return no layout, so they have no blocks. Indra OCR runs on CPU (ONNX Runtime),
 no GPU: its server reads pages in one worker process per core, and its image runs without `--gpus`.
@@ -548,6 +556,34 @@ Nemotron 3.5 Parse (`providers/nemotron_parse.py`; its class tokens, and Chart):
 | Code | code |
 | Table | table |
 | Picture, Chart | figure |
+
+MiniCPM-OCR 1.0 (`providers/minicpm_ocr.py`):
+
+| MiniCPM-OCR 1.0 label | label |
+| --- | --- |
+| abstract, content, reference, reference_content, text, vertical_text, aside_text | text |
+| doc_title, paragraph_title | heading |
+| header, footer, number | page_furniture |
+| figure_title | caption |
+| footnote, vision_footnote | footnote |
+| display_formula, inline_formula, formula_number | equation |
+| algorithm | code |
+| table | table |
+| chart, seal, image, header_image, footer_image | figure |
+
+OXR-1.0 (`providers/oxr.py`; the types of SoMark's API, `oxr/pipeline/models.py`):
+
+| OXR-1.0 label | label |
+| --- | --- |
+| Text | text |
+| Title | heading |
+| Page-header, Page-footer | page_furniture |
+| Caption | caption |
+| Footnote | footnote |
+| Formula, Chemical Equation | equation |
+| Code Block | code |
+| Table | table |
+| Picture, Stamp, Chemical Structure | figure |
 
 ## What differs between vendors, by necessity
 

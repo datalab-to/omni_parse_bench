@@ -34,10 +34,12 @@ try:
         llamaparse,
         llm,
         mineru,
+        minicpm_ocr,
         mistral,
         nanonets,
         nemotron_parse,
         olmocr,
+        oxr,
         paddleocr_vl,
         reducto,
         surya_ocr,
@@ -64,7 +66,7 @@ ADAPTERS: dict[str, type[Parser]] = {a.name: a for a in (
     # or vLLM alone where the vendor offers only the model.
     chandra_ocr.ChandraOcr, deepseek_ocr.DeepseekOcr, dots.Dots, glm_ocr.GlmOcr, hunyuan.Hunyuan,
     indra_ocr.IndraOcr, infinity.Infinity, lighton.LightOn, mineru.MinerU, nanonets.Nanonets,
-    nemotron_parse.NemotronParse, olmocr.OlmOcr,
+    nemotron_parse.NemotronParse, olmocr.OlmOcr, minicpm_ocr.MiniCpmOcr, oxr.Oxr,
     paddleocr_vl.PaddleOcrVl, surya_ocr.SuryaOcr, unlimited.UnlimitedOcr,
     unlimited_ocr2.UnlimitedOcr2)}
 

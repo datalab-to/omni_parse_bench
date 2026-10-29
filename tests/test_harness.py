@@ -29,7 +29,7 @@ from omni_parse_bench.harness.providers import (  # noqa: E402
 @pytest.mark.parametrize("cls", list(harness.ADAPTERS.values()), ids=list(harness.ADAPTERS))
 def test_every_adapter_is_a_page_adapter(cls):
     assert dataclasses.is_dataclass(cls) and issubclass(cls, harness.Parser)
-    assert cls.SUPPORTS and cls.SUPPORTS <= {"html", "blocks"}
+    assert cls.SUPPORTS and cls.SUPPORTS <= {"html", "markdown", "blocks"}
     assert cls().requests(cls.SUPPORTS), "every adapter asks for something"
 
 
@@ -37,6 +37,14 @@ def test_datalab_asks_one_call_with_headers_kept():
     (r,) = datalab.Datalab().requests(frozenset({"html", "blocks"}))
     assert sorted(r.outputs) == ["blocks", "html"] and r.sent["output_format"] == "html,chunks"
     assert r.sent["additional_config"]["keep_pageheader_in_output"] is True
+
+
+def test_datalab_gives_markdown_and_leaves_headers_out_when_asked():
+    (r,) = datalab.Datalab(headers_footers=False).requests(frozenset({"markdown"}))
+    assert r.sent["output_format"] == "markdown"
+    assert r.sent["additional_config"] == {"keep_pageheader_in_output": False,
+                                           "keep_pagefooter_in_output": False}
+    assert datalab.parse({"markdown": "# T", "html": "<h1>T</h1>"}, r) == ({"markdown": "# T"}, {})
 
 
 def test_an_unknown_option_is_refused_by_name():

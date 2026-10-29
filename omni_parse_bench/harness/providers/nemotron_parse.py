@@ -94,7 +94,7 @@ class NemotronParse(Served):
     repetition_penalty: float = 1.05
     seed: int = dataclasses.field(default=0, metadata={"help": "the sampling seed"})
     max_tokens: int = 8744
-    long_edge: int = llm.LONG_EDGE
+    long_edge: int = dataclasses.field(default=llm.LONG_EDGE, metadata={"local": True})
 
     name: ClassVar[str] = "nemotron-parse"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
@@ -128,7 +128,7 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: NemotronParse) -> contract.Call:
     # Note: the client takes images only, so the page goes as opb's PNG, in the body every server takes.
     body = {"page": base64.b64encode(llm.image(page, config.long_edge)).decode("ascii"), "suffix": ".png",
-            "settings": http.settings(config, "long_edge")}
+            "settings": http.settings(config)}
     raw = http.parse(config, page, timeout, body=body)
     with adapter.reading("the server's answer"):
         failed, cost = raw.get("error"), llm.tokens(raw.get("responses") or [])
