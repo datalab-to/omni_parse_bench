@@ -324,9 +324,8 @@ def test_a_server_gets_every_setting_from_the_config(name, tmp_path, monkeypatch
     monkeypatch.setattr(http, "post", lambda url, body, *a, **k: got.update(body) or answer)
     Image.new("RGB", (64, 64), "white").save(page := tmp_path / "p.png")
     mod.call(page, mod.requests(mod.SUPPORTS, config)[0], config=config)
-    local = ("long_edge", *getattr(mod, "LOCAL", ()))  # the options the adapter applies itself
-    default = http.settings(_adapter(mod)(), *local)
-    assert got["settings"] == http.settings(config, *local) != default
+    default = http.settings(_adapter(mod)())
+    assert got["settings"] == http.settings(config) != default
     assert mod.requests(mod.SUPPORTS, config)[0].sent["settings"] == http.settings(config)
 
 

@@ -30,7 +30,6 @@ _BBOX = re.compile(r'data-bbox="\s*(-?[\d.]+)[\s,]+(-?[\d.]+)[\s,]+(-?[\d.]+)[\s
 _TAG = re.compile(r"<[^>]+>")
 PICTURES = ("Image", "Figure", "Picture", "Diagram", "Chemical-Block")
 FURNITURE = ("Page-Header", "Page-Footer")
-LOCAL = ("headers_footers",)  # an option the adapter applies itself: recorded in `sent`, never sent
 
 
 @dataclasses.dataclass(frozen=True)
@@ -91,7 +90,9 @@ class ChandraOcr(Served):
     max_retries: int = 6
     headers_footers: bool = dataclasses.field(
         default=True,
-        metadata={"help": "keep page headers and footers in html and markdown; false: the package's default"})
+        # Note: local, since the adapter drops the header and footer blocks; the server reads every block.
+        metadata={"local": True,
+                  "help": "keep page headers and footers in html and markdown; false: the package's default"})
 
     name: ClassVar[str] = "chandra-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS
@@ -119,8 +120,7 @@ def requests(wants: frozenset[str], config: ChandraOcr) -> list[contract.Request
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: ChandraOcr) -> contract.Call:
-    body = {**http.page(page), "settings": http.settings(config, *LOCAL)}
-    raw = http.parse(config, page, timeout, body=body)
+    raw = http.parse(config, page, timeout)
     with adapter.reading("the server's answer"):
         usage = raw.get("usage") or {}
         cost = contract.Cost(tokens_in=usage.get("prompt_tokens"), tokens_out=usage.get("completion_tokens"))
