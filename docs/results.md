@@ -23,6 +23,7 @@ The headline is the mean of three family scores: text (`present`, `order` and `r
 | GPT-5.6 Sol | closed |  | 87.8 | ≈$94.49 | 85.4 | 91.6 | 86.5 | 17 |
 | MinerU2.5-Pro | open | 1.2B | 87.1 | — | 77.4 | 92.1 | 91.7 | — |
 | Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | — | 83.3 | 84.1 | 93.5 | — |
+| **Surya OCR 2.5** | open | 0.69B | 85.9 | — | 83.8 | 78.3 | 95.7 | — |
 | OXR-1.0 | open | 1.4B | 85.3 | — | 76.4 | 88.2 | 91.4 | — |
 | Extend | closed |  | 83.3 | ≈$33.75 | 64.1 | 92.5 | 93.4 | — |
 | MiniCPM-OCR-1.0 | open | 1.3B | 83.2 | — | 72.8 | 89.1 | 87.6 | — |
@@ -72,6 +73,9 @@ defaults each vendor recommends; each adapter's docstring lists where it differs
 reads PDFs gets the page file and renders it as its vendor does; a model whose vendor code takes images only
 (HunyuanOCR, Nanonets-OCR2, Nemotron 3.5 Parse) gets the page as a PNG at most 2,048 px on its long edge.
 
+Surya OCR 2.5 ran through surya-ocr 0.23.0 with the `datalab-to/surya-ocr-2.5` weights, at 192 DPI and with
+`SURYA_FULLPAGE_REGEN=true`, as the `surya-ocr` serve folder sets it.
+
 ### Headline versus latency
 
 ![Headline against latency](./assets/latency.svg)
@@ -114,6 +118,7 @@ As in the headline, a failed page's tests count as failed. Tests per tag: handwr
 | GPT-5.6 Sol | 67.6 | 92.4 | 91.6 | 79.2 | 87.4 | 81.1 | 77.9 | 87.0 | 75.2 |
 | MinerU2.5-Pro | 52.0 | 88.0 | 91.9 | 75.9 | 87.5 | 85.1 | 82.3 | 77.6 | 60.4 |
 | Infinity-Parser2-Pro | 65.2 | 88.5 | 88.2 | 72.6 | 88.8 | 84.1 | 71.7 | 87.0 | 66.0 |
+| **Surya OCR 2.5** | 58.4 | 97.0 | 88.0 | 71.6 | 85.4 | 81.7 | 74.7 | 75.4 | 72.0 |
 | OXR-1.0 | 56.9 | 90.2 | 86.9 | 65.0 | 86.8 | 73.9 | 69.5 | 78.1 | 51.5 |
 | Extend | 77.0 | 76.6 | 94.7 | 79.9 | 88.3 | 88.2 | 90.4 | 84.8 | 74.2 |
 | MiniCPM-OCR-1.0 | 52.8 | 94.0 | 87.8 | 68.9 | 80.7 | 77.6 | 72.5 | 73.0 | 52.6 |
