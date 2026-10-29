@@ -29,11 +29,12 @@ def page(path: Path) -> dict:
     return {"page": base64.b64encode(path.read_bytes()).decode("ascii"), "suffix": path.suffix.lower()}
 
 
-def settings(config: Any, *local: str) -> dict:
+def settings(config: Any) -> dict:
     """An open model adapter's options as its server takes them: every field but `base_url`, `model` and
-    `served` (checked against what the server says) and those the adapter applies itself (`local`)."""
-    out = {f.name: getattr(config, f.name) for f in dataclasses.fields(config)}
-    return {k: v for k, v in out.items() if k not in ("base_url", "model", "served", *local)}
+    `served` (checked against what the server says) and those the adapter applies itself, which its field
+    marks `metadata={"local": True}` (an image's size before it is sent, which blocks a reply keeps)."""
+    return {f.name: getattr(config, f.name) for f in dataclasses.fields(config)
+            if f.name not in ("base_url", "model", "served") and not f.metadata.get("local")}
 
 
 def parse(config: Any, path: Path, timeout: float, body: dict | None = None) -> dict:

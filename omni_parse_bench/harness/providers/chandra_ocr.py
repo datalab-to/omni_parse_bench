@@ -90,7 +90,9 @@ class ChandraOcr(Served):
     max_retries: int = 6
     headers_footers: bool = dataclasses.field(
         default=True,
-        metadata={"help": "keep page headers and footers in html and markdown; false: the package's default"})
+        # Note: local, since the adapter drops the header and footer blocks; the server reads every block.
+        metadata={"local": True,
+                  "help": "keep page headers and footers in html and markdown; false: the package's default"})
 
     name: ClassVar[str] = "chandra-ocr"
     SUPPORTS: ClassVar[frozenset[str]] = SUPPORTS

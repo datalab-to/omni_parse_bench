@@ -325,6 +325,11 @@ A server.py stands alone: it imports its vendor's code and what that needs, neve
 and nothing in omni_parse_bench imports it. So the vendor's code (and its license) stays in its image,
 and the adapter that reads the answer needs none of it: a saved answer is read again anywhere.
 
+A server.py takes exactly its `SETTINGS` and refuses any other. Its adapter sends them as its options
+(`http.settings`): every option but `base_url`, `model`, `served`, and one the adapter applies itself,
+which its field marks `metadata={"local": True}` (hunyuan's `long_edge`, chandra-ocr's
+`headers_footers`). A test checks that each adapter sends exactly its server's `SETTINGS`.
+
 A model whose vendor offers only the model, with no code of its own around it (Nanonets-OCR2), has no
 server.py: its port is vLLM's `/v1`, and its adapter asks it directly, through `llm.chat`.
 
