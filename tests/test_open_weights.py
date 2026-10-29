@@ -166,6 +166,18 @@ def test_unlimited_ocr_2_reads_its_padded_inline_math_as_math():
         assert unlimited_ocr2.tight(same) == same
 
 
+def test_surya_ocr_2_5_reads_the_packages_result_as_surya_ocr_2s():
+    """The package returns Surya OCR 2.5's page as it returns Surya OCR 2's, so the two read it alike."""
+    from omni_parse_bench.harness.providers import surya_ocr25
+
+    fx = json.loads((HERE / "surya_ocr.json").read_text())
+    api, before = harness.system("surya-ocr-2.5"), harness.system("surya-ocr")
+    request = api.requests(frozenset({"html", "blocks"}))[0]
+    assert request.sent["weights"] == api.served["weights"] == surya_ocr25.WEIGHTS
+    assert (surya_ocr25.WEIGHTS, request.sent["package"]) == ("datalab-to/surya-ocr-2.5", "surya-ocr==0.23.0")
+    assert api.parse(fx["raw"], request) == before.parse(fx["raw"], request)
+
+
 def test_an_open_models_malformed_block_or_unknown_label_fails_the_blocks_only():
     """A block with no box, or a type LABELS lacks, fails the blocks output only; the html is still graded."""
     from omni_parse_bench.harness.providers import dots, mineru
@@ -258,8 +270,8 @@ def _changed(config):
 
 
 @pytest.mark.parametrize("name", ["chandra_ocr", "deepseek_ocr", "dots", "hunyuan", "infinity", "lighton",
-                                  "nemotron_parse", "olmocr", "paddleocr_vl", "surya_ocr", "unlimited",
-                                  "unlimited_ocr2"])
+                                  "nemotron_parse", "olmocr", "paddleocr_vl", "surya_ocr", "surya_ocr25",
+                                  "unlimited", "unlimited_ocr2"])
 def test_a_server_gets_every_setting_from_the_config(name, tmp_path, monkeypatch):
     """The server holds no setting of its own: the adapter sends its options, so an option changes it,
     and the request records it, so the run is named for it."""
@@ -305,7 +317,7 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
 @pytest.mark.parametrize("provider", ["chandra-ocr", "deepseek-ocr", "dots-mocr", "glm-ocr", "hunyuan-ocr",
                                       "infinity-parser2", "lightonocr", "mineru", "nanonets-ocr",
                                       "nemotron-parse", "olmocr", "paddleocr-vl", "surya-ocr",
-                                      "unlimited-ocr", "unlimited-ocr-2"])
+                                      "surya-ocr-2.5", "unlimited-ocr", "unlimited-ocr-2"])
 def test_a_served_model_run_is_named_by_every_option(provider):
     """Every option names the run but the server's address: the same model at another address is the same
     question, and other weights another."""

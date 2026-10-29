@@ -353,6 +353,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | HunyuanOCR-1.5 | `hunyuan-ocr` | `hunyuan-ocr` | html, blocks |
 | DeepSeek-OCR-2 | `deepseek-ocr` | `deepseek-ocr` | html, blocks |
 | Surya OCR 2 | `surya-ocr` | `surya-ocr` | html, blocks |
+| Surya OCR 2.5 | `surya-ocr-2.5` | `surya-ocr-2.5` | html, blocks |
 | MinerU2.5-Pro | `mineru` | `mineru` | html, blocks |
 | GLM-OCR | `glm-ocr` | `glm-ocr` | html, blocks |
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
@@ -523,6 +524,8 @@ Surya OCR 2 (`providers/surya_ocr.py`):
 | Table | table |
 | Form | form |
 | Picture, Figure, Diagram, ChemicalBlock | figure |
+
+Surya OCR 2.5 (`providers/surya_ocr25.py`): Surya OCR 2's labels.
 
 Indra OCR (`providers/indra_ocr.py`):
 
