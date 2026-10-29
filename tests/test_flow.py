@@ -338,7 +338,7 @@ def test_opb_version_is_the_packages(capsys):
     with pytest.raises(SystemExit) as e:
         cli.main(["--version"])
     version = importlib.metadata.version("omni-parse-bench")
-    assert e.value.code == 0 and capsys.readouterr().out.strip() == f"opb {version}" == "opb 1.1.0"
+    assert e.value.code == 0 and capsys.readouterr().out.strip() == f"opb {version}" == "opb 1.1.1"
 
 
 def test_opb_help_lists_no_hidden_command_and_takes_no_abbreviation(capsys):

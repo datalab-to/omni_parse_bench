@@ -30,6 +30,7 @@ _BBOX = re.compile(r'data-bbox="\s*(-?[\d.]+)[\s,]+(-?[\d.]+)[\s,]+(-?[\d.]+)[\s
 _TAG = re.compile(r"<[^>]+>")
 PICTURES = ("Image", "Figure", "Picture", "Diagram", "Chemical-Block")
 FURNITURE = ("Page-Header", "Page-Footer")
+LOCAL = ("headers_footers",)  # an option the adapter applies itself: recorded in `sent`, never sent
 
 
 @dataclasses.dataclass(frozen=True)
@@ -118,7 +119,8 @@ def requests(wants: frozenset[str], config: ChandraOcr) -> list[contract.Request
 
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: ChandraOcr) -> contract.Call:
-    raw = http.parse(config, page, timeout)
+    body = {**http.page(page), "settings": http.settings(config, *LOCAL)}
+    raw = http.parse(config, page, timeout, body=body)
     with adapter.reading("the server's answer"):
         usage = raw.get("usage") or {}
         cost = contract.Cost(tokens_in=usage.get("prompt_tokens"), tokens_out=usage.get("completion_tokens"))
