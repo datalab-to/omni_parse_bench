@@ -67,7 +67,7 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
                                       "output_type": t.output_type, "derivation": t.derivation,
                                       "tags": list(t.tags), "result": v.result, "why": v.why} for v in vs])
 
-    def zero(self, row: data.Page, tests: Sequence[_tests.Test]) -> scorer.Score:
+    def zero(self, tests: Sequence[_tests.Test]) -> scorer.Score:
         """A failed page: the score of a prediction with no outputs, so every test fails and the page costs
         its tests, not a page's share of the headline."""
         return self.score({}, tests)

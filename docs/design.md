@@ -242,8 +242,8 @@ score more precise without making layout count more. The families are those the 
 in, so a subset scores on the families it holds, and the summary lists them in a fixed order: text,
 tables, layout (`vocab.FAMILY_ORDER`). A page whose call failed counts with every test
 failed (`UnitTests.zero`, the omni-bench-core hook for a failed row's score), so it costs its tests, not a
-page's share, and a run where every page failed has headline 0. The families and their mean are kept under
-the summary's `scored`, over every page; `coverage` stays 1, so the top `headline` is `scored.headline`.
+page's share, and a run where every page failed has headline 0. The families and their mean are over every
+page, a failed one's tests included.
 
 The summary holds the headline and the families alone. Any other breakdown (by output type, test type,
 tag, suite or derivation) is computed from each test's verdict, kept in the run's

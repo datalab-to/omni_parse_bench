@@ -52,7 +52,7 @@ A run works in three stages:
 
 Each page asks for the outputs its tests read (its manifest row's `outputs`), and a system is asked only for those
 it can produce (`SUPPORTS`). A page that wants none of them isn't sent; its tests fail as "no <output> output",
-which doesn't lower coverage.
+and it isn't a failed page.
 
 The dataset is downloaded whole the first time (about 1.5 GB) into the Hugging Face cache, even for a few pages.
 Set `HF_TOKEN` (or run `hf auth login`) to download faster.
@@ -122,12 +122,11 @@ For your own predictions, write one file per page, `predictions/<page_id>.json`,
 manifest; a page whose file lacks an output fails that output's tests. Without `--dataset`, it is graded against
 our dataset. `--manifest` picks another manifest inside the dataset.
 
-A prediction that isn't `{"pages": [one object of outputs]}` is the system's failure: the page counts 0. An
+A prediction that isn't `{"pages": [one object of outputs]}` is the system's failure: the page fails. An
 output of the wrong shape inside it fails only that output's tests.
 
 A page that failed counts with every test failed (`UnitTests.zero`), so it costs its tests, not a page's share
-of the headline. The summary's `zeroed` counts those pages, `coverage` stays 1, and the top `headline` is
-`scored.headline`.
+of the headline. The summary's `failed` counts those pages by cause, and `coverage` is the share of pages scored.
 
 ## Score
 
