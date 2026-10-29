@@ -43,6 +43,12 @@ def test_dollar_amounts_in_a_pipe_table_stay_in_their_cells(row, cells):
     assert [c for c in got if c] == cells
 
 
+def test_math_spanning_held_display_math_releases_both():
+    h = markdown.to_html(r"$,$$\lambda$$\text{lambda}$, $n$$\text{lambda}$")
+    assert views.HOLD_OPEN not in h and r"$$\lambda$$" in h
+    normalize.fold(views.text(h))
+
+
 def test_math_with_a_pipe_outside_a_table_is_held_whole():
     assert "$3 - 2|x| < 2$" in markdown.to_html("The set $3 - 2|x| < 2$ is open\n")
     block = "$$\n\\text{O} \\\\\n| \\quad | \\\\\n$$"

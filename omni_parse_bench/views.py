@@ -147,7 +147,9 @@ def hold(s: str, pattern: re.Pattern[str], held: list[str] | None = None) -> tup
 
 def release(s: str, held: list[str]) -> str:
     """Puts back what `hold` took out."""
-    return _HELD.sub(lambda m: held[int(m[1])], s) if held else s
+    # Note: recursive, as a later match can hold an earlier placeholder: inline math `$,$$x$$y$` spans the
+    # display math held before it.
+    return _HELD.sub(lambda m: release(held[int(m[1])], held), s) if held else s
 
 
 def _numbered(s: str) -> str:
