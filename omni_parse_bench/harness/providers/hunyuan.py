@@ -80,7 +80,7 @@ class Hunyuan(Served):
     repetition_penalty: float = 1.08
     min_repeats: int = dataclasses.field(default=8, metadata={
         "help": "how many repeats of the reply's tail stop the stream early (the client's infer_stream)"})
-    long_edge: int = llm.LONG_EDGE
+    long_edge: int = dataclasses.field(default=llm.LONG_EDGE, metadata={"local": True})
 
     def __post_init__(self):
         if self.task not in TASKS:
@@ -114,7 +114,7 @@ def requests(wants: frozenset[str], config: Hunyuan) -> list[contract.Request]:
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0, config: Hunyuan) -> contract.Call:
     # Note: the repository takes images only, so the page goes as opb's PNG, in the body every server takes.
     body = {"page": base64.b64encode(llm.image(page, config.long_edge)).decode("ascii"), "suffix": ".png",
-            "settings": http.settings(config, "long_edge")}
+            "settings": http.settings(config)}
     return contract.Call(http.parse(config, page, timeout, body=body))
 
 
