@@ -222,7 +222,7 @@ A summary looks like this:
 }
 ```
 
-A failed page counts with all its tests failed (`UnitTests.zero`), in the headline and in each family. `failed`
+A failed page counts with all its tests failed (`UnitTests.score_failure`), in the headline and in each family. `failed`
 says why pages failed, and `coverage` is the share of pages scored.
 
 ## Score on your own

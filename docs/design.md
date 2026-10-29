@@ -241,7 +241,7 @@ family's weight never depends on how many tests it has: sampling more layout lin
 score more precise without making layout count more. The families are those the graded tests are
 in, so a subset scores on the families it holds, and the summary lists them in a fixed order: text,
 tables, layout (`vocab.FAMILY_ORDER`). A page whose call failed counts with every test
-failed (`UnitTests.zero`, the omni-bench-core hook for a failed row's score), so it costs its tests, not a
+failed (`UnitTests.score_failure`, the omni-bench-core hook for a failed row's score), so it costs its tests, not a
 page's share, and a run where every page failed has headline 0. The families and their mean are over every
 page, a failed one's tests included.
 

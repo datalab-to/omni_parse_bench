@@ -33,7 +33,7 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     - A page's line in scores.jsonl holds `tests`, `passed` and `per_family` (each family's `tests` and
       `passed`);
     - its details (`details/<page_id>.jsonl`) hold one test line per test (`lines`); and
-    - the summary is `summarize` over every page, a failed one with all its tests failed (`zero`): the
+    - the summary is `summarize` over every page, a failed one with all its tests failed (`score_failure`): the
       families in the order text, tables, layout, and their mean as the headline. Any other breakdown (by tag,
       test type, suite or derivation) is `summarize` of a slice of the details."""
 
@@ -67,7 +67,7 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
                                       "output_type": t.output_type, "derivation": t.derivation,
                                       "tags": list(t.tags), "result": v.result, "why": v.why} for v in vs])
 
-    def zero(self, tests: Sequence[_tests.Test]) -> scorer.Score:
+    def score_failure(self, tests: Sequence[_tests.Test]) -> scorer.Score:
         """A failed page: the score of a prediction with no outputs, so every test fails and the page costs
         its tests, not a page's share of the headline."""
         return self.score({}, tests)
@@ -81,7 +81,7 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
         return {"document": row.document}
 
     def summarize(self, lines: Sequence[Line]) -> dict[str, Any]:
-        """The headline and `families`, over every page's counts, a failed page's from `zero`."""
+        """The headline and `families`, over every page's counts, a failed page's from `score_failure`."""
         s = _summary((f, x["row"]["document"], c["passed"], c["tests"])
                      for x in lines for f, c in x["per_family"].items())
         return {"headline": s["headline"], "headline_is": HEADLINE, "families": s["families"]}

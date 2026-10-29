@@ -125,7 +125,7 @@ our dataset. `--manifest` picks another manifest inside the dataset.
 A prediction that isn't `{"pages": [one object of outputs]}` is the system's failure: the page fails. An
 output of the wrong shape inside it fails only that output's tests.
 
-A page that failed counts with every test failed (`UnitTests.zero`), so it costs its tests, not a page's share
+A page that failed counts with every test failed (`UnitTests.score_failure`), so it costs its tests, not a page's share
 of the headline. The summary's `failed` counts those pages by cause, and `coverage` is the share of pages scored.
 
 ## Score
