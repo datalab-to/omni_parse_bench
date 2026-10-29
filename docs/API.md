@@ -104,7 +104,7 @@ In Python, `b.run(system, out="runs", resume="<run>", retry_failed=True)` and `b
 ```bash
 opb grade runs/<run>                                # the dataset and manifest its settings.json names
 opb grade mine/ --dataset my-dataset/               # your own predictions/<page_id>.json
-opb grade runs/<run> --partial                      # an unfinished run: what's missing counts as 0
+opb grade runs/<run> --partial                      # an unfinished run: what's missing fails
 ```
 
 ```python
@@ -205,7 +205,7 @@ server must say the same at its `/served` route.
 Give an instance to `benchmark.default().run(...)`, or declare the class under the entry-point group
 `omni_parse_bench.adapters` so a config finds it by name.
 
-A page counts 0 only when code raises `SystemFailed` on purpose. Any other exception stops the run, and resuming
+A page fails, every test failed, only when code raises `SystemFailed` on purpose. Any other exception stops the run, and resuming
 after the fix costs nothing for the pages already answered. So:
 
 - in `send`, raise `harness.errors.SystemFailed` for a refusal, an error status or an unusable answer, and read
@@ -320,7 +320,7 @@ fixed `parse` can read it again), `sent`, `error` (its `type`, `status`, `transi
 
 ### A slice of the benchmark
 
-The summary holds the headline and the families only. Every other breakdown (by tag, test type, suite,
+The summary holds `score` (the headline) and the families only, beside the core's counts. Every other breakdown (by tag, test type, suite,
 derivation) comes from the files: each test's verdict is in `details/<page_id>.jsonl`. With DuckDB, the
 handwriting tests of every run:
 

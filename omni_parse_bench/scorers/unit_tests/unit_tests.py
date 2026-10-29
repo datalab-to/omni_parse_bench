@@ -45,7 +45,7 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
 
     def prediction(self, output: Any) -> Mapping[str, Any]:
         """The page's outputs: the one page of the prediction's `pages`, as a row is one page. A prediction
-        that isn't `{"pages": [an object of outputs]}` is the system's failure: the page counts 0. An output
+        that isn't `{"pages": [an object of outputs]}` is the system's failure: the page fails. An output
         of the wrong shape inside it fails only its own tests (`views.MalformedOutput`)."""
         pages = output.get("pages") if isinstance(output, dict) else None
         if not (isinstance(pages, list) and len(pages) == 1 and isinstance(pages[0], dict)):

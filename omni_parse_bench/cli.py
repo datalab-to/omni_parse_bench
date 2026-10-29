@@ -361,7 +361,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     g.add_argument("--manifest",
                    help="default: the one the folder's settings.json names, else manifest.parquet")
     g.add_argument("--partial", action="store_true",
-                   help="grade an unfinished run anyway: its pages with no answer (or no score) count as 0, "
+                   help="grade an unfinished run anyway: its pages with no answer (or no score) fail, "
                         "and the summary counts them under `partial`; scores.jsonl names each")
     g.add_argument("--outputs", nargs="+", help=argparse.SUPPRESS)
     g.add_argument("--unsupported", nargs="*", help=argparse.SUPPRESS)

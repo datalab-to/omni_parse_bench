@@ -1,7 +1,7 @@
 """The line between a system's failure and our bug: an answer is read inside
 `omni_bench_core.adapter.reading`.
 
-The core's one rule: a page counts 0 only when code raises `SystemFailed` on purpose, and `reading` is how
+The core's one rule: a page fails only when code raises `SystemFailed` on purpose, and `reading` is how
 an adapter says so for a malformed answer. Inside `reading`, an answer that can't be read fails one page and
 the run goes on. Anywhere else in an adapter's call, an exception is a bug, and stops the run. So every place
 that reads what a system sent back while calling it (a job id, a status, a server's answer) must sit inside

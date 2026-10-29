@@ -267,8 +267,8 @@ def test_an_image_is_a_document_of_one_page_and_a_page_is_never_read_as_its_firs
 
 
 def test_a_parse_that_raises_a_bug_keeps_the_answer_unread(tmp_path, monkeypatch):
-    """A KeyError in `parse` is a bug, not the system's failure: it isn't counted 0, and the answer is kept,
-    unread, for the fixed `parse` to read."""
+    """A KeyError in `parse` is a bug, not the system's failure: it doesn't fail the page, and the answer is
+    kept, unread, for the fixed `parse` to read."""
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
     monkeypatch.setitem(ANSWER, 0, lambda: contract.Call({"text": "alpha"}))
     with pytest.raises(KeyError) as got:       # parse's own exception, carrying the record to save
@@ -279,7 +279,7 @@ def test_a_parse_that_raises_a_bug_keeps_the_answer_unread(tmp_path, monkeypatch
 
 
 def test_a_parse_raising_system_failed_is_recorded_as_unreadable(tmp_path, monkeypatch):
-    """`parse` raising `SystemFailed` on purpose: the page counts 0, and the record says where, and keeps the
+    """`parse` raising `SystemFailed` on purpose: the page fails, and the record says where, and keeps the
     answer to read again."""
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
 
