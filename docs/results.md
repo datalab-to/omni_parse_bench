@@ -73,9 +73,6 @@ defaults each vendor recommends; each adapter's docstring lists where it differs
 reads PDFs gets the page file and renders it as its vendor does; a model whose vendor code takes images only
 (HunyuanOCR, Nanonets-OCR2, Nemotron 3.5 Parse) gets the page as a PNG at most 2,048 px on its long edge.
 
-Surya OCR 2.5 ran through surya-ocr 0.23.0 with the `datalab-to/surya-ocr-2.5` weights, at 192 DPI and with
-`SURYA_FULLPAGE_REGEN=true`, as the `surya-ocr` serve folder sets it.
-
 ### Headline versus latency
 
 ![Headline against latency](./assets/latency.svg)
