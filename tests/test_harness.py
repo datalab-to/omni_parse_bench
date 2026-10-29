@@ -39,6 +39,14 @@ def test_datalab_asks_one_call_with_headers_kept():
     assert r.sent["additional_config"]["keep_pageheader_in_output"] is True
 
 
+def test_datalab_gives_markdown_and_leaves_headers_out_when_asked():
+    (r,) = datalab.Datalab(headers_footers=False).requests(frozenset({"markdown"}))
+    assert r.sent["output_format"] == "markdown"
+    assert r.sent["additional_config"] == {"keep_pageheader_in_output": False,
+                                           "keep_pagefooter_in_output": False}
+    assert datalab.parse({"markdown": "# T", "html": "<h1>T</h1>"}, r) == ({"markdown": "# T"}, {})
+
+
 def test_an_unknown_option_is_refused_by_name():
     with pytest.raises(ValueError, match="mode"):
         harness.system("datalab", {"mdoe": "fast"})
