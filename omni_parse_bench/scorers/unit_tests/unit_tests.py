@@ -33,9 +33,9 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     - A page's line in scores.jsonl holds `tests`, `passed` and `per_family` (each family's `tests` and
       `passed`);
     - its details (`details/<page_id>.jsonl`) hold one test line per test (`lines`); and
-    - the summary is `summarize` over every page, a failed one with all its tests failed (`score_failure`): the
-      families in the order text, tables, layout, and their mean as the headline. Any other breakdown (by tag,
-      test type, suite or derivation) is `summarize` of a slice of the details."""
+    - the summary is `summarize` over every page, a failed one with all its tests failed (`score_failure`):
+      the families in the order text, tables, layout, and their mean as the headline. Any other breakdown (by
+      tag, test type, suite or derivation) is `summarize` of a slice of the details."""
 
     name: ClassVar[str] = "unit_tests"
 
