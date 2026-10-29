@@ -148,8 +148,13 @@ def hold(s: str, pattern: re.Pattern[str], held: list[str] | None = None) -> tup
 def release(s: str, held: list[str]) -> str:
     """Puts back what `hold` took out."""
     # Note: recursive, as a later match can hold an earlier placeholder: inline math `$,$$x$$y$` spans the
-    # display math held before it.
-    return _HELD.sub(lambda m: release(held[int(m[1])], held), s) if held else s
+    # display math held before it. A held item only holds the ones before it, so a placeholder the page itself
+    # wrote can't loop.
+    def one(m: re.Match[str]) -> str:
+        i = int(m[1])
+        return release(held[i], held[:i])
+
+    return _HELD.sub(one, s) if held else s
 
 
 def _numbered(s: str) -> str:

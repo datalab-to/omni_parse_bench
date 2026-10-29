@@ -49,6 +49,11 @@ def test_math_spanning_held_display_math_releases_both():
     normalize.fold(views.text(h))
 
 
+def test_a_placeholder_the_page_wrote_does_not_loop():
+    s = f"${views.HOLD_OPEN}0{views.HOLD_CLOSE}$"
+    assert views.release(*views.hold(s, re.compile(r"\$.+?\$"))) == s
+
+
 def test_math_with_a_pipe_outside_a_table_is_held_whole():
     assert "$3 - 2|x| < 2$" in markdown.to_html("The set $3 - 2|x| < 2$ is open\n")
     block = "$$\n\\text{O} \\\\\n| \\quad | \\\\\n$$"
