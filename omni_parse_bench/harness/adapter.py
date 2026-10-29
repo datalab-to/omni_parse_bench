@@ -75,7 +75,7 @@ class Parser(adapter.Adapter[Input]):
     - in `send`: `SystemFailed` for a refusal, an error status or an unusable answer, and read the system's
       answer (a job id, a status) inside `adapter.reading`;
     - in `parse`: `SystemFailed` (or read inside `reading`) when the answer holds no usable page, which then
-      counts 0 as `Unreadable`. For one output it can't read, leave it out and give the reason in the second
+      fails as `Unreadable`. For one output it can't read, leave it out and give the reason in the second
       value, so only that output's tests fail; blocks are read this way; and
     - anything else is a bug: the run stops, the answer is kept, and the same command reads it again after
       the fix.

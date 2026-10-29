@@ -210,26 +210,22 @@ A summary looks like this:
 {
   "scorer": "unit_tests",
   "run": "datalab-20261021-160012-3f9a",
-  "headline": 0.657,
-  "headline_is": "scored.headline × coverage",
   "rows": 5,
-  "failed": 1,
-  "zeroed": 1,
-  "coverage": 1.0,
-  "scored": {
-    "headline": 0.657,
-    "headline_is": "the mean of the families' scores",
-    "families": {
-      "text": {"score": 0.72, "tests": 120, "documents": 5},
-      "tables": {"score": 0.59, "tests": 40, "documents": 3},
-      "layout": {"score": 0.66, "tests": 30, "documents": 5}
-    }
+  "failed": {"system": 1, "unusable": 0, "no_answer": 0, "not_scored": 0},
+  "coverage": 0.8,
+  "headline": 0.657,
+  "headline_is": "score",
+  "score": 0.657,
+  "families": {
+    "text": {"score": 0.72, "tests": 120, "documents": 5},
+    "tables": {"score": 0.59, "tests": 40, "documents": 3},
+    "layout": {"score": 0.66, "tests": 30, "documents": 5}
   }
 }
 ```
 
-A failed page counts with all its tests failed (`zeroed`), so `coverage` stays 1 and the headline is
-`scored.headline`.
+A failed page counts with all its tests failed (`UnitTests.score_failure`), in the headline and in each family. `failed`
+says why pages failed, and `coverage` is the share of pages scored.
 
 ## Score on your own
 
@@ -298,10 +294,10 @@ verdicts = unit_tests.score(pred, tests)
 >>> page = data.Page("example-p1", "example", "example", "pages/example-p1.pdf", "gold/example-p1.json", ("html",))
 >>> lines = unit_tests.lines(verdicts, tests, page)
 >>> unit_tests.summarize(lines)
-{'headline': 0.5, 'families': {'text': {'score': 1.0, 'tests': 2, 'documents': 1},
+{'score': 0.5, 'families': {'text': {'score': 1.0, 'tests': 2, 'documents': 1},
                                'tables': {'score': 0.0, 'tests': 1, 'documents': 1}}}
 >>> unit_tests.summarize([x for x in lines if "table" in x["tags"]])   # one tag: the same summary on a slice
-{'headline': 0.0, 'families': {'tables': {'score': 0.0, 'tests': 1, 'documents': 1}}}
+{'score': 0.0, 'families': {'tables': {'score': 0.0, 'tests': 1, 'documents': 1}}}
 ```
 
 A verdict is `pass` or `fail`, with `why` saying what went wrong.

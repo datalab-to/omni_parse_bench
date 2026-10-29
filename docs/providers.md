@@ -62,9 +62,9 @@ adapter makes are format changes, and each is checked to lose nothing:
   spent) is the page's failure, `SystemUnreachable` or `SystemTimeout`, which a page asks again only
   under `--retry-failed`; its record's traceback shows the httpx error underneath. A refused connection
   stops the run instead. A model's reply that is cut off by an error or doesn't parse is asked again within the call, up to 3
-  times. A page a vendor still doesn't answer counts as 0, whatever the cause: answering is part of
+  times. A page a vendor still doesn't answer fails, every test failed, whatever the cause: answering is part of
   what a product does. Under the core's one rule ([omni-bench-core's "The rules"](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules)),
-  a page counts 0 only when the adapter raises `SystemFailed` on purpose, or reads the answer inside
+  a page fails only when the adapter raises `SystemFailed` on purpose, or reads the answer inside
   `omni_bench_core.adapter.reading`, which raises it for a malformed one. The record keeps the failure
   with its `traceback`. Any other exception is the adapter's bug, not the vendor's:
   - a bug in `parse` stops the run with its traceback; the raw answer is kept, unread (`"unread":
@@ -304,7 +304,7 @@ the folder with `WEIGHTS` and `REVISION` and give the same in `served`.
 If nothing listens at `base_url` (the server isn't started, or the address is wrong), the connection is
 refused and the run stops before recording anything, with a message naming the address and the model's
 folder here. Start the server, or fix the address, and resume the run (`opb resume`). A server that is up
-but slow is different: a page it doesn't answer in time is recorded as a timeout, which counts 0 and is
+but slow is different: a page it doesn't answer in time is recorded as a timeout, which fails the page and is
 tried again with `opb resume <its folder> --retry-failed`.
 
 A folder holds:
@@ -611,7 +611,7 @@ answer is the vendor's failure, and every adapter writes it the same way:
   that didn't finish) raises `SystemFailed` with a message saying what was missing;
 - the vendor's own structures (a job's chunks, a page's markdown) are read inside `adapter.reading`, so
   a malformed one is the vendor's failure too;
-- in either case the page is recorded as `Unreadable`, which counts 0 and keeps the message and its
+- in either case the page is recorded as `Unreadable`, which fails the page and keeps the message and its
   traceback, so the record says what couldn't be read; it is never scored as an empty page;
 - `blocks` are read apart from the page, inside `reading` within a `try` that leaves them out: a
   malformed block, or a block type the adapter's `LABELS` lacks, fails the page's blocks output only;

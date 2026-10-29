@@ -54,6 +54,11 @@ BROKEN: set[str] = set()           # pages whose answer `parse` crashes on: a bu
 WRONG: set[str] = set()            # pages `parse` reads wrongly, without raising
 
 
+def failed(**n: int) -> dict[str, int]:
+    """A summary's `failed`: how many rows failed, by cause."""
+    return {"system": 0, "unusable": 0, "no_answer": 0, "not_scored": 0, **n}
+
+
 @dataclasses.dataclass(frozen=True)
 class Alpha(harness.Parser):
     """Answers every page with html holding "alpha"."""
@@ -104,10 +109,10 @@ def test_an_html_only_system_is_predicted_graded_and_resumed(tmp_path):
     name = (g := b.run(Alpha(), tmp_path / "runs"))["run"]
     assert sorted(CALLS) == ["a-p0", "a-p1", "a-p2"]
     [s] = g["scorers"].values()
-    assert s["scored"]["families"] == {"text": {"score": 1.0, "tests": 3, "documents": 3},
+    assert s["families"] == {"text": {"score": 1.0, "tests": 3, "documents": 3},
                              "layout": {"score": 0.0, "tests": 3, "documents": 3}}, s
-    assert (s["headline"], s["coverage"], s["failed"]) == (0.5, 1.0, 0), "no blocks: layout 0, not a failure"
-    assert s["scored"]["headline_is"] == "the mean of the families' scores" and "partial" not in s
+    assert (s["headline"], s["coverage"], s["failed"]) == (0.5, 1.0, failed()), "no blocks: layout 0"
+    assert s["headline_is"] == "score" and "partial" not in s
     assert g["cost"]["usd"] == 0.03
     CALLS.clear()
     b.run(Alpha(), tmp_path / "runs", resume=name)
@@ -127,8 +132,8 @@ def test_a_page_wanting_nothing_the_system_supports_is_not_sent_and_fails_its_te
     rec = json.loads((tmp_path / "runs" / name / "records" / "a-p2.json").read_text())
     assert (rec["output"], rec["error"], rec["cost"]["usd"]) == ({"pages": [{}]}, None, None), rec
     [s] = g["scorers"].values()
-    assert (s["coverage"], s["failed"], s["rows"]) == (1.0, 0, 3), "not a failed page: coverage stays 1"
-    assert s["scored"]["families"]["layout"] == {"score": 0.0, "tests": 3, "documents": 3}, s
+    assert (s["coverage"], s["failed"], s["rows"]) == (1.0, failed(), 3), "not a failed page: coverage is 1"
+    assert s["families"]["layout"] == {"score": 0.0, "tests": 3, "documents": 3}, s
 
 
 def test_details_lines_are_test_lines_that_summarize_reads(tmp_path):
@@ -142,7 +147,7 @@ def test_details_lines_are_test_lines_that_summarize_reads(tmp_path):
                                                                           for i in range(3)}
     [s] = g["scorers"].values()
     got = unit_tests.summarize(lines)
-    assert (got["headline"], got["families"]) == (s["scored"]["headline"], s["scored"]["families"])
+    assert (got["score"], got["families"]) == (s["headline"], s["families"])
     assert list(got["families"]) == ["text", "layout"]
 
 
@@ -176,7 +181,7 @@ def test_opb_grade_grades_a_folder_of_your_own(tmp_path, capsys):
     assert "a-p1" in raised(["grade", str(mine), "--dataset", data]), "a missing prediction is refused"
     assert cli.main(["grade", str(mine), "--dataset", data, "--partial"]) == 0
     [s] = json.loads(capsys.readouterr().out)["scorers"].values()
-    assert (s["rows"], s["failed"], s["headline"]) == (2, 1, 0.25), s
+    assert (s["rows"], s["failed"], s["headline"]) == (2, failed(no_answer=1), 0.25), s
     assert not (mine / "settings.json").exists(), "grading writes nothing into a folder you brought"
 
 
@@ -187,14 +192,14 @@ def test_outputs_is_accepted_with_a_warning_and_ignored(tmp_path, capsys, monkey
     out, err = capsys.readouterr()
     g = json.loads(out)
     [s] = g["scorers"].values()
-    assert set(s["scored"]["families"]) == {"text", "layout"} and s["options"] == {}, s
+    assert set(s["families"]) == {"text", "layout"} and s["options"] == {}, s
     [run] = (tmp_path / "runs").iterdir()
     for argv in (["grade", str(run), "--outputs", "blocks"], ["grade", str(run), "--unsupported", "blocks"]):
         assert cli.main(argv) == 0
         out, err = capsys.readouterr()
         [again] = json.loads(out)["scorers"].values()
         assert "is deprecated and ignored" in err, err
-        assert again["scored"]["families"] == s["scored"]["families"], again
+        assert again["families"] == s["families"], again
     pred, gold = tmp_path / "pred.json", tmp_path / "data" / "gold" / "a-p0.json"
     pred.write_text(json.dumps({"html": "<p>alpha</p>"}))
     assert cli.main(["score", "--pred", str(pred), "--gold", str(gold), "--outputs", "html"]) == 0
@@ -210,7 +215,7 @@ def test_every_page_failing_has_headline_0(tmp_path, monkeypatch):
     b = benchmark.default(dataset(tmp_path / "data"))
     g = b.run(Alpha(), tmp_path / "runs")
     [s] = g["scorers"].values()
-    assert (s["headline"], s["failed"], s["zeroed"], s["coverage"]) == (0.0, 3, 3, 1.0), s
+    assert (s["headline"], s["failed"], s["coverage"]) == (0.0, failed(system=3), 0.0), s
 
 
 @dataclasses.dataclass(frozen=True)
@@ -433,7 +438,7 @@ def test_opb_reread_reads_a_runs_saved_answers_again(tmp_path, capsys, monkeypat
     assert cli.main(argv) == 0
     g = json.loads(capsys.readouterr().out)
     [s] = g["scorers"].values()
-    assert (s["failed"], s["headline"]) == (0, 0.0), s
+    assert (s["failed"], s["headline"]) == (failed(), 0.0), s
     [run] = (tmp_path / "runs").iterdir()
     WRONG.clear()
     CALLS.clear()
@@ -442,7 +447,7 @@ def test_opb_reread_reads_a_runs_saved_answers_again(tmp_path, capsys, monkeypat
     assert json.loads(out) == {run.name: {"changed": 2}} and f"opb grade {run}" in err and CALLS == []
     assert cli.main(["grade", str(run)]) == 0
     [s] = json.loads(capsys.readouterr().out)["scorers"].values()
-    assert (s["failed"], s["coverage"], s["headline"]) == (0, 1.0, 0.5), s
+    assert (s["failed"], s["coverage"], s["headline"]) == (failed(), 1.0, 0.5), s
     BROKEN.add("a-p0")
     with pytest.raises(KeyError) as got:
         cli.main(["reread", str(run)])
@@ -470,7 +475,7 @@ def test_a_bug_in_parse_stops_the_run_and_resuming_reads_it_again(tmp_path, caps
     CALLS.clear()
     assert cli.main(["resume", str(run), "-y"]) == 0
     [s] = json.loads(capsys.readouterr().out)["scorers"].values()
-    assert CALLS == [] and (s["failed"], s["headline"]) == (0, 0.5), s
+    assert CALLS == [] and (s["failed"], s["headline"]) == (failed(), 0.5), s
     assert "unread" not in json.loads((run / "records" / "a-p0.json").read_text())
     (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
     BROKEN.add("p")
@@ -488,7 +493,7 @@ def test_a_parse_raising_system_failed_counts_the_page_0_as_unreadable(tmp_path,
     b = benchmark.default(dataset(tmp_path / "data", 2))
     name = (g := b.run(Alpha(), tmp_path / "runs"))["run"]
     [s] = g["scorers"].values()
-    assert (s["failed"], s["zeroed"], s["coverage"], s["headline"]) == (2, 2, 1.0, 0.0), s
+    assert (s["failed"], s["coverage"], s["headline"]) == (failed(system=2), 0.0, 0.0), s
     err = json.loads((tmp_path / "runs" / name / "records" / "a-p0.json").read_text())["error"]
     assert err["type"] == "Unreadable" and "the answer holds no page" in err["message"]
     assert "in parse" in err["traceback"], err
@@ -517,8 +522,8 @@ def test_a_prediction_that_isnt_an_object_counts_0_with_its_traceback(tmp_path):
     run = tmp_path / "runs" / name
     (run / "predictions" / "a-p0.json").write_text("[]")
     [s] = b.grade(run)["scorers"].values()
-    assert (s["failed"], s["zeroed"], s["coverage"]) == (1, 1, 1.0), s
-    assert s["scored"]["families"]["text"]["tests"] == 2 and s["headline"] == 0.25, s
+    assert (s["failed"], s["coverage"]) == (failed(unusable=1), 0.5), s
+    assert s["families"]["text"]["tests"] == 2 and s["headline"] == 0.25, s
     lines = (run / b.scorers[0].folder_name / "scores.jsonl").read_text().splitlines()
     line = next(x for x in map(json.loads, lines) if x["id"] == "a-p0")
     assert "a row is one page" in line["error"] and "in prediction" in line["traceback"], line

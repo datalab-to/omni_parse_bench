@@ -52,7 +52,7 @@ A run works in three stages:
 
 Each page asks for the outputs its tests read (its manifest row's `outputs`), and a system is asked only for those
 it can produce (`SUPPORTS`). A page that wants none of them isn't sent; its tests fail as "no <output> output",
-which doesn't lower coverage.
+and it isn't a failed page.
 
 The dataset is downloaded whole the first time (about 1.5 GB) into the Hugging Face cache, even for a few pages.
 Set `HF_TOKEN` (or run `hf auth login`) to download faster.
@@ -104,7 +104,7 @@ In Python, `b.run(system, out="runs", resume="<run>", retry_failed=True)` and `b
 ```bash
 opb grade runs/<run>                                # the dataset and manifest its settings.json names
 opb grade mine/ --dataset my-dataset/               # your own predictions/<page_id>.json
-opb grade runs/<run> --partial                      # an unfinished run: what's missing counts as 0
+opb grade runs/<run> --partial                      # an unfinished run: what's missing fails
 ```
 
 ```python
@@ -122,19 +122,18 @@ For your own predictions, write one file per page, `predictions/<page_id>.json`,
 manifest; a page whose file lacks an output fails that output's tests. Without `--dataset`, it is graded against
 our dataset. `--manifest` picks another manifest inside the dataset.
 
-A prediction that isn't `{"pages": [one object of outputs]}` is the system's failure: the page counts 0. An
+A prediction that isn't `{"pages": [one object of outputs]}` is the system's failure: the page fails. An
 output of the wrong shape inside it fails only that output's tests.
 
-A page that failed counts with every test failed (`UnitTests.zero`), so it costs its tests, not a page's share
-of the headline. The summary's `zeroed` counts those pages, `coverage` stays 1, and the top `headline` is
-`scored.headline`.
+A page that failed counts with every test failed (`UnitTests.score_failure`), so it costs its tests, not a page's share
+of the headline. The summary's `failed` counts those pages by cause, and `coverage` is the share of pages scored.
 
 ## Score
 
 ```python
 unit_tests.score(pred, tests) -> [Verdict(id, result, why)]   # pred: one page's {"html": ..., "blocks": [...]}
 unit_tests.lines(verdicts, tests, page) -> [test line]        # each verdict beside its page and its test
-unit_tests.summarize(lines) -> {"headline", "families"}       # any number of test lines
+unit_tests.summarize(lines) -> {"score", "families"}          # any number of test lines
 unit_tests.UnitTests()                                        # the same, as an omni-bench-core scorer
 ```
 
@@ -143,7 +142,7 @@ opb score --pred outputs.json --gold gold/<page_id>.json     # outputs.json: one
 ```
 
 A verdict is `pass` or `fail`, with `why`. A test whose output is missing or malformed fails. A summary holds
-`headline`, the mean of the families' scores, and `families`, always in the order text, tables, layout: each
+`score`, the mean of the families' scores and the headline, and `families`, always in the order text, tables, layout: each
 family's `score` (the share of its tests passed), `tests` and `documents` (the source documents its tests are
 from). `summarize` of a slice of lines (one tag, one suite) is that slice's summary.
 
@@ -206,7 +205,7 @@ server must say the same at its `/served` route.
 Give an instance to `benchmark.default().run(...)`, or declare the class under the entry-point group
 `omni_parse_bench.adapters` so a config finds it by name.
 
-A page counts 0 only when code raises `SystemFailed` on purpose. Any other exception stops the run, and resuming
+A page fails, every test failed, only when code raises `SystemFailed` on purpose. Any other exception stops the run, and resuming
 after the fix costs nothing for the pages already answered. So:
 
 - in `send`, raise `harness.errors.SystemFailed` for a refusal, an error status or an unusable answer, and read
@@ -321,7 +320,7 @@ fixed `parse` can read it again), `sent`, `error` (its `type`, `status`, `transi
 
 ### A slice of the benchmark
 
-The summary holds the headline and the families only. Every other breakdown (by tag, test type, suite,
+The summary holds `score` (the headline) and the families only, beside the core's counts. Every other breakdown (by tag, test type, suite,
 derivation) comes from the files: each test's verdict is in `details/<page_id>.jsonl`. With DuckDB, the
 handwriting tests of every run:
 

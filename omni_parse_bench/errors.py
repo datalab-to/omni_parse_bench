@@ -1,6 +1,6 @@
 """The exceptions code raises on purpose, which are the core's (`omni_bench_core.errors`):
 
-    SystemFailed       the system failed on one page, which counts 0; raised on purpose. `SystemTimeout`,
+    SystemFailed       the system failed on one page, which fails; raised on purpose. `SystemTimeout`,
                        `SystemUnreachable` and `Unreadable` are its kinds
     Unscored           a scorer couldn't score a page (a judge that didn't answer): raised from `score`, or
                        returned in the page's place from `score_all`; the page waits for a later grading
