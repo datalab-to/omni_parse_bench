@@ -41,52 +41,62 @@
    {
     "label": "Page-Header",
     "raw": "<p>AUTHENTICATED<br/>ON GOVERNMENT<br/>INFORMATION<br/>SYSTEMS<br/>GPO</p><img alt=\"GPO logo\" data-bbox=\"135 0 178 45\"/>",
-    "html": "<p>AUTHENTICATED<br/>ON GOVERNMENT<br/>INFORMATION<br/>SYSTEMS<br/>GPO</p>"
+    "html": "<p>AUTHENTICATED<br/>ON GOVERNMENT<br/>INFORMATION<br/>SYSTEMS<br/>GPO</p>",
+    "markdown": "AUTHENTICATED  \nON GOVERNMENT  \nINFORMATION  \nSYSTEMS  \nGPO"
    },
    {
     "label": "Image",
     "raw": "<img alt=\"Seal of the Federal Register, National Archives and Records Administration, established 1995.\"/>The seal of the National Archives and Records Administration (NARA) is circular. It features an eagle with wings spread, perched on a shield. The eagle holds an olive branch in its right talon and arrows in its left. The shield has vertical stripes. The words \"NATIONAL ARCHIVES AND RECORDS ADMINISTRATION\" are written around the top inner border, and \"1995\" is at the bottom.",
-    "html": "<img alt=\"Seal of the Federal Register, National Archives and Records Administration, established 1995.\" src=\"6f2fc2a875f1c421b52e7b1d3c08aeef_1_img.webp\"/>The seal of the National Archives and Records Administration (NARA) is circular. It features an eagle with wings spread, perched on a shield. The eagle holds an olive branch in its right talon and arrows in its left. The shield has vertical stripes. The words \"NATIONAL ARCHIVES AND RECORDS ADMINISTRATION\" are written around the top inner border, and \"1995\" is at the bottom."
+    "html": "<img alt=\"Seal of the Federal Register, National Archives and Records Administration, established 1995.\" src=\"6f2fc2a875f1c421b52e7b1d3c08aeef_1_img.webp\"/>The seal of the National Archives and Records Administration (NARA) is circular. It features an eagle with wings spread, perched on a shield. The eagle holds an olive branch in its right talon and arrows in its left. The shield has vertical stripes. The words \"NATIONAL ARCHIVES AND RECORDS ADMINISTRATION\" are written around the top inner border, and \"1995\" is at the bottom.",
+    "markdown": "![Seal of the Federal Register, National Archives and Records Administration, established 1995.](6f2fc2a875f1c421b52e7b1d3c08aeef_1_img.webp)The seal of the National Archives and Records Administration (NARA) is circular. It features an eagle with wings spread, perched on a shield. The eagle holds an olive branch in its right talon and arrows in its left. The shield has vertical stripes. The words \"NATIONAL ARCHIVES AND RECORDS ADMINISTRATION\" are written around the top inner border, and \"1995\" is at the bottom."
    },
    {
     "label": "Section-Header",
     "raw": "<h2>CODE OF FEDERAL<br/>REGULATIONS</h2>",
-    "html": "<h2>CODE OF FEDERAL<br/>REGULATIONS</h2>"
+    "html": "<h2>CODE OF FEDERAL<br/>REGULATIONS</h2>",
+    "markdown": "## CODE OF FEDERAL REGULATIONS"
    },
    {
     "label": "Section-Header",
     "raw": "<h3><b>Title 31</b></h3>",
-    "html": "<h3><b>Title 31</b></h3>"
+    "html": "<h3><b>Title 31</b></h3>",
+    "markdown": "### **Title 31**"
    },
    {
     "label": "Section-Header",
     "raw": "<h4><b>Money and Finance: Treasury</b></h4><hr/>",
-    "html": "<h4><b>Money and Finance: Treasury</b></h4><hr/>"
+    "html": "<h4><b>Money and Finance: Treasury</b></h4><hr/>",
+    "markdown": "#### **Money and Finance: Treasury**\n\n---"
    },
    {
     "label": "Section-Header",
     "raw": "<h5><b>Parts 0 to 199</b></h5>",
-    "html": "<h5><b>Parts 0 to 199</b></h5>"
+    "html": "<h5><b>Parts 0 to 199</b></h5>",
+    "markdown": "##### **Parts 0 to 199**"
    },
    {
     "label": "Text",
     "raw": "<p>Revised as of July 1, 2016</p>",
-    "html": "<p>Revised as of July 1, 2016</p>"
+    "html": "<p>Revised as of July 1, 2016</p>",
+    "markdown": "Revised as of July 1, 2016"
    },
    {
     "label": "Text",
     "raw": "<p>Containing a codification of documents<br/>of general applicability and future effect</p>",
-    "html": "<p>Containing a codification of documents<br/>of general applicability and future effect</p>"
+    "html": "<p>Containing a codification of documents<br/>of general applicability and future effect</p>",
+    "markdown": "Containing a codification of documents  \nof general applicability and future effect"
    },
    {
     "label": "Text",
     "raw": "<p>As of July 1, 2016</p>",
-    "html": "<p>As of July 1, 2016</p>"
+    "html": "<p>As of July 1, 2016</p>",
+    "markdown": "As of July 1, 2016"
    },
    {
     "label": "Text",
     "raw": "<p>Published by the Office of the Federal Register<br/>National Archives and Records Administration<br/>as a Special Edition of the Federal Register</p>",
-    "html": "<p>Published by the Office of the Federal Register<br/>National Archives and Records Administration<br/>as a Special Edition of the Federal Register</p>"
+    "html": "<p>Published by the Office of the Federal Register<br/>National Archives and Records Administration<br/>as a Special Edition of the Federal Register</p>",
+    "markdown": "Published by the Office of the Federal Register  \nNational Archives and Records Administration  \nas a Special Edition of the Federal Register"
    }
   ],
   "vendor": {

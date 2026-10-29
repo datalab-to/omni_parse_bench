@@ -53,6 +53,21 @@ def test_a_chandra_picture_description_is_alt_text_not_page_text():
     assert "CODE OF FEDERAL" in views.text(outs["html"], alt=False)
 
 
+def test_chandra_markdown_is_the_packages_and_headers_go_only_when_asked():
+    from omni_parse_bench.harness.providers import chandra_ocr
+
+    fx = json.loads((HERE / "chandra_ocr.json").read_text())
+    both = frozenset({"html", "markdown"})
+    (kept,) = chandra_ocr.ChandraOcr().requests(both)
+    outs, errs = chandra_ocr.parse(fx["raw"], kept, chandra_ocr.ChandraOcr())
+    assert not errs and "AUTHENTICATED" in outs["markdown"] and "CODE OF FEDERAL" in outs["markdown"]
+    assert "AUTHENTICATED" in views.text(outs["html"])
+    dropped = chandra_ocr.ChandraOcr(headers_footers=False)
+    outs, _ = chandra_ocr.parse(fx["raw"], dropped.requests(both)[0], dropped)
+    assert "AUTHENTICATED" not in outs["markdown"] and "AUTHENTICATED" not in views.text(outs["html"])
+    assert "CODE OF FEDERAL" in outs["markdown"]
+
+
 def test_a_chandra_diagram_is_alt_text_not_page_text_nor_dropped():
     from omni_parse_bench.harness.providers import chandra_ocr
 
