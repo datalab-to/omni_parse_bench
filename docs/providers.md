@@ -223,7 +223,7 @@ that is missing stops a run before any call and says which `export` to type.
 | `llamaparse` | /api/v2/parse/upload, poll, expand=markdown,items,usage | html, blocks | header and footer fields beside the markdown, put back | LLAMA_CLOUD_API_KEY |
 | `azure` | Content Understanding, prebuilt-layout | html, blocks | comments in its markdown, unwrapped | AZURE_CU_KEY, and the `endpoint` option |
 | `mistral` | /v1/ocr (mistral-ocr-4-1) | html, blocks | header and footer fields beside the markdown, put back | MISTRAL_API_KEY |
-| a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2: html) | kept: vendor defaults that leave them out turned off | none; OPB_ENDPOINT_KEY, when the server has one |
+| a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2, OvisOCR, OvisOCR2: html) | kept: vendor defaults that leave them out turned off | none; OPB_ENDPOINT_KEY, when the server has one |
 | `tesseract` | the local `tesseract` binary, no model of the page | html | kept: it has no notion of them | none |
 
 A vendor's tiers are runs of their own, one config each (or one config and `--set`), with the same pages:
@@ -355,6 +355,9 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | Infinity-Parser2 (Pro, Flash) | `infinity-parser2` | `infinity-parser2` | html, blocks |
 | chandra-ocr-2 | `chandra-ocr` | `chandra-ocr` | html, markdown, blocks |
 | olmOCR-2 | `olmocr` | `olmocr` | html |
+| OvisOCR | `ovisocr` | `ovisocr` | html |
+| OvisOCR2 | `ovisocr2` | `ovisocr2` | html |
+| OvisOCR3 | `ovisocr3` | `ovisocr3` | html, blocks |
 | HunyuanOCR-1.5 | `hunyuan-ocr` | `hunyuan-ocr` | html, blocks |
 | DeepSeek-OCR-2 | `deepseek-ocr` | `deepseek-ocr` | html, blocks |
 | Surya OCR 2 | `surya-ocr` | `surya-ocr` | html, blocks |
@@ -368,7 +371,8 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | MiniCPM-OCR 1.0 | `minicpm-ocr` | `minicpm-ocr` | html, markdown, blocks |
 | OXR-1.0 | `oxr` | `oxr` | html, markdown, blocks |
 
-olmOCR-2 and Nanonets-OCR2 return no layout, so they have no blocks. Indra OCR runs on CPU (ONNX Runtime),
+olmOCR-2, Nanonets-OCR2, OvisOCR and OvisOCR2 return no layout, so they have no blocks. OvisOCR3 gets html
+from its markdown prompt and blocks from its structured one: two calls a page. Indra OCR runs on CPU (ONNX Runtime),
 no GPU: its server reads pages in one worker process per core, and its image runs without `--gpus`.
 
 Their labels (LightOn's table is above):
@@ -417,6 +421,21 @@ Unlimited-OCR (`providers/unlimited.py`):
 | code, algorithm | code |
 | table | table |
 | image, chart | figure |
+
+OvisOCR3 (`providers/ovisocr3.py`; the categories of its structured prompt, PP-DocLayout's list, mapped as
+PaddleOCR-VL's are):
+
+| OvisOCR3 category | label |
+| --- | --- |
+| text, abstract, content, reference_content, aside_text, vertical_text | text |
+| paragraph_title, doc_title | heading |
+| header, footer, number | page_furniture |
+| figure_title | caption |
+| footnote, vision_footnote | footnote |
+| display_formula, inline_formula, formula_number | equation |
+| algorithm | code |
+| table | table |
+| image, chart, seal, header_image, footer_image | figure |
 
 Unlimited-OCR 2 (`providers/unlimited_ocr2.py`): Unlimited-OCR's labels, with a `cross_` or `append_` prefix
 (a block continued across pages or columns) dropped, and:
