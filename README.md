@@ -28,6 +28,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | — | 83.3 | 84.1 | 93.5 | — |
 | Surya OCR 2.5 (Datalab) | open | 0.69B | 85.9 | — | 83.8 | 78.3 | 95.7 | — |
 | OXR-1.0 | open | 1.4B | 85.3 | — | 76.4 | 88.2 | 91.4 | — |
+| OvisOCR3 | open | 0.85B | 84.2 | — | 77.5 | 84.3 | 90.6 | — |
 | Extend | closed |  | 83.3 | ≈$33.75 | 64.1 | 92.5 | 93.4 | — |
 | MiniCPM-OCR-1.0 | open | 1.3B | 83.2 | — | 72.8 | 89.1 | 87.6 | — |
 | Surya OCR 2 (Datalab) | open | 0.67B | 83.1 | — | 80.6 | 74.3 | 94.3 | — |
@@ -43,6 +44,8 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | DeepSeek-OCR-2 | open | 3.4B | 75.2 | — | 64.2 | 70.0 | 91.4 | — |
 | Indra OCR (Datalab) | open | about 12M | 69.5 | — | 60.3 | 58.1 | 90.1 | — |
 | HunyuanOCR-1.5 | open | 1.0B | 64.6 | — | 50.5 | 61.9 | 81.4 | — |
+| OvisOCR2 | open | 0.85B | none | — | 73.7 | 79.6 | unsupported | — |
+| OvisOCR | open | 1.4B | none | — | 71.8 | 77.9 | unsupported | — |
 | olmOCR-2 | open | 8.3B | none | — | 71.3 | 56.6 | unsupported | — |
 | Nanonets-OCR2-3B | open | 3.8B | none | — | 68.2 | 62.6 | unsupported | — |
 | Tesseract | open | n/a | none | — | 17.6 | 0.0 | unsupported | — |
@@ -371,6 +374,7 @@ Tests on a page the system refused or failed to answer count as failed. _Not Eng
 | Infinity-Parser2-Pro | 65.2 | 88.5 | 88.2 | 72.6 | 88.8 | 84.1 | 71.7 | 87.0 | 66.0 |
 | Surya OCR 2.5 (Datalab) | 58.4 | 97.0 | 88.0 | 71.6 | 85.4 | 81.7 | 74.7 | 75.4 | 72.0 |
 | OXR-1.0 | 56.9 | 90.2 | 86.9 | 65.0 | 86.8 | 73.9 | 69.5 | 78.1 | 51.5 |
+| OvisOCR3 | 53.9 | 89.4 | 88.9 | 71.7 | 85.0 | 77.4 | 73.3 | 75.0 | 56.7 |
 | Extend | 77.0 | 76.6 | 94.7 | 79.9 | 88.3 | 88.2 | 90.4 | 84.8 | 74.2 |
 | MiniCPM-OCR-1.0 | 52.8 | 94.0 | 87.8 | 68.9 | 80.7 | 77.6 | 72.5 | 73.0 | 52.6 |
 | Surya OCR 2 (Datalab) | 55.2 | 94.7 | 83.7 | 66.0 | 82.0 | 74.7 | 59.9 | 72.6 | 71.4 |
@@ -386,6 +390,8 @@ Tests on a page the system refused or failed to answer count as failed. _Not Eng
 | DeepSeek-OCR-2 | 43.6 | 91.4 | 75.3 | 56.0 | 77.4 | 62.1 | 36.5 | 60.8 | 52.1 |
 | Indra OCR (Datalab) | 31.0 | 59.7 | 75.1 | 52.4 | 69.6 | 69.3 | 68.8 | 46.2 | 56.5 |
 | HunyuanOCR-1.5 | 42.1 | 53.0 | 70.6 | 53.2 | 72.1 | 54.8 | 49.2 | 65.6 | 53.0 |
+| OvisOCR2 | 26.7 | 96.7 | 79.7 | 64.6 | 76.7 | 59.3 | 55.5 | 69.4 | 32.0 |
+| OvisOCR | 25.3 | 96.1 | 73.3 | 55.6 | 76.3 | 56.2 | 41.6 | 58.8 | 28.7 |
 | olmOCR-2 | 38.5 | 79.7 | 64.7 | 55.6 | 66.2 | 55.0 | 63.6 | 70.4 | 39.0 |
 | Nanonets-OCR2-3B | 41.3 | 88.2 | 68.2 | 61.9 | 64.7 | 44.1 | 35.7 | 69.3 | 43.6 |
 | Tesseract | 0.8 | 0.8 | 12.7 | 14.4 | 16.0 | 25.8 | 6.1 | 2.7 | 12.3 |
