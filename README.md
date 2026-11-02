@@ -43,6 +43,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | DeepSeek-OCR-2 | open | 3.4B | 75.2 | — | 64.2 | 70.0 | 91.4 | — |
 | Indra OCR (Datalab) | open | about 12M | 69.5 | — | 60.3 | 58.1 | 90.1 | — |
 | HunyuanOCR-1.5 | open | 1.0B | 64.6 | — | 50.5 | 61.9 | 81.4 | — |
+| Xiaomi-OCR-0 | open | 0.87B | none | — | 54.5 | 90.3 | unsupported | — |
 | olmOCR-2 | open | 8.3B | none | — | 71.3 | 56.6 | unsupported | — |
 | Nanonets-OCR2-3B | open | 3.8B | none | — | 68.2 | 62.6 | unsupported | — |
 | Tesseract | open | n/a | none | — | 17.6 | 0.0 | unsupported | — |
@@ -386,6 +387,7 @@ Tests on a page the system refused or failed to answer count as failed. _Not Eng
 | DeepSeek-OCR-2 | 43.6 | 91.4 | 75.3 | 56.0 | 77.4 | 62.1 | 36.5 | 60.8 | 52.1 |
 | Indra OCR (Datalab) | 31.0 | 59.7 | 75.1 | 52.4 | 69.6 | 69.3 | 68.8 | 46.2 | 56.5 |
 | HunyuanOCR-1.5 | 42.1 | 53.0 | 70.6 | 53.2 | 72.1 | 54.8 | 49.2 | 65.6 | 53.0 |
+| Xiaomi-OCR-0 | 47.9 | 46.6 | 88.8 | 65.3 | 72.2 | 68.4 | 75.6 | 55.4 | 29.5 |
 | olmOCR-2 | 38.5 | 79.7 | 64.7 | 55.6 | 66.2 | 55.0 | 63.6 | 70.4 | 39.0 |
 | Nanonets-OCR2-3B | 41.3 | 88.2 | 68.2 | 61.9 | 64.7 | 44.1 | 35.7 | 69.3 | 43.6 |
 | Tesseract | 0.8 | 0.8 | 12.7 | 14.4 | 16.0 | 25.8 | 6.1 | 2.7 | 12.3 |
