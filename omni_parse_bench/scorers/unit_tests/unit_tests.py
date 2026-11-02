@@ -65,7 +65,8 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
         result = {"tests": len(vs), "passed": sum(v.result == "pass" for v in vs), "per_family": per_family}
         return scorer.Score(result, [{"test_id": v.id, "test_type": (t := by_id[v.id]).test_type,
                                       "output_type": t.output_type, "derivation": t.derivation,
-                                      "tags": list(t.tags), "expected": t.args, "result": v.result, "why": v.why} for v in vs])
+                                      "tags": list(t.tags), "expected": t.args, "result": v.result,
+                                      "why": v.why} for v in vs])
 
     def score_failure(self, tests: Sequence[_tests.Test]) -> scorer.Score:
         """A failed page: the score of a prediction with no outputs, so every test fails and the page costs
