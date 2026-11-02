@@ -61,3 +61,7 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "B", "UP"]
 ignore = ["E701", "E731"]   # one-line `if x: return y`, and small named lambdas, are the house style
+
+# Preserve upstream vendor source verbatim.
+[tool.ruff.lint.per-file-ignores]
+"omni_parse_bench/harness/providers/serve/xiaomi_ocr/vendor/*.py" = ["B905"]
