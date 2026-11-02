@@ -16,6 +16,7 @@ import fuzzysearch
 from rapidfuzz import fuzz
 
 from omni_parse_bench import normalize, tables, views
+from omni_parse_bench.scorers.unit_tests import hyphenation
 
 # Note: a test allowing k edits in an n-character string passes at ratio 1 - k/n, and rapidfuzz
 # returns exactly that ratio for k edits, which in binary lands a hair under it.
@@ -63,6 +64,8 @@ def found(a: Arg, v: views.Html) -> Mark:
     if isinstance(a, Number): return _number_found(a.number, v)
     if isinstance(a, Latex): return _latex_found(a.latex, v)
     ok, r, thr = contains(a.text, v.text, a.max_diffs)
+    if not ok and hyphenation.matches(a.text, v.text):
+        return True, ""
     return _mark(ok, f"{a.text[:60]!r} not found (best {r:.3f} < {thr:.3f})")
 
 

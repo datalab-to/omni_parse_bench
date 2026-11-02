@@ -57,6 +57,16 @@ is found in an output (`runners.found`):
 
 A `layout_kind` test's text only labels its place; it is never compared.
 
+Text presence also accepts an exact match through an ambiguous wrapping hyphen:
+`মানু- হৰ` can match `মানুহৰ`. The hyphen must follow a letter or its combining marks,
+have whitespace after it, and precede a letter that is neither uppercase nor titlecase.
+The rule applies to the gold and the prediction alike, as the existing Latin line-break rule does.
+The original hyphenated interpretation remains available, so a wrapped compound still
+matches its hyphenated gold. An unspaced compound hyphen remains required; dashes and
+numeric signs receive no new exemption. This fallback must actually omit a continuation
+hyphen inside the match and does not add fuzzy letter edits. Order, repetition, numbers,
+equations and table-cell comparisons retain their existing rules.
+
 | test type | reads | checks | args and settings | family | tests |
 |---|---|---|---|---|---:|
 | `present` | `html` | this content appears | `content` | text | 7,291 |

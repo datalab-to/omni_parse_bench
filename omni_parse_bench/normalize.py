@@ -114,6 +114,11 @@ def fold(s: str) -> str:
 
     Case is folded because it isn't what a parse is paid for; digits, letters and their order are.
     """
+    return _cased(s).lower()
+
+
+def _cased(s: str, *, preserve_dashes: bool = False) -> str:
+    """The fold before lowercasing, for inspecting a continuation's original case."""
     s = _latex_to_text(s)
     # Note: only before a lowercase letter, so a line ending "-" before a capital or a digit stays.
     s = _LINE_HYPHEN.sub(lambda m: m[1] if m[1].islower() else m[0], s)
@@ -125,9 +130,9 @@ def fold(s: str) -> str:
     s = _FOOTNOTE.sub(lambda m: f" {m[1] or m[2]}", s)
     s = _BULLET.sub(r"\1 ", s)
     s = _LEADERS.sub(" ", s)
-    s = typography(s)
+    s = typography(s, preserve_dashes=preserve_dashes)
     s = s.replace("…", "...").translate(_CJK_PUNCT)
-    return _WHITESPACE.sub(" ", s).strip().lower()
+    return _WHITESPACE.sub(" ", s).strip()
 
 
 def boxes(s: str) -> str:
@@ -143,11 +148,12 @@ def _primes(s: str) -> str:
     return _SPACING_ACCENT.sub(lambda m: _COMBINING[m[1]], _ACUTE_APOSTROPHE.sub("'", s))
 
 
-def typography(s: str) -> str:
+def typography(s: str, *, preserve_dashes: bool = False) -> str:
     """`s` with its character forms unified (compatibility forms, invisibles, dashes, quotes,
     spaces, arrows) and nothing else: markup such as `**` and case are left alone."""
     s = _INVISIBLE.sub("", unicodedata.normalize("NFKC", _primes(s))).replace("⁄", "/")
-    s = _DASH.sub("-", s)
+    if not preserve_dashes:
+        s = _DASH.sub("-", s)
     s = _SQUOTE.sub("'", s)
     s = _DQUOTE.sub('"', s)
     s = _SPACE.sub(" ", s)
