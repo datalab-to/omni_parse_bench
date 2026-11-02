@@ -51,7 +51,8 @@ class Test(NamedTuple):
 
     `args` maps each role of the test type to one arg, or a list of them. An arg is exactly one of
     `{"text", "max_diffs"}`, `{"number"}` or `{"latex"}`: its kind, which says how it is compared. A `Test`
-    also names its page, the gold file it came from.
+    also names its page, the gold file it came from. It holds `args` and `settings` as the gold states them,
+    the one record of what the test asks; `params`, what its runner reads, is made from them.
     """
     id: str
     page_id: str    # the page whose gold file holds it
@@ -59,7 +60,14 @@ class Test(NamedTuple):
     output_type: str
     derivation: str
     tags: tuple[str, ...]
-    params: tuple   # the test type's parameter NamedTuple (`runners.TYPES`)
+    args: Mapping[str, Any]
+    settings: Mapping[str, Any]
+
+    @property
+    def params(self) -> tuple:
+        """The test type's parameter NamedTuple (`runners.TYPES`), what its runner reads, made from `args` and
+        `settings`; `parse` has checked they make one."""
+        return _params(f"page {self.page_id}, test {self.id}", self.test_type, self.args, self.settings)
 
 
 def read(path: str | Path) -> tuple[Test, ...]:
@@ -136,7 +144,8 @@ def test(page_id: str, t: Mapping[str, Any]) -> Test:
             raise ValueError(f"{where}: {name}={getattr(params, name)!r:.80} isn't a {hint}")
     if test_type in runners.VALID and not (rule := runners.VALID[test_type])[0](params):
         raise ValueError(f"{where}: {rule[1]}")
-    return Test(t["id"], page_id, test_type, output_type, t["derivation"], tuple(t["tags"]), params)
+    return Test(t["id"], page_id, test_type, output_type, t["derivation"], tuple(t["tags"]), t["args"],
+                t["settings"])
 
 
 def _tag(x: str) -> bool:
