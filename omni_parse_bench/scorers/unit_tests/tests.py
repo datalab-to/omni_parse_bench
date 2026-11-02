@@ -60,7 +60,8 @@ class Test(NamedTuple):
     derivation: str
     tags: tuple[str, ...]
     params: tuple   # the test type's parameter NamedTuple (`runners.TYPES`)
-    args: Mapping[str, Any]    # the args as the gold file states them, what a test line records as `expected`
+    args: Mapping[str, Any]    # the args and settings as the gold file states them, which a test line records
+    settings: Mapping[str, Any]
 
 
 def read(path: str | Path) -> tuple[Test, ...]:
@@ -138,7 +139,7 @@ def test(page_id: str, t: Mapping[str, Any]) -> Test:
     if test_type in runners.VALID and not (rule := runners.VALID[test_type])[0](params):
         raise ValueError(f"{where}: {rule[1]}")
     return Test(t["id"], page_id, test_type, output_type, t["derivation"], tuple(t["tags"]), params,
-                t["args"])
+                t["args"], t["settings"])
 
 
 def _tag(x: str) -> bool:

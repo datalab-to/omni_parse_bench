@@ -72,8 +72,8 @@ def test_a_pages_line_holds_its_counts_and_its_details_every_verdict():
     s = scorer.UnitTests().score({"html": "<p>alpha beta</p>"}, TESTS)
     assert s.result == {"tests": 5, "passed": 2, "per_family": {"text": {"tests": 5, "passed": 2}}}
     assert s.details[2] == {"test_id": "c", "test_type": "present", "output_type": "html",
-                            "derivation": "authored", "tags": ["eng", "table"], "expected": text("gamma"),
-                            "result": "fail", "why": s.details[2]["why"]}
+                            "derivation": "authored", "tags": ["eng", "table"], "args": text("gamma"),
+                            "settings": {}, "result": "fail", "why": s.details[2]["why"]}
 
 
 def test_unit_tests_names_its_headline():

@@ -65,8 +65,8 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
         result = {"tests": len(vs), "passed": sum(v.result == "pass" for v in vs), "per_family": per_family}
         return scorer.Score(result, [{"test_id": v.id, "test_type": (t := by_id[v.id]).test_type,
                                       "output_type": t.output_type, "derivation": t.derivation,
-                                      "tags": list(t.tags), "expected": t.args, "result": v.result,
-                                      "why": v.why} for v in vs])
+                                      "tags": list(t.tags), "args": t.args, "settings": t.settings,
+                                      "result": v.result, "why": v.why} for v in vs])
 
     def score_failure(self, tests: Sequence[_tests.Test]) -> scorer.Score:
         """A failed page: the score of a prediction with no outputs, so every test fails and the page costs
@@ -124,13 +124,13 @@ def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
 
 def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.Page) -> list[dict[str, Any]]:
     """Each verdict of `page` as a test line: `page_id`, `suite`, `document`, `test_id`, `test_type`,
-    `output_type`, `derivation`, `tags`, `expected` (the test's args, as its gold file states them), `result`
-    and `why`. `summarize` reads any set of them."""
+    `output_type`, `derivation`, `tags`, `args` and `settings` (the test's own, as its gold file states them),
+    `result` and `why`. `summarize` reads any set of them."""
     by_id = {t.id: t for t in tests}
     on = {"page_id": page.page_id, "suite": page.suite, "document": page.document}
     return [on | {"test_id": (t := by_id[v.id]).id, "test_type": t.test_type, "output_type": t.output_type,
-                  "derivation": t.derivation, "tags": list(t.tags), "expected": t.args, "result": v.result,
-                  "why": v.why}
+                  "derivation": t.derivation, "tags": list(t.tags), "args": t.args, "settings": t.settings,
+                  "result": v.result, "why": v.why}
             for v in verdicts]
 
 
