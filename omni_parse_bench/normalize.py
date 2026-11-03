@@ -184,7 +184,7 @@ def _math_span(m: re.Match[str]) -> str:
     # dollar amounts has a space inside one of them ("$2.7 $2.2", "$1,000 to $2,000").
     if not _LATEX_MARKUP.search(body): return body if body == body.strip() else m[0]
     try:
-        t = _latex_converter().latex_to_text(dense)
+        t = _latex_converter().latex_to_text(dense, latex_context=_walker_context())
     except Exception:
         # Note: pylatexenc raises on arbitrary malformed LaTeX; the span then compares as written.
         t = body
@@ -208,4 +208,36 @@ def _dense(body: str) -> str:
 def _latex_converter():
     from pylatexenc import latex2text
 
-    return latex2text.LatexNodes2Text()
+    return latex2text.LatexNodes2Text(latex_context=_text_context())
+
+
+# Note: pylatexenc knows \frac but not \dfrac or \tfrac, so their arguments ran together
+# ("\dfrac{1}{2}" read as "12"). In a cell they render as \frac, so they fold as \frac does.
+_FRACTION_STYLES = ("dfrac", "tfrac")
+_CFRAC_STYLE = "cfrac"
+
+
+@functools.cache
+def _text_context():
+    from pylatexenc import latex2text
+
+    db = latex2text.get_default_latex_context_db()
+    macros = [latex2text.MacroTextSpec(name, simplify_repl="%s/%s") for name in _FRACTION_STYLES]
+    # The optional alignment argument shifts cfrac's numerator and denominator to args 2 and 3.
+    macros.append(latex2text.MacroTextSpec(_CFRAC_STYLE, simplify_repl="%(2)s/%(3)s"))
+    db.add_context_category("opb-fraction-styles", macros=macros, prepend=True)
+    return db
+
+
+@functools.cache
+def _walker_context():
+    # Note: the walker reads a macro's arguments from its own context, not the text one.
+    from pylatexenc import latexwalker
+    from pylatexenc.macrospec import MacroSpec
+
+    db = latexwalker.get_default_latex_context_db()
+    macros = [MacroSpec(name, "{{") for name in _FRACTION_STYLES]
+    # cfrac takes an optional [l] or [r] argument before its numerator and denominator.
+    macros.append(MacroSpec(_CFRAC_STYLE, "[{{"))
+    db.add_context_category("opb-fraction-styles", macros=macros, prepend=True)
+    return db
