@@ -39,6 +39,24 @@ def test_spaced_hyphen_is_optional_on_the_gold_side_too():
     assert present("well- known method", "well known method")
 
 
+@pytest.mark.parametrize("hyphen", ["-", "‐", "‑"])
+@pytest.mark.parametrize("space", [" ", "\n"])
+def test_latin_wrapped_compounds_keep_both_readings(hyphen, space):
+    wrapped = f"well{hyphen}{space}known method"
+    for gold in ("well-known method", "wellknown method"):
+        assert present(gold, wrapped)
+        assert present(wrapped, gold)
+    assert not present("well-known method", "wellknown method")
+    assert not present("wellknown method", "well-known method")
+
+
+def test_latin_mixed_hyphen_interpretations_in_one_match():
+    gold = "well-known developers use state-of-the-art methods"
+    wrapped = "well- known develop- ers use state- of-the- art methods"
+    assert present(gold, wrapped)
+    assert present(wrapped, gold)
+
+
 def test_published_korean_compound_regression():
     gold = "있다. T점수가 40점 이하를 낮은 점수라고 본다. 나는 남성성-여성성인 척도 5번이"
     assert present(gold, gold.replace("성-여", "성-\n여"))
@@ -62,6 +80,7 @@ def test_no_new_exemption_for_other_differences(gold, pred):
 
 def test_fold_itself_still_preserves_uncased_breaks():
     assert normalize.fold("পঢ়ি- বলৈ") == "পঢ়ি- বলৈ"
+    assert normalize.fold("well- known develop-\ners") == "wellknown developers"
 
 
 def test_order_and_repeat_keep_their_existing_rules():
@@ -78,16 +97,19 @@ def test_fallback_requires_a_continuation_inside_the_match():
     assert not hyphenation.matches("foo", "foo X- য")
     assert not hyphenation.matches("foo", "X- foo")
     assert not hyphenation.matches("foo", "foo- x")
+    assert not hyphenation.matches("foo-", "foo- x")
+    assert not hyphenation.matches("-foo", "x- foo")
     assert not hyphenation.matches("মানুহৰ", "মানুহৰ X- য")
     assert hyphenation.matches("মানুহৰ", "İ মানু- হৰ")
 
 
-def test_mixed_hyphen_interpretations_follow_the_presence_policy():
+@pytest.mark.parametrize("first, letter, last", [("অ", "ক", "শেষ"), ("a", "b", "end")])
+def test_mixed_hyphen_interpretations_follow_the_presence_policy(first, letter, last):
     # J = joined, W = wrapping evidence, H = a required unspaced hyphen.
     forms = {"J": "", "W": "- ", "H": "-"}
     for left, right in itertools.product(itertools.product(forms, repeat=3), repeat=2):
-        gold = "অ" + "".join(forms[x] + "ক" for x in left) + "শেষ"
-        pred = "অ" + "".join(forms[x] + "ক" for x in right) + "শেষ"
+        gold = first + "".join(forms[x] + letter for x in left) + last
+        pred = first + "".join(forms[x] + letter for x in right) + last
         compatible = all({a, b} != {"J", "H"} for a, b in zip(left, right, strict=True))
         assert present(gold, pred) == compatible, (left, right)
 

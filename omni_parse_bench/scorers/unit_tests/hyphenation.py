@@ -21,7 +21,7 @@ def _word_end(s: str, i: int) -> bool:
 
 @functools.lru_cache(maxsize=128)
 def _prepare(s: str) -> tuple[str, frozenset[int]]:
-    cased = normalize._cased(s, preserve_dashes=True)
+    cased = normalize._cased(s, preserve_dashes=True, preserve_line_hyphens=True)
     optional = set()
     offset = 0
     for i, c in enumerate(cased):
@@ -47,12 +47,12 @@ def _prepare(s: str) -> tuple[str, frozenset[int]]:
 
 
 def matches(needle: str, text: str) -> bool:
-    """An exact substring match that actually omits an evidenced continuation hyphen.
+    """An exact substring match that uses an evidenced continuation hyphen inside the match.
 
     A small nondeterministic automaton consumes equal characters, or skips optional
     hyphens on either side. Equivalent states are merged at each text position: at
     most 2 * (len(needle) + 1) states, O(len(needle) * len(text)) work, no backtracking.
-    Each state records whether a hyphen was skipped inside the matched fragment.
+    Each state records whether a continuation hyphen was retained or skipped inside the match.
     """
     want, want_optional = _prepare(needle)
     hay, hay_optional = _prepare(text)
@@ -60,7 +60,7 @@ def matches(needle: str, text: str) -> bool:
         return False
     if not want:
         return False
-    # Bit 1: no continuation used; bit 2: at least one hyphen was skipped.
+    # Bit 1: no continuation used; bit 2: a continuation hyphen was retained or skipped.
     active = {}
     optional = sorted(want_optional)
     for j, c in enumerate(hay):
@@ -68,6 +68,8 @@ def matches(needle: str, text: str) -> bool:
         following = {}
         for i, flags in active.items():
             if i < len(want) and want[i] == c:
+                if 0 < i < len(want) - 1 and (i in want_optional or j in hay_optional):
+                    flags |= 2
                 following[i + 1] = following.get(i + 1, 0) | flags
             if j in hay_optional and 0 < i < len(want):
                 following[i] = following.get(i, 0) | 2

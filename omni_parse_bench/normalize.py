@@ -117,11 +117,12 @@ def fold(s: str) -> str:
     return _cased(s).lower()
 
 
-def _cased(s: str, *, preserve_dashes: bool = False) -> str:
+def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool = False) -> str:
     """The fold before lowercasing, for inspecting a continuation's original case."""
     s = _latex_to_text(s)
     # Note: only before a lowercase letter, so a line ending "-" before a capital or a digit stays.
-    s = _LINE_HYPHEN.sub(lambda m: m[1] if m[1].islower() else m[0], s)
+    if not preserve_line_hyphens:
+        s = _LINE_HYPHEN.sub(lambda m: m[1] if m[1].islower() else m[0], s)
     s = _SUPERSCRIPT_DIGITS.sub(r" \1", s)
     s = _INVISIBLE.sub("", unicodedata.normalize("NFKC", _primes(s)))
     s = boxes(s)

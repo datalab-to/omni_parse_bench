@@ -64,7 +64,8 @@ The rule applies to the gold and the prediction alike, as the existing Latin lin
 The original hyphenated interpretation remains available, so a wrapped compound still
 matches its hyphenated gold. An unspaced compound hyphen remains required; dashes and
 numeric signs receive no new exemption. This fallback must actually omit a continuation
-hyphen inside the match and does not add fuzzy letter edits. Order, repetition, numbers,
+hyphen inside the match, or retain one that the Latin line-break rule would remove,
+and does not add fuzzy letter edits. Order, repetition, numbers,
 equations and table-cell comparisons retain their existing rules.
 
 | test type | reads | checks | args and settings | family | tests |
