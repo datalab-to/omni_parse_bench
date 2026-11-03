@@ -645,3 +645,25 @@ afterwards. What happens in every other case is
 omni-bench-core's rules ([the table](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules)). `--retry-failed` predicts again only
 the pages whose failure may not recur: a timeout, an outage, a 429 or 5xx; never a 400 or a vendor's
 answer.
+
+### Xiaomi-OCR-0
+
+`xiaomi_ocr` serves [Xiaomi-OCR-0](https://huggingface.co/xiaomi-research/Xiaomi-OCR-0),
+873,438,784 parameters (BF16), through its whole-page document prompt. Build and run
+`omni_parse_bench/harness/providers/serve/xiaomi_ocr/`, then `opb init xiaomi_ocr`.
+The adapter produces `html` only: text and tables can be scored; layout is unsupported,
+so it has no headline score. This is separate from the vendor's two-stage layout pipeline.
+
+The checkpoint and vendor post-processing are pinned. The server sends the vendor's
+prompt before the image with thinking off, temperature 0, top_p 0.8, presence penalty 0,
+repetition penalty 1 and 16,384 output tokens. Vendor `finalize_document` trims repeated
+tails, normalizes math delimiters, and converts OTSL tables to HTML, including merged
+cells. The raw completion is retained. The optional vendor repetition retry is off.
+The prompt explicitly ignores headers and footers; it is preserved verbatim.
+
+Runtime differences: vLLM is pinned at 0.22.1 with bf16 enforced; on Blackwell its vision
+encoder uses TORCH_SDPA to avoid the CuTe compilation failure seen with the existing
+Qwen3.5 providers. Input uses opb's RGB PNG at a 2048-pixel long edge (Pillow's default
+BICUBIC thumbnail rather than the vendor's LANCZOS; PDFs are rendered by opb).
+The server allows 900 seconds per inference request, versus the vendor CLI's default 600.
+No benchmark score has been measured for this provider yet.

@@ -50,6 +50,7 @@ try:
         tesseract,
         unlimited,
         unlimited_ocr2,
+        xiaomi_ocr,
     )
 except ImportError as exc:
     # Note: only a missing or incompatible package is fixed by installing the extra; a broken import of our
@@ -73,7 +74,7 @@ ADAPTERS: dict[str, type[Parser]] = {a.name: a for a in (
     nemotron_parse.NemotronParse, olmocr.OlmOcr, minicpm_ocr.MiniCpmOcr, oxr.Oxr,
     ovisocr.OvisOcr, ovisocr2.OvisOcr2, ovisocr3.OvisOcr3,
     paddleocr_vl.PaddleOcrVl, surya_ocr.SuryaOcr, surya_ocr25.SuryaOcr25, unlimited.UnlimitedOcr,
-    unlimited_ocr2.UnlimitedOcr2)}
+    unlimited_ocr2.UnlimitedOcr2, xiaomi_ocr.XiaomiOcr)}
 
 
 def plugins() -> dict[str, metadata.EntryPoint]:

@@ -307,7 +307,7 @@ runs/datalab-20261021-160012-3f9a/       <system>-<YYYYMMDD-HHMMSS>-<4 hex>
     summary.json                         the grade
     scores.jsonl                         one line per page: id, status, row.document, tests, passed, per_family
     details/<page_id>.jsonl              one line per test: page_id, suite, document, test_id, test_type,
-                                         output_type, derivation, tags, result and why
+                                         output_type, derivation, tags, args, settings, result and why
 ```
 
 `settings.json` is written before the first call. A resume is checked against it, and you don't edit it. It holds
