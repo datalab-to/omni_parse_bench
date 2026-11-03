@@ -43,7 +43,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | DeepSeek-OCR-2 | open | 3.4B | 75.2 | — | 64.2 | 70.0 | 91.4 | — |
 | Indra OCR (Datalab) | open | about 12M | 69.5 | — | 60.3 | 58.1 | 90.1 | — |
 | HunyuanOCR-1.5 | open | 1.0B | 64.6 | — | 50.5 | 61.9 | 81.4 | — |
-| Xiaomi-OCR-0 | open | 0.87B | none | — | 54.5 | 90.3 | unsupported | — |
+| Xiaomi-OCR-0 | open | 0.87B | none | — | 73.3 | 90.4 | unsupported | — |
 | olmOCR-2 | open | 8.3B | none | — | 71.3 | 56.6 | unsupported | — |
 | Nanonets-OCR2-3B | open | 3.8B | none | — | 68.2 | 62.6 | unsupported | — |
 | Tesseract | open | n/a | none | — | 17.6 | 0.0 | unsupported | — |
