@@ -354,6 +354,8 @@ successful, unretried HTML calls only. These timing definitions differ and are n
 
 Tests on a page the system refused or failed to answer count as failed. _Not English_ is a test with a language tag other than English.
 
+Each cell is the pass rate over every test carrying that tag, leaving out layout tests, so a parser with no layout output isn't penalised here. A test with several tags counts in each slice, so the slices overlap. The tags are the ones in the dataset (`tags`); the language check reads an ISO 639-3 code, so `eng` is English and any other code is _not English_. The script tags (`Latn`, `Grek`, ...) aren't languages and don't count.
+
 | parser | handwriting | math | table | form | multi-column | tiny text | rotated | degraded | not English |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Datalab accurate | 76.7 | 98.0 | 95.6 | 84.3 | 94.9 | 90.5 | 95.1 | 89.7 | 83.0 |
@@ -387,7 +389,7 @@ Tests on a page the system refused or failed to answer count as failed. _Not Eng
 | DeepSeek-OCR-2 | 43.6 | 91.4 | 75.3 | 56.0 | 77.4 | 62.1 | 36.5 | 60.8 | 52.1 |
 | Indra OCR (Datalab) | 31.0 | 59.7 | 75.1 | 52.4 | 69.6 | 69.3 | 68.8 | 46.2 | 56.5 |
 | HunyuanOCR-1.5 | 42.1 | 53.0 | 70.6 | 53.2 | 72.1 | 54.8 | 49.2 | 65.6 | 53.0 |
-| Xiaomi-OCR-0 | 47.9 | 46.6 | 88.8 | 65.3 | 72.2 | 68.4 | 75.6 | 55.4 | 29.5 |
+| Xiaomi-OCR-0 | 47.9 | 94.9 | 88.9 | 65.3 | 78.9 | 68.5 | 76.1 | 56.2 | 29.7 |
 | olmOCR-2 | 38.5 | 79.7 | 64.7 | 55.6 | 66.2 | 55.0 | 63.6 | 70.4 | 39.0 |
 | Nanonets-OCR2-3B | 41.3 | 88.2 | 68.2 | 61.9 | 64.7 | 44.1 | 35.7 | 69.3 | 43.6 |
 | Tesseract | 0.8 | 0.8 | 12.7 | 14.4 | 16.0 | 25.8 | 6.1 | 2.7 | 12.3 |
