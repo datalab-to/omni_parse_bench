@@ -141,6 +141,16 @@ def test_math_keeps_the_space_after_a_command_and_in_text():
     assert "is the" in normalize.fold(r"$\text{is the}$")
 
 
+@pytest.mark.parametrize("style", ["dfrac", "tfrac", "cfrac"])
+def test_a_fraction_style_folds_as_a_frac(style):
+    assert normalize.fold(rf"$\{style}{{1}}{{2}}$") == normalize.fold(r"$\frac{1}{2}$") == "1/2"
+    assert normalize.fold(views.text(f"<td>12$\\{style}{{1}}{{2}}$</td>")) == "121/2"
+
+
+def test_a_fraction_style_keeps_its_numerator_and_denominator_apart():
+    assert normalize.fold(r"$\dfrac{1}{23}$") != normalize.fold(r"$\dfrac{12}{3}$")
+
+
 def test_squeeze_joins_superscripts():
     assert normalize.squeeze("Probiotic 1") == normalize.squeeze("Probiotic1")
 
