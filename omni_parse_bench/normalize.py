@@ -86,6 +86,7 @@ _SPACED_DIGITS = re.compile(r"\d[\d.,]*(?:\s+[\d.,]+)+")
 # A word broken at a line end: a hyphen (any of its forms), then the line break, or the space a
 # writer joined lines with. Not a dash, which can end a line before a lowercase word.
 _LINE_HYPHEN = re.compile(r"(?<=[^\W\d_])[-\u2010\u2011]\s+([^\W\d_])")
+_WRAP_HYPHEN = re.compile("[-‐‑](?=\\s)")
 
 
 def fold(s: str) -> str:
@@ -178,27 +179,23 @@ def continuations(s: str) -> tuple[str, frozenset[int]]:
     """
     cased = _cased(s, preserve_dashes=True, preserve_line_hyphens=True)
     optional = set()
-    offset = 0
-    for i, c in enumerate(cased):
-        if c in "-‐‑" and _word_end(cased, i - 1):
-            j = i + 1
-            while j < len(cased) and cased[j].isspace():
-                j += 1
-            if (j > i + 1 and j < len(cased)
-                    and unicodedata.category(cased[j]).startswith("L")
-                    and not cased[j].isupper() and not cased[j].istitle()):
-                optional.add(offset)
-        offset += len(c.lower())
-    # Case conversion can expand a character; map optional indices before squeezing.
-    folded = _DASH.sub("-", cased.lower())
-    chars, squeezed_optional = [], set()
-    for i, c in enumerate(folded):
-        if c.isspace():
+    offset, previous = 0, 0
+    for match in _WRAP_HYPHEN.finditer(cased):
+        i = match.start()
+        if not _word_end(cased, i - 1):
             continue
-        if i in optional:
-            squeezed_optional.add(len(chars))
-        chars.append(c)
-    return "".join(chars), frozenset(squeezed_optional)
+        j = i + 1
+        while j < len(cased) and cased[j].isspace():
+            j += 1
+        if (j < len(cased) and unicodedata.category(cased[j]).startswith("L")
+                and not cased[j].isupper() and not cased[j].istitle()):
+            # Lowercasing can expand characters. Count intervening segments, not every
+            # character in Python or the whole prefix again for each wrapping hyphen.
+            offset += len(_WHITESPACE.sub("", cased[previous:i].lower()))
+            previous = i
+            optional.add(offset)
+    folded = _WHITESPACE.sub("", _DASH.sub("-", cased.lower()))
+    return folded, frozenset(optional)
 
 
 def _word_end(s: str, i: int) -> bool:

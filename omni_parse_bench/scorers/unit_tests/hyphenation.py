@@ -27,6 +27,10 @@ def matches(needle: str, text: str) -> bool:
         return False
     if not want:
         return False
+    # Dropping every hyphen is a necessary condition, never an acceptance rule.
+    # Let native substring search reject unrelated text before scanning Python states.
+    if want.replace("-", "") not in hay.replace("-", ""):
+        return False
     # Bit 1: no continuation used; bit 2: a continuation hyphen was retained or skipped.
     active = {}
     optional = sorted(want_optional)

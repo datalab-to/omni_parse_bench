@@ -354,10 +354,12 @@ def _partial(needle: str, hay: str) -> float:
 def contains(needle: str, text: str, max_diffs: int) -> tuple[bool, float, float]:
     """Whether `needle` appears in `text`, with the best match ratio and the threshold: `_ratio`
     after `fold`, then again after `squeeze` for words the text layer glues together."""
-    ok, r, thr = _ratio(normalize.fold(needle), normalize.fold(text), max_diffs)
+    want, hay = normalize.fold(needle), normalize.fold(text)
+    ok, r, thr = _ratio(want, hay, max_diffs)
     if ok:
         return True, r, thr
-    ok, r2, _ = _ratio(normalize.squeeze(needle), normalize.squeeze(text), max_diffs)
+    # fold has already collapsed all whitespace to ASCII spaces; reuse it for squeeze.
+    ok, r2, _ = _ratio(want.replace(" ", ""), hay.replace(" ", ""), max_diffs)
     return ok, max(r, r2), thr
 
 
