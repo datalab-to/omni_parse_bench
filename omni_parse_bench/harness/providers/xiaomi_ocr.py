@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import dataclasses
+import re
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -86,5 +87,17 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
     return contract.Call(http.parse(config, page, timeout, body=body))
 
 
+# The vendor's postprocess writes inline math as "$ x $", with spaces inside the dollars. The benchmark's
+# math reader takes "$" only when no space follows it, and its converter does not hold such spans, so
+# markdown-it turns "_" inside them into <em>. The spaces are the vendor's padding, not the model's
+# output: remove them before conversion. Display math ($$ ... $$) has no single-dollar match here.
+_PADDED_INLINE_MATH = re.compile(r"(?<![\\$])\$[ \t]+(?=\S)([^$\n]+?)(?<=\S)[ \t]+\$")
+
+
+def unpadded(text: str) -> str:
+    """The vendor's inline math with its padding spaces removed: "$ x^2 $" is "$x^2$"."""
+    return _PADDED_INLINE_MATH.sub(lambda m: f"${m[1]}$", text)
+
+
 def parse(raw: dict, request: contract.Request, config: XiaomiOcr | None = None) -> tuple[dict, dict]:
-    return {"html": markdown.to_html(raw["text"])}, {}
+    return {"html": markdown.to_html(unpadded(raw["text"]))}, {}

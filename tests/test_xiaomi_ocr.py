@@ -90,6 +90,13 @@ def test_empty_response_is_a_failure_and_raw_truncation_is_retained(server, monk
     assert len(raw["completion"]["choices"][0]["message"]["content"]) > 8000
 
 
+def test_padded_inline_math_is_unpadded_before_conversion():
+    text = r"a $ x^2 $ and $ (k,g') $-graph, $$ y_1 $$ and $ z_{i} $."
+    assert xiaomi_ocr.unpadded(text) == r"a $x^2$ and $(k,g')$-graph, $$ y_1 $$ and $z_{i}$."
+    output, _ = xiaomi_ocr.parse({"text": "We have $ g_i $ here."}, None)
+    assert "<em>" not in output["html"] and "$g_i$" in output["html"]
+
+
 def test_vendor_postprocessing_preserves_fenced_code(server):
     text = "```text\n\n<fcel>literal<nl>\n\n```"
     assert server.finalize_document(text) == text
