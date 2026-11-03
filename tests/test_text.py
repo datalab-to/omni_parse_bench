@@ -151,6 +151,18 @@ def test_a_fraction_style_keeps_its_numerator_and_denominator_apart():
     assert normalize.fold(r"$\dfrac{1}{23}$") != normalize.fold(r"$\dfrac{12}{3}$")
 
 
+@pytest.mark.parametrize("alignment", ["l", "r"])
+def test_an_aligned_cfrac_folds_as_a_frac(alignment):
+    assert normalize.fold(rf"$\cfrac[{alignment}]{{1}}{{2}}$") == normalize.fold(r"$\frac{1}{2}$") == "1/2"
+
+
+@pytest.mark.parametrize("alignment", ["l", "r"])
+def test_an_aligned_cfrac_keeps_its_numerator_and_denominator_apart(alignment):
+    assert normalize.fold(rf"$\cfrac[{alignment}]{{1}}{{23}}$") != normalize.fold(
+        rf"$\cfrac[{alignment}]{{12}}{{3}}$"
+    )
+
+
 def test_squeeze_joins_superscripts():
     assert normalize.squeeze("Probiotic 1") == normalize.squeeze("Probiotic1")
 
