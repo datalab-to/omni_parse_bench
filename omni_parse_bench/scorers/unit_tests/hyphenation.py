@@ -6,44 +6,11 @@ additional fuzzy edit allowance. Only text presence uses this fallback.
 """
 from __future__ import annotations
 
-import functools
-import unicodedata
-
 from omni_parse_bench import normalize
 
 
-def _word_end(s: str, i: int) -> bool:
-    # A combining mark qualifies only when its cluster has a preceding letter.
-    while i >= 0 and unicodedata.category(s[i]).startswith("M"):
-        i -= 1
-    return i >= 0 and unicodedata.category(s[i]).startswith("L")
-
-
-@functools.lru_cache(maxsize=128)
-def _prepare(s: str) -> tuple[str, frozenset[int]]:
-    cased = normalize._cased(s, preserve_dashes=True, preserve_line_hyphens=True)
-    optional = set()
-    offset = 0
-    for i, c in enumerate(cased):
-        if c in "-‐‑" and _word_end(cased, i - 1):
-            j = i + 1
-            while j < len(cased) and cased[j].isspace():
-                j += 1
-            if (j > i + 1 and j < len(cased)
-                    and unicodedata.category(cased[j]).startswith("L")
-                    and not cased[j].isupper() and not cased[j].istitle()):
-                optional.add(offset)
-        offset += len(c.lower())
-    # Case conversion can expand a character; map optional indices before squeezing.
-    folded = normalize._DASH.sub("-", cased.lower())
-    chars, squeezed_optional = [], set()
-    for i, c in enumerate(folded):
-        if c.isspace():
-            continue
-        if i in optional:
-            squeezed_optional.add(len(chars))
-        chars.append(c)
-    return "".join(chars), frozenset(squeezed_optional)
+# Note: broadening fold's deletion rule to uncased letters would erase genuine Korean compound
+# hyphens across wraps (test_published_korean_compound_regression); keep both readings here.
 
 
 def matches(needle: str, text: str) -> bool:
@@ -54,8 +21,8 @@ def matches(needle: str, text: str) -> bool:
     most 2 * (len(needle) + 1) states, O(len(needle) * len(text)) work, no backtracking.
     Each state records whether a continuation hyphen was retained or skipped inside the match.
     """
-    want, want_optional = _prepare(needle)
-    hay, hay_optional = _prepare(text)
+    want, want_optional = normalize.continuations(needle)
+    hay, hay_optional = normalize.continuations(text)
     if not want_optional and not hay_optional:
         return False
     if not want:

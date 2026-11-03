@@ -169,6 +169,45 @@ def squeeze(s: str) -> str:
     return _WHITESPACE.sub("", fold(s))
 
 
+@functools.lru_cache(maxsize=128)
+def continuations(s: str) -> tuple[str, frozenset[int]]:
+    """Folded, space-free text and positions of optional wrapping hyphens.
+
+    Inspect original case and hyphen forms before folding them; retain wrapping hyphens so
+    the presence matcher can choose either reading, including for Latin compounds.
+    """
+    cased = _cased(s, preserve_dashes=True, preserve_line_hyphens=True)
+    optional = set()
+    offset = 0
+    for i, c in enumerate(cased):
+        if c in "-‐‑" and _word_end(cased, i - 1):
+            j = i + 1
+            while j < len(cased) and cased[j].isspace():
+                j += 1
+            if (j > i + 1 and j < len(cased)
+                    and unicodedata.category(cased[j]).startswith("L")
+                    and not cased[j].isupper() and not cased[j].istitle()):
+                optional.add(offset)
+        offset += len(c.lower())
+    # Case conversion can expand a character; map optional indices before squeezing.
+    folded = _DASH.sub("-", cased.lower())
+    chars, squeezed_optional = [], set()
+    for i, c in enumerate(folded):
+        if c.isspace():
+            continue
+        if i in optional:
+            squeezed_optional.add(len(chars))
+        chars.append(c)
+    return "".join(chars), frozenset(squeezed_optional)
+
+
+def _word_end(s: str, i: int) -> bool:
+    # A combining mark qualifies only when its cluster has a preceding letter.
+    while i >= 0 and unicodedata.category(s[i]).startswith("M"):
+        i -= 1
+    return i >= 0 and unicodedata.category(s[i]).startswith("L")
+
+
 def _latex_to_text(s: str) -> str:
     if "\\[" in s or "\\(" in s:
         s = _PAREN_MATH.sub(lambda m: f"${m[1]}$", _BRACKET_MATH.sub(lambda m: f"$${m[1]}$$", s))
