@@ -318,8 +318,8 @@ def _changed(config):
 
 
 @pytest.mark.parametrize("name", ["chandra_ocr", "deepseek_ocr", "dots", "hunyuan", "infinity", "lighton",
-                                  "nemotron_parse", "olmocr", "paddleocr_vl", "surya_ocr", "surya_ocr25",
-                                  "unlimited", "unlimited_ocr2"])
+                                  "nemotron_parse", "olmocr", "ovisocr", "ovisocr2", "ovisocr3",
+                                  "paddleocr_vl", "surya_ocr", "surya_ocr25", "unlimited", "unlimited_ocr2"])
 def test_a_server_gets_every_setting_from_the_config(name, tmp_path, monkeypatch):
     """The server holds no setting of its own: the adapter sends its options, so an option changes it,
     and the request records it, so the run is named for it."""
@@ -364,8 +364,9 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("provider", ["chandra-ocr", "deepseek-ocr", "dots-mocr", "glm-ocr", "hunyuan-ocr",
                                       "infinity-parser2", "lightonocr", "mineru", "nanonets-ocr",
-                                      "nemotron-parse", "olmocr", "paddleocr-vl", "surya-ocr",
-                                      "surya-ocr-2.5", "unlimited-ocr", "unlimited-ocr-2"])
+                                      "nemotron-parse", "olmocr", "ovisocr", "ovisocr2", "ovisocr3",
+                                      "paddleocr-vl", "surya-ocr", "surya-ocr-2.5", "unlimited-ocr",
+                                      "unlimited-ocr-2"])
 def test_a_served_model_run_is_named_by_every_option(provider):
     """Every option names the run but the server's address: the same model at another address is the same
     question, and other weights another."""
@@ -443,3 +444,189 @@ def test_vllm_is_asked_what_it_serves_with_the_endpoint_key(monkeypatch):
     with pytest.raises(errors.SystemFailed) as got:
         http.served("http://x", budget.Budget(10))
     assert got.value.status == 401
+
+
+def _ovis_server(name):
+    """A serve folder's server.py, loaded on its own: it stands alone, importing httpx and the stdlib."""
+    import importlib.util
+
+    path = Path(harness.__file__).parent / "providers" / "serve" / name / "server.py"
+    spec = importlib.util.spec_from_file_location(f"serve_{name}", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_ovisocr2_server_post_processing_is_the_cards():
+    server = _ovis_server("ovisocr2")
+    tag = '<img src="images/bbox_1_2_3_4.jpg" />'
+    assert server.drop_image_tags(f"a\n\n{tag}\n\nb") == "a\n\nb"
+    # a short reply is left alone; a long one that ends in a loop keeps one pass of it
+    assert server.clean_truncated_repeats("x" * 100) == "x" * 100
+    looped = "intro " + "abcd" * 3000
+    assert server.clean_truncated_repeats(looped) == "intro abcd"
+    # the card's prompt begins with a newline, which follows the image in the chat template
+    assert server.PROMPT.startswith("\nExtract all readable content")
+
+
+def test_ovisocr2_is_html_only_and_reads_the_servers_text():
+    from omni_parse_bench.harness.providers import ovisocr2
+
+    config = ovisocr2.OvisOcr2()
+    assert ovisocr2.requests(frozenset({"blocks"}), config) == []
+    request = ovisocr2.requests(frozenset({"html", "blocks"}), config)[0]
+    assert request.outputs == frozenset({"html"})
+    outputs, errs = ovisocr2.parse({"text": "# Title\n\ntext", "finish_reason": "stop"}, request)
+    assert "<h1>Title</h1>" in outputs["html"] and not errs
+
+
+def test_ovisocr_prompt_has_no_leading_newline_and_ovisocr2s_has_one():
+    assert _ovis_server("ovisocr").PROMPT.startswith("Extract all readable content")
+    assert _ovis_server("ovisocr2").PROMPT.startswith("\nExtract all readable content")
+    # the two cards' prompts are otherwise the same words
+    assert _ovis_server("ovisocr").PROMPT == _ovis_server("ovisocr2").PROMPT.lstrip("\n")
+
+
+def test_ovisocr3_asks_markdown_for_html_and_structured_for_blocks():
+    from omni_parse_bench.harness.providers import ovisocr3
+
+    config = ovisocr3.OvisOcr3()
+    got = {tuple(r.outputs): r.sent["task"] for r in ovisocr3.requests(frozenset({"html", "blocks"}), config)}
+    assert got == {("html",): "document_markdown", ("blocks",): "document_structured"}
+    assert [r.sent["task"] for r in ovisocr3.requests(frozenset({"html"}), config)] == ["document_markdown"]
+
+
+def test_ovisocr3_server_post_processes_the_markdown_reply_alone(tmp_path, monkeypatch):
+    server = _ovis_server("ovisocr3")
+    (tmp_path / "document_markdown.txt").write_text("MD PROMPT", encoding="utf-8")
+    (tmp_path / "document_structured.txt").write_text("JSON PROMPT", encoding="utf-8")
+    monkeypatch.setattr(server, "PROMPTS_DIR", str(tmp_path))
+    assert server.load_prompt("document_markdown") == "MD PROMPT"
+    tag = '<img src="images/bbox_1_2_3_4.jpg" />'
+    structured = '[{"bbox": [0, 0, 1, 1], "content": "' + tag + '"}]\n'
+    replies = iter(["  a\n\n" + tag + "\n\nb  ", structured])
+
+    class Reply:
+        def raise_for_status(self): pass
+        def json(self): return {"choices": [{"message": {"content": next(replies)}, "finish_reason": "stop"}]}
+
+    sent = {}
+    monkeypatch.setattr(server.httpx, "post", lambda url, json, timeout: sent.update(json) or Reply())
+    s = {"temperature": 0.0, "max_tokens": 5, "min_pixels": 1, "max_pixels": 2, "filter_imgtags": True}
+    assert server.parse(b"png", s, "document_markdown")["text"] == "a\n\nb"
+    assert sent["messages"][0]["content"][1]["text"] == "MD PROMPT"
+    assert sent["mm_processor_kwargs"] == {"images_kwargs": {"min_pixels": 1, "max_pixels": 2}}
+    assert sent["chat_template_kwargs"] == {"enable_thinking": False}
+    # the structured reply is left exactly as the model said it, tag and trailing newline included
+    structured = server.parse(b"png", s, "document_structured")["text"]
+    assert structured.endswith("}]\n") and tag in structured
+
+
+def test_ovisocr3_blocks_come_from_the_structured_reply():
+    from omni_parse_bench.harness.providers import ovisocr3
+
+    said = json.dumps([
+        {"bbox": [100, 50, 900, 120], "category": "doc_title", "content": "# A Title"},
+        {"bbox": [100, 150, 900, 400], "category": "table", "content": "<table><tr><td>1</td></tr></table>"},
+        {"bbox": [100, 450, 500, 700], "category": "image",
+         "content": '<img src="images/bbox_1_2_3_4.jpg" />'},
+        {"bbox": [100, 750, 900, 800], "category": "number", "content": "7"}])
+    request = ovisocr3.requests(frozenset({"blocks"}), ovisocr3.OvisOcr3())[0]
+    outputs, errs = ovisocr3.parse({"text": said, "task": "document_structured"}, request)
+    assert not errs
+    assert [b["label"] for b in outputs["blocks"]] == ["heading", "table", "figure", "page_furniture"]
+    assert outputs["blocks"][0]["bbox"] == [0.1, 0.05, 0.9, 0.12]
+    # a reply cut at the token limit keeps its complete items
+    cut = said[: said.rindex("{") - 2]
+    assert len(ovisocr3.blocks(cut, True)) == 3
+    # a category the table doesn't know fails blocks only, naming it
+    bad = json.dumps([{"bbox": [0, 0, 1, 1], "category": "mystery", "content": "x"}])
+    _, errs = ovisocr3.parse({"text": bad, "task": "document_structured"}, request)
+    assert "mystery" in str(errs["blocks"])
+
+
+@pytest.mark.parametrize("name,sha", [("ovisocr", "dbf31d5899a86047"), ("ovisocr2", "de9617f877f6110d")])
+def test_the_ovis_prompts_are_the_cards(name, sha):
+    """The prompts are the model cards' text (OvisOCR2's begins with a newline, OvisOCR's doesn't): a change
+    to either is a different question, so it is pinned by hash."""
+    import hashlib
+
+    assert hashlib.sha256(_ovis_server(name).PROMPT.encode()).hexdigest()[:16] == sha
+    # the adapter names the run by the same prompt
+    import importlib
+
+    adapter = importlib.import_module(f"omni_parse_bench.harness.providers.{name}")
+    assert adapter.PROMPT_SHA == sha[:12]
+    request = adapter.requests(frozenset({"html"}), _adapter(adapter)())[0]
+    assert request.sent["prompt_sha"] == sha[:12]
+
+
+@pytest.mark.parametrize("name", ["ovisocr", "ovisocr2"])
+def test_ovis_server_asks_vllm_as_the_card_does(name, monkeypatch):
+    server = _ovis_server(name)
+    tag = '<img src="images/bbox_1_2_3_4.jpg" />'
+    reply = {"choices": [{"message": {"content": " a\n\n" + tag + "\n\nb "}, "finish_reason": "stop"}],
+             "usage": {"completion_tokens": 3}}
+
+    class Reply:
+        def raise_for_status(self): pass
+        def json(self): return reply
+
+    sent = {}
+    monkeypatch.setattr(server.httpx, "post", lambda url, json, timeout: sent.update(json) or Reply())
+    s = {"temperature": 0.0, "max_tokens": 5, "min_pixels": 1, "max_pixels": 2, "filter_imgtags": True}
+    got = server.parse(b"png", s)
+    assert got["text"] == "a\n\nb" and got["completion"] == reply   # the raw completion is kept
+    parts = sent["messages"][0]["content"]
+    assert [p["type"] for p in parts] == ["image_url", "text"] and parts[1]["text"] == server.PROMPT
+    assert sent["model"] == name
+    assert (sent["temperature"], sent["max_tokens"]) == (0.0, 5)
+    assert sent["mm_processor_kwargs"] == {"images_kwargs": {"min_pixels": 1, "max_pixels": 2}}
+    assert sent["chat_template_kwargs"] == {"enable_thinking": False}
+    # the card's filter is an option, on by default
+    reply["choices"][0]["message"]["content"] = "a\n\n" + tag
+    assert server.parse(b"png", {**s, "filter_imgtags": False})["text"] == "a\n\n" + tag
+
+
+def test_ovisocr3_a_malformed_structured_reply_fails_blocks_unless_cut_at_the_token_limit():
+    from omni_parse_bench.harness.providers import ovisocr3
+
+    request = ovisocr3.requests(frozenset({"blocks"}), ovisocr3.OvisOcr3())[0]
+    ok = json.dumps({"bbox": [0, 0, 10, 10], "category": "text", "content": "x"})
+    # an unescaped backslash in the middle item makes the whole reply invalid JSON: blocks fail, none are
+    # silently lost
+    formula = '{"bbox": [0, 0, 1, 1], "category": "inline_formula", "content": "\\alpha"}'
+    bad = "[" + ok + ", " + formula + ", " + ok + "]"
+    for text in (bad, "not json at all", '{"bbox": [0, 0, 1, 1]}'):
+        outputs, errs = ovisocr3.parse({"text": text, "finish_reason": "stop"}, request)
+        assert "blocks" not in outputs and "blocks" in errs, text
+    # the model's own token limit cutting the array keeps the complete items before the cut
+    cut = "[" + ok + ", " + ok[:20]
+    outputs, errs = ovisocr3.parse({"text": cut, "finish_reason": "length"}, request)
+    assert len(outputs["blocks"]) == 1 and not errs
+
+
+@pytest.mark.parametrize("name", ["ovisocr2", "ovisocr3"])
+@pytest.mark.parametrize("compute_cap,override,expect", [
+    ("9.0", "", ""),                       # Hopper: vLLM's own choice, as the card runs it
+    ("8.0", "", ""),
+    ("10.0", "", "TORCH_SDPA"),            # Blackwell: vLLM 0.22.1's default fails to compile there
+    ("12.0", "", "TORCH_SDPA"),
+    ("9.0", "TORCH_SDPA", "TORCH_SDPA"),   # an explicit choice wins
+    ("10.0", "default", ""),
+])
+def test_ovis_qwen35_servers_choose_the_vision_encoders_attention(
+        name, compute_cap, override, expect, tmp_path):
+    """On Blackwell vLLM 0.22.1's vision-encoder attention fails to compile, so start.sh passes torch SDPA
+    there and leaves vLLM's choice elsewhere; `MM_ENCODER_ATTN_BACKEND` overrides either."""
+    import subprocess
+
+    text = (Path(harness.__file__).parent / "providers" / "serve" / name / "start.sh").read_text()
+    snippet = text.split("# --- encoder attention\n", 1)[1].split("# --- end encoder attention", 1)[0]
+    (tmp_path / "nvidia-smi").write_text(f"#!/bin/sh\necho {compute_cap}\n")
+    (tmp_path / "nvidia-smi").chmod(0o755)
+    env = {"PATH": f"{tmp_path}:/usr/bin:/bin"} | ({"MM_ENCODER_ATTN_BACKEND": override} if override else {})
+    out = subprocess.run(["bash", "-c", snippet + '\necho "${ENC[*]:-}"'], env=env, capture_output=True,
+                         text=True, check=True).stdout.strip()
+    assert out == (f"--mm-encoder-attn-backend {expect}" if expect else "")
+    assert '"${ENC[@]}"' in text.split("vllm.entrypoints.cli.main serve", 1)[1]
