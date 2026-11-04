@@ -27,7 +27,8 @@ _FOOTNOTE = re.compile(r"\[\^\s*(\w{1,3})\s*\]|\[\s*(\d{1,3})\s*\]")
 _BULLET = re.compile(r"(?m)^([ \t]*)[•‣◦▪▶∙●](?=\s|$)")
 _LEADERS = re.compile("(?:[.…·_\\-–—=*]\\s?){3,}")
 _DASH = re.compile("[‐-―−]")
-_SQUOTE = re.compile("[‘’‚‛ʼ`´′]")
+# Note: ꞌ (saltillo, a glottal stop in Amarasi) and ˈ (IPA primary stress) are typed as an ASCII apostrophe.
+_SQUOTE = re.compile("[‘’‚‛ʼ`´′ꞌꞋˈ]")
 _DQUOTE = re.compile("[“”„‟«»]")
 # TeX's quotes, written as doubled single quotes; and a spacing accent typed after its letter, as a
 # text layer copies it from TeX ("Cuo´"), which NFKC would split into a space and a loose accent.
@@ -109,7 +110,7 @@ def fold(s: str) -> str:
                          [ ] and [unchecked]
         markers          a footnote marker [1] or [^1] -> " 1"; a bullet glyph starting a line -> a space
         leaders          runs of 3+ dots, dashes or underscores -> a space
-        typography       dash, quote (with primes), space and arrow families unified; the fraction slash
+        typography       dash, quote (with primes, ꞌ and ˈ), space and arrow families unified; the fraction slash
                          -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII
         case, spacing    lowercased; whitespace collapsed and trimmed
 
