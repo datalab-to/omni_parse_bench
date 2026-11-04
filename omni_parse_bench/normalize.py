@@ -110,7 +110,7 @@ def fold(s: str) -> str:
                          [ ] and [unchecked]
         markers          a footnote marker [1] or [^1] -> " 1"; a bullet glyph starting a line -> a space
         leaders          runs of 3+ dots, dashes or underscores -> a space
-        typography       dash, quote (with primes, ꞌ and ˈ), space and arrow families unified; the fraction slash
+        typography       dash, quote (with primes, ꞌ, ˈ), space and arrow families unified; the fraction slash
                          -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII
         case, spacing    lowercased; whitespace collapsed and trimmed
 
