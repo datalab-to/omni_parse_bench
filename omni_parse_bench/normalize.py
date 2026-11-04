@@ -86,6 +86,7 @@ _SPACED_DIGITS = re.compile(r"\d[\d.,]*(?:\s+[\d.,]+)+")
 # A word broken at a line end: a hyphen (any of its forms), then the line break, or the space a
 # writer joined lines with. Not a dash, which can end a line before a lowercase word.
 _LINE_HYPHEN = re.compile(r"(?<=[^\W\d_])[-\u2010\u2011]\s+([^\W\d_])")
+_WRAP_HYPHEN = re.compile("[-‐‑](?=\\s)")
 
 
 def fold(s: str) -> str:
@@ -114,9 +115,15 @@ def fold(s: str) -> str:
 
     Case is folded because it isn't what a parse is paid for; digits, letters and their order are.
     """
+    return _cased(s).lower()
+
+
+def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool = False) -> str:
+    """The fold before lowercasing, for inspecting a continuation's original case."""
     s = _latex_to_text(s)
     # Note: only before a lowercase letter, so a line ending "-" before a capital or a digit stays.
-    s = _LINE_HYPHEN.sub(lambda m: m[1] if m[1].islower() else m[0], s)
+    if not preserve_line_hyphens:
+        s = _LINE_HYPHEN.sub(lambda m: m[1] if m[1].islower() else m[0], s)
     s = _SUPERSCRIPT_DIGITS.sub(r" \1", s)
     s = _INVISIBLE.sub("", unicodedata.normalize("NFKC", _primes(s)))
     s = boxes(s)
@@ -125,9 +132,9 @@ def fold(s: str) -> str:
     s = _FOOTNOTE.sub(lambda m: f" {m[1] or m[2]}", s)
     s = _BULLET.sub(r"\1 ", s)
     s = _LEADERS.sub(" ", s)
-    s = typography(s)
+    s = typography(s, preserve_dashes=preserve_dashes)
     s = s.replace("…", "...").translate(_CJK_PUNCT)
-    return _WHITESPACE.sub(" ", s).strip().lower()
+    return _WHITESPACE.sub(" ", s).strip()
 
 
 def boxes(s: str) -> str:
@@ -143,11 +150,12 @@ def _primes(s: str) -> str:
     return _SPACING_ACCENT.sub(lambda m: _COMBINING[m[1]], _ACUTE_APOSTROPHE.sub("'", s))
 
 
-def typography(s: str) -> str:
+def typography(s: str, *, preserve_dashes: bool = False) -> str:
     """`s` with its character forms unified (compatibility forms, invisibles, dashes, quotes,
     spaces, arrows) and nothing else: markup such as `**` and case are left alone."""
     s = _INVISIBLE.sub("", unicodedata.normalize("NFKC", _primes(s))).replace("⁄", "/")
-    s = _DASH.sub("-", s)
+    if not preserve_dashes:
+        s = _DASH.sub("-", s)
     s = _SQUOTE.sub("'", s)
     s = _DQUOTE.sub('"', s)
     s = _SPACE.sub(" ", s)
@@ -160,6 +168,41 @@ def squeeze(s: str) -> str:
     """`fold` with every space removed, for text layers that glue a footnote marker to its word
     ("Probiotic1")."""
     return _WHITESPACE.sub("", fold(s))
+
+
+@functools.lru_cache(maxsize=128)
+def continuations(s: str) -> tuple[str, frozenset[int]]:
+    """Folded, space-free text and positions of optional wrapping hyphens.
+
+    Inspect original case and hyphen forms before folding them; retain wrapping hyphens so
+    the presence matcher can choose either reading, including for Latin compounds.
+    """
+    cased = _cased(s, preserve_dashes=True, preserve_line_hyphens=True)
+    optional = set()
+    offset, previous = 0, 0
+    for match in _WRAP_HYPHEN.finditer(cased):
+        i = match.start()
+        if not _word_end(cased, i - 1):
+            continue
+        j = i + 1
+        while j < len(cased) and cased[j].isspace():
+            j += 1
+        if (j < len(cased) and unicodedata.category(cased[j]).startswith("L")
+                and not cased[j].isupper() and not cased[j].istitle()):
+            # Lowercasing can expand characters. Count intervening segments, not every
+            # character in Python or the whole prefix again for each wrapping hyphen.
+            offset += len(_WHITESPACE.sub("", cased[previous:i].lower()))
+            previous = i
+            optional.add(offset)
+    folded = _WHITESPACE.sub("", _DASH.sub("-", cased.lower()))
+    return folded, frozenset(optional)
+
+
+def _word_end(s: str, i: int) -> bool:
+    # A combining mark qualifies only when its cluster has a preceding letter.
+    while i >= 0 and unicodedata.category(s[i]).startswith("M"):
+        i -= 1
+    return i >= 0 and unicodedata.category(s[i]).startswith("L")
 
 
 def _latex_to_text(s: str) -> str:

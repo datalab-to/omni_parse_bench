@@ -16,6 +16,7 @@ import fuzzysearch
 from rapidfuzz import fuzz
 
 from omni_parse_bench import normalize, tables, views
+from omni_parse_bench.scorers.unit_tests import hyphenation
 
 # Note: a test allowing k edits in an n-character string passes at ratio 1 - k/n, and rapidfuzz
 # returns exactly that ratio for k edits, which in binary lands a hair under it.
@@ -63,6 +64,8 @@ def found(a: Arg, v: views.Html) -> Mark:
     if isinstance(a, Number): return _number_found(a.number, v)
     if isinstance(a, Latex): return _latex_found(a.latex, v)
     ok, r, thr = contains(a.text, v.text, a.max_diffs)
+    if not ok and hyphenation.matches(a.text, v.text):
+        return True, ""
     return _mark(ok, f"{a.text[:60]!r} not found (best {r:.3f} < {thr:.3f})")
 
 
@@ -351,10 +354,12 @@ def _partial(needle: str, hay: str) -> float:
 def contains(needle: str, text: str, max_diffs: int) -> tuple[bool, float, float]:
     """Whether `needle` appears in `text`, with the best match ratio and the threshold: `_ratio`
     after `fold`, then again after `squeeze` for words the text layer glues together."""
-    ok, r, thr = _ratio(normalize.fold(needle), normalize.fold(text), max_diffs)
+    want, hay = normalize.fold(needle), normalize.fold(text)
+    ok, r, thr = _ratio(want, hay, max_diffs)
     if ok:
         return True, r, thr
-    ok, r2, _ = _ratio(normalize.squeeze(needle), normalize.squeeze(text), max_diffs)
+    # fold has already collapsed all whitespace to ASCII spaces; reuse it for squeeze.
+    ok, r2, _ = _ratio(want.replace(" ", ""), hay.replace(" ", ""), max_diffs)
     return ok, max(r, r2), thr
 
 
