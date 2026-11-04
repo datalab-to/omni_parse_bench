@@ -128,6 +128,15 @@ def test_fold_leaves_money_alone():
     assert normalize.fold(form) == "amount enclosed $ date paid balance $"
 
 
+def test_fold_normalizes_decimal_middle_dots_only_between_digits():
+    assert normalize.fold("4·5 and 0∙7") == "4.5 and 0.7"
+    assert normalize.fold("mol·dm") == "mol·dm"
+
+
+def test_fold_normalizes_equivalent_diamond_and_less_equal_glyphs():
+    assert normalize.fold("♢ ≦ 10") == normalize.fold("◊ ≤ 10")
+
+
 def test_a_line_end_dash_isnt_a_hyphen():
     assert normalize.fold("north\u2014\nsouth") != normalize.fold("northsouth")
 
