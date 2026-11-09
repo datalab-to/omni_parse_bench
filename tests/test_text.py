@@ -114,11 +114,19 @@ def test_seen_view_leaves_out_image_alt_text():
     ("\u2018\u2018quoted\u2019\u2019", '"quoted"'),
     ("Cuo\u00b4 and Mu\u00a8ller", "Cu\u00f3 and M\u00fcller"),
     ("it\u00b4s", "it's"),
+    ("re\ua78c anmatoom", "re' anmatoom"),
+    ("Re\ua78b anmatoom", "re' anmatoom"),
+    ("/\u02c8m\u026an\u026at/", "/'m\u026an\u026at/"),
     ("<math>T = 20.3, p &lt; 0.0001</math>", "T = 20.3, p < 0.0001"),
     ("$T = 20.3$, $p < 0.0001$", "T = 20.3, p < 0.0001"),
 ])
 def test_fold_equates_both_sides(a, b):
     assert normalize.fold(views.text(a)) == normalize.fold(views.text(b))
+
+
+def test_fold_keeps_other_modifier_letters():
+    for kept in ("ˉ", "ˌ", "ꞎ", "ʻ"):
+        assert normalize.fold(f"a{kept}b") == f"a{kept}b"
 
 
 def test_fold_leaves_money_alone():
