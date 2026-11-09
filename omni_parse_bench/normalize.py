@@ -87,6 +87,7 @@ _SPACED_DIGITS = re.compile(r"\d[\d.,]*(?:\s+[\d.,]+)+")
 # A word broken at a line end: a hyphen (any of its forms), then the line break, or the space a
 # writer joined lines with. Not a dash, which can end a line before a lowercase word.
 _LINE_HYPHEN = re.compile(r"(?<=[^\W\d_])[-\u2010\u2011]\s+([^\W\d_])")
+_DECIMAL_MIDDOT = re.compile(r"(?<=\d)[·∙](?=\d)")
 _WRAP_HYPHEN = re.compile("[-‐‑](?=\\s)")
 
 
@@ -112,6 +113,7 @@ def fold(s: str) -> str:
         leaders          runs of 3+ dots, dashes or underscores -> a space
         typography       dash, quote (with primes, ꞌ, ˈ), space and arrow families unified; the fraction slash
                          -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII
+        symbols          decimal middle dots -> "."; ♢ -> ◊; ≦ -> ≤
         case, spacing    lowercased; whitespace collapsed and trimmed
 
     Case is folded because it isn't what a parse is paid for; digits, letters and their order are.
@@ -135,6 +137,7 @@ def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool
     s = _LEADERS.sub(" ", s)
     s = typography(s, preserve_dashes=preserve_dashes)
     s = s.replace("…", "...").translate(_CJK_PUNCT)
+    s = _DECIMAL_MIDDOT.sub(".", s).replace("♢", "◊").replace("≦", "≤")
     return _WHITESPACE.sub(" ", s).strip()
 
 
