@@ -22,10 +22,14 @@ _CHECKED = re.compile("[☑☒■▣✓✔✗✘]")
 _UNCHECKED = re.compile("[☐□◻◼❏▢⬜]")
 _BRACKET_CHECKED = re.compile(r"\[(?:[xX✓✗]|checked)\]", re.I)
 _BRACKET_UNCHECKED = re.compile(r"\[ ?\]|\[unchecked\]", re.I)
-_FOOTNOTE = re.compile(r"\[\^\s*(\w{1,3})\s*\]|\[\s*(\d{1,3})\s*\]")
+# Note: not an index, after "]" or before "[", "(", "=" or ";" ("str[3][10]", "URL[6];").
+_FOOTNOTE = re.compile(r"\[\^\s*(\w{1,3})\s*\]|(?<!\])\[\s*(\d{1,3})\s*\](?![\[(=;])")
 # Note: ■ isn't here; it's a checked box (_CHECKED).
 _BULLET = re.compile(r"(?m)^([ \t]*)[•‣◦▪▶∙●](?=\s|$)")
-_LEADERS = re.compile("(?:[.…·_\\-–—=*]\\s?){3,}")
+# Note: one kind per run, and dots never start at a sentence's full stop (a dot after a word and before
+# a space); a dash before a digit is its sign ("....... -4.8%").
+_LEADERS = re.compile(r"(?:(?<!\w)|(?=[.…·][.…·]))(?:[.…·]\s*){3,}|(?:_\s*){3,}|(?:[-–—](?!\d)\s*){3,}"
+                      r"|(?:=\s*){3,}|(?:\*\s*){3,}")
 _DASH = re.compile("[‐-―−]")
 # Note: ꞌ (saltillo, a glottal stop in Amarasi) and ˈ (IPA primary stress) are typed as an ASCII apostrophe.
 _SQUOTE = re.compile("[‘’‚‛ʼ`´′ꞌꞋˈ]")
@@ -63,6 +67,7 @@ _DISPLAY_MATH = re.compile(r"\$\$(.+?)\$\$", re.S)
 # \[..\] and \(..\) are the same math as $$..$$ and $..$, written the other LaTeX way.
 _BRACKET_MATH, _PAREN_MATH = re.compile(r"\\\[(.+?)\\\]", re.S), re.compile(r"\\\((.+?)\\\)", re.S)
 _INLINE_MATH = re.compile(r"\$([^$\n]+?)\$")
+_BLANK = re.compile("__")   # a fill-in blank; LaTeX never writes two underscores in a row
 _LATEX_MARKUP = re.compile(r"[\\^_{}]")
 _LATEX_RESIDUE = re.compile(r"[_^{}\\]")
 # A $..$ span is math only if it's short and dense. Prose between two dollar amounts ("$5.00 ... on
@@ -214,22 +219,37 @@ def _latex_to_text(s: str) -> str:
         s = _PAREN_MATH.sub(lambda m: f"${m[1]}$", _BRACKET_MATH.sub(lambda m: f"$${m[1]}$$", s))
     if "$" not in s:
         return s
-    s = _DISPLAY_MATH.sub(_math_span, s)
-    return _INLINE_MATH.sub(_math_span, s)
+    s = _DISPLAY_MATH.sub(lambda m: m[0] if (t := _math_span(m)) is None else t, s)
+    out, i = [], 0
+    while m := _INLINE_MATH.search(s, i):
+        if (t := _math_span(m)) is None:
+            # Note: prose between two dollars; its closing $ may open the math that follows.
+            out.append(s[i:m.end() - 1])
+            i = m.end() - 1
+            continue
+        out += [s[i:m.start()], t]
+        i = m.end()
+    return "".join(out) + s[i:]
 
 
-def _math_span(m: re.Match[str]) -> str:
+def _math_span(m: re.Match[str]) -> str | None:
+    """The text a math span renders, or None when it isn't math."""
     body = m[1]
+    if _BLANK.search(body): return None
+    # Note: a digit on both sides of a span is two prices ("$92,000; Net +$60,000"); math before a number
+    # rarely starts with one ("$<$0.05", "$\\ge$2").
+    if m.re is _INLINE_MATH and body[:1].isdigit() and m.string[m.end():m.end() + 1].isdigit():
+        return None
     if _MATH_LETTERS.fullmatch(body.strip()): return body.strip()
     dense = _dense(body)
     if _SPACED_DIGITS.fullmatch(body): return dense
     if (dense.count(" ") > _MATH_MAX_SPACES or len(body) > _MATH_MAX_LEN
             or (m.re is _INLINE_MATH and _prose(body))):
-        return m[0]
+        return None
     # Note: math with no LaTeX in it ("$p < 0.05$", <math>T = 20.3</math>) reads as the text it
     # renders, as math with LaTeX does; but only when it hugs its dollars, since prose between two
     # dollar amounts has a space inside one of them ("$2.7 $2.2", "$1,000 to $2,000").
-    if not _LATEX_MARKUP.search(body): return body if body == body.strip() else m[0]
+    if not _LATEX_MARKUP.search(body): return body if body == body.strip() else None
     try:
         t = _latex_converter().latex_to_text(dense, latex_context=_walker_context())
     except Exception:

@@ -11,6 +11,8 @@ import unicodedata
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from omni_parse_bench import views
+
 KATEX = Path(__file__).parent / "katex" / "katex.js"   # KaTeX 0.16.22, MIT (LICENSE beside it)
 _RENDER = """(tex, display) => {
   try {
@@ -156,7 +158,8 @@ def _invisible(s: str | None) -> bool:
 def spans(html: str) -> list[tuple[str, bool]]:
     """The math in an output, in order: each span's LaTeX (or MathML) and whether it is display math."""
     out = []
-    for m in _SPANS.finditer(html):
+    # Note: a line break before each block tag, which stays: an image's alt text may hold math.
+    for m in _SPANS.finditer(views.BLOCK.sub(lambda b: "\n" + b[0], html)):
         if m[6] is not None:
             body, display = m[6].strip(), "block" in (m[5] or "")
             if "<" in body:

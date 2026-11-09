@@ -161,3 +161,14 @@ def test_a_footnote_marker_after_a_number_is_not_one_of_its_digits(output):
 def test_a_text_test_still_finds_a_superscript_written_inline():
     assert R.present(R.Present(R.Text("m2 area", 0)), html("<p>m<sup>2</sup> area</p>"))[0]
     assert R.order(R.Order("x2", "y", 0), html("<p>x<sup>2</sup> then y</p>"))[0]
+
+
+def test_an_image_description_beside_a_cells_text_doesnt_cost():
+    v = html('<table><tr><td><img alt="photo: Shangjr Gwo">Shangjr Gwo</td>'
+             '<td>Tsing Hua University</td></tr></table>')
+    assert R.table_cell(R.TableCell("Tsing Hua University", {"left": "Shangjr Gwo"}, 0), v)[0]
+
+
+def test_a_cell_that_is_only_an_image_reads_as_its_alt_text():
+    v = html('<table><tr><td>Status</td><td><img alt="red circle"></td></tr></table>')
+    assert R.table_cell(R.TableCell("red circle", {"left": "Status"}, 0), v)[0]

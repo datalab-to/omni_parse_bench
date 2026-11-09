@@ -31,7 +31,7 @@ _COMMENT = re.compile(r"<!--.*?-->", re.S)
 _DOCTYPE = re.compile(r"<!DOCTYPE[^>]*>", re.I)
 # Note: <head> and <title> hold a document's metadata, which a browser never shows on the page.
 _SCRIPT = re.compile(r"<(script|style|head|title)\b.*?</\1>", re.S | re.I)
-_BLOCK = re.compile(
+BLOCK = re.compile(
     r"</?(?:table|thead|tbody|tfoot|tr|td|th|p|div|li|ul|ol|dl|dt|dd|h[1-6]|br|hr|section|article|"
     r"figure|figcaption|blockquote|pre|caption|header|footer|nav|aside|form|label|select|option|"
     r"textarea|img)\b[^<>]*>",
@@ -131,7 +131,7 @@ def text(s: str, *, alt: bool = True) -> str:
     s = _MD_IMAGE.sub(lambda m: f" {m[1]} " if alt else " ", s)
     for pattern in (_COMMENT, _DOCTYPE, _SCRIPT):
         s = pattern.sub(" ", s)
-    s = _INLINE.sub("", _BLOCK.sub(" ", _SUP.sub(" ", s)))
+    s = _INLINE.sub("", BLOCK.sub(" ", _SUP.sub(" ", s)))
     return _html.unescape(s)
 
 

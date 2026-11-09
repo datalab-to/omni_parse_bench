@@ -6,6 +6,7 @@ import re
 import pytest
 
 from omni_parse_bench import markdown, normalize, views
+from omni_parse_bench.scorers.unit_tests import runners
 
 
 def test_unclosed_fence_is_not_a_code_block():
@@ -252,3 +253,74 @@ def test_no_escape_is_left_inside_a_raw_html_block():
 def test_a_reference_list_is_text():
     assert "[1]: https://doi.org/10.1000/xyz" in views.text(
         markdown.to_html("References\n\n[1]: https://doi.org/10.1000/xyz\n\nEnd."))
+
+
+@pytest.mark.parametrize("html, number", [
+    ("<p>Fee: $____</p><p>12</p><p>34</p><p>$____</p>", "12"),
+    ("<p>Fee $____ 12 34 $____</p>", "12"),
+    ("<p>Deposit $___ 10% of $___</p>", "10%"),
+])
+def test_dollars_around_a_form_blank_arent_math(html, number):
+    assert runners.found(runners.Number(number), views.html(html))[0]
+
+
+@pytest.mark.parametrize("text, html", [
+    ("Gross 8% / $92,000; Net +5% / +$60,000", "<td>Gross 8% / $92,000;<br>Net +5% / +$60,000</td>"),
+    ("Cost $5 12 x_1 34 $6", "<p>Cost $5</p><td>12 x_1 34</td><p>$6</p>"),
+    ("the Mann-Whitney U test", "<p>Cost was US$5 and the Mann-Whitney $U$ test was run</p>"),
+])
+def test_two_prices_are_never_the_ends_of_one_math_span(text, html):
+    assert runners.found(runners.Text(text, 0), views.html(html))[0]
+
+
+def test_inline_math_still_reads_as_its_text():
+    assert normalize.fold(r"Let $c_{\text{MC}}$ and $x_1$ be") == "let cmc and x1 be"
+
+
+def test_a_bullet_starting_a_paragraph_reads_as_it_does_inline():
+    html = "<p>P.O. BOX 2000</p><p>• CORTLAND, NY 13045-0900</p>"
+    assert runners.found(runners.Text("P.O. BOX 2000 • CORTLAND, NY 13045-0900", 0), views.html(html))[0]
+
+
+def test_a_table_cell_isnt_matched_by_one_of_its_paragraphs():
+    t = runners.TableCell("2024", {"right": "1,240"}, 0)
+    html = "<table><tr><td><p>2024</p><p>2025</p></td><td>1,240</td></tr></table>"
+    assert not runners.table_cell(t, views.html(html))[0]
+
+
+@pytest.mark.parametrize("html, number", [
+    ("<p>Net change ........ -4.8%</p>", "-4.8%"),
+    ("<p>Net change -------- -4.8%</p>", "-4.8%"),
+    ("<p>Balance ____ -120</p>", "-120"),
+])
+def test_a_negative_number_after_leaders_keeps_its_sign(html, number):
+    assert runners.found(runners.Number(number), views.html(html))[0]
+
+
+def test_leaders_fold_away_however_they_are_spaced():
+    assert normalize.fold("Total ____  _ 12 .  .  . 3") == "total 12 3"
+
+
+def test_a_full_stop_before_a_blank_stays():
+    assert normalize.fold("Sign here. ________") == "sign here."
+
+
+@pytest.mark.parametrize("text, folded", [
+    (r"$\ge$2 cas", "≥2 cas"), (r"$\pm$13.33", "±13.33"), (r"p $<$0.05", "p <0.05"), (r"n $=$12", "n =12"),
+    (r"$-$5 dB", "-5 db"), (r"$x^2$1", "x21"),
+])
+def test_math_right_before_a_number_still_reads_as_math(text, folded):
+    assert normalize.fold(text) == folded
+
+
+def test_a_full_stop_before_dot_leaders_on_the_next_line_stays():
+    html = "<p>All are most cordially invited to attend.</p><p>. ..... .....</p>"
+    assert runners.found(runners.Text("All are most cordially invited to attend.", 0), views.html(html))[0]
+
+
+@pytest.mark.parametrize("text, folded", [
+    ("char str[3][10],temp[10];", "char str[3][10],temp[10];"), ("new URL[6];", "new url[6];"),
+    ("four-chamber view[1] can", "four-chamber view 1 can"),
+])
+def test_an_index_isnt_a_footnote_marker(text, folded):
+    assert normalize.fold(text) == folded
