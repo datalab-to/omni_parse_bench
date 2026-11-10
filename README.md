@@ -12,6 +12,8 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 
 | parser | weights | parameters | headline | USD / 1,000 pages | text | tables | layout | refusals |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Gemini 4 Argon † | closed |  | 95.8 | $49.91 ‡ | 93.9 | 97.0 | 96.4 | 8 |
+| Gemini 4 Carbon † | closed |  | 95.6 | $58.66 ‡ | 94.1 | 97.0 | 95.6 | 5 |
 | Datalab accurate | closed |  | 94.1 | $7.50 | 92.0 | 94.2 | 96.0 | — |
 | Gemini 3.8 Flash * | closed |  | 92.9 | ≈$37.08 | 91.3 | 95.2 | 92.2 | 8 |
 | Datalab balanced | closed |  | 92.6 | $3.00 | 90.1 | 91.6 | 96.2 | — |
@@ -52,6 +54,10 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | Tesseract | open | n/a | none | — | 17.6 | 0.0 | unsupported | — |
 
 \* Used in creating and verifying at least some tests.
+
+† Gemini 4 results use the shared `bbox` reader alias and one rerun of all originally failed pages; original successful pages are unchanged. Other rows have not been rerun with this reader. See [the run notes](docs/gemini4-2026-11-10.md).
+
+‡ Gemini 4 costs include the original full pass **and** all failed-page reruns, divided by 2,937 pages; separate validation probes are excluded. These cumulative experiment costs are not fresh single-pass prices.
 
 ## About the benchmark
 
