@@ -366,6 +366,202 @@
         "max": 803.2
       },
       "latency_definition": "Full-page saved record wall_s over all 2937 pages, including requested HTML and layout, failures and retries; 32 workers. Historical chart values use successful unretried HTML calls and are not directly comparable."
+    },
+    "Gemini 4 Argon": {
+      "headline": 0.9575443059448414,
+      "families": {
+        "text": {
+          "score": 0.939286974938228,
+          "tests": 8499,
+          "documents": 1791
+        },
+        "tables": {
+          "score": 0.9695506869662087,
+          "tests": 5386,
+          "documents": 591
+        },
+        "layout": {
+          "score": 0.9637952559300874,
+          "tests": 2403,
+          "documents": 632
+        }
+      },
+      "coverage": 0.9972761321075928,
+      "pages": 2937,
+      "failed_pages": 8,
+      "refused_pages": 8,
+      "other_failed_pages": 0,
+      "refusal_page_ids": [
+        "multiling_finepdfs-cop_Copt_65913050-p1",
+        "multiling_finepdfs-hbo_Hebr_64070277-p1",
+        "multiling_finepdfs-images_hbo_Hebr_64070277-p1",
+        "multiling_finepdfs-images_kyu_Kali_18386587-p1",
+        "multiling_finepdfs-images_sat_Olck_74281726-p1",
+        "multiling_finepdfs-lis_Lisu_02548283-p1",
+        "synth_copies-images_svefb02291-p1",
+        "synth_copies-svefb02291-p1"
+      ],
+      "failed_page_ids": [
+        "multiling_finepdfs-cop_Copt_65913050-p1",
+        "multiling_finepdfs-hbo_Hebr_64070277-p1",
+        "multiling_finepdfs-images_hbo_Hebr_64070277-p1",
+        "multiling_finepdfs-images_kyu_Kali_18386587-p1",
+        "multiling_finepdfs-images_sat_Olck_74281726-p1",
+        "multiling_finepdfs-lis_Lisu_02548283-p1",
+        "synth_copies-images_svefb02291-p1",
+        "synth_copies-svefb02291-p1"
+      ],
+      "measurement": "2026-11-10: one full pass followed by one rerun of every originally failed page after adding the shared bbox key alias; all original successful pages retained and every retry outcome used. Not an independent fresh full pass.",
+      "dataset_revision": "d70182b9f901d1660a27e60bf6be6d6e6ea83013",
+      "scorer_package": "omni-parse-bench 1.5.0",
+      "core_package": "omni-bench-core 0.14.0",
+      "model": "google/gemini-4-argon",
+      "inference": {
+        "reasoning": "provider default; medium in the OpenRouter catalog at launch",
+        "max_output_tokens": 32000,
+        "long_edge_pixels": 2048,
+        "timeout_seconds": 900,
+        "workers": 32,
+        "attempts": 3,
+        "prompts": "stock separate HTML and layout requests"
+      },
+      "reader": {
+        "change": "accept bbox as an alias for bbox_2d / box_2d, in the same prompted [ymin, xmin, ymax, xmax] coordinate order",
+        "function_sha256": "a5c5999610786508807775a23dba5e876b8bddb1a1c1105219dd6b6987549a4c",
+        "scope": "same generic reader for both models; other scorer and runtime code unchanged"
+      },
+      "initial_pass": {
+        "run": "google__gemini-4-argon-20261110-195518-6cc5",
+        "headline": 0.8503922946443653,
+        "families": {
+          "text": {
+            "score": 0.8845746558418638,
+            "tests": 8499,
+            "documents": 1791
+          },
+          "tables": {
+            "score": 0.93501670998886,
+            "tests": 5386,
+            "documents": 591
+          },
+          "layout": {
+            "score": 0.731585518102372,
+            "tests": 2403,
+            "documents": 632
+          }
+        },
+        "failed_pages": 172,
+        "reported_cost_usd": 135.418094
+      },
+      "failed_page_rerun": {
+        "run": "google__gemini-4-argon-20261110-211259-2668",
+        "pages": 172,
+        "recovered_pages": 164,
+        "reported_cost_usd": 11.171204
+      },
+      "reported_cost_usd": 146.58929799999999,
+      "reported_cost_per_1000_pages": 49.9112352740892,
+      "cost_unknown_pages": 0,
+      "cost_basis": "Cumulative reported spend of the original full pass plus all failed-page reruns, divided by 2937 pages; includes abandoned original failures, excludes separate five-page validation probes. Not a fresh single-pass price or steady-state estimate.",
+      "reported_cost_source": "Stock adapter usage.cost plus cost_details.upstream_inference_cost under BYOK; includes every stock parse attempt."
+    },
+    "Gemini 4 Carbon": {
+      "headline": 0.9558998386936245,
+      "families": {
+        "text": {
+          "score": 0.9412872102600306,
+          "tests": 8499,
+          "documents": 1791
+        },
+        "tables": {
+          "score": 0.9701076865948756,
+          "tests": 5386,
+          "documents": 591
+        },
+        "layout": {
+          "score": 0.9563046192259675,
+          "tests": 2403,
+          "documents": 632
+        }
+      },
+      "coverage": 0.9962546816479401,
+      "pages": 2937,
+      "failed_pages": 11,
+      "refused_pages": 5,
+      "other_failed_pages": 6,
+      "refusal_page_ids": [
+        "multiling_finepdfs-images_kyu_Kali_18386587-p1",
+        "olmo_old_scans-82-p1",
+        "synth_copies-images_sv29a51595-p1",
+        "synth_copies-images_svefb02291-p1",
+        "synth_copies-svefb02291-p1"
+      ],
+      "failed_page_ids": [
+        "docparsing_images-images_ce7a1476_images_finance_financial_report_00050-p1",
+        "multiling_finepdfs-images_hbo_Hebr_64070277-p1",
+        "multiling_finepdfs-images_kyu_Kali_18386587-p1",
+        "multiling_finepdfs-images_sat_Olck_74281726-p1",
+        "multiling_finepdfs-images_sat_Olck_80815249-p1",
+        "multiling_finepdfs-images_ydd_Hebr_48174878-p1",
+        "olmo_old_scans-82-p1",
+        "synth_copies-images_sv29a51595-p1",
+        "synth_copies-images_svefb02291-p1",
+        "synth_copies-sv77fd1adc-p1",
+        "synth_copies-svefb02291-p1"
+      ],
+      "measurement": "2026-11-10: one full pass followed by one rerun of every originally failed page after adding the shared bbox key alias; all original successful pages retained and every retry outcome used. Not an independent fresh full pass.",
+      "dataset_revision": "d70182b9f901d1660a27e60bf6be6d6e6ea83013",
+      "scorer_package": "omni-parse-bench 1.5.0",
+      "core_package": "omni-bench-core 0.14.0",
+      "model": "google/gemini-4-carbon",
+      "inference": {
+        "reasoning": "provider default; medium in the OpenRouter catalog at launch",
+        "max_output_tokens": 32000,
+        "long_edge_pixels": 2048,
+        "timeout_seconds": 900,
+        "workers": 32,
+        "attempts": 3,
+        "prompts": "stock separate HTML and layout requests"
+      },
+      "reader": {
+        "change": "accept bbox as an alias for bbox_2d / box_2d, in the same prompted [ymin, xmin, ymax, xmax] coordinate order",
+        "function_sha256": "a5c5999610786508807775a23dba5e876b8bddb1a1c1105219dd6b6987549a4c",
+        "scope": "same generic reader for both models; other scorer and runtime code unchanged"
+      },
+      "initial_pass": {
+        "run": "google__gemini-4-carbon-20261110-195518-8f90",
+        "headline": 0.8367214576265297,
+        "families": {
+          "text": {
+            "score": 0.8724555830097659,
+            "tests": 8499,
+            "documents": 1791
+          },
+          "tables": {
+            "score": 0.9244337170441886,
+            "tests": 5386,
+            "documents": 591
+          },
+          "layout": {
+            "score": 0.7132750728256346,
+            "tests": 2403,
+            "documents": 632
+          }
+        },
+        "failed_pages": 189,
+        "reported_cost_usd": 155.541172
+      },
+      "failed_page_rerun": {
+        "run": "google__gemini-4-carbon-20261110-211259-7e69",
+        "pages": 189,
+        "recovered_pages": 178,
+        "reported_cost_usd": 16.736262
+      },
+      "reported_cost_usd": 172.277434,
+      "reported_cost_per_1000_pages": 58.657621382362954,
+      "cost_unknown_pages": 0,
+      "cost_basis": "Cumulative reported spend of the original full pass plus all failed-page reruns, divided by 2937 pages; includes abandoned original failures, excludes separate five-page validation probes. Not a fresh single-pass price or steady-state estimate.",
+      "reported_cost_source": "Stock adapter usage.cost plus cost_details.upstream_inference_cost under BYOK; includes every stock parse attempt."
     }
   }
 }

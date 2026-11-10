@@ -188,18 +188,18 @@ def _objects(text: str) -> list:
 def as_blocks(text: str) -> list[dict] | None:
     """A layout reply as blocks, or None when it holds none. A line that isn't valid JSON is salvaged
     by its box, type and text, so one unescaped quote costs one block, not the page. A box is read
-    under `bbox_2d` or `box_2d`, Gemini's own name for it."""
+    under `bbox_2d`, `box_2d` or `bbox`, in the prompted [ymin, xmin, ymax, xmax] order."""
     out = []
     for obj in _objects(reply(text)):
         if isinstance(obj, str):
-            box = re.search(r'"b(?:b)?ox_2d"\s*:\s*\[([^\]]+)\]', obj)
+            box = re.search(r'"(?:bbox_2d|box_2d|bbox)"\s*:\s*\[([^\]]+)\]', obj)
             kind = re.search(r'"type"\s*:\s*"([^"]*)"', obj)
             said = re.search(r'"text"\s*:\s*"(.*)"', obj)
             if not box: continue
             obj = {"type": kind.group(1) if kind else "text", "text": said.group(1) if said else "",
                    "bbox_2d": re.findall(r"-?[\d.]+", box.group(1))}
         if not isinstance(obj, dict): continue
-        box = obj.get("bbox_2d", obj.get("box_2d"))
+        box = obj.get("bbox_2d", obj.get("box_2d", obj.get("bbox")))
         # Note: a block given as a box per line ([[ymin, xmin, ymax, xmax], ...]) is one block, over their
         # union.
         if isinstance(box, list) and box and all(isinstance(b, list) and len(b) == 4 for b in box):
