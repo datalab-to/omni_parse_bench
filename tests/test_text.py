@@ -332,3 +332,13 @@ def test_a_too_long_math_span_stays_text_and_the_next_span_still_converts():
 ])
 def test_spaced_dot_leaders_fold_after_a_word(text, folded):
     assert normalize.fold(text) == folded
+
+
+def test_paren_and_bracket_math_before_a_digit_is_not_two_prices():
+    assert normalize.fold(views.text(r"\(5\)6")) == "56"
+    assert normalize.fold(views.text(r"\(2\)3 and \(4\)")) == "23 and 4"
+    assert normalize.fold(views.text(r"\[5\]6")) == "56"
+
+
+def test_a_freed_dollar_does_not_make_the_words_between_two_spans_a_variable():
+    assert normalize.fold(views.text("$a$ and $b__c$ and $d$")) == "a and $b__c$ and d"
