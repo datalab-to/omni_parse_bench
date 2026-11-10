@@ -14,6 +14,7 @@ tests/fixtures/invariants/, and on the published dataset's when OPB_DATASET is s
 from __future__ import annotations
 
 import html as _html
+import os
 
 import pytest
 from hypothesis import assume, given
@@ -24,10 +25,11 @@ from omni_parse_bench import data, normalize, views
 from omni_parse_bench.scorers import unit_tests as scorer
 from omni_parse_bench.scorers.unit_tests import runners
 
-LIVE = (DATASET / data.MANIFEST).exists()
+LIVE = bool(os.environ.get("OPB_DATASET")) and (DATASET / data.MANIFEST).exists()
 TESTS = scorer.check(data.read_manifest(DATASET)[1]) if LIVE else fixture_tests()
 HTML_TESTS = [t for t in TESTS if "html" in answer(t)]
 INLINE_TESTS = [t for t in HTML_TESTS if answer(t)["html"].startswith("<p>")]
+assert HTML_TESTS and INLINE_TESTS, "no html tests found: check tests/fixtures/invariants/ or OPB_DATASET"
 
 # Filler no test asks for, and the marks a page prints around its text. Note: no bare "$": two of them
 # around LaTeX-like text ("$ _ P < 0.05 $") read as math, as an OCR model's spaced "$ x_1 $" must.
@@ -38,34 +40,70 @@ TOKENS = st.lists(st.one_of(WORD, MARK), max_size=12)
 PARAGRAPH = TOKENS.map(" ".join)
 
 
+def leaders(x: str) -> bool:
+    """Whether `x` has a word of only dot-leader marks: fold drops runs of three, so what survives depends
+    on what sits beside them, and splitting into blocks or sitting by a minus sign changes it."""
+    return any(set(w) <= set("._…·-–—=*") for w in x.split())
+
+
 def paragraphs(xs: list[str]) -> str:
     return "".join(f"<p>{_html.escape(x, quote=False)}</p>" for x in xs)
 
 
-@pytest.mark.xfail(strict=False, reason="price/math misgrade: a $ in a price pairs with the math's $")
 @given(st.sampled_from(HTML_TESTS), st.lists(PARAGRAPH, max_size=3), st.lists(PARAGRAPH, max_size=3))
 def test_an_answer_passes_with_paragraphs_around_it(t, before, after):
+    # Known bugs (regression tests below): a "$" pairs with the math's "$"; leader marks hide a minus sign.
+    assume(not any("$" in x or leaders(x) for x in [*before, *after]))
     [v] = scorer.score({"html": paragraphs(before) + answer(t)["html"] + paragraphs(after)}, [t])
     assert v.result == "pass", v.why
 
 
-@pytest.mark.xfail(strict=False, reason="price/math misgrade: a $ in a price pairs with the math's $")
 @given(st.sampled_from(INLINE_TESTS), PARAGRAPH, PARAGRAPH)
 def test_an_answer_passes_with_text_around_it_in_its_paragraph(t, before, after):
+    # Known bugs (regression tests below): a "$" pairs with the math's "$"; leader marks hide a minus sign.
+    assume(not any("$" in x or leaders(x) for x in (before, after)))
     h = answer(t)["html"]
     head, tail = h[:-len("</p>")].replace("<p>", f"<p>{_html.escape(before, quote=False)} ", 1), "</p>"
     [v] = scorer.score({"html": f"{head} {_html.escape(after, quote=False)}{tail}"}, [t])
     assert v.result == "pass", v.why
 
 
-@pytest.mark.xfail(strict=False, reason='fold drops "____ _" but keeps "_" once blocks split the marks')
 @given(TOKENS.filter(bool), st.data())
 def test_text_folds_the_same_however_an_output_splits_it_into_blocks(tokens, data):
+    # Known bug (regression tests below): fold drops runs of leader marks ("____ _", "... —") but keeps them
+    # once blocks split the run.
+    assume(not any(leaders(x) for x in tokens))
     cuts = sorted(data.draw(st.sets(st.integers(1, max(1, len(tokens) - 1)), max_size=len(tokens) - 1)))
     tag = data.draw(st.sampled_from(["p", "td", "li", "div"]))
     lines = [" ".join(tokens[i:j]) for i, j in zip([0, *cuts], [*cuts, len(tokens)], strict=True)]
     html = "".join(f"<{tag}>{_html.escape(x, quote=False)}</{tag}>" for x in lines)
     assert normalize.fold(views.text(html)) == normalize.fold(" ".join(tokens))
+
+
+@pytest.mark.xfail(strict=False, raises=AssertionError,
+                   reason="price/math misgrade: a $ in a price pairs with the math's $")
+def test_regression_dollar_price_before_math_answer():
+    [t] = [t for t in HTML_TESTS if "$U$" in answer(t)["html"]] or pytest.skip("no math test in this set")
+    [v] = scorer.score({"html": paragraphs(["$5.00"]) + answer(t)["html"]}, [t])
+    assert v.result == "pass", v.why
+
+
+@pytest.mark.xfail(strict=False, raises=AssertionError,
+                   reason='fold drops "____ _" but keeps "_" once blocks split the marks')
+def test_regression_underscore_marks_split_into_blocks():
+    html = paragraphs(["____", "_"])
+    assert normalize.fold(views.text(html)) == normalize.fold("____ _")
+
+
+@pytest.mark.xfail(strict=False, raises=AssertionError, reason="same fold bug with other leader marks")
+def test_regression_dot_and_dash_marks_split_into_blocks():
+    assert normalize.fold(views.text(paragraphs(["...", "—"]))) == normalize.fold("... —")
+
+
+@pytest.mark.xfail(strict=False, raises=AssertionError, reason="a '____' before a number hides its minus")
+def test_regression_underscore_run_before_negative_number():
+    found, why = runners.found(runners.Number("-4.8%"), views.html("<p>____ -4.8%</p>"))
+    assert found, why
 
 
 def written(digits: str, sep: str, frac: str, negative: bool, percent: bool) -> str:
@@ -81,7 +119,10 @@ def test_a_number_is_found_as_written_and_never_with_a_digit_changed(digits, sep
     changed = digits[:i] + str((int(digits[i]) + 1) % 10) + digits[i + 1:]
     assume(changed[0] != "0")
     s, other = written(digits, sep, frac, neg, pct), written(changed, sep, frac, neg, pct)
-    page = lambda x: views.html(f"<p>{_html.escape(before, quote=False)}</p><p>{x}</p>")  # noqa: E731
+
+    def page(x):
+        return views.html(f"<p>{_html.escape(before, quote=False)}</p><p>{x}</p>")
+
     assume(runners.number(s) is not None and not runners.found(runners.Number(s), page(""))[0])
     assert runners.found(runners.Number(s), page(s))[0]
     assert not runners.found(runners.Number(s), page(other))[0]

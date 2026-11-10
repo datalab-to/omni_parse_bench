@@ -54,13 +54,18 @@ class _KaTeX:
             answer = self.ctx.call("render", tex, display)
         return answer.get("mathml")
 
+    def close(self) -> None:
+        # Note: takes the lock, so a thread mid-call finishes before the context goes away.
+        with self.lock:
+            self.ctx.close()
+
 
 @functools.cache
 def _katex() -> _KaTeX:
     katex = _KaTeX()
     # Note: closed here, while Python can still run threads. Left to its finalizer at interpreter exit, the
     # context joins its event-loop thread, which can't take the GIL by then, and the process never exits.
-    atexit.register(katex.ctx.close)
+    atexit.register(katex.close)
     return katex
 
 
