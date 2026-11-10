@@ -25,9 +25,11 @@ _BRACKET_UNCHECKED = re.compile(r"\[ ?\]|\[unchecked\]", re.I)
 _FOOTNOTE = re.compile(r"\[\^\s*(\w{1,3})\s*\]|\[\s*(\d{1,3})\s*\]")
 # Note: ■ isn't here; it's a checked box (_CHECKED).
 _BULLET = re.compile(r"(?m)^([ \t]*)[•‣◦▪▶∙●](?=\s|$)")
-# Note: one kind of character per run, so a full stop beside a blank stays ("here. ____"); a dash
-# before a digit is its sign ("....... -4.8%"), not a leader.
-_LEADERS = re.compile(r"(?:[.…·]\s*){3,}|(?:_\s*){3,}|(?:[-–—](?!\d)\s*){3,}|(?:=\s*){3,}|(?:\*\s*){3,}")
+# Note: dots and dashes fold as one mixed run ("hospital......-.-"), the other characters each in their
+# own run, so a full stop beside a blank stays ("here. ____"). A dash is a leader unless it is a sign:
+# before a digit and after a space ("....... -4.8%"); one glued to what precedes it ("-----5") is a leader.
+_LEADERS = re.compile(
+    r"(?:(?:[.…·]|(?<=\S)[-–—]|[-–—](?!\d))\s*){3,}|(?:_\s*){3,}|(?:=\s*){3,}|(?:\*\s*){3,}")
 _DASH = re.compile("[‐-―−]")
 # Note: ꞌ (saltillo, a glottal stop in Amarasi) and ˈ (IPA primary stress) are typed as an ASCII apostrophe.
 _SQUOTE = re.compile("[‘’‚‛ʼ`´′ꞌꞋˈ]")
@@ -220,7 +222,8 @@ def _latex_to_text(s: str) -> str:
                             else t, s)
     if "$" not in s:
         return s
-    s = _DISPLAY_MATH.sub(lambda m: m[0] if (t := _math_span(m, inline=False)) is None else t, s)
+    s = _DISPLAY_MATH.sub(lambda m: m[0] if (t := _math_span(m, inline=False, dollars=False)) is None
+                        else t, s)
     out, i = [], 0
     while m := _INLINE_MATH.search(s, i):
         if (t := _math_span(m, inline=True)) is None:

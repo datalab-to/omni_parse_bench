@@ -342,3 +342,24 @@ def test_paren_and_bracket_math_before_a_digit_is_not_two_prices():
 
 def test_a_freed_dollar_does_not_make_the_words_between_two_spans_a_variable():
     assert normalize.fold(views.text("$a$ and $b__c$ and $d$")) == "a and $b__c$ and d"
+
+
+@pytest.mark.parametrize("text, folded", [
+    ("$$ x $$", "x"), ("$$\nx\n$$", "x"), (r"\[ x \]", "x"), ("<p>$$ n $$</p>", "n"), ("$$a<br>$$", "a"),
+])
+def test_a_spaced_variable_in_display_math_reads_as_text(text, folded):
+    assert normalize.fold(views.text(text)) == folded
+
+
+def test_spaced_variables_between_plain_dollars_are_prose():
+    assert normalize.fold(views.text("$a$ and $b__c$ and $d$")) == "a and $b__c$ and d"
+
+
+@pytest.mark.parametrize("text, folded", [
+    ("Butterfield hospital...............-.-", "butterfield hospital"),
+    ("Total ---------5", "total 5"), ("Page ......-5", "page 5"), ("Total ---- 5", "total 5"),
+    ("Net ........ -4.8%", "net -4.8%"), ("Balance ____ -120", "balance -120"),
+    ("- - - - item", "item"),
+])
+def test_mixed_dot_and_dash_leaders_fold_but_a_spaced_sign_stays(text, folded):
+    assert normalize.fold(views.text(text)) == folded
