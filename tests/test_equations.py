@@ -14,6 +14,13 @@ from omni_parse_bench.scorers.unit_tests import runners
      r"$$\begin{cases} x = 1 \\ y = 2 \end{cases}$$"),
     (r"x_1 + y", '<math display="block">x_{1} +\\, y</math>'),
     (r"X \coloneqq (x_1,\cdots,x_n)", r"$X := (x_1, \dots, x_n)$"),
+    (r"a \coloneq b", r"$a := b$"),
+    (r"a \coloneq b", r"$a \coloneqq b$"),
+    (r"a \Coloneq b", r"$a \Coloneqq b$"),
+    (r"x \leqq y", r"$x \le y$"),
+    ("x ≦ y", r"$x \le y$"),
+    (r"x \geqq y", r"$x \ge y$"),
+    ("x ≧ y", r"$x \ge y$"),
     (r"\rho_{AB},\sigma_{A'B'}", r"$\rho_{AB}$, $\sigma_{A'B'}$"),
     (r"\Phi(y)\not\in B", r"$\Phi(y) \notin B$"),
     (r"\varphi_{\mid S_1}", r"$\varphi|_{S_1}$"),
@@ -35,6 +42,8 @@ def test_one_equation_written_two_ways_matches(test, output):
     (r"A\setminus B", r"$A - B$"),
     (r"\mathcal{Z}", r"$\Z$"),
     (r"d_{\min}^{\mathcal{C}}", r"$d_{\min}^{\mathcal{Q}}$"),
+    (r"a :- b", r"$a := b$"),  # Note: the colon-minus is a different symbol, not \coloneq's alias
+    (r"a \coloneq b", r"$a :- b$"),
 ])
 def test_a_different_equation_fails(test, output):
     assert not equations.appears(test, output)[0]

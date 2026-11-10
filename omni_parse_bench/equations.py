@@ -16,10 +16,12 @@ from pathlib import Path
 from omni_parse_bench import views
 
 KATEX = Path(__file__).parent / "katex" / "katex.js"   # KaTeX 0.16.22, MIT (LICENSE beside it)
+# Note: KaTeX bundles mathtools' pre-2022 \coloneq (":-"); since 2022 it prints ":=", as \coloneqq does.
 _RENDER = """(tex, display) => {
   try {
+    const macros = {"\\\\coloneq": "\\\\coloneqq", "\\\\Coloneq": "\\\\Coloneqq"};
     return {mathml: katex.renderToString(tex, {output: "mathml", displayMode: display, strict: "ignore",
-                                                throwOnError: true, trust: false})};
+                                                throwOnError: true, trust: false, macros})};
   } catch (e) {
     return {error: String(e.message || e).slice(0, 300)};
   }
