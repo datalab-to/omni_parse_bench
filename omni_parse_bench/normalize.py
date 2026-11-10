@@ -88,6 +88,13 @@ _SPACED_DIGITS = re.compile(r"\d[\d.,]*(?:\s+[\d.,]+)+")
 # writer joined lines with. Not a dash, which can end a line before a lowercase word.
 _LINE_HYPHEN = re.compile(r"(?<=[^\W\d_])[-\u2010\u2011]\s+([^\W\d_])")
 _DECIMAL_MIDDOT = re.compile(r"(?<=\d)[·∙](?=\d)")
+# Note: the CJK and half-width middle dots are the same dot as "·" (NFKC would turn ㆍ into a Hangul jamo and
+# ･ into ・). ⋅, the multiplication dot, is left out: "2⋅3" is a product, not 2.3.
+_MIDDLE_DOT = str.maketrans("ㆍ・･‧", "····")
+# Romanian writes ș and ț with a comma below; a keyboard or font often gives the cedilla forms ş and ţ.
+_COMMA_BELOW = str.maketrans("şţŞŢ", "șțȘȚ")
+# Note: wave dash and asterisk operator are the tilde and the asterisk; gershayim is the Hebrew double quote.
+_LOOKALIKES = str.maketrans({"〜": "~", "∗": "*", "״": '"'})
 _WRAP_HYPHEN = re.compile("[-‐‑](?=\\s)")
 
 
@@ -113,7 +120,8 @@ def fold(s: str) -> str:
         leaders          runs of 3+ dots, dashes or underscores -> a space
         typography       dash, quote (with primes, ꞌ, ˈ), space and arrow families unified; the fraction slash
                          -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII
-        symbols          decimal middle dots -> "."; ♢ -> ◊; ≦ -> ≤
+        symbols          CJK middle dots -> "·"; ş ţ -> ș ț; 〜 ∗ ״ -> ~ * "; decimal middle dots -> "."
+                         ♢ -> ◊; ≦ -> ≤
         case, spacing    lowercased; whitespace collapsed and trimmed
 
     Case is folded because it isn't what a parse is paid for; digits, letters and their order are.
@@ -148,9 +156,9 @@ def boxes(s: str) -> str:
 
 
 def _primes(s: str) -> str:
-    """″, ‴ and TeX's doubled quotes as ", and a spacing accent after a letter as a combining one:
-    before NFKC, which would split ″ and ‴ into primes and a spacing accent off its letter."""
-    s = _TEX_QUOTE.sub('"', s.replace("″", '"').replace("‴", '"'))
+    """″, ‴ and TeX's doubled quotes as ", the CJK middle dots as "·", and a spacing accent after a letter as
+    a combining one: before NFKC, which would split ″ and ‴ into primes and an accent off its letter."""
+    s = _TEX_QUOTE.sub('"', s.replace("″", '"').replace("‴", '"')).translate(_MIDDLE_DOT)
     return _SPACING_ACCENT.sub(lambda m: _COMBINING[m[1]], _ACUTE_APOSTROPHE.sub("'", s))
 
 
@@ -160,6 +168,7 @@ def typography(s: str, *, preserve_dashes: bool = False) -> str:
     s = _INVISIBLE.sub("", unicodedata.normalize("NFKC", _primes(s))).replace("⁄", "/")
     if not preserve_dashes:
         s = _DASH.sub("-", s)
+    s = s.translate(_COMMA_BELOW).translate(_LOOKALIKES)
     s = _SQUOTE.sub("'", s)
     s = _DQUOTE.sub('"', s)
     s = _SPACE.sub(" ", s)
