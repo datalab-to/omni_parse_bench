@@ -11,8 +11,6 @@ import unicodedata
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from omni_parse_bench import views
-
 KATEX = Path(__file__).parent / "katex" / "katex.js"   # KaTeX 0.16.22, MIT (LICENSE beside it)
 _RENDER = """(tex, display) => {
   try {
@@ -34,6 +32,11 @@ _DROPPED = {"mspace", "mphantom", "annotation", "annotation-xml", "none", "mpres
 _SPANS = re.compile(r"\$\$(.+?)\$\$|\\\[(.+?)\\\]|\\\((.+?)\\\)|(?<![\\$])\$(?!\s)([^$\n]+?)(?<!\s)\$"
                     r"|<math\b([^<>]*)>(.*?)</math>", re.S | re.I)
 _TAG = re.compile(r"<[^<>]+>")
+# Note: a line break before each block tag, so an inline $..$ never spans two blocks
+# ("<p>$5</p><p>$$x$$</p>").
+# Not <br> or <img>: a break or an image may sit inside a span.
+_BLOCK = re.compile(r"(?=</?(?:table|thead|tbody|tfoot|tr|td|th|p|div|li|ul|ol|dl|dt|dd|h[1-6]|section|"
+                    r"article|figure|figcaption|blockquote|pre|caption)\b)", re.I)
 _BOUNDARY = "\uffff"
 _PUNCT = {",", ";", "."}
 
@@ -158,8 +161,7 @@ def _invisible(s: str | None) -> bool:
 def spans(html: str) -> list[tuple[str, bool]]:
     """The math in an output, in order: each span's LaTeX (or MathML) and whether it is display math."""
     out = []
-    # Note: a line break before each block tag, which stays: an image's alt text may hold math.
-    for m in _SPANS.finditer(views.BLOCK.sub(lambda b: "\n" + b[0], html)):
+    for m in _SPANS.finditer(_BLOCK.sub("\n", html)):
         if m[6] is not None:
             body, display = m[6].strip(), "block" in (m[5] or "")
             if "<" in body:

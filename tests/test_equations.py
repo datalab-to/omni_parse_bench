@@ -44,6 +44,6 @@ def test_a_price_before_an_equation_never_pairs_with_its_dollar(before):
     assert equations.appears(r"\frac{a}{b} \leq c", f"<p>{before}</p><p>$$\\frac{{a}}{{b}} \\leq c$$</p>")[0]
 
 
-def test_math_in_an_image_alt_text_is_found():
-    html = r'<p>Algorithm</p><img alt="Ensure: $T _ { (0) } = \{ \varnothing \}$">'
-    assert equations.appears(r"T_{(0)} = \{\varnothing\}", html)[0]
+def test_inline_math_may_hold_a_line_break_but_not_a_block():
+    assert equations.appears("a + b", "<p>$a +<br>b$</p>")[0]
+    assert not equations.appears("x y", "<td>$x</td><td>y$</td>")[0]

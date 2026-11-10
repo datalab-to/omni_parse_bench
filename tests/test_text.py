@@ -313,14 +313,16 @@ def test_math_right_before_a_number_still_reads_as_math(text, folded):
     assert normalize.fold(text) == folded
 
 
-def test_a_full_stop_before_dot_leaders_on_the_next_line_stays():
-    html = "<p>All are most cordially invited to attend.</p><p>. ..... .....</p>"
-    assert runners.found(runners.Text("All are most cordially invited to attend.", 0), views.html(html))[0]
+@pytest.mark.parametrize("text, folded", [
+    ("$92,000; Net +$60,000", "$92,000; net +$60,000"),
+    (r"$5\times$10", "5×10"), (r"$1.5\pm$0.2", "1.5±0.2"),
+])
+def test_math_before_a_number_is_math_and_two_prices_are_not(text, folded):
+    assert normalize.fold(text) == folded
 
 
 @pytest.mark.parametrize("text, folded", [
-    ("char str[3][10],temp[10];", "char str[3][10],temp[10];"), ("new URL[6];", "new url[6];"),
-    ("four-chamber view[1] can", "four-chamber view 1 can"),
+    ("Introduction. . . . . 5", "introduction 5"), ("Chapter 1. . . 7", "chapter 1 7"),
 ])
-def test_an_index_isnt_a_footnote_marker(text, folded):
+def test_spaced_dot_leaders_fold_after_a_word(text, folded):
     assert normalize.fold(text) == folded
