@@ -65,6 +65,7 @@ _DISPLAY_MATH = re.compile(r"\$\$(.+?)\$\$", re.S)
 # \[..\] and \(..\) are the same math as $$..$$ and $..$, written the other LaTeX way.
 _BRACKET_MATH, _PAREN_MATH = re.compile(r"\\\[(.+?)\\\]", re.S), re.compile(r"\\\((.+?)\\\)", re.S)
 _INLINE_MATH = re.compile(r"\$([^$\n]+?)\$")
+_ASCII_DIGITS = tuple("0123456789")
 _LATEX_MARKUP = re.compile(r"[\\^_{}]")
 _LATEX_RESIDUE = re.compile(r"[_^{}\\]")
 # A $..$ span is math only if it's short and dense. Prose between two dollar amounts ("$5.00 ... on
@@ -235,14 +236,17 @@ def _math_span(m: re.Match[str]) -> str | None:
     if "__" in body: return None   # a form's blank; LaTeX never writes two underscores in a row
     # Note: a digit on both sides of a span with no LaTeX in it is two prices ("$92,000; Net +$60,000"),
     # not math before a number ("$\\ge$2", "$5\\times$10").
-    if (m.re is _INLINE_MATH and body[:1].isdigit() and not _LATEX_MARKUP.search(body)
-            and m.string[m.end():m.end() + 1].isdigit()):
+    if (m.re is _INLINE_MATH and body[:1] in _ASCII_DIGITS and not _LATEX_MARKUP.search(body)
+            and m.string[m.end():m.end() + 1] in _ASCII_DIGITS):
         return None
     if _MATH_LETTERS.fullmatch(body.strip()): return body.strip()
     dense = _dense(body)
     if _SPACED_DIGITS.fullmatch(body): return dense
-    if (dense.count(" ") > _MATH_MAX_SPACES or len(body) > _MATH_MAX_LEN
-            or (m.re is _INLINE_MATH and _prose(body))):
+    # Note: too long or too spaced is still math, just not ours to read; the whole match stays text so
+    # a hugging span after it pairs as it always did. Prose is None: its closing $ may open the next span.
+    if dense.count(" ") > _MATH_MAX_SPACES or len(body) > _MATH_MAX_LEN:
+        return m[0]
+    if m.re is _INLINE_MATH and _prose(body):
         return None
     # Note: math with no LaTeX in it ("$p < 0.05$", <math>T = 20.3</math>) reads as the text it
     # renders, as math with LaTeX does; but only when it hugs its dollars, since prose between two

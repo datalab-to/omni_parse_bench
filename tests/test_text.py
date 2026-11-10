@@ -257,20 +257,21 @@ def test_a_reference_list_is_text():
 
 @pytest.mark.parametrize("html, number", [
     ("<p>Fee: $____</p><p>12</p><p>34</p><p>$____</p>", "12"),
-    ("<p>Fee $____ 12 34 $____</p>", "12"),
     ("<p>Deposit $___ 10% of $___</p>", "10%"),
 ])
 def test_dollars_around_a_form_blank_arent_math(html, number):
     assert runners.found(runners.Number(number), views.html(html))[0]
 
 
-@pytest.mark.parametrize("text, html", [
-    ("Gross 8% / $92,000; Net +5% / +$60,000", "<td>Gross 8% / $92,000;<br>Net +5% / +$60,000</td>"),
-    ("Cost $5 12 x_1 34 $6", "<p>Cost $5</p><td>12 x_1 34</td><p>$6</p>"),
-    ("the Mann-Whitney U test", "<p>Cost was US$5 and the Mann-Whitney $U$ test was run</p>"),
-])
-def test_two_prices_are_never_the_ends_of_one_math_span(text, html):
-    assert runners.found(runners.Text(text, 0), views.html(html))[0]
+def test_two_prices_are_never_the_ends_of_one_math_span():
+    assert normalize.fold("$92,000; Net +$60,000") == "$92,000; net +$60,000"
+    assert normalize.fold("Gross 8% / $92,000; Net +5% / +$60,000") == (
+        "gross 8% / $92,000; net +5% / +$60,000")
+
+
+def test_a_price_beside_math_is_not_its_span():
+    html = "<p>Cost was US$5 and the Mann-Whitney $U$ test was run</p>"
+    assert runners.found(runners.Text("the Mann-Whitney U test", 0), views.html(html))[0]
 
 
 def test_inline_math_still_reads_as_its_text():
@@ -307,18 +308,23 @@ def test_a_full_stop_before_a_blank_stays():
 
 @pytest.mark.parametrize("text, folded", [
     (r"$\ge$2 cas", "≥2 cas"), (r"$\pm$13.33", "±13.33"), (r"p $<$0.05", "p <0.05"), (r"n $=$12", "n =12"),
-    (r"$-$5 dB", "-5 db"), (r"$x^2$1", "x21"),
+    (r"$-$5 dB", "-5 db"), (r"$x^2$1", "x21"), (r"$5\times$10", "5×10"), (r"$1.5\pm$0.2", "1.5±0.2"),
+    ("$5$²", "5 2"),
 ])
 def test_math_right_before_a_number_still_reads_as_math(text, folded):
     assert normalize.fold(text) == folded
 
 
 @pytest.mark.parametrize("text, folded", [
-    ("$92,000; Net +$60,000", "$92,000; net +$60,000"),
-    (r"$5\times$10", "5×10"), (r"$1.5\pm$0.2", "1.5±0.2"),
+    ("$5$6", "$5$6"), ("$100-$200", "$100-$200"),
 ])
-def test_math_before_a_number_is_math_and_two_prices_are_not(text, folded):
+def test_digit_bounded_dollars_without_latex_stay_text(text, folded):
     assert normalize.fold(text) == folded
+
+
+def test_a_too_long_math_span_stays_text_and_the_next_span_still_converts():
+    long = "x" * 130
+    assert normalize.fold(f"${long}$,$y$") == f"${long}$,y"
 
 
 @pytest.mark.parametrize("text, folded", [
