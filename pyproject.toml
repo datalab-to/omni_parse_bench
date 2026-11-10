@@ -32,6 +32,7 @@ benchmark = [
 ]
 dev = [
     "omni-parse-bench[benchmark]",
+    "hypothesis>=6.100",
     "pytest>=8.0",
     "ruff>=0.6",
 ]
