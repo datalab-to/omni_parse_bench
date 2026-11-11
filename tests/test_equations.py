@@ -37,3 +37,13 @@ def test_one_equation_written_two_ways_matches(test, output):
 ])
 def test_a_different_equation_fails(test, output):
     assert not equations.appears(test, output)[0]
+
+
+@pytest.mark.parametrize("before", ["Price $5", "Price $5.00 and $6", "Cost: $"])
+def test_a_price_before_an_equation_never_pairs_with_its_dollar(before):
+    assert equations.appears(r"\frac{a}{b} \leq c", f"<p>{before}</p><p>$$\\frac{{a}}{{b}} \\leq c$$</p>")[0]
+
+
+def test_inline_math_may_hold_a_line_break_but_not_a_block():
+    assert equations.appears("a + b", "<p>$a +<br>b$</p>")[0]
+    assert not equations.appears("x y", "<td>$x</td><td>y$</td>")[0]
