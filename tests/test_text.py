@@ -145,6 +145,8 @@ def test_fold_equates_look_alike_glyphs(a, b):
     ("a\u301cb", "a-b"), ("p\u2217", "p"), ("\u05e6\u05d4\u05f4\u05dc", "\u05e6\u05d4\u05dc"),
     ("a\u30fbb", "a b"),
     ("3\u30fb11", "3.11"), ("3\uff65" "5", "3.5"), ("1\u20275", "1.5"),
+    ("3\u30fb\u200b5", "3.5"), ("3\u30fb\u00b2", "3.2"), ("\u00b2\u30fb3", "2.3"),
+    ("3\u30fb\u2460", "3.1"),
 ])
 def test_fold_keeps_look_alike_glyph_neighbours_apart(a, b):
     assert normalize.fold(a) != normalize.fold(b)
