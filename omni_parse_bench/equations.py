@@ -446,9 +446,9 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
             out += [f"{ch}(", *_chars(text[i + 1:j].strip("{}")), ")"]
             i = j
             continue
-        elif text.startswith("...", i):
+        elif m := _SPACED_DOTS.match(text, i):
             out.append("⋯")
-            i += 3
+            i = m.end()
             continue
         elif ch in "'′":
             out += ["^(", "'", ")"]
@@ -461,6 +461,8 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
     return out
 
 
+# Three or more dots, spaced or not, are an ellipsis ("...", ". . .").
+_SPACED_DOTS = re.compile(r"\.(?: ?\.){2,}")
 # Note: a dash stands for a minus in typewritten text.
 _DASHES = str.maketrans(dict.fromkeys("‐‑‒–—―", "-"))
 

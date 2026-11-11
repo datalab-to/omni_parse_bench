@@ -249,3 +249,8 @@ def test_an_equation_number_after_dot_leaders_starts_with_a_digit(test, output, 
 def test_a_decimal_point_continues_a_number(test, output, ok):
     v = views.html(markdown.to_html(output)) if output.startswith("$") else views.html(output)
     assert runners.present(runners.Present(runners.Latex(test)), v)[0] is ok
+
+
+def test_spaced_dots_in_plain_text_are_an_ellipsis():
+    v = views.html("<p>for 1, . . ., n we have</p>")
+    assert runners.present(runners.Present(runners.Latex(r"1,\ldots,n")), v)[0]
