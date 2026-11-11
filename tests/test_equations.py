@@ -224,3 +224,16 @@ def test_plain_text_reads_ellipses_and_unbraced_scripts(test, output, ok):
 def test_policy_bold_counts(test, output, ok):
     v = views.html(markdown.to_html(output))
     assert runners.present(runners.Present(runners.Latex(test)), v)[0] is ok
+
+
+# Scoring policy: a variant Greek letter is not its plain letter.
+@pytest.mark.parametrize("test, output, ok", [
+    (r"\phi(x)", r"$\varphi(x)$", False),
+    (r"\epsilon<1", r"$\varepsilon<1$", False),
+    (r"\vartheta", r"$\theta$", False),
+    (r"\epsilon<1", "<p>for ϵ < 1</p>", True),
+    (r"\epsilon<1", "<p>for ε < 1</p>", False),
+])
+def test_policy_greek_variants_differ(test, output, ok):
+    v = views.html(markdown.to_html(output))
+    assert runners.present(runners.Present(runners.Latex(test)), v)[0] is ok

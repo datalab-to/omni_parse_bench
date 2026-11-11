@@ -32,7 +32,7 @@ _NS = "{http://www.w3.org/1998/Math/MathML}"
 _KEPT_FONTS = {"double-struck": "double-struck", "script": "script", "fraktur": "fraktur", "bold": "bold",
                "bold-italic": "bold", "bold-script": "bold-script", "bold-fraktur": "bold-fraktur"}
 _ALIASES = str.maketrans({"⩽": "≤", "⩾": "≥", "∥": "‖", "−": "-", "′": "'", "∣": "|", "⋅": "·",
-                          "∗": "*", "⋆": "*", "ϵ": "ε", "ϕ": "φ", "ϑ": "θ", "∶": ":",
+                          "∗": "*", "⋆": "*", "∶": ":",
                           "…": "⋯", "\\": "∖", "♯": "#", "≔": ":=", "≕": "=:", "≦": "≤", "≧": "≥"})
 _DOTS, _VDOTS = {"⋯", "·", "."}, {"⋮", "⋱", "⋰"}
 _INVISIBLE = {"⁡", "⁢", "⁣", "⁤", "​"}
@@ -119,7 +119,7 @@ def symbols(tex: str, display: bool = False) -> tuple[str, ...] | None:
                                  (\mathbf{v}, \boldsymbol{v}, \bm{v} and \pmb{v} alike)
         invisible operators      function application, invisible times: dropped
         look-alikes              ⩽, ≦ and ≤, ⩾, ≧ and ≥, ∥ and ‖, − and -, ′ and ', … and ⋯, ≔ and :=,
-                                 ° and a degree written ^\circ, ϵ and ε, ϕ and φ, ϑ and θ,
+                                 ° and a degree written ^\circ,
                                  ∖ and a backslash, ♯ and #, ⋆ and *, . and ·
         equation numbers         \tag and \label, and a number after dot leaders ending a display formula
                                  (". . . (2)"): dropped, on both sides
@@ -127,8 +127,8 @@ def symbols(tex: str, display: bool = False) -> tuple[str, ...] | None:
         restrictions             a | opening a subscript and a | just before it (φ_{|S} and φ|_S)
         constructions            `cases` and `\left\{ \begin{aligned} … \right.` render alike already
 
-    These stay differences: \bar and \overline, \setminus and a minus, one letter font for another, and a
-    dropped blackboard font."""
+    These stay differences: \bar and \overline, \setminus and a minus, one letter font for another, a
+    dropped blackboard font, ϕ and φ, ϵ and ε, ϑ and θ."""
     mathml = _katex().mathml(tex, display)
     return None if mathml is None else _from_mathml(mathml)
 
@@ -455,12 +455,14 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
     return out
 
 
-# Note: a dash stands for a minus in typewritten text.
+# Note: NFKC folds the variant Greek letters into the plain ones, which print differently; and a dash
+# stands for a minus in typewritten text.
+_VARIANTS = "ϕϵϑϖϱϰ"
 _DASHES = str.maketrans(dict.fromkeys("‐‑‒–—―", "-"))
 
 
 def _chars(s: str) -> list[str]:
     # Note: NFKC would make an ellipsis three full stops.
-    s = unicodedata.normalize("NFKC", s.replace("…", "⋯"))
+    s = "".join(ch if ch in _VARIANTS else unicodedata.normalize("NFKC", ch) for ch in s.replace("…", "⋯"))
     s = s.translate(_ALIASES).translate(_DASHES)
     return [ch if ch != "." else _GAP + "·" for ch in s if not ch.isspace() and ch not in _INVISIBLE]
