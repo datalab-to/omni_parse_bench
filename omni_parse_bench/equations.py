@@ -482,5 +482,5 @@ def _chars(s: str) -> list[str]:
     s = s.translate(_ALIASES).translate(_DASHES)
     s = "".join(ch for ch in s if not ch.isspace() and ch not in _INVISIBLE)
     # Note: a point between digits is a decimal point, read as in math; any other ends a sentence.
-    return [ch if ch != "." else "·" if s[i - 1:i].isdigit() and s[i + 1:i + 2].isdigit() else _GAP + "·"
+    return [ch if ch != "." else "." if s[i - 1:i].isdigit() and s[i + 1:i + 2].isdigit() else _GAP + "·"
             for i, ch in enumerate(s)]
