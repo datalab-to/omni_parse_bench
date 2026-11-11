@@ -236,3 +236,16 @@ def test_an_html_tag_inside_math_is_still_dropped():
 ])
 def test_an_equation_number_after_dot_leaders_starts_with_a_digit(test, output, ok):
     assert equations.appears(test, output)[0] is ok
+
+
+@pytest.mark.parametrize("test, output, ok", [
+    (r"5", r"$5.5$", False),
+    (r"5", r"$2.5$", False),
+    (r"x=2", r"$x=2.5$", False),
+    (r"x^2", "<p>so x^2.5 grows</p>", False),
+    (r"x^{2.5}", "<p>so x^2.5 grows</p>", True),
+    (r"x=2.5", r"$x=2.5$", True),
+])
+def test_a_decimal_point_continues_a_number(test, output, ok):
+    v = views.html(markdown.to_html(output)) if output.startswith("$") else views.html(output)
+    assert runners.present(runners.Present(runners.Latex(test)), v)[0] is ok

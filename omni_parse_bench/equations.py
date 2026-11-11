@@ -377,11 +377,15 @@ def _search(want: tuple[str, ...], hay: list[str], words: bool = False) -> bool:
     # before it negates its first term (one after an operand is a binary + or -), no script after it
     # raises its last; a letter beside it is a factor of a longer product, which a test may quote.
     letters = "".join(c for t, c in code.items() if words and t[-1:].isalnum() and not t.startswith(_GAP))
+    # Note: a point between digits joins them (2.5, and 2\cdot 5 as a product), so no number ends at one.
+    points = "".join(c for t, c in code.items() if t in ("·", "."))
     edges = [f"(?<![{letters}])" if want[0][-1:].isalnum() and letters else "",
              f"(?<![{digits}])" if want[0].isdigit() and digits else "",
+             f"(?<![{digits}][{points}])" if want[0].isdigit() and digits and points else "",
              f"(?<![{operators}][{signs}])" if want[0] not in _OPS and signs and operators else ""]
     ends = [f"(?![{letters}])" if want[-1][-1:].isalnum() and letters else "",
             f"(?![{digits}])" if want[-1].isdigit() and digits else "",
+            f"(?![{points}][{digits}])" if want[-1].isdigit() and digits and points else "",
             f"(?![{scripts}])" if want[-1] not in _OPS and scripts else ""]
     return re.search("".join(edges) + body + "".join(ends), text) is not None
 
@@ -437,7 +441,8 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
             j = text.find("}", i) + 1 if text[i + 1] == "{" else i + 2
             j = j or len(text)
             # Note: unbraced digits after ^ or _ are one script ("x^23" is x^{23}, never x^{2}3).
-            while text[i + 1].isdigit() and j < len(text) and text[j].isdigit(): j += 1
+            while text[i + 1].isdigit() and j < len(text) and (text[j].isdigit() or text[j] == "." and
+                                                              text[j + 1:j + 2].isdigit()): j += 1
             out += [f"{ch}(", *_chars(text[i + 1:j].strip("{}")), ")"]
             i = j
             continue
@@ -464,4 +469,7 @@ def _chars(s: str) -> list[str]:
     # Note: NFKC would make an ellipsis three full stops.
     s = unicodedata.normalize("NFKC", s.replace("…", "⋯"))
     s = s.translate(_ALIASES).translate(_DASHES)
-    return [ch if ch != "." else _GAP + "·" for ch in s if not ch.isspace() and ch not in _INVISIBLE]
+    s = "".join(ch for ch in s if not ch.isspace() and ch not in _INVISIBLE)
+    # Note: a point between digits is a decimal point, read as in math; any other ends a sentence.
+    return [ch if ch != "." else "·" if s[i - 1:i].isdigit() and s[i + 1:i + 2].isdigit() else _GAP + "·"
+            for i, ch in enumerate(s)]
