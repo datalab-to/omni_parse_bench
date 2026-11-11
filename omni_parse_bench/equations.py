@@ -392,9 +392,16 @@ def _search(want: tuple[str, ...], hay: list[str], words: bool = False) -> bool:
              f"(?<![{operators}][{signs}])" if want[0] not in _OPS and signs and operators else ""]
     ends = [f"(?![{letters}])" if want[-1][-1:].isalnum() and letters else "",
             f"(?![{digits}])" if want[-1].isdigit() and digits else "",
-            f"(?![{points}][{digits}])" if want[-1].isdigit() and digits and points else "",
+            f"(?![{points}][{digits}])" if _last_digit(want) and digits and points else "",
             f"(?![{scripts}])" if want[-1] not in _OPS and scripts else ""]
     return re.search("".join(edges) + body + "".join(ends), text) is not None
+
+
+def _last_digit(want: tuple[str, ...]) -> bool:
+    """Whether `want` ends with a digit, inside closing scripts or not (x^2, x_{12})."""
+    end = len(want)
+    while end and want[end - 1] == ")": end -= 1
+    return end > 0 and want[end - 1].isdigit()
 
 
 def _operand(t: str) -> bool:
@@ -469,7 +476,7 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
 
 
 # Three or more dots, spaced or not, are an ellipsis ("...", ". . .").
-_SPACED_DOTS = re.compile(r"\.(?: ?\.){2,}")
+_SPACED_DOTS = re.compile(r"\.(?:\s*\.){2,}")
 # Note: NFKC folds the variant Greek letters into the plain ones, which print differently; and a dash
 # stands for a minus in typewritten text.
 _VARIANTS = "ϕϵϑϖϱϰ"
