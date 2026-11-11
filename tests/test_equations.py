@@ -172,3 +172,12 @@ def test_look_alikes_and_prose_count_only_as_decided(test, output, ok):
 
 def test_a_less_than_before_a_letter_p_in_inline_math_is_not_a_block_tag():
     assert equations.appears(r"0<p\leq 1", "<p>Let $0<p\\leq 1$.</p>")[0]
+
+
+@pytest.mark.parametrize("test, output", [
+    (r"a=b \tag{\text{$\dagger$}}", r"$$a=b \tag{†}$$"),
+    (r"a=b", r"$$a=b \tag{\text{$\dagger$}}$$"),
+    (r"a=b \label{eq:{x}}", r"$$a=b$$"),
+])
+def test_a_tag_with_nested_braces_counts_on_neither_side(test, output):
+    assert equations.appears(test, output)[0]

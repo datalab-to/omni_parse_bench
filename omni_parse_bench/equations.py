@@ -52,7 +52,7 @@ _TAG = re.compile(r"<[^<>]+>")
 # isn't one.
 _BLOCK = re.compile(r"(?=</?(?:table|thead|tbody|tfoot|tr|td|th|p|div|li|ul|ol|dl|dt|dd|h[1-6]|section|"
                     r"article|figure|figcaption|blockquote|pre|caption)(?=[\s/>]))", re.I)
-_UNTAG = re.compile(r"\\(?:tag\*?|label)\s*\{[^{}]*\}|\\(?:notag|nonumber)(?![A-Za-z])")
+_UNTAG = re.compile(r"\\(?:tag\*?|label)\s*\{|\\(?:notag|nonumber)(?![A-Za-z])")
 _UNDEFINED = re.compile(r"Undefined control sequence: (\\[A-Za-z]+)")
 _LATEX = re.compile(r"\\[A-Za-z]|[\^_]")
 _WORD = re.compile(r"(?<![\\\w])[^\W\d_]{3,}")
@@ -276,10 +276,25 @@ def _bare(tex: str) -> bool:
     return not _WORD.search(words) and symbols(tex, True) is not None
 
 
+def _untag(tex: str) -> str:
+    r"""`tex` without its \tag, \label, \notag and \nonumber, braces nested in a tag and all
+    (\tag{\text{$\dagger$}})."""
+    out, i = [], 0
+    while m := _UNTAG.search(tex, i):
+        out.append(tex[i:m.start()] + " ")
+        i = m.end()
+        if m[0].endswith("{"):
+            depth = 1
+            while i < len(tex) and depth:
+                depth += {"{": 1, "}": -1}.get(tex[i], 0) if tex[i - 1] != "\\" else 0
+                i += 1
+    return "".join(out) + tex[i:]
+
+
 def _span_symbols(tex: str, display: bool) -> tuple[str, ...]:
     if tex.startswith("<math>"):
         return _from_mathml(f'<math xmlns="http://www.w3.org/1998/Math/MathML">{tex[6:-7]}</math>') or ()
-    tex = _UNTAG.sub(" ", tex)
+    tex = _untag(tex)
     # Note: a command KaTeX doesn't know is left out, not the whole span with it.
     for _ in range(_MAX_UNDEFINED):
         if (got := symbols(tex, display)) is not None: return got
@@ -309,7 +324,7 @@ def appears(test_tex: str, html: str) -> tuple[bool, str]:
     in "E=mc^2"). A span with a command KaTeX doesn't know is read without it. A different symbol, a missing
     or added index, exponent or term, or a dropped condition fails.
     """
-    want = symbols(_UNTAG.sub(" ", test_tex), True)
+    want = symbols(_untag(test_tex), True)
     if want is None:
         return False, "the test's LaTeX doesn't render"
     want = _unnumber(want)
@@ -383,7 +398,7 @@ _HTML_SCRIPT = re.compile(r"<(sup|sub)\b[^<>]*>(.*?)</\1>", re.I | re.S)
 def in_text(test_tex: str, html: str) -> bool:
     """Whether the test's equation is in the output's text, with its scripts written as scripts: the
     text read as symbols, each math span as what it renders ("ex$(n, C_5)$")."""
-    want = symbols(_UNTAG.sub(" ", test_tex), True)
+    want = symbols(_untag(test_tex), True)
     if not want: return False
     s = _blocks(html)
     out, parts, end = [], {}, 0
