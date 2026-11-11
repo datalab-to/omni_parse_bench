@@ -258,7 +258,8 @@ def test_spaced_dots_in_plain_text_are_an_ellipsis():
 
 
 @pytest.mark.parametrize("test, output", [
-    (r"x^2", "<p>x^2.5</p>"), (r"x_1", "<p>x_1.5</p>"), (r"x^2", r"<p>$x^2.5$</p>"), (r"x^2", r"<p>$$x^2.5$$</p>"),
+    (r"x^2", "<p>x^2.5</p>"), (r"x_1", "<p>x_1.5</p>"),
+    (r"x^2", r"<p>$x^2.5$</p>"), (r"x^2", r"<p>$$x^2.5$$</p>"),
 ])
 def test_a_script_ending_in_a_digit_is_not_found_before_a_decimal_part(test, output):
     assert not runners.present(runners.Present(runners.Latex(test)), views.html(output))[0]
