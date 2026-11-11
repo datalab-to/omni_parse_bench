@@ -93,13 +93,23 @@ _SPACED_DIGITS = re.compile(r"\d[\d.,]*(?:\s+[\d.,]+)+")
 # writer joined lines with. Not a dash, which can end a line before a lowercase word.
 _LINE_HYPHEN = re.compile(r"(?<=[^\W\d_])[-\u2010\u2011]\s+([^\W\d_])")
 _DECIMAL_MIDDOT = re.compile(r"(?<=\d)[·∙](?=\d)")
+# Note: the CJK and half-width middle dots are the same dot as "·" (NFKC would turn ㆍ into a Hangul jamo and
+# ･ into ・). Between two digits they are left as they were: in Japanese "3・11" is a separator, not a
+# decimal.
+# ⋅, the multiplication dot, is left out: "2⋅3" is a product, not 2.3.
+_MIDDLE_DOT = re.compile(r"(?<!\d)[ㆍ・･‧]|[ㆍ・･‧](?!\d)")
+# Note: wave dash and asterisk operator are the tilde and the asterisk, so "∗∗∗" is a leader like "***".
+_PRE_NFKC = str.maketrans({"〜": "~", "∗": "*"})
+# Note: Romanian writes ș and ț with a comma below, but a keyboard or font often gives the cedilla forms ş and
+# ţ; gershayim is the Hebrew double quote.
+_POST_NFKC = str.maketrans({"ş": "ș", "ţ": "ț", "Ş": "Ș", "Ţ": "Ț", "״": '"'})
 _WRAP_HYPHEN = re.compile("[-‐‑](?=\\s)")
 
 
 def fold(s: str) -> str:
     r"""The canonical form of `s` for comparison.
 
-    It applies, in this order:
+    It applies these steps, roughly in this order:
 
         LaTeX spans      $..$ carrying LaTeX markup, one to three letters, or digits -> its text, without
                          the spaces math mode doesn't render ("$c_{\text{MC}}$" -> "cMC", "$U$" -> "U",
@@ -108,7 +118,9 @@ def fold(s: str) -> str:
                          -> "developers"), when a lowercase letter follows
         superscripts     superscript digits after a digit set apart ("1,240¹" -> "1,240 1"), as views.text
                          sets apart a <sup>, so a footnote marker never joins the number it follows
-        NFKC             compatibility forms -> canonical ("ﬁ" -> "fi")
+        NFKC             compatibility forms -> canonical ("ﬁ" -> "fi"); just before it, ″ ‴ and TeX quotes
+                         -> ", 〜 ∗ -> ~ *, CJK middle dots (not between digits) -> "·", spacing accents
+                         after a letter -> combining ones
         invisibles       private-use characters and format characters (Unicode category Cf: zero-width,
                          bidi controls, soft hyphen, word joiner, ...) removed, except the visible
                          number signs that are Cf (Arabic, Syriac, Kaithi: `_VISIBLE_FORMAT`)
@@ -117,7 +129,8 @@ def fold(s: str) -> str:
         markers          a footnote marker [1] or [^1] -> " 1"; a bullet glyph starting a line -> a space
         leaders          runs of 3+ dots, dashes or underscores -> a space
         typography       dash, quote (with primes, ꞌ, ˈ), space and arrow families unified; the fraction slash
-                         -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII
+                         -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII;
+                         ş ţ -> ș ț; ״ -> "
         symbols          decimal middle dots -> "."; ♢ -> ◊; ≦ -> ≤
         case, spacing    lowercased; whitespace collapsed and trimmed
 
@@ -153,9 +166,10 @@ def boxes(s: str) -> str:
 
 
 def _primes(s: str) -> str:
-    """″, ‴ and TeX's doubled quotes as ", and a spacing accent after a letter as a combining one:
-    before NFKC, which would split ″ and ‴ into primes and a spacing accent off its letter."""
-    s = _TEX_QUOTE.sub('"', s.replace("″", '"').replace("‴", '"'))
+    """The folds that must run before NFKC, which would split ″ ‴ and a spacing accent, turn ㆍ into a
+    jamo and ･ into ・, and leave 〜 ∗ alone: ″ ‴ and TeX quotes as ", 〜 ∗ as ~ *, CJK middle dots as "·"."""
+    s = _TEX_QUOTE.sub('"', s.replace("″", '"').replace("‴", '"')).translate(_PRE_NFKC)
+    s = _MIDDLE_DOT.sub("·", s)
     return _SPACING_ACCENT.sub(lambda m: _COMBINING[m[1]], _ACUTE_APOSTROPHE.sub("'", s))
 
 
@@ -165,6 +179,7 @@ def typography(s: str, *, preserve_dashes: bool = False) -> str:
     s = _INVISIBLE.sub("", unicodedata.normalize("NFKC", _primes(s))).replace("⁄", "/")
     if not preserve_dashes:
         s = _DASH.sub("-", s)
+    s = s.translate(_POST_NFKC)
     s = _SQUOTE.sub("'", s)
     s = _DQUOTE.sub('"', s)
     s = _SPACE.sub(" ", s)

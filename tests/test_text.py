@@ -125,6 +125,31 @@ def test_fold_equates_both_sides(a, b):
     assert normalize.fold(views.text(a)) == normalize.fold(views.text(b))
 
 
+@pytest.mark.parametrize("a, b", [
+    ("乔治‧华盛顿", "乔治·华盛顿"), ("ㆍ제주", "·제주"), ("ヴァン・ゴッホ", "ヴァン·ゴッホ"),
+    ("ﾏﾘｱ･ｼｮﾊﾟﾝ", "マリア·ショパン"),
+    ("\u2217\u2217\u2217", "***"),
+    ("Bucure\u015fti, \u0162ara", "Bucure\u0219ti, \u021aara"),
+    ("pa\u0163i", "pa\u021bi"), ("\u0218TIRI", "\u015eTIRI"),
+    ("a\u301cb", "a~b"), ("10\u301c20", "10~20"), ("p\u2217", "p*"),
+    ("\u05e6\u05d4\u05f4\u05dc", '\u05e6\u05d4"\u05dc'),
+])
+def test_fold_equates_look_alike_glyphs(a, b):
+    assert normalize.fold(a) == normalize.fold(b)
+
+
+@pytest.mark.parametrize("a, b", [
+    ("2\u22c53", "2.3"),  # a multiplication dot is not a decimal point
+    ("a\u22c5b", "a\u00b7b"),
+    ("Bucure\u015fti", "Bucuresti"), ("pa\u021bi", "pati"),
+    ("a\u301cb", "a-b"), ("p\u2217", "p"), ("\u05e6\u05d4\u05f4\u05dc", "\u05e6\u05d4\u05dc"),
+    ("a\u30fbb", "a b"),
+    ("3\u30fb11", "3.11"), ("3\uff65" "5", "3.5"), ("1\u20275", "1.5"),
+])
+def test_fold_keeps_look_alike_glyph_neighbours_apart(a, b):
+    assert normalize.fold(a) != normalize.fold(b)
+
+
 def test_fold_keeps_other_modifier_letters():
     for kept in ("ˉ", "ˌ", "ꞎ", "ʻ"):
         assert normalize.fold(f"a{kept}b") == f"a{kept}b"
