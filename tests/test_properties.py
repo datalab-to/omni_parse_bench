@@ -53,6 +53,7 @@ def paragraphs(xs: list[str]) -> str:
 @given(st.sampled_from(HTML_TESTS), st.lists(PARAGRAPH, max_size=3), st.lists(PARAGRAPH, max_size=3))
 def test_an_answer_passes_with_paragraphs_around_it(t, before, after):
     # Known bugs (regression tests below): a "$" pairs with the math's "$"; leader marks hide a minus sign.
+    # The "$" exclusion also hides a residual: a 100+ character price paragraph (long-price regression).
     assume(not any("$" in x or leaders(x) for x in [*before, *after]))
     [v] = scorer.score({"html": paragraphs(before) + answer(t)["html"] + paragraphs(after)}, [t])
     assert v.result == "pass", v.why
@@ -61,6 +62,7 @@ def test_an_answer_passes_with_paragraphs_around_it(t, before, after):
 @given(st.sampled_from(INLINE_TESTS), PARAGRAPH, PARAGRAPH)
 def test_an_answer_passes_with_text_around_it_in_its_paragraph(t, before, after):
     # Known bugs (regression tests below): a "$" pairs with the math's "$"; leader marks hide a minus sign.
+    # The "$" exclusion also hides a residual: a 100+ character price paragraph (long-price regression).
     assume(not any("$" in x or leaders(x) for x in (before, after)))
     h = answer(t)["html"]
     head, tail = h[:-len("</p>")].replace("<p>", f"<p>{_html.escape(before, quote=False)} ", 1), "</p>"
@@ -80,11 +82,26 @@ def test_text_folds_the_same_however_an_output_splits_it_into_blocks(tokens, dat
     assert normalize.fold(views.text(html)) == normalize.fold(" ".join(tokens))
 
 
+def math_test():
+    """The first test whose answer holds `$U$`; skips when the set has none."""
+    found = [t for t in HTML_TESTS if "$U$" in answer(t)["html"]]
+    return found[0] if found else pytest.skip("no math test in this set")
+
+
 @pytest.mark.xfail(strict=False, raises=AssertionError,
                    reason="price/math misgrade: a $ in a price pairs with the math's $")
 def test_regression_dollar_price_before_math_answer():
-    [t] = [t for t in HTML_TESTS if "$U$" in answer(t)["html"]] or pytest.skip("no math test in this set")
+    t = math_test()
     [v] = scorer.score({"html": paragraphs(["$5.00"]) + answer(t)["html"]}, [t])
+    assert v.result == "pass", v.why
+
+
+@pytest.mark.xfail(strict=False, raises=AssertionError,
+                   reason="a long price paragraph before math: the span $5.00 ... $ is rejected for length "
+                          "but still consumes the closing $ of $U$")
+def test_regression_long_price_paragraph_before_math_answer():
+    t = math_test()
+    [v] = scorer.score({"html": f"<p>$5.00 {'a' * 100}</p>" + answer(t)["html"]}, [t])
     assert v.result == "pass", v.why
 
 
@@ -135,9 +152,12 @@ def test_text_within_its_edits_is_found(text, data):
                                min_size=k, max_size=k, unique_by=lambda e: e[0]))
     out = list(text)
     for i, kind in sorted(edits, reverse=True):
-        if kind == "s": out[i] = "#"
-        elif kind == "i": out.insert(i, "#")
-        else: del out[i]
+        if kind == "s":
+            out[i] = "#"
+        elif kind == "i":
+            out.insert(i, "#")
+        else:
+            del out[i]
     assert runners.found(runners.Text(text, k), views.html(f"<p>{''.join(out)}</p>"))[0]
 
 
