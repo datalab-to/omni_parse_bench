@@ -433,6 +433,8 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
         elif ch in "^_" and i + 1 < len(text) and not text[i + 1].isspace():
             j = text.find("}", i) + 1 if text[i + 1] == "{" else i + 2
             j = j or len(text)
+            # Note: unbraced digits after ^ or _ are one script ("x^23" is x^{23}, never x^{2}3).
+            while text[i + 1].isdigit() and j < len(text) and text[j].isdigit(): j += 1
             out += [f"{ch}(", *_chars(text[i + 1:j].strip("{}")), ")"]
             i = j
             continue
@@ -456,6 +458,7 @@ _DASHES = str.maketrans(dict.fromkeys("‐‑‒–—―", "-"))
 
 
 def _chars(s: str) -> list[str]:
-    s = unicodedata.normalize("NFKC", s)
+    # Note: NFKC would make an ellipsis three full stops.
+    s = unicodedata.normalize("NFKC", s.replace("…", "⋯"))
     s = s.translate(_ALIASES).translate(_DASHES)
     return [ch if ch != "." else _GAP + "·" for ch in s if not ch.isspace() and ch not in _INVISIBLE]

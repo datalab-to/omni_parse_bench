@@ -196,3 +196,15 @@ def test_only_a_number_after_dot_leaders_is_an_equation_number(test, output, ok)
 def test_an_underline_is_not_an_overline():
     assert not equations.appears(r"\underline{x}", r"$\overline{x}$")[0]
     assert equations.appears(r"\underline{x}", r"$\underline{x}$")[0]
+
+
+@pytest.mark.parametrize("test, output, ok", [
+    (r"1,\ldots,n", "<p>for 1, …, n we have</p>", True),
+    (r"1,\ldots,n", "<p>for 1, ..., n we have</p>", True),
+    (r"x^2", "<p>so x^23 grows</p>", False),
+    (r"x_1", "<p>so x_12 grows</p>", False),
+    (r"x^{23}", "<p>so x^23 grows</p>", True),
+    (r"x^2y", "<p>so x^2y grows</p>", True),
+])
+def test_plain_text_reads_ellipses_and_unbraced_scripts(test, output, ok):
+    assert runners.present(runners.Present(runners.Latex(test)), views.html(output))[0] is ok
