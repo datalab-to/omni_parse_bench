@@ -237,3 +237,13 @@ def test_policy_bold_counts(test, output, ok):
 def test_policy_greek_variants_differ(test, output, ok):
     v = views.html(markdown.to_html(output))
     assert runners.present(runners.Present(runners.Latex(test)), v)[0] is ok
+
+
+# Scoring policy: an old book's Σ and Π are \sum and \prod.
+@pytest.mark.parametrize("test, output", [
+    (r"\sum_{i=1}^{n} x_i", r"$\Sigma_{i=1}^{n} x_i$"),
+    (r"\prod_{k=1}^{n} a_k", r"$\Pi_{k=1}^{n} a_k$"),
+    (r"\Sigma x", r"$\sum x$"),
+])
+def test_policy_sigma_and_pi_are_sum_and_prod(test, output):
+    assert equations.appears(test, output)[0]

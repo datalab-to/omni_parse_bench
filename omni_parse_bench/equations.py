@@ -33,7 +33,8 @@ _KEPT_FONTS = {"double-struck": "double-struck", "script": "script", "fraktur": 
                "bold-italic": "bold", "bold-script": "bold-script", "bold-fraktur": "bold-fraktur"}
 _ALIASES = str.maketrans({"⩽": "≤", "⩾": "≥", "∥": "‖", "−": "-", "′": "'", "∣": "|", "⋅": "·",
                           "∗": "*", "⋆": "*", "∶": ":",
-                          "…": "⋯", "\\": "∖", "♯": "#", "≔": ":=", "≕": "=:", "≦": "≤", "≧": "≥"})
+                          "…": "⋯", "\\": "∖", "♯": "#", "≔": ":=", "≕": "=:", "≦": "≤", "≧": "≥",
+                          "∑": "Σ", "∏": "Π"})
 _DOTS, _VDOTS = {"⋯", "·", "."}, {"⋮", "⋱", "⋰"}
 _INVISIBLE = {"⁡", "⁢", "⁣", "⁤", "​"}
 _DROPPED = {"mspace", "mphantom", "annotation", "annotation-xml", "none", "mprescripts"}
@@ -119,7 +120,7 @@ def symbols(tex: str, display: bool = False) -> tuple[str, ...] | None:
                                  (\mathbf{v}, \boldsymbol{v}, \bm{v} and \pmb{v} alike)
         invisible operators      function application, invisible times: dropped
         look-alikes              ⩽, ≦ and ≤, ⩾, ≧ and ≥, ∥ and ‖, − and -, ′ and ', … and ⋯, ≔ and :=,
-                                 ° and a degree written ^\circ,
+                                 Σ and ∑, Π and ∏, ° and a degree written ^\circ,
                                  ∖ and a backslash, ♯ and #, ⋆ and *, . and ·
         equation numbers         \tag and \label, and a number after dot leaders ending a display formula
                                  (". . . (2)"): dropped, on both sides
