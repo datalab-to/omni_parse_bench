@@ -68,7 +68,8 @@ def parse(html: str) -> tuple[Table, ...]:
 
 def _text(td) -> str:
     """A cell's text, read the way the page's text is (`views.text`): inputs, alt text and math."""
-    return views.text(td.decode_contents()).strip()
+    s = td.decode_contents()
+    return views.text(s, alt=False).strip() or views.text(s).strip()
 
 
 def heading(table: Table, cell: Cell, direction: Direction) -> frozenset[Cell]:

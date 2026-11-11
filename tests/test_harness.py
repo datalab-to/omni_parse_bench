@@ -371,6 +371,23 @@ def test_an_llm_layout_reply_is_read_as_an_array_or_spread_over_lines(reply):
     assert [(b["label"], b["text"]) for b in llm.as_blocks(reply)] == [("text", "a"), ("table", "b")]
 
 
+@pytest.mark.parametrize("key", ["bbox_2d", "box_2d", "bbox"])
+@pytest.mark.parametrize("malformed_text", [False, True])
+def test_llm_box_aliases_use_the_prompted_coordinate_order(key, malformed_text):
+    text = 'say "hello"' if malformed_text else 'hello'
+    reply = '{"type": "text", "' + key + '": [100, 200, 400, 700], "text": "' + text + '"}'
+    assert llm.as_blocks(reply) == [{"label": "text", "bbox": [0.2, 0.1, 0.7, 0.4], "text": text}]
+
+
+def test_llm_bbox_alias_keeps_nested_boxes_and_explicit_key_precedence():
+    nested = '{"type": "text", "bbox": [[100, 200, 300, 500], [200, 400, 600, 800]], "text": "a"}'
+    assert llm.as_blocks(nested) == [
+        {"label": "text", "bbox": [0.2, 0.1, 0.8, 0.6], "text": "a"}]
+    both = '{"type": "text", "bbox_2d": [100, 200, 400, 700], "bbox": [0, 0, 1, 1], "text": "a"}'
+    assert llm.as_blocks(both) == [
+        {"label": "text", "bbox": [0.2, 0.1, 0.7, 0.4], "text": "a"}]
+
+
 def test_an_extend_block_with_a_null_side_costs_only_that_block():
     page = {"number": 1, "width": 100, "height": 100}
     blocks = [{"type": "text", "content": "a", "metadata": {"page": page},

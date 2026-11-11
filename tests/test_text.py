@@ -6,6 +6,7 @@ import re
 import pytest
 
 from omni_parse_bench import markdown, normalize, views
+from omni_parse_bench.scorers.unit_tests import runners
 
 
 def test_unclosed_fence_is_not_a_code_block():
@@ -122,6 +123,31 @@ def test_seen_view_leaves_out_image_alt_text():
 ])
 def test_fold_equates_both_sides(a, b):
     assert normalize.fold(views.text(a)) == normalize.fold(views.text(b))
+
+
+@pytest.mark.parametrize("a, b", [
+    ("乔治‧华盛顿", "乔治·华盛顿"), ("ㆍ제주", "·제주"), ("ヴァン・ゴッホ", "ヴァン·ゴッホ"),
+    ("ﾏﾘｱ･ｼｮﾊﾟﾝ", "マリア·ショパン"),
+    ("\u2217\u2217\u2217", "***"),
+    ("Bucure\u015fti, \u0162ara", "Bucure\u0219ti, \u021aara"),
+    ("pa\u0163i", "pa\u021bi"), ("\u0218TIRI", "\u015eTIRI"),
+    ("a\u301cb", "a~b"), ("10\u301c20", "10~20"), ("p\u2217", "p*"),
+    ("\u05e6\u05d4\u05f4\u05dc", '\u05e6\u05d4"\u05dc'),
+])
+def test_fold_equates_look_alike_glyphs(a, b):
+    assert normalize.fold(a) == normalize.fold(b)
+
+
+@pytest.mark.parametrize("a, b", [
+    ("2\u22c53", "2.3"),  # a multiplication dot is not a decimal point
+    ("a\u22c5b", "a\u00b7b"),
+    ("Bucure\u015fti", "Bucuresti"), ("pa\u021bi", "pati"),
+    ("a\u301cb", "a-b"), ("p\u2217", "p"), ("\u05e6\u05d4\u05f4\u05dc", "\u05e6\u05d4\u05dc"),
+    ("a\u30fbb", "a b"),
+    ("3\u30fb11", "3.11"), ("3\uff65" "5", "3.5"), ("1\u20275", "1.5"),
+])
+def test_fold_keeps_look_alike_glyph_neighbours_apart(a, b):
+    assert normalize.fold(a) != normalize.fold(b)
 
 
 def test_fold_keeps_other_modifier_letters():
@@ -252,3 +278,113 @@ def test_no_escape_is_left_inside_a_raw_html_block():
 def test_a_reference_list_is_text():
     assert "[1]: https://doi.org/10.1000/xyz" in views.text(
         markdown.to_html("References\n\n[1]: https://doi.org/10.1000/xyz\n\nEnd."))
+
+
+@pytest.mark.parametrize("html, number", [
+    ("<p>Fee: $____</p><p>12</p><p>34</p><p>$____</p>", "12"),
+    ("<p>Deposit $___ 10% of $___</p>", "10%"),
+])
+def test_dollars_around_a_form_blank_arent_math(html, number):
+    assert runners.found(runners.Number(number), views.html(html))[0]
+
+
+def test_two_prices_are_never_the_ends_of_one_math_span():
+    assert normalize.fold("$92,000; Net +$60,000") == "$92,000; net +$60,000"
+    assert normalize.fold("Gross 8% / $92,000; Net +5% / +$60,000") == (
+        "gross 8% / $92,000; net +5% / +$60,000")
+
+
+def test_a_price_beside_math_is_not_its_span():
+    html = "<p>Cost was US$5 and the Mann-Whitney $U$ test was run</p>"
+    assert runners.found(runners.Text("the Mann-Whitney U test", 0), views.html(html))[0]
+
+
+def test_inline_math_still_reads_as_its_text():
+    assert normalize.fold(r"Let $c_{\text{MC}}$ and $x_1$ be") == "let cmc and x1 be"
+
+
+def test_a_bullet_starting_a_paragraph_reads_as_it_does_inline():
+    html = "<p>P.O. BOX 2000</p><p>• CORTLAND, NY 13045-0900</p>"
+    assert runners.found(runners.Text("P.O. BOX 2000 • CORTLAND, NY 13045-0900", 0), views.html(html))[0]
+
+
+def test_a_table_cell_isnt_matched_by_one_of_its_paragraphs():
+    t = runners.TableCell("2024", {"right": "1,240"}, 0)
+    html = "<table><tr><td><p>2024</p><p>2025</p></td><td>1,240</td></tr></table>"
+    assert not runners.table_cell(t, views.html(html))[0]
+
+
+@pytest.mark.parametrize("html, number", [
+    ("<p>Net change ........ -4.8%</p>", "-4.8%"),
+    ("<p>Net change -------- -4.8%</p>", "-4.8%"),
+    ("<p>Balance ____ -120</p>", "-120"),
+])
+def test_a_negative_number_after_leaders_keeps_its_sign(html, number):
+    assert runners.found(runners.Number(number), views.html(html))[0]
+
+
+def test_leaders_fold_away_however_they_are_spaced():
+    assert normalize.fold("Total ____  _ 12 .  .  . 3") == "total 12 3"
+
+
+def test_a_full_stop_before_a_blank_stays():
+    assert normalize.fold("Sign here. ________") == "sign here."
+
+
+@pytest.mark.parametrize("text, folded", [
+    (r"$\ge$2 cas", "≥2 cas"), (r"$\pm$13.33", "±13.33"), (r"p $<$0.05", "p <0.05"), (r"n $=$12", "n =12"),
+    (r"$-$5 dB", "-5 db"), (r"$x^2$1", "x21"), (r"$5\times$10", "5×10"), (r"$1.5\pm$0.2", "1.5±0.2"),
+    ("$5$²", "5 2"),
+])
+def test_math_right_before_a_number_still_reads_as_math(text, folded):
+    assert normalize.fold(text) == folded
+
+
+@pytest.mark.parametrize("text, folded", [
+    ("$5$6", "$5$6"), ("$100-$200", "$100-$200"),
+])
+def test_digit_bounded_dollars_without_latex_stay_text(text, folded):
+    assert normalize.fold(text) == folded
+
+
+def test_a_too_long_math_span_stays_text_and_the_next_span_still_converts():
+    long = "x" * 130
+    assert normalize.fold(f"${long}$,$y$") == f"${long}$,y"
+
+
+@pytest.mark.parametrize("text, folded", [
+    ("Introduction. . . . . 5", "introduction 5"), ("Chapter 1. . . 7", "chapter 1 7"),
+])
+def test_spaced_dot_leaders_fold_after_a_word(text, folded):
+    assert normalize.fold(text) == folded
+
+
+def test_paren_and_bracket_math_before_a_digit_is_not_two_prices():
+    assert normalize.fold(views.text(r"\(5\)6")) == "56"
+    assert normalize.fold(views.text(r"\(2\)3 and \(4\)")) == "23 and 4"
+    assert normalize.fold(views.text(r"\[5\]6")) == "56"
+
+
+def test_a_freed_dollar_does_not_make_the_words_between_two_spans_a_variable():
+    assert normalize.fold(views.text("$a$ and $b__c$ and $d$")) == "a and $b__c$ and d"
+
+
+@pytest.mark.parametrize("text, folded", [
+    ("$$ x $$", "x"), ("$$\nx\n$$", "x"), (r"\[ x \]", "x"), ("<p>$$ n $$</p>", "n"), ("$$a<br>$$", "a"),
+])
+def test_a_spaced_variable_in_display_math_reads_as_text(text, folded):
+    assert normalize.fold(views.text(text)) == folded
+
+
+def test_spaced_variables_between_plain_dollars_are_prose():
+    assert normalize.fold(views.text("$a$ and $b__c$ and $d$")) == "a and $b__c$ and d"
+
+
+@pytest.mark.parametrize("text, folded", [
+    ("Butterfield hospital...............-.-", "butterfield hospital"),
+    ("Total ---------5", "total 5"), ("Page ......-5", "page 5"), ("Total ---- 5", "total 5"),
+    ("Net ........ -4.8%", "net -4.8%"), ("Balance ____ -120", "balance -120"),
+    ("- - - - item", "item"),
+])
+def test_mixed_dot_and_dash_leaders_fold_but_a_spaced_sign_stays(text, folded):
+    assert normalize.fold(views.text(text)) == folded
