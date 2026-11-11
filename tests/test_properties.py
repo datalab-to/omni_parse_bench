@@ -40,30 +40,24 @@ TOKENS = st.lists(st.one_of(WORD, MARK), max_size=12)
 PARAGRAPH = TOKENS.map(" ".join)
 
 
-def leaders(x: str) -> bool:
-    """Whether `x` has a word of only dot-leader marks: fold drops runs of three, so what survives depends
-    on what sits beside them, and splitting into blocks or sitting by a minus sign changes it."""
-    return any(set(w) <= set("._…·-–—=*") for w in x.split())
-
-
 def paragraphs(xs: list[str]) -> str:
     return "".join(f"<p>{_html.escape(x, quote=False)}</p>" for x in xs)
 
 
 @given(st.sampled_from(HTML_TESTS), st.lists(PARAGRAPH, max_size=3), st.lists(PARAGRAPH, max_size=3))
 def test_an_answer_passes_with_paragraphs_around_it(t, before, after):
-    # Known bugs (regression tests below): a "$" pairs with the math's "$"; leader marks hide a minus sign.
-    # The "$" exclusion also hides a residual: a 100+ character price paragraph (long-price regression).
-    assume(not any("$" in x or leaders(x) for x in [*before, *after]))
+    # No "$": it hides a known bug (pinned by the long-price xfail below), a 100+ character price paragraph
+    # before the math, and a short "$5.00 ... _ $5.00" case.
+    assume(not any("$" in x for x in [*before, *after]))
     [v] = scorer.score({"html": paragraphs(before) + answer(t)["html"] + paragraphs(after)}, [t])
     assert v.result == "pass", v.why
 
 
 @given(st.sampled_from(INLINE_TESTS), PARAGRAPH, PARAGRAPH)
 def test_an_answer_passes_with_text_around_it_in_its_paragraph(t, before, after):
-    # Known bugs (regression tests below): a "$" pairs with the math's "$"; leader marks hide a minus sign.
-    # The "$" exclusion also hides a residual: a 100+ character price paragraph (long-price regression).
-    assume(not any("$" in x or leaders(x) for x in (before, after)))
+    # No "$": it hides a known bug (pinned by the long-price xfail below), a 100+ character price paragraph
+    # before the math, and a short "$5.00 ... _ $5.00" case.
+    assume(not any("$" in x for x in (before, after)))
     h = answer(t)["html"]
     head, tail = h[:-len("</p>")].replace("<p>", f"<p>{_html.escape(before, quote=False)} ", 1), "</p>"
     [v] = scorer.score({"html": f"{head} {_html.escape(after, quote=False)}{tail}"}, [t])
@@ -72,9 +66,6 @@ def test_an_answer_passes_with_text_around_it_in_its_paragraph(t, before, after)
 
 @given(TOKENS.filter(bool), st.data())
 def test_text_folds_the_same_however_an_output_splits_it_into_blocks(tokens, data):
-    # Known bug (regression tests below): fold drops runs of leader marks ("____ _", "... —") but keeps them
-    # once blocks split the run.
-    assume(not any(leaders(x) for x in tokens))
     cuts = sorted(data.draw(st.sets(st.integers(1, max(1, len(tokens) - 1)), max_size=len(tokens) - 1)))
     tag = data.draw(st.sampled_from(["p", "td", "li", "div"]))
     lines = [" ".join(tokens[i:j]) for i, j in zip([0, *cuts], [*cuts, len(tokens)], strict=True)]
@@ -89,38 +80,12 @@ def math_test():
 
 
 @pytest.mark.xfail(strict=False, raises=AssertionError,
-                   reason="price/math misgrade: a $ in a price pairs with the math's $")
-def test_regression_dollar_price_before_math_answer():
-    t = math_test()
-    [v] = scorer.score({"html": paragraphs(["$5.00"]) + answer(t)["html"]}, [t])
-    assert v.result == "pass", v.why
-
-
-@pytest.mark.xfail(strict=False, raises=AssertionError,
                    reason="a long price paragraph before math: the span $5.00 ... $ is rejected for length "
                           "but still consumes the closing $ of $U$")
 def test_regression_long_price_paragraph_before_math_answer():
     t = math_test()
     [v] = scorer.score({"html": f"<p>$5.00 {'a' * 100}</p>" + answer(t)["html"]}, [t])
     assert v.result == "pass", v.why
-
-
-@pytest.mark.xfail(strict=False, raises=AssertionError,
-                   reason='fold drops "____ _" but keeps "_" once blocks split the marks')
-def test_regression_underscore_marks_split_into_blocks():
-    html = paragraphs(["____", "_"])
-    assert normalize.fold(views.text(html)) == normalize.fold("____ _")
-
-
-@pytest.mark.xfail(strict=False, raises=AssertionError, reason="same fold bug with other leader marks")
-def test_regression_dot_and_dash_marks_split_into_blocks():
-    assert normalize.fold(views.text(paragraphs(["...", "—"]))) == normalize.fold("... —")
-
-
-@pytest.mark.xfail(strict=False, raises=AssertionError, reason="a '____' before a number hides its minus")
-def test_regression_underscore_run_before_negative_number():
-    found, why = runners.found(runners.Number("-4.8%"), views.html("<p>____ -4.8%</p>"))
-    assert found, why
 
 
 def written(digits: str, sep: str, frac: str, negative: bool, percent: bool) -> str:
