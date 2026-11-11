@@ -215,7 +215,8 @@ def test_a_less_than_and_a_space_before_a_letter_p_is_not_a_block_tag():
 
 
 @pytest.mark.parametrize("output", [
-    r"$$\left< \cdot, \cdot \right>_S$$", r"$\left< \cdot, \cdot \right>_S$", r"\[\left< \cdot, \cdot \right>_S\]",
+    r"$$\left< \cdot, \cdot \right>_S$$", r"$\left< \cdot, \cdot \right>_S$",
+    r"\[\left< \cdot, \cdot \right>_S\]",
 ])
 def test_angle_brackets_in_math_are_not_html_tags(output):
     assert equations.appears(r"\left< \cdot, \cdot \right>_S", output)[0]

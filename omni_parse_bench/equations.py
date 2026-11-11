@@ -160,7 +160,8 @@ def _unnumber(xs: tuple[str, ...]) -> tuple[str, ...]:
     if not body or body[-1] != ")" or "(" not in body: return xs
     j = len(body) - 1 - body[::-1].index("(")
     number = body[j + 1:-1]
-    if not 0 < len(number) <= 8 or not number[0].isdigit() or not all(t.isalnum() or t in ".·'*" for t in number): return xs
+    if not 0 < len(number) <= 8 or not number[0].isdigit(): return xs
+    if not all(t.isalnum() or t in ".·'*" for t in number): return xs
     # Note: only after dot leaders; a number after a single dot is a factor (2\cdot(3)).
     k = j
     while k and body[k - 1] in ("⋯", "·"): k -= 1
