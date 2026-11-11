@@ -3,6 +3,7 @@ what it renders, `spans` finds the math in an output, and `appears` says whether
 """
 from __future__ import annotations
 
+import atexit
 import functools
 import html as _html
 import re
@@ -58,10 +59,19 @@ class _KaTeX:
             answer = self.ctx.call("render", tex, display)
         return answer.get("mathml")
 
+    def close(self) -> None:
+        # Note: takes the lock, so a thread mid-call finishes before the context goes away.
+        with self.lock:
+            self.ctx.close()
+
 
 @functools.cache
 def _katex() -> _KaTeX:
-    return _KaTeX()
+    katex = _KaTeX()
+    # Note: closed here, while Python can still run threads. Left to its finalizer at interpreter exit, the
+    # context joins its event-loop thread, which can't take the GIL by then, and the process never exits.
+    atexit.register(katex.close)
+    return katex
 
 
 @functools.lru_cache(maxsize=200_000)
