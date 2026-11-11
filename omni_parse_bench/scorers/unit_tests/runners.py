@@ -186,7 +186,7 @@ def _latex_found(latex: str, v: views.Html) -> Mark:
     # Note: "3σ" and "α = 0.05" are faithful transcriptions of $3\sigma$ and $\alpha = 0.05$, as a text
     # test already accepts $3\sigma$ for "3σ"; a fraction or a root written as text loses its structure.
     if ok or not plain(latex): return ok, why
-    return (True, "") if contains(f"${latex}$", v.text, 0)[0] else (False, why)
+    return (True, "") if equations.in_text(latex, v.html) else (False, why)
 
 
 # LaTeX commands whose rendering plain text writes exactly: letters, operators, relations, spacing.
