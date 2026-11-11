@@ -168,3 +168,7 @@ def test_an_equation_is_found_only_as_written(test, output, ok):
 def test_look_alikes_and_prose_count_only_as_decided(test, output, ok):
     v = views.html(markdown.to_html(output))
     assert runners.present(runners.Present(runners.Latex(test)), v)[0] is ok
+
+
+def test_a_less_than_before_a_letter_p_in_inline_math_is_not_a_block_tag():
+    assert equations.appears(r"0<p\leq 1", "<p>Let $0<p\\leq 1$.</p>")[0]
