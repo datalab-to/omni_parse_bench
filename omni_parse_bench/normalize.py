@@ -97,7 +97,24 @@ _DECIMAL_MIDDOT = re.compile(r"(?<=\d)[·∙](?=\d)")
 # ･ into ・). Between two digits they are left as they were: in Japanese "3・11" is a separator, not a
 # decimal.
 # ⋅, the multiplication dot, is left out: "2⋅3" is a product, not 2.3.
-_MIDDLE_DOT = re.compile(r"(?<!\d)[ㆍ・･‧]|[ㆍ・･‧](?!\d)")
+_MIDDLE_DOT = re.compile(r"[ㆍ・･‧]")
+
+
+def _digit_at(s: str, i: int, step: int) -> bool:
+    """Whether the first character from `i` going `step`, skipping invisible format characters (which
+    `fold` strips later), is a digit once NFKC has folded it (², ₂, ②, ０)."""
+    while 0 <= i < len(s):
+        if unicodedata.category(s[i]) != "Cf":
+            return unicodedata.normalize("NFKC", s[i]).isdecimal()
+        i += step
+    return False
+
+
+def _fold_middle_dot(m: re.Match) -> str:
+    s = m.string
+    if _digit_at(s, m.start() - 1, -1) and _digit_at(s, m.end(), 1):
+        return m[0]
+    return "·"
 # Note: wave dash and asterisk operator are the tilde and the asterisk, so "∗∗∗" is a leader like "***".
 _PRE_NFKC = str.maketrans({"〜": "~", "∗": "*"})
 # Note: Romanian writes ș and ț with a comma below, but a keyboard or font often gives the cedilla forms ş and
@@ -169,7 +186,7 @@ def _primes(s: str) -> str:
     """The folds that must run before NFKC, which would split ″ ‴ and a spacing accent, turn ㆍ into a
     jamo and ･ into ・, and leave 〜 ∗ alone: ″ ‴ and TeX quotes as ", 〜 ∗ as ~ *, CJK middle dots as "·"."""
     s = _TEX_QUOTE.sub('"', s.replace("″", '"').replace("‴", '"')).translate(_PRE_NFKC)
-    s = _MIDDLE_DOT.sub("·", s)
+    s = _MIDDLE_DOT.sub(_fold_middle_dot, s)
     return _SPACING_ACCENT.sub(lambda m: _COMBINING[m[1]], _ACUTE_APOSTROPHE.sub("'", s))
 
 
