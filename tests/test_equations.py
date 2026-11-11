@@ -210,6 +210,53 @@ def test_plain_text_reads_ellipses_and_unbraced_scripts(test, output, ok):
     assert runners.present(runners.Present(runners.Latex(test)), views.html(output))[0] is ok
 
 
+def test_a_less_than_and_a_space_before_a_letter_p_is_not_a_block_tag():
+    assert equations.appears(r"0<p \leq 1", "<p>$0<p \\leq 1$</p>")[0]
+
+
+@pytest.mark.parametrize("output", [
+    r"$$\left< \cdot, \cdot \right>_S$$", r"$\left< \cdot, \cdot \right>_S$",
+    r"\[\left< \cdot, \cdot \right>_S\]",
+])
+def test_angle_brackets_in_math_are_not_html_tags(output):
+    assert equations.appears(r"\left< \cdot, \cdot \right>_S", output)[0]
+
+
+@pytest.mark.parametrize("test", [r"\kappa^{<\kappa}>\kappa", r"\mathbb{P}^x(\tau_{B_{r_0}(x_0)}<\infty)>0"])
+def test_a_less_than_and_a_greater_than_in_math_are_not_a_tag(test):
+    assert equations.appears(test, f"$${test}$$")[0]
+
+
+def test_an_html_tag_inside_math_is_still_dropped():
+    assert equations.appears("a+b", "<p>$a+<span>b</span>$</p>")[0]
+
+
+@pytest.mark.parametrize("test, output, ok", [
+    (r"f=g\cdots(x)", r"$$f=g\cdots(y)$$", False),
+    (r"a=b \dots (3a)", r"$$a=b$$", True),
+])
+def test_an_equation_number_after_dot_leaders_starts_with_a_digit(test, output, ok):
+    assert equations.appears(test, output)[0] is ok
+
+
+@pytest.mark.parametrize("test, output, ok", [
+    (r"5", r"$5.5$", False),
+    (r"5", r"$2.5$", False),
+    (r"x=2", r"$x=2.5$", False),
+    (r"x^2", "<p>so x^2.5 grows</p>", False),
+    (r"x^{2.5}", "<p>so x^2.5 grows</p>", True),
+    (r"x=2.5", r"$x=2.5$", True),
+])
+def test_a_decimal_point_continues_a_number(test, output, ok):
+    v = views.html(markdown.to_html(output)) if output.startswith("$") else views.html(output)
+    assert runners.present(runners.Present(runners.Latex(test)), v)[0] is ok
+
+
+def test_spaced_dots_in_plain_text_are_an_ellipsis():
+    v = views.html("<p>for 1, . . ., n we have</p>")
+    assert runners.present(runners.Present(runners.Latex(r"1,\ldots,n")), v)[0]
+
+
 # Scoring policy: bold counts.
 @pytest.mark.parametrize("test, output, ok", [
     (r"\mathbf{v}=a\mathbf{u}", r"$v=au$", False),

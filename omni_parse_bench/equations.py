@@ -47,13 +47,16 @@ _SPANS = re.compile(
     # a price ("$5 or $6").
     r"|(?<![\\$])\$(?P<pad>[^$\n]*?[\\^_][^$\n]*?)\$(?!\$)"
     r"|(?:^|(?<=>))(?P<bare>(?:[^<>$\n\\]|\\(?![(\[]))+)(?=<|$)", re.S | re.I | re.M)
-_TAG = re.compile(r"<[^<>]+>")
+# Note: only real HTML tags, so the angle brackets of "\left< a, b \right>" stay math.
+_TAG = re.compile(r"</?(?:a|abbr|b|big|br|cite|code|del|dfn|em|font|i|img|ins|kbd|mark|q|s|samp|small|span|"
+                  r"strike|strong|sub|sup|tt|u|var|wbr|table|thead|tbody|tfoot|tr|td|th|p|div|li|ul|ol|dl|dt|dd|"
+                  r"h[1-6]|section|article|figure|figcaption|blockquote|pre|caption)(?:\s[^<>]*)?/?>", re.I)
 # Note: a line break before each block tag, so an inline $..$ never spans two blocks
 # ("<p>$5</p><p>$$x$$</p>").
-# Not <br> or <img>: a break or an image may sit inside a span. The name must end the tag, so "0<p\leq 1"
-# isn't one.
+# Not <br> or <img>: a break or an image may sit inside a span. A tag must close
+# before any other "<", so "0<p\leq 1" and "0<p \leq 1" aren't tags.
 _BLOCK = re.compile(r"(?=</?(?:table|thead|tbody|tfoot|tr|td|th|p|div|li|ul|ol|dl|dt|dd|h[1-6]|section|"
-                    r"article|figure|figcaption|blockquote|pre|caption)(?=[\s/>]))", re.I)
+                    r"article|figure|figcaption|blockquote|pre|caption)(?=(?:\s[^<>]*)?/?>))", re.I)
 _UNTAG = re.compile(r"\\(?:tag\*?|label)\s*\{|\\(?:notag|nonumber)(?![A-Za-z])")
 _UNDEFINED = re.compile(r"Undefined control sequence: (\\[A-Za-z]+)")
 _LATEX = re.compile(r"\\[A-Za-z]|[\^_]")
@@ -161,7 +164,8 @@ def _unnumber(xs: tuple[str, ...]) -> tuple[str, ...]:
     if not body or body[-1] != ")" or "(" not in body: return xs
     j = len(body) - 1 - body[::-1].index("(")
     number = body[j + 1:-1]
-    if not 0 < len(number) <= 8 or not all(t.isalnum() or t in ".·'*" for t in number): return xs
+    if not 0 < len(number) <= 8 or not number[0].isdigit(): return xs
+    if not all(t.isalnum() or t in ".·'*" for t in number): return xs
     # Note: only after dot leaders; a number after a single dot is a factor (2\cdot(3)).
     k = j
     while k and body[k - 1] in ("⋯", "·"): k -= 1
@@ -380,11 +384,15 @@ def _search(want: tuple[str, ...], hay: list[str], words: bool = False) -> bool:
     # before it negates its first term (one after an operand is a binary + or -), no script after it
     # raises its last; a letter beside it is a factor of a longer product, which a test may quote.
     letters = "".join(c for t, c in code.items() if words and t[-1:].isalnum() and not t.startswith(_GAP))
+    # Note: a point between digits joins them (2.5, and 2\cdot 5 as a product), so no number ends at one.
+    points = "".join(c for t, c in code.items() if t in ("·", "."))
     edges = [f"(?<![{letters}])" if want[0][-1:].isalnum() and letters else "",
              f"(?<![{digits}])" if want[0].isdigit() and digits else "",
+             f"(?<![{digits}][{points}])" if want[0].isdigit() and digits and points else "",
              f"(?<![{operators}][{signs}])" if want[0] not in _OPS and signs and operators else ""]
     ends = [f"(?![{letters}])" if want[-1][-1:].isalnum() and letters else "",
             f"(?![{digits}])" if want[-1].isdigit() and digits else "",
+            f"(?![{points}][{digits}])" if want[-1].isdigit() and digits and points else "",
             f"(?![{scripts}])" if want[-1] not in _OPS and scripts else ""]
     return re.search("".join(edges) + body + "".join(ends), text) is not None
 
@@ -440,13 +448,14 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
             j = text.find("}", i) + 1 if text[i + 1] == "{" else i + 2
             j = j or len(text)
             # Note: unbraced digits after ^ or _ are one script ("x^23" is x^{23}, never x^{2}3).
-            while text[i + 1].isdigit() and j < len(text) and text[j].isdigit(): j += 1
+            while text[i + 1].isdigit() and j < len(text) and (text[j].isdigit() or text[j] == "." and
+                                                              text[j + 1:j + 2].isdigit()): j += 1
             out += [f"{ch}(", *_chars(text[i + 1:j].strip("{}")), ")"]
             i = j
             continue
-        elif text.startswith("...", i):
+        elif m := _SPACED_DOTS.match(text, i):
             out.append("⋯")
-            i += 3
+            i = m.end()
             continue
         elif ch in "'′":
             out += ["^(", "'", ")"]
@@ -459,6 +468,8 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
     return out
 
 
+# Three or more dots, spaced or not, are an ellipsis ("...", ". . .").
+_SPACED_DOTS = re.compile(r"\.(?: ?\.){2,}")
 # Note: NFKC folds the variant Greek letters into the plain ones, which print differently; and a dash
 # stands for a minus in typewritten text.
 _VARIANTS = "ϕϵϑϖϱϰ"
@@ -469,4 +480,7 @@ def _chars(s: str) -> list[str]:
     # Note: NFKC would make an ellipsis three full stops.
     s = "".join(ch if ch in _VARIANTS else unicodedata.normalize("NFKC", ch) for ch in s.replace("…", "⋯"))
     s = s.translate(_ALIASES).translate(_DASHES)
-    return [ch if ch != "." else _GAP + "·" for ch in s if not ch.isspace() and ch not in _INVISIBLE]
+    s = "".join(ch for ch in s if not ch.isspace() and ch not in _INVISIBLE)
+    # Note: a point between digits is a decimal point, read as in math; any other ends a sentence.
+    return [ch if ch != "." else "·" if s[i - 1:i].isdigit() and s[i + 1:i + 2].isdigit() else _GAP + "·"
+            for i, ch in enumerate(s)]
