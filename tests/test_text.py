@@ -378,8 +378,30 @@ def test_a_spaced_variable_in_display_math_reads_as_text(text, folded):
     assert normalize.fold(views.text(text)) == folded
 
 
-def test_spaced_variables_between_plain_dollars_are_prose():
-    assert normalize.fold(views.text("$a$ and $b__c$ and $d$")) == "a and $b__c$ and d"
+@pytest.mark.parametrize("text, folded", [
+    ("$ p $", "p"), ("$ x $", "x"), ("Let $ x $ be", "let x be"),
+    ("animal model ($ n $)", "animal model (n)"),
+    ("$ Q $ and $ n $", "q and n"),
+    ("$p $", "p"), ("$ a$", "a"),                                   # one-sided spacing reads too, by choice
+    ("$ FeS $", "fes"), ("$ BMI $", "bmi"), ("$ ab $", "ab"),       # so do longer variables
+    ("$ n $个", "n个"), ("$ n $th", "nth"), ("其中$ p $值", "其中p值"),   # neighbours do not matter
+])
+def test_a_spaced_variable_between_plain_dollars_reads_as_its_letters(text, folded):
+    assert normalize.fold(views.text(text)) == folded
+
+
+@pytest.mark.parametrize("text, folded", [
+    ("$a$ and $b__c$ and $d$", "a and $b__c$ and d"),
+    ("Cost $ and $x$", "cost $ and x"),
+    ("$5.00 for $U$", "$5.00 for u"),
+    ("Cost $ and $ x $ now", "cost $ and x now"),
+    ("in $ and $ out", "in $ and $ out"),
+    ("$b__c$ and $ d $", "$b__c$ and d"),                       # the word after a rejected span
+    ("$b__c$ or $ of $ and $ n $", "$b__c$ or $ of $ and n"),    # a stop word right after a rejected span
+    ("$ P=0.0074 $ and $ P=0.0089 $", "$ p=0.0074 $ and $ p=0.0089 $"),   # "and" stays prose
+])
+def test_a_spaced_function_word_between_two_dollars_is_prose(text, folded):
+    assert normalize.fold(views.text(text)) == folded
 
 
 @pytest.mark.parametrize("text, folded", [

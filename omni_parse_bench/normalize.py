@@ -80,6 +80,11 @@ _PROSE_WORD = re.compile(r"(?<![\\\w&])[^\W\d_]{3,}")
 _BRACED = re.compile(r"\{[^{}]*\}")
 # Note: one to three letters between dollars is a variable ($U$, $d$, $Re$); an amount has digits.
 _MATH_LETTERS = re.compile(r"[^\W\d_]{1,3}")
+# Note: a padded span of 2-3 letters that is a function word is the prose between two dollars
+# ("$a$ and $b$"), not a variable. English only; one letter ("a", "I") is always a variable.
+_FUNCTION_WORDS = frozenset(
+    "an and or to of the in on at by as is it if vs per for nor but not no so we he me my us be do go up am "
+    "are via".split())
 # Note: in math mode a space renders nothing ("$$2 . 5 5$$" is 2.55), except the one ending a
 # command name (\pm 0, \alpha b), a control space (x\ y), and those in and after a text group
 # (\text{is the} x), which may hold one level of braces.
@@ -279,8 +284,10 @@ def _math_span(m: re.Match[str], *, inline: bool, dollars: bool = True) -> str |
     if (inline and dollars and _DIGIT.match(body) and not _LATEX_MARKUP.search(body)
             and _DIGIT.match(m.string, m.end())):
         return None
-    # Note: between plain dollars a variable hugs them; spaced letters ("$a$ and $b__c$ and $d$") are prose.
-    if _MATH_LETTERS.fullmatch(body.strip()) and (body == body.strip() or not dollars): return body.strip()
+    letters = body.strip()
+    if _MATH_LETTERS.fullmatch(letters) and (
+            body == letters or not dollars or len(letters) == 1 or letters.lower() not in _FUNCTION_WORDS):
+        return letters
     dense = _dense(body)
     if _SPACED_DIGITS.fullmatch(body): return dense
     # Note: too long or too spaced is still math, just not ours to read; the whole match stays text so

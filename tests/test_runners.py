@@ -57,6 +57,12 @@ def test_table_cell_checks_neighbours_and_headings():
     assert not R.table_cell(R.TableCell("1,240", {"left": "2023"}, 0), v)[0]
 
 
+def test_table_cell_reads_a_spaced_variable_in_a_heading_as_the_letter():
+    v = html("<table><tr><th>Group</th><th>$ p $</th></tr>"
+             "<tr><td>animal model ($ n $)</td><td>0.03</td></tr></table>")
+    assert R.table_cell(R.TableCell("0.03", {"top_heading": "p", "left": "animal model (n)"}, 0), v)[0]
+
+
 HEADED = ("<table><tr><th rowspan='2'>Model</th><th colspan='2'>Univariable</th></tr>"
           "<tr><th>HR</th><th>P</th></tr>"
           "<tr><td>A. Overall</td><td></td><td></td></tr>"
