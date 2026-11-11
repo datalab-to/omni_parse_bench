@@ -228,3 +228,11 @@ def test_a_less_than_and_a_greater_than_in_math_are_not_a_tag(test):
 
 def test_an_html_tag_inside_math_is_still_dropped():
     assert equations.appears("a+b", "<p>$a+<span>b</span>$</p>")[0]
+
+
+@pytest.mark.parametrize("test, output, ok", [
+    (r"f=g\cdots(x)", r"$$f=g\cdots(y)$$", False),
+    (r"a=b \dots (3a)", r"$$a=b$$", True),
+])
+def test_an_equation_number_after_dot_leaders_starts_with_a_digit(test, output, ok):
+    assert equations.appears(test, output)[0] is ok
