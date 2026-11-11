@@ -208,3 +208,19 @@ def test_an_underline_is_not_an_overline():
 ])
 def test_plain_text_reads_ellipses_and_unbraced_scripts(test, output, ok):
     assert runners.present(runners.Present(runners.Latex(test)), views.html(output))[0] is ok
+
+
+# Scoring policy: bold counts.
+@pytest.mark.parametrize("test, output, ok", [
+    (r"\mathbf{v}=a\mathbf{u}", r"$v=au$", False),
+    (r"\mathbf{v}=a\mathbf{u}", r"$\boldsymbol{v}=a\bm{u}$", True),
+    (r"\mathbf{x}^*", r"$x^*$", False),
+    (r"x^*", r"$\mathbf{x}^*$", False),
+    (r"\boldsymbol{\mu}_X", r"$\mu_X$", False),
+    (r"\mathbf{A}\mathbf{x}=\mathbf{b}", r"$\mathbf{A}x=\mathbf{b}$", False),
+    (r"\pmb{x}", r"$x$", False),
+    (r"\pmb{x}", r"$\boldsymbol{x}$", True),
+])
+def test_policy_bold_counts(test, output, ok):
+    v = views.html(markdown.to_html(output))
+    assert runners.present(runners.Present(runners.Latex(test)), v)[0] is ok

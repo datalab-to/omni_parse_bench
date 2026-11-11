@@ -19,7 +19,8 @@ KATEX = Path(__file__).parent / "katex" / "katex.js"   # KaTeX 0.16.22, MIT (LIC
 # Note: KaTeX bundles mathtools' pre-2022 \coloneq (":-"); since 2022 it prints ":=", as \coloneqq does.
 _RENDER = """(tex, display) => {
   try {
-    const macros = {"\\\\coloneq": "\\\\coloneqq", "\\\\Coloneq": "\\\\Coloneqq"};
+    const macros = {"\\\\coloneq": "\\\\coloneqq", "\\\\Coloneq": "\\\\Coloneqq",
+                    "\\\\pmb": "\\\\boldsymbol"};
     return {mathml: katex.renderToString(tex, {output: "mathml", displayMode: display, strict: "ignore",
                                                 throwOnError: true, trust: false, macros})};
   } catch (e) {
@@ -27,9 +28,9 @@ _RENDER = """(tex, display) => {
   }
 }"""
 _NS = "{http://www.w3.org/1998/Math/MathML}"
-# Note: bold is dropped, so a bold script or fraktur letter is its plain script or fraktur letter.
-_KEPT_FONTS = {"double-struck": "double-struck", "script": "script", "fraktur": "fraktur",
-               "bold-script": "script", "bold-fraktur": "fraktur"}
+# Note: bold marks a vector or a matrix, so it counts; upright or italic doesn't.
+_KEPT_FONTS = {"double-struck": "double-struck", "script": "script", "fraktur": "fraktur", "bold": "bold",
+               "bold-italic": "bold", "bold-script": "bold-script", "bold-fraktur": "bold-fraktur"}
 _ALIASES = str.maketrans({"⩽": "≤", "⩾": "≥", "∥": "‖", "−": "-", "′": "'", "∣": "|", "⋅": "·",
                           "∗": "*", "⋆": "*", "ϵ": "ε", "ϕ": "φ", "ϑ": "θ", "∶": ":",
                           "…": "⋯", "\\": "∖", "♯": "#", "≔": ":=", "≕": "=:", "≦": "≤", "≧": "≥"})
@@ -114,7 +115,8 @@ def symbols(tex: str, display: bool = False) -> tuple[str, ...] | None:
         alignment                `&`, and how rows are split into cells: dropped; rows are kept, and a row of
                                  nothing but dots is one ellipsis, whatever its dots (vertical and diagonal
                                  dots one kind, horizontal another)
-        fonts                    upright, italic and bold: dropped; blackboard, script and fraktur kept
+        fonts                    upright and italic: dropped; bold, blackboard, script and fraktur kept
+                                 (\mathbf{v}, \boldsymbol{v}, \bm{v} and \pmb{v} alike)
         invisible operators      function application, invisible times: dropped
         look-alikes              ⩽, ≦ and ≤, ⩾, ≧ and ≥, ∥ and ‖, − and -, ′ and ', … and ⋯, ≔ and :=,
                                  ° and a degree written ^\circ, ϵ and ε, ϕ and φ, ϑ and θ,
