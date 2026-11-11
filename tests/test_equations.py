@@ -208,3 +208,7 @@ def test_an_underline_is_not_an_overline():
 ])
 def test_plain_text_reads_ellipses_and_unbraced_scripts(test, output, ok):
     assert runners.present(runners.Present(runners.Latex(test)), views.html(output))[0] is ok
+
+
+def test_a_less_than_and_a_space_before_a_letter_p_is_not_a_block_tag():
+    assert equations.appears(r"0<p \leq 1", "<p>$0<p \\leq 1$</p>")[0]

@@ -48,10 +48,10 @@ _SPANS = re.compile(
 _TAG = re.compile(r"<[^<>]+>")
 # Note: a line break before each block tag, so an inline $..$ never spans two blocks
 # ("<p>$5</p><p>$$x$$</p>").
-# Not <br> or <img>: a break or an image may sit inside a span. The name must end the tag, so "0<p\leq 1"
-# isn't one.
+# Not <br> or <img>: a break or an image may sit inside a span. A tag must close
+# before any other "<", so "0<p\leq 1" and "0<p \leq 1" aren't tags.
 _BLOCK = re.compile(r"(?=</?(?:table|thead|tbody|tfoot|tr|td|th|p|div|li|ul|ol|dl|dt|dd|h[1-6]|section|"
-                    r"article|figure|figcaption|blockquote|pre|caption)(?=[\s/>]))", re.I)
+                    r"article|figure|figcaption|blockquote|pre|caption)(?=(?:\s[^<>]*)?/?>))", re.I)
 _UNTAG = re.compile(r"\\(?:tag\*?|label)\s*\{|\\(?:notag|nonumber)(?![A-Za-z])")
 _UNDEFINED = re.compile(r"Undefined control sequence: (\\[A-Za-z]+)")
 _LATEX = re.compile(r"\\[A-Za-z]|[\^_]")
