@@ -121,7 +121,8 @@ def symbols(tex: str, display: bool = False) -> tuple[str, ...] | None:
         invisible operators      function application, invisible times: dropped
         look-alikes              ⩽, ≦ and ≤, ⩾, ≧ and ≥, ∥ and ‖, − and -, ′ and ', … and ⋯, ≔ and :=,
                                  Σ and ∑, Π and ∏, ° and a degree written ^\circ,
-                                 ∖ and a backslash, ♯ and #, ⋆ and *, . and ·
+                                 ∖ and a backslash, ♯ and #, ⋆ and *, a multiplying . and ·
+                                 (a decimal point stays a decimal point: 2.5 isn't 2·5)
         equation numbers         \tag and \label, and a number after dot leaders ending a display formula
                                  (". . . (2)"): dropped, on both sides
         negations                a relation with a slash through it (\not\in) and its negated character (∉)
@@ -233,8 +234,10 @@ def _walk(e: ET.Element) -> list[str]:
 
 def _leaf(tag: str, text: str, e: ET.Element) -> list[str]:
     text = "".join(ch for ch in text if ch not in _INVISIBLE and not ch.isspace()).translate(_ALIASES)
-    # Note: a point is a raised dot, whether it is a decimal point, multiplies or ends a sentence.
-    text = text.replace(".", "·")
+    # Note: KaTeX writes a decimal point inside its number (<mn>2.5</mn>); any other . multiplies or
+    # ends a sentence, as · does.
+    text = text[:-1] + "·" if tag == "mn" and text.endswith(".") else text
+    text = text if tag == "mn" else text.replace(".", "·")
     font = e.get("mathvariant")
     return [f"{_KEPT_FONTS[font]}:{ch}" if font in _KEPT_FONTS else ch for ch in text]
 
@@ -449,7 +452,7 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
             out += ["^(", "'", ")"]
         elif ch == ".":
             decimal = 0 < i < len(text) - 1 and text[i - 1].isdigit() and text[i + 1].isdigit()
-            out.append("·" if decimal else _GAP + "·")
+            out.append("." if decimal else _GAP + "·")
         else:
             out += _chars(ch)
         i += 1

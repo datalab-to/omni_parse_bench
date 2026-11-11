@@ -247,3 +247,16 @@ def test_policy_greek_variants_differ(test, output, ok):
 ])
 def test_policy_sigma_and_pi_are_sum_and_prod(test, output):
     assert equations.appears(test, output)[0]
+
+
+# Scoring policy: a raised dot is read by what it means; a decimal point is not \cdot.
+@pytest.mark.parametrize("test, output, ok", [
+    (r"x=2.5", r"$x=2\cdot 5$", False),
+    (r"x=2\cdot 5", r"$x=2.5$", False),
+    (r"x=2.5", r"$x=2.5$", True),
+    (r"a \cdot b", r"$a.b$", True),
+    (r"x=2.5", "<p>so x = 2.5 here</p>", True),
+])
+def test_policy_a_decimal_point_is_not_a_raised_dot(test, output, ok):
+    v = views.html(markdown.to_html(output))
+    assert runners.present(runners.Present(runners.Latex(test)), v)[0] is ok
