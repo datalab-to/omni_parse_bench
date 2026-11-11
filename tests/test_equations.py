@@ -262,3 +262,8 @@ def test_spaced_dots_in_plain_text_are_an_ellipsis():
 ])
 def test_a_script_ending_in_a_digit_is_not_found_before_a_decimal_part(test, output):
     assert not runners.present(runners.Present(runners.Latex(test)), views.html(output))[0]
+
+
+def test_widely_spaced_dots_in_plain_text_are_an_ellipsis():
+    v = views.html("<p>for 1, .  . ., n we have</p>")
+    assert runners.present(runners.Present(runners.Latex(r"1,\ldots,n")), v)[0]
