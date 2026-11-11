@@ -13,7 +13,7 @@ import unicodedata
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from omni_parse_bench import views
+from omni_parse_bench import mathspans, views
 
 KATEX = Path(__file__).parent / "katex" / "katex.js"   # KaTeX 0.16.22, MIT (LICENSE beside it)
 # Note: KaTeX bundles mathtools' pre-2022 \coloneq (":-"); since 2022 it prints ":=", as \coloneqq does.
@@ -37,14 +37,15 @@ _DOTS, _VDOTS = {"⋯", "·", "."}, {"⋮", "⋱", "⋰"}
 _INVISIBLE = {"⁡", "⁢", "⁣", "⁤", "​"}
 _DROPPED = {"mspace", "mphantom", "annotation", "annotation-xml", "none", "mprescripts"}
 _SPANS = re.compile(
-    r"\$\$(?P<dd>.+?)\$\$|\\\[(?P<db>.+?)\\\]|\\\((?P<ib>.+?)\\\)|(?<![\\$])\$(?!\s)(?P<i>[^$\n]+?)(?<!\s)\$"
+    r"\\\[(?P<db>.+?)\\\]|\\\((?P<ib>.+?)\\\)"
     r"|<math\b(?P<mattr>[^<>]*)>(?P<m>.*?)</math>"
     r"|(?P<env>\\begin\{(?P<name>(?:equation|align|alignat|aligned|gather|gathered|multline|eqnarray|"
-    r"displaymath)\*?)\}.*?\\end\{(?P=name)\})"
-    # Note: dollars with a space inside are math only around LaTeX ("$ x_1 $", "$\\psi = $ const"), never
-    # a price ("$5 or $6").
-    r"|(?<![\\$])\$(?P<pad>[^$\n]*?[\\^_][^$\n]*?)\$(?!\$)"
-    r"|(?:^|(?<=>))(?P<bare>(?:[^<>$\n\\]|\\(?![(\[]))+)(?=<|$)", re.S | re.I | re.M)
+    r"displaymath)\*?)\}.*?\\end\{(?P=name)\})", re.S | re.I)
+# Note: the dollar-delimited spans are `mathspans`' (the text path reads the same ones). These delimiters
+# say what they are, so there is no pairing to decide. A bare line is a line with no span in it.
+_CROSSES_BLOCK = re.compile(r"\n(?=</?(?:table|thead|tbody|tfoot|tr|td|th|p|div|li|ul|ol|dl|dt|dd|h[1-6]|"
+                            r"section|article|figure|figcaption|blockquote|pre|caption)\b)", re.I)
+_BARE = re.compile(r"(?:^|(?<=>))(?P<bare>(?:[^<>$\n\\\x01]|\\(?![(\[]))+)(?=<|$)", re.M)
 # Note: only real HTML tags, so the angle brackets of "\left< a, b \right>" stay math.
 _TAG = re.compile(r"</?(?:a|abbr|b|big|br|cite|code|del|dfn|em|font|i|img|ins|kbd|mark|q|s|samp|small|span|"
                   r"strike|strong|sub|sup|tt|u|var|wbr|table|thead|tbody|tfoot|tr|td|th|p|div|li|ul|ol|dl|dt|dd|"
@@ -255,21 +256,48 @@ def _blocks(html: str) -> str:
 
 
 def _spans(s: str) -> list[tuple[str, bool, int, int]]:
-    """Each math span of `s` (`_blocks`): its LaTeX or MathML, whether it is display math, and where."""
-    out = []
+    """Each math span of `s` (`_blocks`): its LaTeX or MathML, whether it is display math, and where. Where
+    two spans overlap, the one that starts first is the span."""
+    found = []
     for m in _SPANS.finditer(s):
+        if _CROSSES_BLOCK.search(m[0]) and m["m"] is None:    # these delimiters do not hold a block break
+            continue
         if m["m"] is not None:
             body, display = m["m"].strip(), "block" in (m["mattr"] or "")
             span = (f"<math>{body}</math>" if "<" in body else _html.unescape(body), display)
-        elif m["bare"] is not None:
-            if not _bare(tex := _html.unescape(m["bare"]).strip()): continue
-            span = (tex, True)
         else:
-            tex = next(m[g] for g in ("dd", "db", "ib", "i", "env", "pad") if m[g] is not None)
-            span = (_html.unescape(_TAG.sub(" ", tex)), m["dd"] is not None or m["db"] is not None
-                    or m["env"] is not None)
-        out.append((*span, m.start(), m.end()))
-    return out
+            tex = next(m[g] for g in ("db", "ib", "env") if m[g] is not None)
+            span = (_html.unescape(_TAG.sub(" ", tex)), m["db"] is not None or m["env"] is not None)
+        found.append((m.start(), 0, (*span, m.start(), m.end())))
+    # Note: tags are blanked (an image's alt text kept), so the dollars are the ones `mathspans` pairs.
+    for x in mathspans.find(_TAG.sub(_blank, s)):
+        d = 2 if x.display else 1
+        found.append((x.start, 1, (_html.unescape(_TAG.sub(" ", s[x.start + d:x.end - d])), x.display,
+                                   x.start, x.end)))
+    out, taken, last = [], list(s), 0
+    for _, _, span in sorted(found, key=lambda f: f[:2]):
+        if span[2] >= last:
+            out.append(span)
+            last = span[3]
+            taken[span[2]:span[3]] = "\x01" * (span[3] - span[2])
+    # Note: a bare line is a line with no span in it.
+    for m in _BARE.finditer("".join(taken)):
+        if _bare(tex := _html.unescape(m["bare"]).strip()):
+            out.append((tex, True, m.start(), m.end()))
+    return sorted(out, key=lambda x: x[2])
+
+
+_ALT = re.compile(r"\balt=(?:\"([^\"]*)\"|'([^']*)')", re.I)
+
+
+def _blank(tag: re.Match[str]) -> str:
+    """A tag as blanks of its length, keeping an image's alt text, which a reader sees (`views.text`)."""
+    t = tag[0]
+    out = ["\x01"] * len(t)
+    if t[:4].lower() == "<img" and (a := _ALT.search(t)):
+        g = 1 if a[1] is not None else 2
+        out[a.start(g):a.end(g)] = t[a.start(g):a.end(g)]
+    return "".join(out)
 
 
 def _bare(tex: str) -> bool:

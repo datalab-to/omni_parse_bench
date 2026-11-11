@@ -46,18 +46,12 @@ def paragraphs(xs: list[str]) -> str:
 
 @given(st.sampled_from(HTML_TESTS), st.lists(PARAGRAPH, max_size=3), st.lists(PARAGRAPH, max_size=3))
 def test_an_answer_passes_with_paragraphs_around_it(t, before, after):
-    # No "$": it hides a known bug (pinned by the long-price xfail below), a 100+ character price paragraph
-    # before the math, and a short "$5.00 ... _ $5.00" case.
-    assume(not any("$" in x for x in [*before, *after]))
     [v] = scorer.score({"html": paragraphs(before) + answer(t)["html"] + paragraphs(after)}, [t])
     assert v.result == "pass", v.why
 
 
 @given(st.sampled_from(INLINE_TESTS), PARAGRAPH, PARAGRAPH)
 def test_an_answer_passes_with_text_around_it_in_its_paragraph(t, before, after):
-    # No "$": it hides a known bug (pinned by the long-price xfail below), a 100+ character price paragraph
-    # before the math, and a short "$5.00 ... _ $5.00" case.
-    assume(not any("$" in x for x in (before, after)))
     h = answer(t)["html"]
     head, tail = h[:-len("</p>")].replace("<p>", f"<p>{_html.escape(before, quote=False)} ", 1), "</p>"
     [v] = scorer.score({"html": f"{head} {_html.escape(after, quote=False)}{tail}"}, [t])
@@ -66,6 +60,8 @@ def test_an_answer_passes_with_text_around_it_in_its_paragraph(t, before, after)
 
 @given(TOKENS.filter(bool), st.data())
 def test_text_folds_the_same_however_an_output_splits_it_into_blocks(tokens, data):
+    # Note: a block bounds a math span ("<p>$a</p><p>b$</p>" is not one), so with dollars the split matters.
+    assume(not any("$" in x for x in tokens))
     cuts = sorted(data.draw(st.sets(st.integers(1, max(1, len(tokens) - 1)), max_size=len(tokens) - 1)))
     tag = data.draw(st.sampled_from(["p", "td", "li", "div"]))
     lines = [" ".join(tokens[i:j]) for i, j in zip([0, *cuts], [*cuts, len(tokens)], strict=True)]
@@ -79,10 +75,7 @@ def math_test():
     return found[0] if found else pytest.skip("no math test in this set")
 
 
-@pytest.mark.xfail(strict=False, raises=AssertionError,
-                   reason="a long price paragraph before math: the span $5.00 ... $ is rejected for length "
-                          "but still consumes the closing $ of $U$")
-def test_regression_long_price_paragraph_before_math_answer():
+def test_a_long_price_paragraph_before_math_does_not_take_the_maths_dollar():
     t = math_test()
     [v] = scorer.score({"html": f"<p>$5.00 {'a' * 100}</p>" + answer(t)["html"]}, [t])
     assert v.result == "pass", v.why

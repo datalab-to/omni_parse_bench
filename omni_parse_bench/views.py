@@ -37,6 +37,22 @@ _BLOCK = re.compile(
     r"textarea|img)\b[^<>]*>",
     re.I,
 )
+# Note: a block tag breaks the line, so a math span never crosses one ("<p>$5</p><p>$$x$$</p>"); a <br> or
+# an image may sit inside a span, and a reader sees them as a space.
+_LINE_BREAKING = re.compile(
+    r"</?(?:table|thead|tbody|tfoot|tr|td|th|p|div|li|ul|ol|dl|dt|dd|h[1-6]|section|article|figure|"
+    r"figcaption|blockquote|pre|caption)\b", re.I)
+
+
+# Note: U+2029, a paragraph separator: white space to everything that reads the text, and no line start to a
+# pattern anchored on "\\n" (a bullet opening a block is not a bullet opening a line).
+BREAK = "\u2029"
+
+
+def _block_break(m: re.Match[str]) -> str:
+    return BREAK if _LINE_BREAKING.match(m[0]) else " "
+
+
 # Note: a footnote marker or exponent set as <sup> would otherwise become digits of the number it
 # follows ("1,240<sup>1</sup>" read as 1,2401); a text test still finds "x2" in "x 2" by `squeeze`.
 _SUP = re.compile(r"<sup\b[^<>]*>", re.I)
@@ -131,7 +147,7 @@ def text(s: str, *, alt: bool = True) -> str:
     s = _MD_IMAGE.sub(lambda m: f" {m[1]} " if alt else " ", s)
     for pattern in (_COMMENT, _DOCTYPE, _SCRIPT):
         s = pattern.sub(" ", s)
-    s = _INLINE.sub("", _BLOCK.sub(" ", _SUP.sub(" ", s)))
+    s = _INLINE.sub("", _BLOCK.sub(_block_break, _SUP.sub(" ", s)))
     return _html.unescape(s)
 
 
