@@ -158,9 +158,10 @@ def _unnumber(xs: tuple[str, ...]) -> tuple[str, ...]:
     j = len(body) - 1 - body[::-1].index("(")
     number = body[j + 1:-1]
     if not 0 < len(number) <= 8 or not all(t.isalnum() or t in ".·'*" for t in number): return xs
+    # Note: only after dot leaders; a number after a single dot is a factor (2\cdot(3)).
     k = j
     while k and body[k - 1] in ("⋯", "·"): k -= 1
-    return body[:k] + tail if k < j else xs
+    return body[:k] + tail if "⋯" in body[k:j] else xs
 
 
 def _canonical(xs: list[str]) -> list[str]:

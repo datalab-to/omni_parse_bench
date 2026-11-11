@@ -181,3 +181,13 @@ def test_a_less_than_before_a_letter_p_in_inline_math_is_not_a_block_tag():
 ])
 def test_a_tag_with_nested_braces_counts_on_neither_side(test, output):
     assert equations.appears(test, output)[0]
+
+
+@pytest.mark.parametrize("test, output, ok", [
+    (r"x=2\cdot(3)", r"$x=2$", False),
+    (r"x=2\cdot(3)", r"$x=2\cdot(4)$", False),
+    (r"x=2\cdot(3)", r"$x=2\cdot(3)$", True),
+    (r"a=b \dots (3)", r"$$a=b$$", True),
+])
+def test_only_a_number_after_dot_leaders_is_an_equation_number(test, output, ok):
+    assert equations.appears(test, output)[0] is ok
