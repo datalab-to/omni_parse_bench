@@ -45,7 +45,10 @@ _SPANS = re.compile(
     # a price ("$5 or $6").
     r"|(?<![\\$])\$(?P<pad>[^$\n]*?[\\^_][^$\n]*?)\$(?!\$)"
     r"|(?:^|(?<=>))(?P<bare>(?:[^<>$\n\\]|\\(?![(\[]))+)(?=<|$)", re.S | re.I | re.M)
-_TAG = re.compile(r"<[^<>]+>")
+# Note: only real HTML tags, so the angle brackets of "\left< a, b \right>" stay math.
+_TAG = re.compile(r"</?(?:a|abbr|b|big|br|cite|code|del|dfn|em|font|i|img|ins|kbd|mark|q|s|samp|small|span|"
+                  r"strike|strong|sub|sup|tt|u|var|wbr|table|thead|tbody|tfoot|tr|td|th|p|div|li|ul|ol|dl|dt|dd|"
+                  r"h[1-6]|section|article|figure|figcaption|blockquote|pre|caption)(?:\s[^<>]*)?/?>", re.I)
 # Note: a line break before each block tag, so an inline $..$ never spans two blocks
 # ("<p>$5</p><p>$$x$$</p>").
 # Not <br> or <img>: a break or an image may sit inside a span. A tag must close

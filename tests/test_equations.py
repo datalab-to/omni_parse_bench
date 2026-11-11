@@ -212,3 +212,19 @@ def test_plain_text_reads_ellipses_and_unbraced_scripts(test, output, ok):
 
 def test_a_less_than_and_a_space_before_a_letter_p_is_not_a_block_tag():
     assert equations.appears(r"0<p \leq 1", "<p>$0<p \\leq 1$</p>")[0]
+
+
+@pytest.mark.parametrize("output", [
+    r"$$\left< \cdot, \cdot \right>_S$$", r"$\left< \cdot, \cdot \right>_S$", r"\[\left< \cdot, \cdot \right>_S\]",
+])
+def test_angle_brackets_in_math_are_not_html_tags(output):
+    assert equations.appears(r"\left< \cdot, \cdot \right>_S", output)[0]
+
+
+@pytest.mark.parametrize("test", [r"\kappa^{<\kappa}>\kappa", r"\mathbb{P}^x(\tau_{B_{r_0}(x_0)}<\infty)>0"])
+def test_a_less_than_and_a_greater_than_in_math_are_not_a_tag(test):
+    assert equations.appears(test, f"$${test}$$")[0]
+
+
+def test_an_html_tag_inside_math_is_still_dropped():
+    assert equations.appears("a+b", "<p>$a+<span>b</span>$</p>")[0]
