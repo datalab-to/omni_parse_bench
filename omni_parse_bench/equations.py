@@ -201,7 +201,7 @@ def _walk(e: ET.Element) -> list[str]:
         name = "binom" if e.get("linethickness") in ("0", "0px", "0em") else "frac"
         return [f"{name}(", *num, ",", *den, ")"]
     if tag == "munder" and e.get("accentunder") == "true":
-        return ["accent(", *_walk(kids[1]), ")(", *_walk(kids[0]), ")"]
+        return ["underaccent(", *_walk(kids[1]), ")(", *_walk(kids[0]), ")"]
     if tag in ("msub", "munder"):
         return [*_walk(kids[0]), "_(", *_walk(kids[1]), ")"]
     if tag in ("msup", "mover"):

@@ -191,3 +191,8 @@ def test_a_tag_with_nested_braces_counts_on_neither_side(test, output):
 ])
 def test_only_a_number_after_dot_leaders_is_an_equation_number(test, output, ok):
     assert equations.appears(test, output)[0] is ok
+
+
+def test_an_underline_is_not_an_overline():
+    assert not equations.appears(r"\underline{x}", r"$\overline{x}$")[0]
+    assert equations.appears(r"\underline{x}", r"$\underline{x}$")[0]
