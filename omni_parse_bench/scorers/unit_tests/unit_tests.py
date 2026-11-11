@@ -30,11 +30,12 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     system didn't produce fails as "no <output> output", so a system with html alone scores 0 on layout.
 
     - A page's line in scores.jsonl holds `tests`, `passed` and `per_family` (each family's `tests` and
-      `passed`);
+      `passed`), and the same counts by `per_tag`, `per_test_type` and `per_derivation`; its `row` holds
+      the page's `document` and `suite`;
     - its details (`details/<page_id>.jsonl`) hold one test line per test (`lines`); and
     - the summary is `summarize` over every page, a failed one with all its tests failed (`score_failure`):
-      the families in the order text, tables, layout, and their mean as the headline. Any other breakdown (by
-      tag, test type, suite or derivation) is `summarize` of a slice of the details."""
+      the families in the order text, tables, layout, and their mean as the headline, then the same scores
+      by tag, suite, test type and derivation."""
 
     name: ClassVar[str] = "unit_tests"
     headline: ClassVar[str] = "score"
@@ -57,12 +58,8 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     def score(self, pred: Mapping[str, Any], tests: Sequence[_tests.Test]) -> scorer.Score:
         vs = compare.score(pred, tests)
         by_id = {t.id: t for t in tests}
-        per_family: dict[str, dict[str, int]] = {}
-        for v in vs:
-            c = per_family.setdefault(vocab.FAMILIES[by_id[v.id].test_type], {"tests": 0, "passed": 0})
-            c["tests"] += 1
-            c["passed"] += v.result == "pass"
-        result = {"tests": len(vs), "passed": sum(v.result == "pass" for v in vs), "per_family": per_family}
+        result = {"tests": len(vs), "passed": sum(v.result == "pass" for v in vs)} | _count(
+            (v.result == "pass", (t := by_id[v.id]).test_type, t.derivation, t.tags) for v in vs)
         return scorer.Score(result, [{"test_id": v.id, "test_type": (t := by_id[v.id]).test_type,
                                       "output_type": t.output_type, "derivation": t.derivation,
                                       "tags": list(t.tags), "args": t.args, "settings": t.settings,
@@ -79,12 +76,13 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
         return {"page_id": row.page_id, "suite": row.suite, "document": row.document}
 
     def row_fields(self, row: data.Page) -> dict[str, Any]:
-        return {"document": row.document}
+        return {"document": row.document, "suite": row.suite}
 
     def summarize(self, lines: Sequence[Line]) -> dict[str, Any]:
-        """`score` and `families`, over every page's counts, a failed page's from `score_failure`."""
-        return _summary((f, x["row"]["document"], c["passed"], c["tests"])
-                        for x in lines for f, c in x["per_family"].items())
+        """`score`, `families` and the slices (`per_tag`, `per_suite`, `per_test_type`, `per_derivation`),
+        over every page's counts, a failed page's from `score_failure`. A line kept before the slices were
+        (no `per_tag`, ..., no `row.suite`) adds nothing to them."""
+        return _summary(lines)
 
     def check_gold(self, rows: Sequence[data.Page]) -> None:
         """Every page's tests read and checked (`check`), before any call."""
@@ -136,27 +134,78 @@ def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.
 
 def summarize(lines: Iterable[Line]) -> dict[str, Any]:
     """Test lines (from `lines`) as one summary: `score`, the mean of the families' scores, and `families`,
-    each family's `score` (the share of its tests passed), `tests` and `documents`. `score` is None when there
-    are no tests.
+    each family's `score` (the share of its tests passed), `tests` and `documents`; then `per_tag`,
+    `per_suite`, `per_test_type` and `per_derivation`, each a slice's entries shaped as a family's. `score`
+    is None when there are no tests, and a slice with no tests is left out.
+
+    Note: a test with several tags counts under each, so the tag slices' `tests` add up to at least the
+    total; the suite, test type and derivation slices each add up to it exactly. A slice's score is its
+    share of tests passed, not part of the headline.
+
+    Note: a page's lines are those sharing a `page_id` (unique in a dataset); a line without `suite`,
+    `tags` or `derivation` adds nothing to that slice.
 
     Note: a mean over families, each flat over its tests, so how many tests a family has never sets its
     weight. A document's tests pass or fail together (one misread table fails all its cells), so
     `documents` says how much a score rests on."""
-    return _summary((vocab.FAMILIES[x["test_type"]], x["document"], int(x["result"] == "pass"), 1)
-                    for x in lines)
+    by_page: dict[str, list[Line]] = collections.defaultdict(list)
+    for x in lines:
+        by_page[x.get("page_id", x["document"])].append(x)
+    return _summary(
+        {"row": {"document": xs[0]["document"], **({"suite": xs[0]["suite"]} if "suite" in xs[0] else {})},
+         "tests": len(xs), "passed": sum(x["result"] == "pass" for x in xs)}
+        | _count((x["result"] == "pass", x["test_type"], x.get("derivation", ""), x.get("tags", ()))
+                 for x in xs)
+        for xs in by_page.values())
 
 
-def _summary(counts: Iterable[tuple[str, str, int, int]]) -> dict[str, Any]:
-    """`score` and `families` from (family, document, passed, tests) counts, the families in
-    `vocab.FAMILY_ORDER`."""
+def _count(marks: Iterable[tuple[bool, str, str, Iterable[str]]]) -> dict[str, dict[str, dict[str, int]]]:
+    """One page's counts, each as `{key: {"tests", "passed"}}`: `per_family`, `per_tag`, `per_test_type` and
+    `per_derivation`, from its tests' (passed, test type, derivation, tags). A test counts once under each
+    of its tags; a blank derivation counts under none."""
+    out: dict[str, dict[str, dict[str, int]]] = {"per_family": {}, "per_tag": {}, "per_test_type": {},
+                                                 "per_derivation": {}}
+    for ok, test_type, derivation, tags in marks:
+        keys = {"per_family": [vocab.FAMILIES[test_type]], "per_tag": dict.fromkeys(tags),
+                "per_test_type": [test_type], "per_derivation": [derivation] if derivation else []}
+        for slice_, ks in keys.items():
+            for k in ks:
+                c = out[slice_].setdefault(k, {"tests": 0, "passed": 0})
+                c["tests"] += 1
+                c["passed"] += ok
+    return out
+
+
+def _entries(counts: Iterable[tuple[str, str, int, int]], order: Sequence[str] = ()) -> dict[str, Any]:
+    """From (key, document, passed, tests) counts, each key's `score`, `tests` and `documents`: the keys of
+    `order` first, then the rest sorted; a key with no tests is left out."""
     tests: collections.Counter[str] = collections.Counter()
     passed: collections.Counter[str] = collections.Counter()
     documents: dict[str, set[str]] = collections.defaultdict(set)
-    for f, d, k, n in counts:
-        tests[f] += n
-        passed[f] += k
-        documents[f].add(d)
-    families = {f: {"score": passed[f] / n, "tests": n, "documents": len(documents[f])}
-                for f in vocab.FAMILY_ORDER if (n := tests[f])}
+    for key, document, k, n in counts:
+        tests[key] += n
+        passed[key] += k
+        documents[key].add(document)
+    keys = [*order, *sorted(tests.keys() - set(order))]
+    return {k: {"score": passed[k] / n, "tests": n, "documents": len(documents[k])}
+            for k in keys if (n := tests[k])}
+
+
+def _summary(pages: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    """`score`, `families` and the slices, from score lines (a page's `row`, `tests`, `passed` and `_count`s);
+    the families in `vocab.FAMILY_ORDER`, the test types in `vocab.FAMILIES` order, the other slices' keys
+    sorted. A line without a count, or without `row.suite`, adds nothing to that slice."""
+    pages = list(pages)
+
+    def counted(name: str) -> Iterable[tuple[str, str, int, int]]:
+        return ((k, x["row"]["document"], c["passed"], c["tests"])
+                for x in pages for k, c in x.get(name, {}).items())
+
+    families = _entries(counted("per_family"), vocab.FAMILY_ORDER)
     return {"score": float(statistics.fmean(x["score"] for x in families.values())) if families else None,
-            "families": families}
+            "families": families,
+            "per_tag": _entries(counted("per_tag")),
+            "per_suite": _entries((x["row"]["suite"], x["row"]["document"], x["passed"], x["tests"])
+                                 for x in pages if "suite" in x["row"]),
+            "per_test_type": _entries(counted("per_test_type"), tuple(vocab.FAMILIES)),
+            "per_derivation": _entries(counted("per_derivation"))}

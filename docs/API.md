@@ -133,7 +133,7 @@ of the headline. The summary's `failed` counts those pages by cause, and `covera
 ```python
 unit_tests.score(pred, tests) -> [Verdict(id, result, why)]   # pred: one page's {"html": ..., "blocks": [...]}
 unit_tests.lines(verdicts, tests, page) -> [test line]        # each verdict beside its page and its test
-unit_tests.summarize(lines) -> {"score", "families"}          # any number of test lines
+unit_tests.summarize(lines) -> {"score", "families", "per_tag", "per_suite", "per_test_type", "per_derivation"}
 unit_tests.UnitTests()                                        # the same, as an omni-bench-core scorer
 ```
 
@@ -144,7 +144,8 @@ opb score --pred outputs.json --gold gold/<page_id>.json     # outputs.json: one
 A verdict is `pass` or `fail`, with `why`. A test whose output is missing or malformed fails. A summary holds
 `score`, the mean of the families' scores and the headline, and `families`, always in the order text, tables, layout: each
 family's `score` (the share of its tests passed), `tests` and `documents` (the source documents its tests are
-from). `summarize` of a slice of lines (one tag, one suite) is that slice's summary.
+from). `per_tag`, `per_suite`, `per_test_type` and `per_derivation` give the same three numbers for each slice;
+they are not part of the headline, a test with several tags counts under each, and an empty slice is left out.
 
 ## Predict
 
@@ -305,7 +306,8 @@ runs/datalab-20261021-160012-3f9a/       <system>-<YYYYMMDD-HHMMSS>-<4 hex>
   predictions/<page_id>.json             each page's outputs alone; all grading reads
   unit_tests/
     summary.json                         the grade
-    scores.jsonl                         one line per page: id, status, row.document, tests, passed, per_family
+    scores.jsonl                         one line per page: id, status, row.document, row.suite, tests, passed, per_family, per_tag,
+                                         per_test_type, per_derivation
     details/<page_id>.jsonl              one line per test: page_id, suite, document, test_id, test_type,
                                          output_type, derivation, tags, args, settings, result and why
 ```

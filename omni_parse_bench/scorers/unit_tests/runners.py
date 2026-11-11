@@ -63,10 +63,11 @@ def found(a: Arg, v: views.Html) -> Mark:
         # -> (True, "")"""
     if isinstance(a, Number): return _number_found(a.number, v)
     if isinstance(a, Latex): return _latex_found(a.latex, v)
-    ok, r, thr = contains(a.text, v.text, a.max_diffs)
+    ok, r, thr, window = _contains(a.text, v.text, a.max_diffs)
     if not ok and hyphenation.matches(a.text, v.text):
         return True, ""
-    return _mark(ok, f"{a.text[:60]!r} not found (best {r:.3f} < {thr:.3f})")
+    near = f"; closest {_excerpt(window)!r}" if window else ""
+    return _mark(ok, f"{a.text[:60]!r} not found (best {r:.3f} < {thr:.3f}){near}")
 
 
 class Present(NamedTuple):
@@ -351,16 +352,37 @@ def _partial(needle: str, hay: str) -> float:
     return (fuzz.partial_ratio(needle, hay) if len(hay) >= len(needle) else fuzz.ratio(needle, hay)) / 100.0
 
 
+def _window(needle: str, hay: str) -> tuple[float, str]:
+    """`_partial`'s score and the window of `hay` it came from (all of `hay` when it is the shorter). Kept
+    apart from `_partial`, which runs on every test, so only a failure pays for the alignment."""
+    if len(hay) < len(needle):
+        return fuzz.ratio(needle, hay) / 100.0, hay
+    a = fuzz.partial_ratio_alignment(needle, hay)
+    return a.score / 100.0, hay[a.dest_start:a.dest_end]
+
+
+def _excerpt(window: str, n: int = 120) -> str:
+    return window if len(window) <= n else window[:n - 1] + "…"
+
+
 def contains(needle: str, text: str, max_diffs: int) -> tuple[bool, float, float]:
     """Whether `needle` appears in `text`, with the best match ratio and the threshold: `_ratio`
     after `fold`, then again after `squeeze` for words the text layer glues together."""
+    return _contains(needle, text, max_diffs)[:3]
+
+
+def _contains(needle: str, text: str, max_diffs: int) -> tuple[bool, float, float, str]:
+    """`contains`, and, when it fails, the best-matching window of the folded text (the squeezed, if that
+    matched better): lowercased, its spacing folded; "" when it passes or `needle` is empty."""
     want, hay = normalize.fold(needle), normalize.fold(text)
     ok, r, thr = _ratio(want, hay, max_diffs)
     if ok:
-        return True, r, thr
+        return True, r, thr, ""
     # fold has already collapsed all whitespace to ASCII spaces; reuse it for squeeze.
-    ok, r2, _ = _ratio(want.replace(" ", ""), hay.replace(" ", ""), max_diffs)
-    return ok, max(r, r2), thr
+    squeezed = want.replace(" ", ""), hay.replace(" ", "")
+    ok, r2, _ = _ratio(*squeezed, max_diffs)
+    window = "" if ok or not want else _window(*(squeezed if r2 > r else (want, hay)))[1]
+    return ok, max(r, r2), thr, window
 
 
 def _fold_cell(s: str) -> str:

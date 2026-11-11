@@ -52,9 +52,88 @@ def test_a_missing_output_fails_its_tests():
     assert {v.result for v in score({}, TESTS[:4])} == {"fail"}
 
 
-def test_the_summary_is_the_score_and_the_families_alone():
+def test_the_summary_is_the_score_the_families_and_the_slices():
     s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS))
-    assert s == {"score": 2 / 5, "families": {"text": {"score": 2 / 5, "tests": 5, "documents": 1}}}
+    assert set(s) == {"score", "families", "per_tag", "per_suite", "per_test_type", "per_derivation"}
+    assert (s["score"], s["families"]) == (2 / 5, {"text": {"score": 2 / 5, "tests": 5, "documents": 1}})
+
+
+SLICED = {"per_tag": {"eng": {"score": 2 / 3, "tests": 3, "documents": 1},
+                      "form": {"score": 0.0, "tests": 1, "documents": 1},
+                      "math": {"score": 0.0, "tests": 1, "documents": 1},
+                      "table": {"score": 0.0, "tests": 1, "documents": 1}},
+          "per_suite": {"s": {"score": 2 / 5, "tests": 5, "documents": 1}},
+          "per_test_type": {"present": {"score": 2 / 5, "tests": 5, "documents": 1}},
+          "per_derivation": {"authored": {"score": 2 / 5, "tests": 5, "documents": 1}}}
+
+
+def _slices(s: dict) -> dict:
+    return {k: v for k, v in s.items() if k.startswith("per_")}
+
+
+def test_test_lines_are_summarized_by_slice():
+    s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS))
+    assert _slices(s) == SLICED
+    assert sum(x["tests"] for x in s["per_tag"].values()) == 6      # "c" counts under eng and table
+
+
+def test_score_lines_are_summarized_by_slice_the_same_way():
+    sc = scorer.UnitTests().score({"html": "<p>alpha beta</p>"}, TESTS)
+    line = {"id": "p", "row": scorer.UnitTests().row_fields(PAGE), **sc.result}
+    assert _slices(scorer.UnitTests().summarize([line])) == SLICED
+
+
+def test_an_empty_slice_is_left_out_and_test_types_keep_the_vocabulary_order():
+    tests = on_one_page(
+        {"id": "a", "test_type": "present", "tags": [], "args": text("alpha")},
+        {"id": "r", "test_type": "repeat", "tags": [], "args": text("alpha"),
+         "settings": {"expected_count": 1}},
+        {"id": "o", "test_type": "order", "tags": [], "args": {"before": text("alpha")["content"],
+                                                              "after": text("beta")["content"]}})
+    s = summarize(lines(score({"html": "<p>alpha beta</p>"}, tests), tests))
+    assert s["per_tag"] == {}
+    assert list(s["per_test_type"]) == ["present", "order", "repeat"]
+
+
+def test_a_failing_text_test_names_the_closest_text_and_a_passing_one_does_not():
+    ts = on_one_page({"id": "f", "test_type": "present", "tags": [], "args": text("Total due 40")},
+                     {"id": "g", "test_type": "present", "tags": [], "args": text("Total")})
+    f, g = score({"html": "<p>Intro. Total dew 41 now</p>"}, ts)
+    assert (f.result, g.result) == ("fail", "pass")
+    assert f.why.startswith("'Total due 40' not found (best 0.") and "; closest 'total dew 41'" in f.why
+    assert g.why == ""
+
+
+def test_the_closest_text_is_cut_to_120_characters():
+    long = on_one_page({"id": "l", "test_type": "present", "tags": [], "args": text("word " * 60)})
+    (v,) = score({"html": "<p>" + "other " * 60 + "</p>"}, long)
+    assert v.why.endswith("…'") and len(v.why.split("; closest ", 1)[1]) == 120 + 2     # the text, quoted
+
+
+def test_the_closest_text_of_glued_words_comes_from_the_squeezed_text():
+    ts = on_one_page({"id": "s", "test_type": "present", "tags": [], "args": text("net total due")})
+    (v,) = score({"html": "<p>nettotaldue</p>"}, ts)
+    assert v.result == "pass"
+    ts = on_one_page({"id": "s", "test_type": "present", "tags": [], "args": text("net total due 40")})
+    (v,) = score({"html": "<p>nettotaldue 41</p>"}, ts)
+    assert v.result == "fail" and "; closest 'nettotaldue4'" in v.why
+
+
+def test_documents_count_each_document_once_across_its_pages():
+    pages = [dataclasses.replace(PAGE, page_id=i, document=d, suite="s") for i, d in
+             (("p1", "d1"), ("p2", "d1"), ("p3", "d2"))]
+    base = {"test_type": "present", "output_type": "html", "derivation": "authored", "tags": ["eng"]}
+    xs = [base | {"page_id": p.page_id, "document": p.document, "suite": p.suite, "test_id": p.page_id,
+                  "result": r} for p, r in zip(pages, ("pass", "fail", "pass"), strict=True)]
+    s = summarize(xs)
+    assert s["per_tag"]["eng"] == {"score": 2 / 3, "tests": 3, "documents": 2}
+    assert s["per_suite"]["s"] == {"score": 2 / 3, "tests": 3, "documents": 2}
+
+
+def test_a_test_line_without_suite_tags_or_derivation_is_still_summarized():
+    s = summarize([{"document": "d", "test_type": "present", "result": "pass"}])
+    assert s["score"] == 1.0 and _slices(s) == {k: {} for k in SLICED} | {"per_test_type": {
+        "present": {"score": 1.0, "tests": 1, "documents": 1}}}
 
 
 def test_a_slice_of_test_lines_is_summarized_the_same_way():
@@ -70,7 +149,11 @@ def test_scores_are_floats_even_when_every_test_agrees():
 
 def test_a_pages_line_holds_its_counts_and_its_details_every_verdict():
     s = scorer.UnitTests().score({"html": "<p>alpha beta</p>"}, TESTS)
-    assert s.result == {"tests": 5, "passed": 2, "per_family": {"text": {"tests": 5, "passed": 2}}}
+    assert s.result == {"tests": 5, "passed": 2, "per_family": {"text": {"tests": 5, "passed": 2}},
+                        "per_tag": {"eng": {"tests": 3, "passed": 2}, "table": {"tests": 1, "passed": 0},
+                                    "form": {"tests": 1, "passed": 0}, "math": {"tests": 1, "passed": 0}},
+                        "per_test_type": {"present": {"tests": 5, "passed": 2}},
+                        "per_derivation": {"authored": {"tests": 5, "passed": 2}}}
     assert s.details[2] == {"test_id": "c", "test_type": "present", "output_type": "html",
                             "derivation": "authored", "tags": ["eng", "table"], "args": text("gamma"),
                             "settings": {}, "result": "fail", "why": s.details[2]["why"]}
@@ -80,8 +163,9 @@ def test_unit_tests_names_its_headline():
     line = {"id": "p", "row": {"document": "d"}, "tests": 1, "passed": 1,
             "per_family": {"text": {"tests": 1, "passed": 1}}}
     assert scorer.UnitTests.headline == "score"
-    assert scorer.UnitTests().summarize([line]) == {
-        "score": 1.0, "families": {"text": {"score": 1.0, "tests": 1, "documents": 1}}}
+    s = scorer.UnitTests().summarize([line])     # a line kept before the slices were adds nothing to them
+    assert (s["score"], s["families"]) == (1.0, {"text": {"score": 1.0, "tests": 1, "documents": 1}})
+    assert _slices(s) == {k: {} for k in SLICED}
 
 
 def test_the_families_come_in_a_fixed_order_whatever_the_order_met():
