@@ -43,6 +43,41 @@ def test_an_exact_match_is_not_cut_out_of_a_longer_number(needle, text, passes):
     assert R.present(R.Present(R.Text(needle, 0)), html(f"<p>{text}</p>"))[0] is passes
 
 
+@pytest.mark.parametrize("text, passes", [
+    ("1. Introduction ... 2. Methods", True),
+    ("2. Methods ... 1. Introduction", False),
+    ("11. Introduction ... 22. Methods", False),
+    ("11. Introduction ... 2. Methods", False),
+    ("1. Introduction ... 22. Methods", False),
+    ("11. Introduction and 1. Introduction ... 2. Methods", True),
+    ("1. Intro duction ... 2. Methods", True),
+])
+def test_order_items_are_not_cut_out_of_a_longer_number(text, passes):
+    assert R.order(R.Order("1. Introduction", "2. Methods", 0), html(f"<p>{text}</p>"))[0] is passes
+
+
+@pytest.mark.parametrize("text, passes", [
+    ("Set of 6pcs Summicron used lenses T2.0 then 18mm/f", True),
+    ("Set of 6pcs Summicron used lenses t2.018mm/f then 18mm/f", False),
+    ("Set of 6pcs Summicron used lenses t2.0 18mm/f", True),
+])
+def test_order_squeezed_item_is_not_cut_out_of_a_longer_number(text, passes):
+    v = html(f"<p>{text}</p>")
+    assert R.order(R.Order("Set of 6pcs Summicron used lenses T2.0", "18mm/f", 0), v)[0] is passes
+
+
+@pytest.mark.parametrize("needle, text, passes", [
+    ("7777777 77", "id 7777777777777777777 x", False),
+    ("7777777 77", "id 7777777 77 x", True),
+    ("26a. Provide", "512 6a. provide", False),
+    ("35 \u00b1 6", "35 \u00b1 6 33 \u00b1 8", True),
+    ("305357", "3 0 5 3 5 7", True),
+    ("305357", "x 3 0 5 3 5 7 y", True),
+])
+def test_a_squeezed_match_is_not_glued_to_the_digits_around_it(needle, text, passes):
+    assert R.present(R.Present(R.Text(needle, 0)), html(f"<p>{text}</p>"))[0] is passes
+
+
 def test_a_number_is_strict_on_digits_lenient_on_separators():
     v = html("<p>total 1 234 567,89 EUR</p>")
     assert R.found(R.Number("1,234,567.89"), v)[0]
