@@ -81,6 +81,10 @@ def test_a_long_price_paragraph_before_math_does_not_take_the_maths_dollar():
     assert v.result == "pass", v.why
 
 
+def html_page(s: str) -> views.Html:
+    return views.html(f"<p>{s}</p>")
+
+
 def written(digits: str, sep: str, frac: str, negative: bool, percent: bool) -> str:
     """`digits` as a page prints them: thousands marked by `sep`, a decimal part, a sign, a percent."""
     groups = [digits[max(0, i - 3):i] for i in range(len(digits), 0, -3)][::-1]
@@ -101,6 +105,12 @@ def test_a_number_is_found_as_written_and_never_with_a_digit_changed(digits, sep
     assume(runners.number(s) is not None and not runners.found(runners.Number(s), page(""))[0])
     assert runners.found(runners.Number(s), page(s))[0]
     assert not runners.found(runners.Number(s), page(other))[0]
+
+
+@given(st.integers(1, 10**9).map(str), st.text("0123456789", min_size=1, max_size=3), st.booleans())
+def test_digits_inside_a_longer_digit_run_are_not_present(digits, glue, front):
+    page = html_page(glue + digits if front else digits + glue)
+    assert not runners.present(runners.Present(runners.Text(digits, 0)), page)[0]
 
 
 @given(st.lists(WORD, min_size=2, max_size=8).map(" ".join), st.data())
