@@ -181,6 +181,10 @@ def test_a_line_end_hyphen_before_a_capital_stays():
     assert normalize.fold("well-\nKnown") != normalize.fold("wellKnown")
 
 
+def test_a_line_end_hyphen_after_a_decomposed_letter_is_joined_as_after_a_composed_one():
+    assert normalize.fold("caf\u0065\u0301- ali") == normalize.fold("caf\u00e9- ali") == "caféali"
+
+
 def test_math_keeps_the_space_after_a_command_and_in_text():
     assert normalize.fold(r"$\alpha b$") == "αb"
     assert "is the" in normalize.fold(r"$\text{is the}$")

@@ -137,7 +137,9 @@ def fold(s: str) -> str:
 
 def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool = False) -> str:
     """The fold before lowercasing, for inspecting a continuation's original case."""
-    s = _latex_to_text(s)
+    # Note: composed first, so a letter written as a base and a combining accent ("e" + U+0301, as a macOS
+    # text layer gives it) is one letter to the hyphen rule below, as "é" is.
+    s = unicodedata.normalize("NFC", _latex_to_text(s))
     # Note: only before a lowercase letter, so a line ending "-" before a capital or a digit stays.
     if not preserve_line_hyphens:
         s = _LINE_HYPHEN.sub(lambda m: m[1] if m[1].islower() else m[0], s)
