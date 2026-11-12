@@ -106,11 +106,11 @@ def balanced(body: str) -> bool:
 
 def _strong_markup(body: str) -> bool:
     """A command, a brace, or a script with its operand against it: the markup of math, not of a blank."""
-    return bool(re.search(r"[\\{}]|[_^](?=\S)", body.replace("\\$", "")))
+    return bool(re.search(r"[\\{}]|[_^](?=\S)", body))
 
 
 def has_markup(body: str) -> bool:
-    return bool(_LATEX_MARKUP.search(body.replace("\\$", "")))
+    return bool(_LATEX_MARKUP.search(body))
 
 
 def _pads_math(s: str) -> bool:
@@ -122,7 +122,7 @@ def _pads_math(s: str) -> bool:
             return False
         body = s[m.end():end]
         if (len(body) > 2 and body[-1].isspace() and "\n" not in body and s[end + 1:end + 2] != "$"
-                and re.search(r"[\\^_]", body[1:-1].replace("\\$", ""))):
+                and re.search(r"[\\^_]", body[1:-1])):
             return True
     return False
 

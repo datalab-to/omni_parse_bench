@@ -143,16 +143,15 @@ def test_an_unfinished_environment_does_not_swallow_the_next_blocks():
     assert [tex.strip() for tex, _ in equations.spans(html)] == ["x = 1", "\\begin{aligned} b \\end{aligned}"]
 
 
-# 11. Found in a second review: an escaped dollar is not LaTeX, a lone later dollar does not turn a display
+# 11. Found in a second review: a lone later dollar does not turn a display
 # into an inline span, and the padding check stays linear.
-@pytest.mark.parametrize("text", ["$$x^2$$ and $", "$$x^2$$ cost $", "$$x^2$$ \\$ $"])
+@pytest.mark.parametrize("text", ["$$x^2$$ and $", "$$x^2$$ cost $"])
 def test_a_display_stays_a_display_beside_a_lone_dollar(text):
     assert [(x.body, x.display) for x in mathspans.find(text)] == [("x^2", True)]
 
 
-def test_an_escaped_dollar_is_not_latex_markup():
-    assert not mathspans.has_markup(r" price \$ total")
-    assert "x_1" in bodies(r"$x_1$ and a price \$5")
+def test_math_mode_currency_is_math():
+    assert bodies(r"cost = $\$412$. min = $\$178$.") == [r"\$412", r"\$178"]
 
 
 def test_the_padding_check_is_linear():
