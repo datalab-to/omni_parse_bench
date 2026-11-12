@@ -159,3 +159,16 @@ def test_the_padding_check_is_linear():
     start = time.perf_counter()
     mathspans.find("$ " + "_a" * 10000 + "$")
     assert time.perf_counter() - start < 0.2
+
+
+# 12. A display holding math of its own in `\text{...}` is one display, not the spans inside it.
+def test_a_display_holding_inline_math_in_its_text_is_one_display():
+    tex = r"W(a,b)=\begin{cases} 1 & \text{if $b\neq 0$,} \\ 0 & \text{if $a=0$, $b=0$.} \end{cases}"
+    spans = mathspans.find(f"$${tex}$$")
+    assert [(x.display, x.body) for x in spans] == [(True, tex)]
+
+
+def test_a_display_does_not_swallow_the_inline_spans_after_it():
+    html = "$$ a=b $$ then $ x_1 $ and $ y_2 $ and $$ c=d"
+    assert [(x.display, x.body.strip()) for x in mathspans.find(html)][:1] == [(True, "a=b")]
+    assert "x_1" in [x.body.strip() for x in mathspans.find(html) if not x.display]

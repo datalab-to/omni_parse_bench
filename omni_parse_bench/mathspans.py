@@ -192,7 +192,8 @@ def _pair(s: str, pads: bool) -> list[Span]:
                 score = _score(body, s, toks[i + 1].closer, pads)[0]
                 options.append((score + g[i + 1][1] - unused, "inline"))
             if u == 0 and t.run == 2 and (j := _partner(toks, i)) is not None:
-                options.append((_display_value(s[t.pos + 2:toks[j].pos]) + g[j + 1][0], "display"))
+                nested = _nested_value(toks, i, j, s, pads)
+                options.append((_display_value(s[t.pos + 2:toks[j].pos]) + nested + g[j + 1][0], "display"))
             value, name = options[0]
             for v, nm in options[1:]:
                 if v > value:
@@ -223,6 +224,36 @@ def _pair(s: str, pads: bool) -> list[Span]:
         else:
             i, u = i + 1, 0
     return out
+
+
+_TEXT_GROUP = re.compile(r"\\(?:text|textrm|textbf|textit|mbox|hbox)\s*\{")
+
+
+def _in_text_group(before: str) -> bool:
+    """Whether the end of `before` is inside an open `\\text{...}` group, where TeX nests math in math."""
+    for m in reversed(list(_TEXT_GROUP.finditer(before))):
+        depth = 1
+        for c in before[m.end():]:
+            depth += (c == "{") - (c == "}")
+            if depth == 0:
+                break
+        else:
+            return True
+    return False
+
+
+def _nested_value(toks: list[_Token], i: int, j: int, s: str, pads: bool) -> float:
+    """What the single dollars inside a display add to it: math in the display's `\\text{...}`, as in
+    `\\text{if $b\\neq 0$,}`. Such a pair is worth what it reads as, so the display is not outvoted by the
+    spans it contains. Single dollars anywhere else add nothing: they are spans the display swallowed."""
+    inner = toks[i + 1:j]
+    total = 0.0
+    for a, b in zip(inner[::2], inner[1::2], strict=False):
+        body = s[a.opener + 1:b.closer]
+        if _LINE_END.search(body) or not _in_text_group(s[toks[i].pos + 2:a.pos]):
+            continue
+        total += max(0.0, _score(body, s, b.closer, pads)[0])
+    return total
 
 
 def _partner(toks: list[_Token], i: int) -> int | None:
