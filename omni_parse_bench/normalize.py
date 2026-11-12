@@ -8,7 +8,7 @@ import re
 import sys
 import unicodedata
 
-from omni_parse_bench import views
+from omni_parse_bench import mathspans, views
 
 # Note: Cf is the whole invisible-formatting category, so a stray one (a zero-width space in "Ac\u200bme")
 # never splits a word; but the prepended concatenation marks are Cf and printed (the Arabic number
@@ -63,32 +63,11 @@ _CJK_PUNCT = str.maketrans({
     "。": ".", "，": ",", "．": ".", "：": ":", "；": ";", "！": "!",
     "？": "?", "（": "(", "）": ")", "、": ",", "％": "%", "＝": "=",
 })
-_DISPLAY_MATH = re.compile(r"\$\$(.+?)\$\$", re.S)
 # \[..\] and \(..\) are the same math as $$..$$ and $..$, written the other LaTeX way.
-_BRACKET_MATH, _PAREN_MATH = re.compile(r"\\\[(.+?)\\\]", re.S), re.compile(r"\\\((.+?)\\\)", re.S)
-_INLINE_MATH = re.compile(r"\$([^$\n]+?)\$")
+_BRACKET_MATH = re.compile(r"\\\[([^\u2029]+?)\\\]")    # not across a block
+_PAREN_MATH = re.compile(r"\\\(([^\u2029]+?)\\\)")
 _DIGIT = re.compile(r"[0-9]")   # ASCII only; `c in "0123456789"` is also true for ""
-_LATEX_MARKUP = re.compile(r"[\\^_{}]")
 _LATEX_RESIDUE = re.compile(r"[_^{}\\]")
-# A $..$ span is math only if it's short and dense. Prose between two dollar amounts ("$5.00 ... on
-# line $1,000") also sits between two "$", and converting it would eat the money's "$".
-_MATH_MAX_LEN, _MATH_MAX_SPACES = 120, 4
-# Note: and an inline span with this many bare words (three letters or more, outside every brace, not
-# a command) is prose ("$____ Date paid ____ Balance $"); math has almost none, however it's spaced.
-_PROSE_WORDS = 3
-_PROSE_WORD = re.compile(r"(?<![\\\w&])[^\W\d_]{3,}")
-_BRACED = re.compile(r"\{[^{}]*\}")
-# Note: one to three letters between dollars is a variable ($U$, $d$, $Re$); an amount has digits.
-_MATH_LETTERS = re.compile(r"[^\W\d_]{1,3}")
-# Note: in math mode a space renders nothing ("$$2 . 5 5$$" is 2.55), except the one ending a
-# command name (\pm 0, \alpha b), a control space (x\ y), and those in and after a text group
-# (\text{is the} x), which may hold one level of braces.
-_MATH_TEXT = re.compile(r"\\(?:text\w*|mbox|operatorname)\s*\{(?:[^{}]|\{[^{}]*\})*\}\s*")
-_COMMAND_SPACE = re.compile(r"(\\[A-Za-z]+)\s+")
-_CONTROL_SPACE = re.compile(r"(?<!\\)\\\s+")
-# Digits spaced out inside the dollars, as a LaTeX writer spaces them ("$$2 . 5 5$$"); a dollar
-# amount has a space at the span's edge instead ("$2.7 $2.2": the span is "2.7 "), so it isn't one.
-_SPACED_DIGITS = re.compile(r"\d[\d.,]*(?:\s+[\d.,]+)+")
 # A word broken at a line end: a hyphen (any of its forms), then the line break, or the space a
 # writer joined lines with. Not a dash, which can end a line before a lowercase word.
 _LINE_HYPHEN = re.compile(r"(?<=[^\W\d_])[-\u2010\u2011]\s+([^\W\d_])")
@@ -247,71 +226,63 @@ def _word_end(s: str, i: int) -> bool:
 
 
 def _latex_to_text(s: str) -> str:
+    """`s` with its math spans read as text, and the block breaks `views.text` leaves (they only bound a span)
+    as the spaces they were."""
+    return _math_to_text(s).replace(views.BREAK, " ")
+
+
+def _math_to_text(s: str) -> str:
     if "\\[" in s or "\\(" in s:
         # \(..\) and \[..\] are unambiguous math: no price rule; one we can't read stays as $..$.
         s = _BRACKET_MATH.sub(lambda m: f"$${m[1]}$$", s)
-        s = _PAREN_MATH.sub(lambda m: f"${m[1]}$" if (t := _math_span(m, inline=True, dollars=False)) is None
+        s = _PAREN_MATH.sub(lambda m: f"${m[1]}$" if (t := _display_or_paren(m[0], m[1], inline=True)) is None
                             else t, s)
     if "$" not in s:
         return s
-    s = _DISPLAY_MATH.sub(lambda m: m[0] if (t := _math_span(m, inline=False, dollars=False)) is None
-                        else t, s)
     out, i = [], 0
-    while m := _INLINE_MATH.search(s, i):
-        if (t := _math_span(m, inline=True)) is None:
-            # Note: prose between two dollars; its closing $ may open the math that follows.
-            out.append(s[i:m.end() - 1])
-            i = m.end() - 1
+    for span in mathspans.find(s):    # the dollar-delimited spans: where they are is `mathspans`' to say
+        if span.display:
+            t = _display_or_paren(s[span.start:span.end], span.body, inline=False)
+            if t is None or t == s[span.start:span.end]:
+                continue
+        elif span.read:
+            t = _read(span.body)
+        else:
             continue
-        out += [s[i:m.start()], t]
-        i = m.end()
+        out += [s[i:span.start], t]
+        i = span.end
     return "".join(out) + s[i:]
 
 
-def _math_span(m: re.Match[str], *, inline: bool, dollars: bool = True) -> str | None:
-    """What a math match becomes: its text; None when it isn't math (its closing $ stays free for the
-    next span); or the whole match, when it is math we won't read (too long, too spaced), consumed.
-    dollars: a plain $..$ match, which may be two prices or prose between them (off for \\(..\\))."""
-    body = m[1]
+def _display_or_paren(whole: str, body: str, *, inline: bool) -> str | None:
+    """What a `$$..$$`, `\\[..\\]` or `\\(..\\)` becomes: its text; None when it is not math (a form's
+    blank, or prose in `\\(..\\)`); or the whole, when it is math too long or too spaced to read. Their
+    delimiters say they are math, so there is no currency to tell apart and no pairing to decide."""
     if "__" in body: return None   # a form's blank; LaTeX never writes two underscores in a row
-    # Note: a digit on both sides of a span with no LaTeX in it is two prices ("$92,000; Net +$60,000"),
-    # not math before a number ("$\\ge$2", "$5\\times$10").
-    if (inline and dollars and _DIGIT.match(body) and not _LATEX_MARKUP.search(body)
-            and _DIGIT.match(m.string, m.end())):
+    if mathspans.LETTERS.fullmatch(body.strip()): return body.strip()
+    if mathspans.SPACED_DIGITS.fullmatch(body): return mathspans.dense(body)
+    # Note: too long or too spaced is still math, just not ours to read; the whole stays text.
+    if mathspans.too_long(body):
+        return whole
+    if inline and mathspans.prose(body):
         return None
-    # Note: between plain dollars a variable hugs them; spaced letters ("$a$ and $b__c$ and $d$") are prose.
-    if _MATH_LETTERS.fullmatch(body.strip()) and (body == body.strip() or not dollars): return body.strip()
-    dense = _dense(body)
-    if _SPACED_DIGITS.fullmatch(body): return dense
-    # Note: too long or too spaced is still math, just not ours to read; the whole match stays text so
-    # a hugging span after it pairs as it always did. Prose is None: its closing $ may open the next span.
-    if dense.count(" ") > _MATH_MAX_SPACES or len(body) > _MATH_MAX_LEN:
-        return m[0]
-    if inline and _prose(body):
-        return None
-    # Note: math with no LaTeX in it ("$p < 0.05$", <math>T = 20.3</math>) reads as the text it
-    # renders, as math with LaTeX does; but only when it hugs its dollars, since prose between two
-    # dollar amounts has a space inside one of them ("$2.7 $2.2", "$1,000 to $2,000").
-    if not _LATEX_MARKUP.search(body): return body if body == body.strip() else None
+    if not mathspans.has_markup(body): return body if body == body.strip() else None
+    return _read(body)
+
+
+def _read(body: str) -> str:
+    """A math span's body as the text it renders: letters and plain symbols as written, LaTeX converted."""
+    inner = body.strip()
+    if mathspans.LETTERS.fullmatch(inner): return inner
+    dense = mathspans.dense(body)
+    if mathspans.SPACED_DIGITS.fullmatch(body): return dense
+    if not mathspans.has_markup(body): return inner
     try:
         t = _latex_converter().latex_to_text(dense, latex_context=_walker_context())
     except Exception:
         # Note: pylatexenc raises on arbitrary malformed LaTeX; the span then compares as written.
         t = body
     return _LATEX_RESIDUE.sub("", t.replace("∘", "°").replace("\\circ", "°"))
-
-
-def _prose(body: str) -> bool:
-    """Whether an inline span's words, outside its braces, are prose's."""
-    while (unbraced := _BRACED.sub(" ", body)) != body: body = unbraced
-    return len(_PROSE_WORD.findall(body)) >= _PROSE_WORDS
-
-
-def _dense(body: str) -> str:
-    """A math span's LaTeX without the spaces that render nothing."""
-    body, held = views.hold(body, _MATH_TEXT)
-    body = _COMMAND_SPACE.sub(lambda m: m[1] + "\0", _CONTROL_SPACE.sub("\0", body))
-    return views.release(re.sub(r"\s+", "", body).replace("\0", " "), held)
 
 
 @functools.cache
