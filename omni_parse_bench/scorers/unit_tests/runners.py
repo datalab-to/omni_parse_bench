@@ -371,11 +371,36 @@ def contains(needle: str, text: str, max_diffs: int) -> tuple[bool, float, float
     return _contains(needle, text, max_diffs)[:3]
 
 
+def _edges_ok(want: str, hay: str) -> bool:
+    """Whether some occurrence of `want` in `hay` is not cut out of a longer number: a leading digit
+    isn't glued to a digit, a sign or a separator after a digit, a trailing digit isn't glued to a digit
+    or to a separator before one. A hyphen after a letter or digit is a hyphen, not a sign."""
+    i = hay.find(want)
+    while i != -1:
+        j = i + len(want)
+        before, after = hay[i - 1:i], hay[j:j + 1]
+        glued = (
+            want[0].isdigit() and bool(before) and (
+                before.isdigit()
+                or (before in ".," and hay[i - 2:i - 1].isdigit())
+                or (before in "-\u2212+" and not hay[i - 2:i - 1].isalnum()))
+        ) or (
+            want[-1].isdigit() and bool(after) and (
+                after.isdigit() or (after in ".," and hay[j + 1:j + 2].isdigit()))
+        )
+        if not glued:
+            return True
+        i = hay.find(want, i + 1)
+    return False
+
+
 def _contains(needle: str, text: str, max_diffs: int) -> tuple[bool, float, float, str]:
     """`contains`, and, when it fails, the best-matching window of the folded text (the squeezed, if that
     matched better): lowercased, its spacing folded; "" when it passes or `needle` is empty."""
     want, hay = normalize.fold(needle), normalize.fold(text)
     ok, r, thr = _ratio(want, hay, max_diffs)
+    if ok and want and want in hay and not _edges_ok(want, hay):
+        return False, r, thr, ""
     if ok:
         return True, r, thr, ""
     # fold has already collapsed all whitespace to ASCII spaces; reuse it for squeeze.

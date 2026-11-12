@@ -16,6 +16,33 @@ def test_present_allows_exactly_the_edits_it_says():
     assert not R.present(R.Present(R.Text("a" * 39, 1)), html("<p>" + "a" * 37 + "bb</p>"))[0]
 
 
+@pytest.mark.parametrize("needle, text, passes", [
+    ("3 Park Street, Boston, Mass.", "13 Park Street, Boston, Mass.", False),
+    ("10 000", "10 0000", False),
+    ("05/21/2025", "1205/21/2025", False),
+    ("МФО 313399", "МФО 31339969035", False),
+    ("1,000", "21,000", False),
+    ("1,000", "x 1.1,000", False),
+    ("5", "+5", False),
+    ("5", "\u22125", False),
+    ("12", "12.5", False),
+    ("12", "12,5", False),
+    ("3 Park Street", "13 Park Street and 3 Park Street", True),
+    ("3 Park Street", "3 Park Street and 13 Park Street", True),
+    ("-5", "x-5", True),
+    ("5", "x-5", True),
+    ("5", "a +5", False),
+    ("12", "12. Next", True),
+    ("12", "ref 12, next", True),
+    ("park street 3", "park street 31", False),
+    ("Park Street", "Spark Streets", True),
+    ("abc 12", "xabc 12", True),
+    ("3 Park Street, Boston, Mass.", "3 Park Street, Boston, Mass.", True),
+])
+def test_an_exact_match_is_not_cut_out_of_a_longer_number(needle, text, passes):
+    assert R.present(R.Present(R.Text(needle, 0)), html(f"<p>{text}</p>"))[0] is passes
+
+
 def test_a_number_is_strict_on_digits_lenient_on_separators():
     v = html("<p>total 1 234 567,89 EUR</p>")
     assert R.found(R.Number("1,234,567.89"), v)[0]
