@@ -19,7 +19,8 @@ KATEX = Path(__file__).parent / "katex" / "katex.js"   # KaTeX 0.16.22, MIT (LIC
 # Note: KaTeX bundles mathtools' pre-2022 \coloneq (":-"); since 2022 it prints ":=", as \coloneqq does.
 _RENDER = """(tex, display) => {
   try {
-    const macros = {"\\\\coloneq": "\\\\coloneqq", "\\\\Coloneq": "\\\\Coloneqq"};
+    const macros = {"\\\\coloneq": "\\\\coloneqq", "\\\\Coloneq": "\\\\Coloneqq",
+                    "\\\\pmb": "\\\\boldsymbol"};
     return {mathml: katex.renderToString(tex, {output: "mathml", displayMode: display, strict: "ignore",
                                                 throwOnError: true, trust: false, macros})};
   } catch (e) {
@@ -27,12 +28,13 @@ _RENDER = """(tex, display) => {
   }
 }"""
 _NS = "{http://www.w3.org/1998/Math/MathML}"
-# Note: bold is dropped, so a bold script or fraktur letter is its plain script or fraktur letter.
-_KEPT_FONTS = {"double-struck": "double-struck", "script": "script", "fraktur": "fraktur",
-               "bold-script": "script", "bold-fraktur": "fraktur"}
+# Note: bold marks a vector or a matrix, so it counts; upright or italic doesn't.
+_KEPT_FONTS = {"double-struck": "double-struck", "script": "script", "fraktur": "fraktur", "bold": "bold",
+               "bold-italic": "bold", "bold-script": "bold-script", "bold-fraktur": "bold-fraktur"}
 _ALIASES = str.maketrans({"⩽": "≤", "⩾": "≥", "∥": "‖", "−": "-", "′": "'", "∣": "|", "⋅": "·",
-                          "∗": "*", "⋆": "*", "ϵ": "ε", "ϕ": "φ", "ϑ": "θ", "∶": ":",
-                          "…": "⋯", "\\": "∖", "♯": "#", "≔": ":=", "≕": "=:", "≦": "≤", "≧": "≥"})
+                          "∗": "*", "⋆": "*", "∶": ":",
+                          "…": "⋯", "\\": "∖", "♯": "#", "≔": ":=", "≕": "=:", "≦": "≤", "≧": "≥",
+                          "∑": "Σ", "∏": "Π"})
 _DOTS, _VDOTS = {"⋯", "·", "."}, {"⋮", "⋱", "⋰"}
 _INVISIBLE = {"⁡", "⁢", "⁣", "⁤", "​"}
 _DROPPED = {"mspace", "mphantom", "annotation", "annotation-xml", "none", "mprescripts"}
@@ -117,19 +119,21 @@ def symbols(tex: str, display: bool = False) -> tuple[str, ...] | None:
         alignment                `&`, and how rows are split into cells: dropped; rows are kept, and a row of
                                  nothing but dots is one ellipsis, whatever its dots (vertical and diagonal
                                  dots one kind, horizontal another)
-        fonts                    upright, italic and bold: dropped; blackboard, script and fraktur kept
+        fonts                    upright and italic: dropped; bold, blackboard, script and fraktur kept
+                                 (\mathbf{v}, \boldsymbol{v}, \bm{v} and \pmb{v} alike)
         invisible operators      function application, invisible times: dropped
         look-alikes              ⩽, ≦ and ≤, ⩾, ≧ and ≥, ∥ and ‖, − and -, ′ and ', … and ⋯, ≔ and :=,
-                                 ° and a degree written ^\circ, ϵ and ε, ϕ and φ, ϑ and θ,
-                                 ∖ and a backslash, ♯ and #, ⋆ and *, . and ·
+                                 Σ and ∑, Π and ∏, ° and a degree written ^\circ,
+                                 ∖ and a backslash, ♯ and #, ⋆ and *, a multiplying . and ·
+                                 (a decimal point stays a decimal point: 2.5 isn't 2·5)
         equation numbers         \tag and \label, and a number after dot leaders ending a display formula
                                  (". . . (2)"): dropped, on both sides
         negations                a relation with a slash through it (\not\in) and its negated character (∉)
         restrictions             a | opening a subscript and a | just before it (φ_{|S} and φ|_S)
         constructions            `cases` and `\left\{ \begin{aligned} … \right.` render alike already
 
-    These stay differences: \bar and \overline, \setminus and a minus, one letter font for another, and a
-    dropped blackboard font."""
+    These stay differences: \bar and \overline, \setminus and a minus, one letter font for another, a
+    dropped blackboard font, ϕ and φ, ϵ and ε, ϑ and θ."""
     mathml = _katex().mathml(tex, display)
     return None if mathml is None else _from_mathml(mathml)
 
@@ -234,8 +238,10 @@ def _walk(e: ET.Element) -> list[str]:
 
 def _leaf(tag: str, text: str, e: ET.Element) -> list[str]:
     text = "".join(ch for ch in text if ch not in _INVISIBLE and not ch.isspace()).translate(_ALIASES)
-    # Note: a point is a raised dot, whether it is a decimal point, multiplies or ends a sentence.
-    text = text.replace(".", "·")
+    # Note: KaTeX writes a decimal point inside its number (<mn>2.5</mn>); any other . multiplies or
+    # ends a sentence, as · does.
+    text = text[:-1] + "·" if tag == "mn" and text.endswith(".") else text
+    text = text if tag == "mn" else text.replace(".", "·")
     font = e.get("mathvariant")
     return [f"{_KEPT_FONTS[font]}:{ch}" if font in _KEPT_FONTS else ch for ch in text]
 
@@ -462,7 +468,7 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
             out += ["^(", "'", ")"]
         elif ch == ".":
             decimal = 0 < i < len(text) - 1 and text[i - 1].isdigit() and text[i + 1].isdigit()
-            out.append("·" if decimal else _GAP + "·")
+            out.append("." if decimal else _GAP + "·")
         else:
             out += _chars(ch)
         i += 1
@@ -471,15 +477,17 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
 
 # Three or more dots, spaced or not, are an ellipsis ("...", ". . .").
 _SPACED_DOTS = re.compile(r"\.(?:\s*\.){2,}")
-# Note: a dash stands for a minus in typewritten text.
+# Note: NFKC folds the variant Greek letters into the plain ones, which print differently; and a dash
+# stands for a minus in typewritten text.
+_VARIANTS = "ϕϵϑϖϱϰ"
 _DASHES = str.maketrans(dict.fromkeys("‐‑‒–—―", "-"))
 
 
 def _chars(s: str) -> list[str]:
     # Note: NFKC would make an ellipsis three full stops.
-    s = unicodedata.normalize("NFKC", s.replace("…", "⋯"))
+    s = "".join(ch if ch in _VARIANTS else unicodedata.normalize("NFKC", ch) for ch in s.replace("…", "⋯"))
     s = s.translate(_ALIASES).translate(_DASHES)
     s = "".join(ch for ch in s if not ch.isspace() and ch not in _INVISIBLE)
     # Note: a point between digits is a decimal point, read as in math; any other ends a sentence.
-    return [ch if ch != "." else "·" if s[i - 1:i].isdigit() and s[i + 1:i + 2].isdigit() else _GAP + "·"
+    return [ch if ch != "." else "." if s[i - 1:i].isdigit() and s[i + 1:i + 2].isdigit() else _GAP + "·"
             for i, ch in enumerate(s)]

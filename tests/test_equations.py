@@ -268,3 +268,55 @@ def test_a_script_ending_in_a_digit_is_not_found_before_a_decimal_part(test, out
 def test_widely_spaced_dots_in_plain_text_are_an_ellipsis():
     v = views.html("<p>for 1, .  . ., n we have</p>")
     assert runners.present(runners.Present(runners.Latex(r"1,\ldots,n")), v)[0]
+
+
+# Scoring policy: bold counts.
+@pytest.mark.parametrize("test, output, ok", [
+    (r"\mathbf{v}=a\mathbf{u}", r"$v=au$", False),
+    (r"\mathbf{v}=a\mathbf{u}", r"$\boldsymbol{v}=a\bm{u}$", True),
+    (r"\mathbf{x}^*", r"$x^*$", False),
+    (r"x^*", r"$\mathbf{x}^*$", False),
+    (r"\boldsymbol{\mu}_X", r"$\mu_X$", False),
+    (r"\mathbf{A}\mathbf{x}=\mathbf{b}", r"$\mathbf{A}x=\mathbf{b}$", False),
+    (r"\pmb{x}", r"$x$", False),
+    (r"\pmb{x}", r"$\boldsymbol{x}$", True),
+])
+def test_policy_bold_counts(test, output, ok):
+    v = views.html(markdown.to_html(output))
+    assert runners.present(runners.Present(runners.Latex(test)), v)[0] is ok
+
+
+# Scoring policy: a variant Greek letter is not its plain letter.
+@pytest.mark.parametrize("test, output, ok", [
+    (r"\phi(x)", r"$\varphi(x)$", False),
+    (r"\epsilon<1", r"$\varepsilon<1$", False),
+    (r"\vartheta", r"$\theta$", False),
+    (r"\epsilon<1", "<p>for ϵ < 1</p>", True),
+    (r"\epsilon<1", "<p>for ε < 1</p>", False),
+])
+def test_policy_greek_variants_differ(test, output, ok):
+    v = views.html(markdown.to_html(output))
+    assert runners.present(runners.Present(runners.Latex(test)), v)[0] is ok
+
+
+# Scoring policy: an old book's Σ and Π are \sum and \prod.
+@pytest.mark.parametrize("test, output", [
+    (r"\sum_{i=1}^{n} x_i", r"$\Sigma_{i=1}^{n} x_i$"),
+    (r"\prod_{k=1}^{n} a_k", r"$\Pi_{k=1}^{n} a_k$"),
+    (r"\Sigma x", r"$\sum x$"),
+])
+def test_policy_sigma_and_pi_are_sum_and_prod(test, output):
+    assert equations.appears(test, output)[0]
+
+
+# Scoring policy: a raised dot is read by what it means; a decimal point is not \cdot.
+@pytest.mark.parametrize("test, output, ok", [
+    (r"x=2.5", r"$x=2\cdot 5$", False),
+    (r"x=2\cdot 5", r"$x=2.5$", False),
+    (r"x=2.5", r"$x=2.5$", True),
+    (r"a \cdot b", r"$a.b$", True),
+    (r"x=2.5", "<p>so x = 2.5 here</p>", True),
+])
+def test_policy_a_decimal_point_is_not_a_raised_dot(test, output, ok):
+    v = views.html(markdown.to_html(output))
+    assert runners.present(runners.Present(runners.Latex(test)), v)[0] is ok
