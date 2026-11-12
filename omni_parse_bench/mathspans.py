@@ -59,7 +59,8 @@ _MATH_TEXT = re.compile(r"\\(?:text\w*|mbox|operatorname)\s*\{(?:[^{}]|\{[^{}]*\
 _COMMAND_SPACE = re.compile(r"(\\[A-Za-z]+)\s+")
 _CONTROL_SPACE = re.compile(r"(?<!\\)\\\s+")
 # A padded span around LaTeX is the sign of a producer that pads its math.
-_PADDED_LATEX = re.compile(r"(?<![\\$])\$\s[^$\n]*?[\\^_][^$\n]*?\s\$(?!\$)")
+# Note: `$ ... $` with a space inside both dollars and a command or script between: the page pads its math.
+_PADDED_OPEN = re.compile(r"(?<![\\$])\$(?=\s)")
 _CURRENCY = re.compile(r"\s?(?:\d|\.\d)")
 _CURRENCY_CODE = re.compile(r"(?:^|\s)[A-Z]{1,3}$")    # US$5, CA$5, R$5
 _LINE_END = re.compile(r"[\n\u2029]")
@@ -105,18 +106,32 @@ def balanced(body: str) -> bool:
 
 def _strong_markup(body: str) -> bool:
     """A command, a brace, or a script with its operand against it: the markup of math, not of a blank."""
-    return bool(re.search(r"[\\{}]|[_^](?=\S)", body))
+    return bool(re.search(r"[\\{}]|[_^](?=\S)", body.replace("\\$", "")))
 
 
 def has_markup(body: str) -> bool:
-    return bool(_LATEX_MARKUP.search(body))
+    return bool(_LATEX_MARKUP.search(body.replace("\\$", "")))
+
+
+def _pads_math(s: str) -> bool:
+    """Whether the text has a span padded inside its dollars around a command or script: `$ x_1 $`. Each
+    dollar looks only as far as the next one, so the scan is linear."""
+    for m in _PADDED_OPEN.finditer(s):
+        end = s.find("$", m.end())
+        if end < 0:
+            return False
+        body = s[m.end():end]
+        if (len(body) > 2 and body[-1].isspace() and "\n" not in body and s[end + 1:end + 2] != "$"
+                and re.search(r"[\\^_]", body[1:-1].replace("\\$", ""))):
+            return True
+    return False
 
 
 def find(s: str) -> list[Span]:
     """The math spans of `s`, in order: `$$..$$` displays and single-dollar pairs whose body reads as math."""
     if "$" not in s:
         return []
-    return _pair(s, bool(_PADDED_LATEX.search(s)))
+    return _pair(s, _pads_math(s))
 
 
 class _Token(NamedTuple):
@@ -226,7 +241,7 @@ def _stray(s: str, d: int) -> float:
 
 def _display_value(body: str) -> float:
     """A `$$..$$` is math unless it is empty or a form's blank: its delimiters are the evidence."""
-    return -3.0 if not body.strip() or "__" in body else 3.0
+    return -3.0 if not body.strip() or "__" in body else 5.0
 
 
 def _math(body: str, s: str, closer: int, pads: bool) -> tuple[bool, bool]:
