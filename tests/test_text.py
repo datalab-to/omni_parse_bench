@@ -37,6 +37,7 @@ def test_math_braces_survive_conversion():
     ("| Total | **$24,468** | **$1,200** |", ["Total", "$24,468", "$1,200"]),
     ("| $x_1$ | $y$ |", ["$x_1$", "$y$"]),
     ("| Loss | $f = (f_i)|_{|\\mathcal{B}|}$ |", ["Loss", "$f = (f_i)|_{|\\mathcal{B}|}$"]),
+    ("| $5 | x_1 | US$6 |", ["$5", "x_1", "US$6"]),
 ])
 def test_dollar_amounts_in_a_pipe_table_stay_in_their_cells(row, cells):
     h = markdown.to_html(f"| a | b | c | d |\n|---|---|---|---|\n{row}\n")

@@ -23,9 +23,12 @@ _HTML_ELEMENT = re.compile(
 _DISPLAY_MATH = re.compile(r"\$\$.+?\$\$|\\\[.+?\\\]", re.S)
 # Note: an escaped dollar (\$5) is a price, neither end of math.
 _INLINE_MATH = re.compile(r"(?<!\\)\$(?!\s)[^$\n]+?(?<![\s\\])\$|\\\(.+?\\\)", re.S)
-# In a table row, $..$ crosses a bare | only if it holds \ ^ _ or {: "$2.5 | ($27.8)" is two cells.
-_ROW_MATH = re.compile(r"(?<!\\)\$(?!\s)(?:(?=[^$\n]*[\\^_{])[^$\n]+?|[^$\n|]+?)(?<![\s\\])\$|\\\(.+?\\\)",
-                       re.S)
+# In a table row, $..$ crosses a bare | only if it holds \ ^ _ or {: "$2.5 | ($27.8)" is two cells. Not when
+# it opens with an amount before the |, or closes on a dollar glued to a digit: "$5 | x_1 | US$6" is three
+# cells, two of them prices.
+_ROW_MATH = re.compile(
+    r"(?<!\\)\$(?!\s)(?:(?=[^$\n]*[\\^_{])(?!\d[\d.,]*\s*\|)[^$\n]+?|[^$\n|]+?)"
+    r"(?<![\s\\])\$(?!\d)|\\\(.+?\\\)", re.S)
 _ROWS = re.compile(r"(?m)((?:^[ \t]*\|.*(?:\n|$))+)")  # runs of table-row lines
 
 
