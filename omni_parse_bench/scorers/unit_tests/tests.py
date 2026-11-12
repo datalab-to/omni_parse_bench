@@ -212,6 +212,21 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
         raise ValueError(f"{where}: {e}") from None
 
 
+def arg_kinds(test_type: str, args: Mapping[str, Any]) -> tuple[str, ...]:
+    """The kinds (text, number, latex) of the args a test compares, each once, in `KINDS` order. A
+    `layout_kind` test's text only labels its place and is never compared, so it has none. `args` is read
+    as the gold states it; anything that isn't an arg is skipped, not refused (`parse` checks them)."""
+    if test_type == "layout_kind":
+        return ()
+    found: set[str] = set()
+    for a in args.values():
+        for x in a if isinstance(a, list) else [a]:
+            for k, fs in KINDS.items():
+                if isinstance(x, dict) and set(fs) <= set(x) <= {*fs, *OPTIONAL.get(k, ())}:
+                    found.add(k)
+    return tuple(k for k in KINDS if k in found)
+
+
 def _arg(where: str, role: str, a: Any) -> runners.Arg:
     """An arg as the runner's content: its kind is its key, never guessed from its value."""
     match _kind(where, role, a):

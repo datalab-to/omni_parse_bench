@@ -257,7 +257,7 @@ page's share, and a run where every page failed has headline 0. The families and
 page, a failed one's tests included.
 
 The summary holds `score` (the headline) and the families alone, beside the core's counts. Any other breakdown (by output type, test type,
-tag, suite or derivation) is computed from each test's verdict, kept in the run's
+arg kind, tag, suite or derivation) is computed from each test's verdict, kept in the run's
 `details/<page_id>.jsonl` as a test line (its page, suite, document, test type, tags, derivation, and its args and
 settings as the gold stated them, so a run's details say what each test looked for), and
 from `opb tests`
