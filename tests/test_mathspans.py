@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html as _html
+from unittest import mock
 
 import pytest
 from hypothesis import given
@@ -118,7 +119,10 @@ def test_math_in_an_images_alt_text_is_read():
 
 
 def test_the_span_that_starts_first_is_the_span():
-    assert equations.spans(r"<p>$a \( b$ c \)</p>") == [(r"a \( b", False)]
+    # `\( b$ c \)` is no math to the text path (padded, no LaTeX), so it stays `$ b$ c $` and its dollars are
+    # no delimiters of the text around it; the dollar in its body still pairs with the first, and that span,
+    # starting first, holds the `\(..\)`
+    assert equations.spans(r"<p>$a \( b$ c \)</p>") == [("a $ b", False)]
 
 
 # 10. Found in review: a padded span around LaTeX before a digit is math, a display does not take the dollar
@@ -172,3 +176,145 @@ def test_a_display_does_not_swallow_the_inline_spans_after_it():
     html = "$$ a=b $$ then $ x_1 $ and $ y_2 $ and $$ c=d"
     assert [(x.display, x.body.strip()) for x in mathspans.find(html)][:1] == [(True, "a=b")]
     assert "x_1" in [x.body.strip() for x in mathspans.find(html) if not x.display]
+
+
+# 13. The two paths read one text: the equation path pairs the dollars of the text the text path pairs
+# (`views.reading`, then `normalize.read_math`), so the spans the text path reads as math are the spans
+# `equations.spans` returns.
+@pytest.mark.parametrize("html, found", [
+    # an escaped dollar is the dollar it names
+    ("<p>&#36;x&#36;</p>", [("x", False)]),
+    ("<p>&dollar;x&dollar;</p>", [("x", False)]),
+    ("<p>&#x24;x&#x24;</p>", [("x", False)]),
+    # a tag's remnant does not leak into a span that starts in an image's alt text
+    ("<p><img alt='$q_1$'>\\($</p>", [(" \\(", False)]),
+    # an inline tag between dollars is not a character of the text
+    ("<p>$$x$<b>$$</p>", [("x", True)]),
+    ("<p>$\\(b\\)$</p>", [("b", False)]),
+    # \( \) is rewritten before the dollars are paired
+    ("<p>$$y^2$$ \\(a_2\\) and $5.00 </p>", [("y^2", True), ("a_2", False)]),
+    ("<p>$$y^2$$ <math>c_1</math> and $5.00 </p>", [("y^2", True), ("c_1", False)]),
+    ("<p>$5 <math>x_1</math> $6</p>", [("x_1", False)]),
+    # <br> is a space, not a character that is none
+    ("<p>$5.00<br>$U$<br>$5.00</p>", [("U", False)]),
+    # a block ends the line
+    ("<p>$$ $x_1$ $$</p><p>$$ </p>", [(" $x_1$ ", True)]),
+])
+def test_the_equation_path_reads_the_spans_the_text_path_reads(html, found):
+    assert equations.spans(html) == found
+    assert sorted(text_path_math(html)) == sorted(found)
+
+
+def text_path_math(html: str) -> list[tuple[str, bool]]:
+    """The math spans the text path (`normalize.fold` of `views.text`) reads, as (body, display): each span
+    `mathspans.find` returns on the text it is given (also those it does not convert: math too long to read),
+    and each `\\(..\\)` it reads as text, placed in that text where it replaced the `\\(..\\)`. As for any two
+    spans, where two overlap the one that starts first is the span, so a `\\(..\\)` inside a span `find`
+    returns is a part of that span's body."""
+    spans, calls, placed = [], [], []
+    find, display, sub = mathspans.find, normalize._display_or_paren, views.Seq.sub
+
+    def spy_find(s, pads=None):
+        out = find(s, pads)
+        if pads is not None: return out    # a \\(..\\) left as `$..$`, read alone: the paren is its span
+        spans.append([(x.start, x.end, x.body.replace(normalize._HELD_DOLLAR, "$"), x.display) for x in out])
+        return out
+
+    def spy_display(whole, body, *, inline):
+        out = display(whole, body, inline=inline)
+        if inline: calls.append((body, out))
+        return out
+
+    def spy_sub(self, pattern, repl, where=None):
+        where = [] if where is None else where
+        out = sub(self, pattern, repl, where)
+        if pattern is normalize._PAREN_MATH: placed.extend(where)
+        return out
+
+    mathspans.find, normalize._display_or_paren, views.Seq.sub = spy_find, spy_display, spy_sub
+    try:
+        normalize.fold(views.text(html))
+    finally:
+        mathspans.find, normalize._display_or_paren, views.Seq.sub = find, display, sub
+    assert len(spans) <= 1
+    # Note: a `\\(..\\)` that is not math (`out` is None) is written as `$..$`, which `find` decides on.
+    both = [(a, b, body, False) for (a, b), (body, out) in zip(placed, calls, strict=True)
+            if out is not None or body.strip()]
+    out, end = [], 0
+    for a, b, body, display in sorted([*both, *(spans[0] if spans else [])], key=lambda x: x[0]):
+        if a >= end:
+            out.append((body, display))
+            end = b
+    return out
+
+
+# Note: the text path writes a line of nothing but LaTeX as it is; it is math only to the equation path.
+TOKEN = st.sampled_from(
+    ["$", "$$", "\\$", "&#36;", "&dollar;", "\\(", "\\)", "\\[", "\\]", "x_1", "\\alpha", "<br>", "</p><p>",
+     "word", "five words here", "5.00", " ", " ", "<math>x_1</math>", "<math display='block'>y^2</math>"])
+
+
+@given(st.lists(TOKEN, min_size=1, max_size=12).map("".join))
+def test_the_text_path_and_the_equation_path_read_the_same_spans(s):
+    html = f"<p>{s}</p>"
+    with mock.patch.object(equations, "_bare", lambda tex: False):
+        assert sorted(equations.spans(html)) == sorted(text_path_math(html)), html
+
+
+@given(st.text(st.sampled_from(list("$\\()[]x_1 <>&#;brp/")), max_size=14))
+def test_the_text_view_that_tracks_its_source_is_the_text_view(s):
+    q = views.reading(views.Seq.tracking(s))
+    assert q.s == views.text(s)
+    assert all(0 <= a <= b <= len(s) for a, b in zip(q.lo, q.hi, strict=True))
+
+
+# 14. Linear in the size of the page, whatever the delimiters.
+@pytest.mark.parametrize("s", ["$" * 20000, "$ " + "_a" * 10000 + "$", "&#36;" * 5000, "<br>$x$" * 3000])
+def test_both_paths_are_linear_on_adversarial_pages(s):
+    import time
+    html = f"<p>{s}</p>"
+    start = time.perf_counter()
+    normalize.fold(views.text(html))
+    equations.spans(html)
+    assert time.perf_counter() - start < 2
+
+
+# 15. A page with no dollar: `\[..\]` displays between paragraphs holding `\( .. \)`. A `\(..\)` the text path
+# leaves as `$..$` (padded plain text) must not pair with the dollars of a display and swallow the paragraphs
+# between them.
+def test_displays_between_paragraphs_with_padded_plain_inline_math_are_found():
+    html = ("<p>a nontrivial  \\( (k,g,s) \\) -multipole with  \\( s \\leq (k-2)g \\) , then</p>\n"
+            "<p>\\[|G|\\geq b_{2}(k,g,s)\\geq\\frac{1}{2}M(k,g).\\]</p>\n"
+            "<p>Proof. Note that  \\( b_{2}(k,g,s) \\geq 1 \\) . It is easy to check.</p>\n"
+            "<p>\\[b_{2}(3,g-1,g-1)>b_{1}(3,g,g)\\]</p>")
+    found = equations.spans(html)
+    assert [t for t, d in found if d] == [
+        "|G|\\geq b_{2}(k,g,s)\\geq\\frac{1}{2}M(k,g).", "b_{2}(3,g-1,g-1)>b_{1}(3,g,g)"]
+    assert [t.strip() for t, d in found if not d] == ["(k,g,s)", "s \\leq (k-2)g", "b_{2}(k,g,s) \\geq 1"]
+    assert equations.appears("b_2(3, g - 1, g - 1) > b_1(3, g, g)", html)[0]
+
+
+# 16. A span's place is where its delimiters are in `_blocks(html)`, which `appears` and `in_text` slice: also
+# after block tags (each gets a "\n" in `_blocks`) and a `\(..\)` too long to read, which the text path leaves
+# as it is.
+def test_a_spans_place_starts_and_ends_at_its_delimiters():
+    long = "\\( \\in t$ " + "$x_1$ " * 30 + "q \\)"
+    for html in (f"<p>a $b$ c</p><p>$s {long} $d$</p>\n<div>\\[e\\] and \\(f\\)</p><p>$$g$$ $h$</p>",
+                 f"<p>$s {long} $d$ and $h$</p>"):
+        s = equations._blocks(html)
+        found = equations._spans(html)
+        assert found
+        for tex, _, start, stop in found:
+            ends = (s[start:start + 2], s[stop - 2:stop])
+            assert ends in {("\\(", "\\)"), ("\\[", "\\]"), ("$$", "$$")} or (
+                s[start] == "$" and s[stop - 1] == "$"), (tex, s[start:stop])
+
+
+# 17. A "<" that starts no tag is text, to both paths: a display with "p'<q<3p'" and "r<p ... )>0" in it (the
+# "<p" and its "\\leq q ... )>" are not a tag), then inline spans.
+def test_a_raw_less_than_in_math_is_no_tag_to_either_path():
+    html = ("<p>$$\\begin{cases}a,&\\text{for }p'<q<3p';\\\\ b,&\\text{for }q\\leq p'.\\end{cases}$$</p>\n"
+            "<p>If $1\\leq r<p\\leq q\\leq\\infty$ and $1+(1+\\omega)(\\frac{1}{q}-\\frac{1}{p})>0$ then</p>")
+    assert [t for t, d in equations.spans(html) if not d] == [
+        "1\\leq r<p\\leq q\\leq\\infty", "1+(1+\\omega)(\\frac{1}{q}-\\frac{1}{p})>0"]
+    assert "<p\\leq q" in views.text(html)

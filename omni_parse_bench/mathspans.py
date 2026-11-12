@@ -127,11 +127,17 @@ def _pads_math(s: str) -> bool:
     return False
 
 
-def find(s: str) -> list[Span]:
-    """The math spans of `s`, in order: `$$..$$` displays and single-dollar pairs whose body reads as math."""
+def find(s: str, pads: bool | None = None) -> list[Span]:
+    """The math spans of `s`, in order: `$$..$$` displays and single-dollar pairs whose body reads as math.
+    `pads` says whether the page pads its math (rule 6) when `s` is a part of a page; by default `s` says."""
     if "$" not in s:
         return []
-    return _pair(s, _pads_math(s))
+    return _pair(s, _pads_math(s) if pads is None else pads)
+
+
+def pads_math(s: str) -> bool:
+    """Whether the text pads its math (rule 6)."""
+    return _pads_math(s)
 
 
 class _Token(NamedTuple):

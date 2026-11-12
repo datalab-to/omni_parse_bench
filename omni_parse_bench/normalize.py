@@ -231,16 +231,58 @@ def _latex_to_text(s: str) -> str:
     return _math_to_text(s).replace(views.BREAK, " ")
 
 
-def _math_to_text(s: str) -> str:
-    if "\\[" in s or "\\(" in s:
+_HELD_DOLLAR = "\ue002"    # a dollar that is not a delimiter, for `find`
+
+
+def read_math(q: views.Seq) -> tuple[views.Seq, list[mathspans.Span], list[mathspans.Span]]:
+    """The math of a text view (`views.reading`), read once for the text path and the equation path: the text
+    with its `\\(..\\)` replaced by what they read as and `\\[..\\]` written as `$$..$$`; the `\\(..\\)` spans
+    in that text (`read` is False for one too long to read, which stays as written); and the
+    dollar-delimited spans `mathspans` finds in it. A span of the second list may lie inside one of the
+    third."""
+    parens: list[mathspans.Span] = []
+    held: list[tuple[int, int]] = []
+    if "\\[" in q.s or "\\(" in q.s:
         # \(..\) and \[..\] are unambiguous math: no price rule; one we can't read stays as $..$.
-        s = _BRACKET_MATH.sub(lambda m: f"$${m[1]}$$", s)
-        s = _PAREN_MATH.sub(lambda m: f"${m[1]}$" if (t := _display_or_paren(m[0], m[1], inline=True)) is None
-                            else t, s)
-    if "$" not in s:
-        return s
+        q = q.sub(_BRACKET_MATH, lambda m: f"$${m[1]}$$")
+        kept: list[tuple[str, str | None, bool]] = []    # each \(..\): body, what it reads as, whether read
+
+        def paren(m: re.Match[str]) -> str:
+            t = _display_or_paren(m[0], m[1], inline=True)
+            kept.append((m[1], t, t != m[0]))
+            return f"${m[1]}$" if t is None else t
+
+        placed: list[tuple[int, int]] = []
+        q = q.sub(_PAREN_MATH, paren, placed)
+        for (a, b), (body, t, read) in zip(placed, kept, strict=True):
+            if t is None: held += [(a, b - 1)]
+            # Note: a \(..\) the text path leaves as `$..$` (padded plain text) (or prose: that rule is
+            # the text path's) is still math to a reader of equations, who is told so by its delimiters.
+            if t is not None or body.strip():
+                parens.append(mathspans.Span(a, b, body, read, False))
+    # Note: the dollars of a \(..\) that is not read are no delimiters of the text around it ("$$..$$" beside
+    # "\( x \)" is a display): `find` reads the text with them held.
+    chars = list(q.s)
+    for a, b in held:
+        chars[a] = chars[b] = _HELD_DOLLAR
+    fed = "".join(chars) if held else q.s
+    found = [x._replace(body=q.s[x.start + (d := 2 if x.display else 1):x.end - d])
+             for x in mathspans.find(fed)]
+    if held:
+        # Note: each of them is a pair of dollars of its own, read as the page reads its math.
+        pads = mathspans.pads_math(q.s)
+        for a, b in held:
+            found += [x._replace(start=x.start + a, end=x.end + a) for x in mathspans.find(q.s[a:b + 1], pads)
+                      if (x.start, x.end) == (0, b + 1 - a)]
+        found.sort(key=lambda x: x.start)
+    return q, parens, found    # the dollar spans: where they are is `mathspans`' to say
+
+
+def _math_to_text(s: str) -> str:
+    q, _, found = read_math(views.Seq(s))
+    s = q.s
     out, i = [], 0
-    for span in mathspans.find(s):    # the dollar-delimited spans: where they are is `mathspans`' to say
+    for span in found:
         if span.display:
             t = _display_or_paren(s[span.start:span.end], span.body, inline=False)
             if t is None or t == s[span.start:span.end]:

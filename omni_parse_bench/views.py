@@ -34,9 +34,11 @@ _SCRIPT = re.compile(r"<(script|style|head|title)\b.*?</\1>", re.S | re.I)
 _BLOCK = re.compile(
     r"</?(?:table|thead|tbody|tfoot|tr|td|th|p|div|li|ul|ol|dl|dt|dd|h[1-6]|br|hr|section|article|"
     r"figure|figcaption|blockquote|pre|caption|header|footer|nav|aside|form|label|select|option|"
-    r"textarea|img)\b[^<>]*>",
+    r"textarea|img)(?:\s[^<>]*)?/?>",
     re.I,
 )
+# Note: a tag has a tag's shape: its name, then attributes with no "<" in them, then ">", so the "<p" of
+# "p<q\leq r ... )>0" is no tag (`_INLINE`, `_BLOCK`, `_SUP`).
 # Note: a block tag breaks the line, so a math span never crosses one ("<p>$5</p><p>$$x$$</p>"); a <br> or
 # an image may sit inside a span, and a reader sees them as a space.
 _LINE_BREAKING = re.compile(
@@ -55,7 +57,7 @@ def _block_break(m: re.Match[str]) -> str:
 
 # Note: a footnote marker or exponent set as <sup> would otherwise become digits of the number it
 # follows ("1,240<sup>1</sup>" read as 1,2401); a text test still finds "x2" in "x 2" by `squeeze`.
-_SUP = re.compile(r"<sup\b[^<>]*>", re.I)
+_SUP = re.compile(r"<sup(?:\s[^<>]*)?/?>", re.I)
 # Note: a tag must start with a letter and hold no stray `<` or `>`, so "P < 0.05" and
 # "<name@example.com>" survive as text.
 _INLINE = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?/?>")
@@ -138,17 +140,77 @@ def blocks(raw: list) -> tuple[Block, ...]:
 
 def text(s: str, *, alt: bool = True) -> str:
     """The text a reader sees; without `alt`, image alt text is left out."""
-    s = _MATH.sub(_math, s)
-    if "<ol" in s.lower(): s = _numbered(s)
-    s = _CONTROL.sub(lambda m: f" {CHECKED if _CHECKED_ATTR.search(m[0]) else UNCHECKED} ", s)
-    s = _BOX_TAG.sub(lambda m: f" {UNCHECKED if m[1] else CHECKED} ", s)
-    s = _INPUT_VALUE.sub(lambda m: f" {_quoted(m)} ", s)
-    s = _IMG_ALT.sub(lambda m: f" {_quoted(m)} " if alt else " ", s)
-    s = _MD_IMAGE.sub(lambda m: f" {m[1]} " if alt else " ", s)
+    return reading(Seq(s), alt=alt).s
+
+
+class Seq:
+    """A string and, when it tracks its source, where each character came from: `lo[i]:hi[i]` is the stretch
+    of the source that character `i` stands for. A rewrite (`sub`) keeps the sources of what it leaves and
+    gives what it writes the source of what it replaced, so a position in the text maps back (`source`)."""
+    __slots__ = ("s", "lo", "hi")
+
+    def __init__(self, s: str, lo: list[int] | None = None, hi: list[int] | None = None) -> None:
+        self.s, self.lo, self.hi = s, lo, hi
+
+    @classmethod
+    def tracking(cls, s: str) -> Seq:
+        return cls(s, list(range(len(s))), list(range(1, len(s) + 1)))
+
+    def sub(self, pattern: re.Pattern[str], repl, placed: list[tuple[int, int]] | None = None) -> Seq:
+        """`pattern.sub(repl, s)`, `repl` a string with no group references or a function of the match. With
+        `placed`, the stretch each replacement takes in the result is appended to it."""
+        if self.lo is None and placed is None:
+            return Seq(pattern.sub(repl, self.s))
+        s, parts, lo, hi, i, n = self.s, [], [], [], 0, 0
+        for m in pattern.finditer(s):
+            a, b = m.span()
+            r = repl(m) if callable(repl) else repl
+            parts += [s[i:a], r]
+            n += a - i
+            if placed is not None: placed.append((n, n + len(r)))
+            n += len(r)
+            if self.lo is not None:
+                lo += self.lo[i:a]
+                hi += self.hi[i:a]
+                if r == s[a:b]:    # left as it was: each character keeps its own source
+                    lo += self.lo[a:b]
+                    hi += self.hi[a:b]
+                    i = b
+                    continue
+                if a < b: first, last = self.lo[a], self.hi[b - 1]
+                else: first = last = self.lo[a] if a < len(self.lo) else (self.hi[-1] if self.hi else 0)
+                lo += [first] * len(r)
+                hi += [last] * len(r)
+            i = b
+        if i == 0 and not parts: return self
+        parts.append(s[i:])
+        if self.lo is None: return Seq("".join(parts))
+        return Seq("".join(parts), lo + self.lo[i:], hi + self.hi[i:])
+
+    def source(self, start: int, end: int) -> tuple[int, int]:
+        """The stretch of the source that `s[start:end]` stands for."""
+        return self.lo[start], self.hi[end - 1]
+
+
+# The pattern `html.unescape` reads references with.
+_CHARREF = re.compile(r"&(#[0-9]+;?|#[xX][0-9a-fA-F]+;?|[^\t\n\f <&#;]{1,32};?)")
+
+
+def reading(q: Seq, *, alt: bool = True) -> Seq:
+    """What `text` writes, on a `Seq`: the same rewrites, so a tracking one says where in the HTML each
+    character of the text came from."""
+    q = q.sub(_MATH, _math)
+    if "<ol" in q.s.lower(): q = q.sub(_LIST_TAG, _numbering())
+    q = q.sub(_CONTROL, lambda m: f" {CHECKED if _CHECKED_ATTR.search(m[0]) else UNCHECKED} ")
+    q = q.sub(_BOX_TAG, lambda m: f" {UNCHECKED if m[1] else CHECKED} ")
+    q = q.sub(_INPUT_VALUE, lambda m: f" {_quoted(m)} ")
+    q = q.sub(_IMG_ALT, lambda m: f" {_quoted(m)} " if alt else " ")
+    q = q.sub(_MD_IMAGE, lambda m: f" {m[1]} " if alt else " ")
     for pattern in (_COMMENT, _DOCTYPE, _SCRIPT):
-        s = pattern.sub(" ", s)
-    s = _INLINE.sub("", _BLOCK.sub(_block_break, _SUP.sub(" ", s)))
-    return _html.unescape(s)
+        q = q.sub(pattern, " ")
+    q = q.sub(_SUP, " ").sub(_BLOCK, _block_break).sub(_INLINE, "")
+    if q.lo is None: return Seq(_html.unescape(q.s))
+    return q.sub(_CHARREF, lambda m: _html.unescape(m[0]))
 
 
 def hold(s: str, pattern: re.Pattern[str], held: list[str] | None = None) -> tuple[str, list[str]]:
@@ -173,9 +235,9 @@ def release(s: str, held: list[str]) -> str:
     return _HELD.sub(lambda m: out[int(m[1])], s) if held else s
 
 
-def _numbered(s: str) -> str:
-    """`s` with each <li> of an <ol> preceded by the number a browser draws for it ("3. "), from the
-    list's `start`, so an HTML list keeps the numbers a markdown one writes as text."""
+def _numbering():
+    """The rewrite of each <li> of an <ol> to itself preceded by the number a browser draws for it ("3. "),
+    from the list's `start`, so an HTML list keeps the numbers a markdown one writes as text."""
     stack: list[list[int]] = []   # per open list: [is_ordered, next number]
 
     def one(m: re.Match[str]) -> str:
@@ -192,7 +254,13 @@ def _numbered(s: str) -> str:
         stack[-1][1] += 1
         return f"{m[0]}{n}. "
 
-    return _LIST_TAG.sub(one, s)
+    return one
+
+
+def mathml_only(body: str) -> bool:
+    """Whether a <math> element's body is MathML with no TeX in it: the text view reads it as its text, not as
+    `$..$`."""
+    return "<" in body and not _TEX_ANNOTATION.search(body)
 
 
 def _math(m: re.Match[str]) -> str:
