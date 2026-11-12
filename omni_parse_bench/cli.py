@@ -276,13 +276,15 @@ def cmd_check(a: argparse.Namespace) -> int:
 
 
 def cmd_tests(a: argparse.Namespace) -> int:
-    """Every test of a dataset as a JSON line, with its page's id, suite and document: a flat table to query
-    (polars, DuckDB, pandas), made from the gold files and never stored."""
+    """Every test of a dataset as a JSON line, with its page's id, suite and document, and the kinds of its
+    args (`arg_kinds`: text, number, latex): a flat table to query (polars, DuckDB, pandas), made from the
+    gold files and never stored."""
     _, pages = data.read_manifest(a.dataset, a.manifest)
     unit_tests.check(pages)   # Note: first, so only a dataset that checks is written out.
     for p in pages:
         for t in json.loads(Path(p.gt_path).read_text())["tests"]:
             row = {"id": t["id"], "page_id": p.page_id, "suite": p.suite, "document": p.document} | t
+            row["arg_kinds"] = list(unit_tests.tests.arg_kinds(t["test_type"], t["args"]))
             print(json.dumps(row, ensure_ascii=False))
     return 0
 

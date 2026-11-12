@@ -133,7 +133,7 @@ of the headline. The summary's `failed` counts those pages by cause, and `covera
 ```python
 unit_tests.score(pred, tests) -> [Verdict(id, result, why)]   # pred: one page's {"html": ..., "blocks": [...]}
 unit_tests.lines(verdicts, tests, page) -> [test line]        # each verdict beside its page and its test
-unit_tests.summarize(lines) -> {"score", "families", "per_tag", "per_suite", "per_test_type", "per_derivation"}
+unit_tests.summarize(lines) -> {"score", "families", "per_tag", "per_suite", "per_test_type", "per_arg_kind", "per_derivation"}
 unit_tests.UnitTests()                                        # the same, as an omni-bench-core scorer
 ```
 
@@ -144,8 +144,11 @@ opb score --pred outputs.json --gold gold/<page_id>.json     # outputs.json: one
 A verdict is `pass` or `fail`, with `why`. A test whose output is missing or malformed fails. A summary holds
 `score`, the mean of the families' scores and the headline, and `families`, always in the order text, tables, layout: each
 family's `score` (the share of its tests passed), `tests` and `documents` (the source documents its tests are
-from). `per_tag`, `per_suite`, `per_test_type` and `per_derivation` give the same three numbers for each slice;
+from). `per_tag`, `per_suite`, `per_test_type`, `per_arg_kind` and `per_derivation` give the same three numbers for each slice;
 they are not part of the headline, a test with several tags counts under each, and an empty slice is left out.
+`per_arg_kind` slices by how a test's content is compared (`text`, `number` or `latex`): a test counts under each
+kind its args use, and a `layout_kind` test under none, since its text only labels a place. Run results kept
+before the slice existed have no `per_arg_kind` until they are graded again.
 
 ## Predict
 
@@ -307,7 +310,7 @@ runs/datalab-20261021-160012-3f9a/       <system>-<YYYYMMDD-HHMMSS>-<4 hex>
   unit_tests/
     summary.json                         the grade
     scores.jsonl                         one line per page: id, status, row.document, row.suite, tests, passed, per_family, per_tag,
-                                         per_test_type, per_derivation
+                                         per_test_type, per_arg_kind, per_derivation
     details/<page_id>.jsonl              one line per test: page_id, suite, document, test_id, test_type,
                                          output_type, derivation, tags, args, settings, result and why
 ```
