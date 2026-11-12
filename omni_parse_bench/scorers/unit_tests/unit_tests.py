@@ -30,7 +30,8 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     system didn't produce fails as "no <output> output", so a system with html alone scores 0 on layout.
 
     - A page's line in scores.jsonl holds `tests`, `passed` and `per_family` (each family's `tests` and
-      `passed`), and the same counts by `per_tag`, `per_test_type`, `per_arg_kind` and `per_derivation`; its `row` holds
+      `passed`), and the same counts by `per_tag`, `per_test_type`, `per_arg_kind` and `per_derivation`;
+      its `row` holds
       the page's `document` and `suite`;
     - its details (`details/<page_id>.jsonl`) hold one test line per test (`lines`); and
     - the summary is `summarize` over every page, a failed one with all its tests failed (`score_failure`):
@@ -81,7 +82,8 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
 
     def summarize(self, lines: Sequence[Line]) -> dict[str, Any]:
         """`score`, `families` and the slices (`per_tag`, `per_suite`, `per_test_type`, `per_arg_kind`,
-        `per_derivation`), over every page's counts, a failed page's from `score_failure`. A line kept before the slices were
+        `per_derivation`), over every page's counts, a failed page's from `score_failure`. A line kept
+        before the slices were
         (no `per_tag`, ..., no `row.suite`) adds nothing to them."""
         return _summary(lines)
 
@@ -201,7 +203,8 @@ def _entries(counts: Iterable[tuple[str, str, int, int]], order: Sequence[str] =
 def _summary(pages: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     """`score`, `families` and the slices, from score lines (a page's `row`, `tests`, `passed` and `_count`s);
     the families in `vocab.FAMILY_ORDER`, the test types in `vocab.FAMILIES` order, the arg kinds in
-    `tests.KINDS` order, the other slices' keys sorted. A line without a count, or without `row.suite`, adds nothing to that slice."""
+    `tests.KINDS` order, the other slices' keys sorted. A line without a count, or without `row.suite`, adds
+    nothing to that slice."""
     pages = list(pages)
 
     def counted(name: str) -> Iterable[tuple[str, str, int, int]]:

@@ -221,9 +221,9 @@ def arg_kinds(test_type: str, args: Mapping[str, Any]) -> tuple[str, ...]:
     found: set[str] = set()
     for a in args.values():
         for x in a if isinstance(a, list) else [a]:
-            if isinstance(x, dict) and (k := next((k for k, fs in KINDS.items()
-                                                   if set(fs) <= set(x) <= {*fs, *OPTIONAL.get(k, ())}), None)):
-                found.add(k)
+            for k, fs in KINDS.items():
+                if isinstance(x, dict) and set(fs) <= set(x) <= {*fs, *OPTIONAL.get(k, ())}:
+                    found.add(k)
     return tuple(k for k in KINDS if k in found)
 
 

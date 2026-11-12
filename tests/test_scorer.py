@@ -156,7 +156,8 @@ def test_a_pages_line_holds_its_counts_and_its_details_every_verdict():
                         "per_tag": {"eng": {"tests": 3, "passed": 2}, "table": {"tests": 1, "passed": 0},
                                     "form": {"tests": 1, "passed": 0}, "math": {"tests": 1, "passed": 0}},
                         "per_test_type": {"present": {"tests": 5, "passed": 2}},
-                        "per_arg_kind": {"text": {"tests": 4, "passed": 2}, "latex": {"tests": 1, "passed": 0}},
+                        "per_arg_kind": {"text": {"tests": 4, "passed": 2},
+                                         "latex": {"tests": 1, "passed": 0}},
                         "per_derivation": {"authored": {"tests": 5, "passed": 2}}}
     assert s.details[2] == {"test_id": "c", "test_type": "present", "output_type": "html",
                             "derivation": "authored", "tags": ["eng", "table"], "args": text("gamma"),
@@ -285,13 +286,14 @@ def test_arg_kinds_are_how_a_tests_content_is_compared():
     assert kinds("present", text("a")) == ("text",)
     assert kinds("present", {"content": {"number": "3.5"}}) == ("number",)
     assert kinds("present", {"content": {"latex": "x^2"}}) == ("latex",)
-    # several args of one kind count it once; a test type that takes only text (order, table_cell) has just text
-    cell = {"cell": {"text": "7", "max_diffs": 0}, "headings": [{"text": "N", "max_diffs": 0}, {"text": "n", "max_diffs": 0}]}
+    # several args of one kind count it once; order and table_cell take only text
+    t0, t1 = {"text": "N", "max_diffs": 0}, {"text": "n", "max_diffs": 0}
+    cell = {"cell": {"text": "7", "max_diffs": 0}, "headings": [t0, t1]}
     assert kinds("table_cell", cell) == ("text",)
-    assert kinds("order", {"before": {"text": "a", "max_diffs": 0}, "after": {"text": "b", "max_diffs": 0}}) == ("text",)
+    assert kinds("order", {"before": t0, "after": t1}) == ("text",)
     # mixed kinds, were a test type to take them, come in the order text, number, latex
-    assert kinds("present", {"x": {"latex": "x"}, "y": {"number": "1"}, "z": {"text": "t", "max_diffs": 0}}) == (
-        "text", "number", "latex")
+    mixed = {"x": {"latex": "x"}, "y": {"number": "1"}, "z": t0}
+    assert kinds("present", mixed) == ("text", "number", "latex")
     # a layout test's text only labels its place, so it is compared by no kind
     assert kinds("layout_kind", {"content": {"text": "x", "max_diffs": 0, "place": [[0, 0, 1, 1]]}}) == ()
 
@@ -300,8 +302,8 @@ def test_the_arg_kind_slice_counts_a_test_under_each_kind_and_leaves_layout_out(
     tests = on_one_page(
         {"id": "t", "test_type": "present", "tags": ["eng"], "args": text("alpha")},
         {"id": "n", "test_type": "present", "tags": ["eng"], "args": {"content": {"number": "12"}}},
-        {"id": "c", "test_type": "table_cell", "tags": ["table"], "args": {"cell": {"text": "12", "max_diffs": 0},
-         "headings": [{"text": "alpha", "max_diffs": 0}]}},
+        {"id": "c", "test_type": "table_cell", "tags": ["table"],
+         "args": {"cell": {"text": "12", "max_diffs": 0}, "headings": [{"text": "alpha", "max_diffs": 0}]}},
         {"id": "l", "test_type": "layout_kind", "output_type": "blocks", "tags": ["eng"],
          "args": {"content": {"text": "alpha", "max_diffs": 0, "place": [[0.1, 0.1, 0.5, 0.2]]}},
          "settings": {"kind": "text"}})
