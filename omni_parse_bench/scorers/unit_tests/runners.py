@@ -105,11 +105,15 @@ class Order(NamedTuple):
 
 def order(t: Order, v: views.Html) -> Mark:
     """`before` comes before `after`, found as `contains` finds them: after `fold`, then, if either
-    is missing, both again after `squeeze`, whose positions keep the folded text's order."""
+    is missing, both again after `squeeze`, whose positions keep the folded text's order. An exact
+    match counts only if it is not cut out of a longer number (`_edges_ok`)."""
+    folded = normalize.fold(v.text)
     for f in (normalize.fold, normalize.squeeze):
         hay = f(v.text)
-        a = fuzzysearch.find_near_matches(f(t.before), hay, max_l_dist=t.max_diffs)
-        b = fuzzysearch.find_near_matches(f(t.after), hay, max_l_dist=t.max_diffs)
+        kept = [k for k, c in enumerate(folded) if not c.isspace()] if f is normalize.squeeze else None
+
+        a, b = (_unglued(fuzzysearch.find_near_matches(f(x), hay, max_l_dist=t.max_diffs), folded, kept)
+                for x in (t.before, t.after))
         if a and b: break
     if not a: return False, f"'before' text {t.before[:40]!r} not found"
     if not b: return False, f"'after' text {t.after[:40]!r} not found"
@@ -371,27 +375,52 @@ def contains(needle: str, text: str, max_diffs: int) -> tuple[bool, float, float
     return _contains(needle, text, max_diffs)[:3]
 
 
-def _edges_ok(want: str, hay: str) -> bool:
-    """Whether some occurrence of `want` in `hay` is not cut out of a longer number: a leading digit
-    isn't glued to a digit, a sign or a separator after a digit, a trailing digit isn't glued to a digit
-    or to a separator before one. A hyphen after a letter or digit is a hyphen, not a sign."""
+def _folded_span(i: int, j: int, kept: list[int] | None) -> tuple[int, int]:
+    """Span [i, j) of the squeezed text as a span of the folded text; `kept`: its non-space indices."""
+    return (i, j) if kept is None else (kept[i], kept[j - 1] + 1)
+
+
+def _unglued(matches: list, folded: str, kept: list[int] | None) -> list:
+    """The matches but exact ones cut out of a longer number in `folded` (`kept`: see `_edges_ok`)."""
+    return [m for m in matches
+            if m.dist or m.end <= m.start or not _glued(folded, *_folded_span(m.start, m.end, kept))]
+
+
+def _glued(hay: str, i: int, j: int) -> bool:
+    """Whether the span hay[i:j] is cut out of a longer number: a leading digit glued to a digit, a sign or
+    a separator after a digit, a trailing digit glued to a digit or to a separator before one. A hyphen
+    after a letter or digit is a hyphen, not a sign."""
+    if j <= i:
+        return False
+    before, after = hay[i - 1:i], hay[j:j + 1]
+    return (
+        hay[i].isdigit() and bool(before) and (
+            before.isdigit()
+            or (before in ".," and hay[i - 2:i - 1].isdigit())
+            or (before in "-\u2212+" and not hay[i - 2:i - 1].isalnum()))
+    ) or (
+        hay[j - 1].isdigit() and bool(after) and (
+            after.isdigit() or (after in ".," and hay[j + 1:j + 2].isdigit()))
+    )
+
+
+def _edges_ok(want: str, hay: str, folded: str = "", kept: list[int] | None = None) -> bool:
+    """Whether some occurrence of `want` in `hay` is not cut out of a longer number (`_glued`). For a
+    squeezed `hay`, pass the `folded` text and its non-space indices `kept`, to judge the edges there."""
     i = hay.find(want)
     while i != -1:
-        j = i + len(want)
-        before, after = hay[i - 1:i], hay[j:j + 1]
-        glued = (
-            want[0].isdigit() and bool(before) and (
-                before.isdigit()
-                or (before in ".," and hay[i - 2:i - 1].isdigit())
-                or (before in "-\u2212+" and not hay[i - 2:i - 1].isalnum()))
-        ) or (
-            want[-1].isdigit() and bool(after) and (
-                after.isdigit() or (after in ".," and hay[j + 1:j + 2].isdigit()))
-        )
-        if not glued:
+        if not _glued(folded or hay, *_folded_span(i, i + len(want), kept)):
             return True
         i = hay.find(want, i + 1)
     return False
+
+
+def _squeezed_ok(want: str, hay: str, folded: str) -> bool:
+    """Whether a squeezed match stands: an exact one must not be cut out of a longer number in `folded`
+    (a space is not glued); a fuzzy one is not checked."""
+    if want not in hay:
+        return True
+    return _edges_ok(want, hay, folded, [k for k, c in enumerate(folded) if c != " "])
 
 
 def _contains(needle: str, text: str, max_diffs: int) -> tuple[bool, float, float, str]:
@@ -406,6 +435,8 @@ def _contains(needle: str, text: str, max_diffs: int) -> tuple[bool, float, floa
     # fold has already collapsed all whitespace to ASCII spaces; reuse it for squeeze.
     squeezed = want.replace(" ", ""), hay.replace(" ", "")
     ok, r2, _ = _ratio(*squeezed, max_diffs)
+    if ok and want:
+        ok = _squeezed_ok(*squeezed, hay)
     window = "" if ok or not want else _window(*(squeezed if r2 > r else (want, hay)))[1]
     return ok, max(r, r2), thr, window
 

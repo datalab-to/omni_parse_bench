@@ -113,6 +113,14 @@ def test_digits_inside_a_longer_digit_run_are_not_present(digits, glue, front):
     assert not runners.present(runners.Present(runners.Text(digits, 0)), page)[0]
 
 
+@given(st.integers(1, 10**6).map(str), st.text("0123456789", min_size=1, max_size=3), st.booleans())
+def test_an_order_item_with_a_digit_glued_on_never_passes(digits, glue, front):
+    item = f"{digits}. Alpha" if front else f"Alpha {digits}"
+    glued = f"{glue}{item}" if front else f"{item}{glue}"
+    page = html_page(f"{glued} then Omega")
+    assert not runners.order(runners.Order(item, "Omega", 0), page)[0]
+
+
 @given(st.lists(WORD, min_size=2, max_size=8).map(" ".join), st.data())
 def test_text_within_its_edits_is_found(text, data):
     k = data.draw(st.integers(1, max(1, len(text) // 5)))
