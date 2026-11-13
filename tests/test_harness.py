@@ -20,6 +20,7 @@ from omni_parse_bench.harness.providers import (  # noqa: E402
     datalab,
     extend,
     llamaparse,
+    liteparse,
     llm,
     mistral,
     tesseract,
@@ -111,6 +112,58 @@ def test_tesseract_is_free_and_says_so(monkeypatch, tmp_path):
     [r] = tesseract.Tesseract(model="eng").requests(frozenset({"html"}))
     got = tesseract.call(tmp_path / "p.png", r, config=tesseract.Tesseract(model="eng"))
     assert got.cost.usd == 0.0 and got.raw["text"] == "hi"
+
+
+def test_liteparse_parses_once_for_both_outputs():
+    [r] = liteparse.LiteParse().requests(frozenset({"html", "blocks"}))
+    assert r.outputs == {"html", "blocks"}
+    assert r.sent["headers_footers"] is True and r.sent["extract_blocks"] is True
+
+
+def test_liteparse_answer_is_plain_data_read_as_html_and_blocks(monkeypatch, tmp_path):
+    lp = pytest.importorskip("liteparse")
+    from liteparse.types import AnnotationRect, LayoutBlock, LayoutCell
+
+    blocks = [LayoutBlock(kind="heading", text="Title", level=1, bbox=AnnotationRect(20, 10, 100, 10)),
+              LayoutBlock(kind="rule", bbox=AnnotationRect(0, 30, 200, 1)),
+              LayoutBlock(kind="table", header=[LayoutCell("a"), LayoutCell("b")],
+                          rows=[[LayoutCell("1"), LayoutCell("2")]], bbox=AnnotationRect(0, 50, 200, 50))]
+    page = types.SimpleNamespace(markdown="# Title", width=200, height=100, blocks=blocks)
+    stub = types.SimpleNamespace(parse=lambda _: types.SimpleNamespace(pages=[page]))
+    monkeypatch.setattr(liteparse, "parser", lambda config, timeout: stub)
+    [r] = liteparse.LiteParse().requests(frozenset({"html", "blocks"}))
+    got = liteparse.call(tmp_path / "p.pdf", r)
+    assert got.cost.usd == 0.0 and got.raw["version"] == f"liteparse {lp.__version__}"
+    assert json.loads(json.dumps(got.raw)) == got.raw
+    outs, errs = liteparse.parse(got.raw, r)
+    assert errs == {} and outs["html"] == "<h1>Title</h1>\n"
+    assert outs["blocks"] == [{"label": "heading", "bbox": [0.1, 0.1, 0.6, 0.2], "text": "Title"},
+                              {"label": "table", "bbox": [0.0, 0.5, 1.0, 1.0], "text": "a | b\n1 | 2"}]
+
+
+def test_liteparse_timeout_and_failure_are_the_systems(monkeypatch, tmp_path):
+    lp = pytest.importorskip("liteparse")
+
+    def raising(exc):
+        def parse(_): raise exc
+        return types.SimpleNamespace(parse=parse)
+
+    [r] = liteparse.LiteParse().requests(frozenset({"html"}))
+    slow = lp.ParseTimeoutError("slow", source="p", timeout=1)
+    monkeypatch.setattr(liteparse, "parser", lambda c, t: raising(slow))
+    with pytest.raises(errors.SystemTimeout):
+        liteparse.call(tmp_path / "p.pdf", r)
+    monkeypatch.setattr(liteparse, "parser", lambda c, t: raising(lp.ParseError("bad pdf")))
+    with pytest.raises(errors.SystemFailed, match="liteparse failed: bad pdf"):
+        liteparse.call(tmp_path / "p.pdf", r)
+
+
+def test_liteparse_block_kind_it_doesnt_know_fails_the_page():
+    raw = {"markdown": "", "width": 1, "height": 1,
+           "blocks": [{"kind": "aside", "bbox": {"x": 0, "y": 0, "width": 1, "height": 1}}]}
+    [r] = liteparse.LiteParse().requests(frozenset({"blocks"}))
+    with pytest.raises(errors.SystemFailed, match="'aside' isn't in the adapter's LABELS"):
+        liteparse.parse(raw, r)
 
 
 def test_a_timeout_is_printed_with_its_decimals():

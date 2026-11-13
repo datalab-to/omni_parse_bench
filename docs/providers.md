@@ -193,6 +193,18 @@ figures are their own blocks):
 | table | table |
 | figure | figure |
 
+LiteParse (its `LayoutBlock` kinds; `grid_fallback` is text laid out on a grid that wasn't read as a
+table, and `rule` blocks carry no text and are left out):
+
+| LiteParse kind | label |
+| --- | --- |
+| paragraph, grid_fallback | text |
+| heading | heading |
+| list_item | list |
+| code | code |
+| table, merged_table | table |
+| figure | figure |
+
 LightOn (the labels of its model card, and those its own ParseBench parser also reads; a label
 ending in `+` continues the block before it and is read without the `+`):
 
@@ -225,6 +237,7 @@ that is missing stops a run before any call and says which `export` to type.
 | `mistral` | /v1/ocr (mistral-ocr-4-1) | html, blocks | header and footer fields beside the markdown, put back | MISTRAL_API_KEY |
 | a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2, OvisOCR, OvisOCR2: html) | kept: vendor defaults that leave them out turned off | none; OPB_ENDPOINT_KEY, when the server has one |
 | `tesseract` | the local `tesseract` binary, no model of the page | html | kept: it has no notion of them | none |
+| `liteparse` | the `liteparse` Python package, in its pool of worker processes: the PDF's text layer, Tesseract for pages with none | html, blocks | native switch, set to keep them (`headers_footers`) | none |
 
 A vendor's tiers are runs of their own, one config each (or one config and `--set`), with the same pages:
 
@@ -284,6 +297,15 @@ Per vendor:
   and it gives no layout blocks. It is free, so its cost is recorded as `usd` 0.0. A tesseract that
   exits with an error fails the page as a `SystemFailed` with its stderr. Needs `brew install tesseract tesseract-lang` (or the
   distribution's tesseract and its script models).
+- liteparse: LiteParse, model-free and run locally at no cost through its Python package at its
+  defaults. It reads a PDF's text layer and lays it out; Tesseract (built in) reads pages and images
+  with no text layer, unless `ocr` is off. One parse per page (`output_format="markdown"`,
+  `extract_blocks=True`, `keep_headers_footers=True`; the option `headers_footers: false` strips them,
+  LiteParse's default) answers both outputs: html is its markdown through `markdown.to_html`, blocks
+  are its layout blocks, typed, with boxes in PDF points on the page's frame. Pages run in LiteParse's
+  own pool of worker processes (`pool_size`), its deadline the run's `timeout`: a parse past it is a
+  `SystemTimeout`, any other LiteParse error a `SystemFailed`. Its cost is recorded as `usd` 0.0.
+  Needs `pip install liteparse`.
 
 ## Serving an open model
 
