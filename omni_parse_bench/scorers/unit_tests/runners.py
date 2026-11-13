@@ -323,13 +323,15 @@ def _number_pattern(core: str, written: str = "") -> re.Pattern[str]:
 
     A separator may stand only between thousands groups ("1,240", "1 240", "1240", never "12,40"),
     or where the test's own text puts one, so a copy as written always counts ("1.800.934.4850").
-    A number starts after anything but a digit or a digit's separator, so "No.12345" holds 12345; a
-    "-" is its sign only after a non-word character, so "E-4065" and "COVID-19" are positive."""
+    A number starts after anything but a digit or a digit's separator, so "No.12345" holds 12345, and
+    ends before anything but a digit or a separator and a digit, so "12.5" is not in "12.5.7" nor
+    "12.5,3", but is in "12.5. Next"; a "-" is its sign only after a non-word character, so "E-4065"
+    and "COVID-19" are positive."""
     whole, _, frac = core.partition(".")
     groups = [whole[max(0, i - 3):i] for i in range(len(whole), 0, -3)][::-1]
     digits = r"[,\.\u202f ]?".join(re.escape(g) for g in groups)
     if written and written != core: digits = f"(?:{digits}|{re.escape(written)})"
-    tail = r"[.,]" + re.escape(frac) if frac else r"(?![.,]\d)"
+    tail = (r"[.,]" + re.escape(frac) if frac else "") + r"(?![.,]\d)"
     return re.compile(r"(?<!\d)(?<!\d[.,])(?P<pre>(?<!\w)-(?=[\d$€£¥])|\(\s?)?(?:[$€£¥]\s?)?"
                       + digits + tail + r"(?P<pct>\s?%)?\)?(?![\d])")
 

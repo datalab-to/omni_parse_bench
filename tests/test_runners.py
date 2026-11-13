@@ -84,6 +84,23 @@ def test_a_number_is_strict_on_digits_lenient_on_separators():
     assert not R.found(R.Number("1,234,567.80"), v)[0]
 
 
+@pytest.mark.parametrize("gold, text, passes", [
+    ("12.5", "12.5.7", False),
+    ("12.5", "12.5,3", False),
+    ("12.5", "12,5,3", False),
+    ("12.5", "total 12.5", True),
+    ("12.5", "12.5. Next", True),
+    ("12.5", "(12.5)", True),
+    ("12.5", "12.5, then", True),
+    ("12.5", "12.55", False),
+    ("12", "12.5", False),
+    ("12", "12.5.7", False),
+    ("12", "12. Next", True),
+])
+def test_a_number_is_not_cut_out_of_a_longer_decimal(gold, text, passes):
+    assert R.found(R.Number(gold), html(f"<p>{text}</p>"))[0] is passes
+
+
 def test_a_number_keeps_sign_and_percent():
     v = html("<p>change 4.8% and 12.5</p>")
     assert R.found(R.Number("4.8%"), v)[0]
