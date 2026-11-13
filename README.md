@@ -44,8 +44,10 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | Unlimited-OCR | open | 3.3B | 79.5 | — | 70.7 | 76.6 | 91.1 | — |
 | Infinity-Parser2-Flash | open | 2.2B | 78.7 | — | 78.8 | 66.8 | 90.4 | — |
 | DeepSeek-OCR-2 | open | 3.4B | 75.4 | — | 64.6 | 70.2 | 91.4 | — |
+| LiteParse + ocria-nano ¶ | open | 8.1M | 74.8 | — | 59.4 | 74.1 | 90.9 | — |
 | Indra OCR (Datalab) | open | about 12M | 71.4 | — | 62.5 | 59.6 | 92.0 | — |
 | HunyuanOCR-1.5 | open | 1.0B | 68.8 | — | 62.3 | 62.6 | 81.4 | — |
+| LiteParse (Tesseract) ¶ | open | n/a | 42.3 | — | 43.6 | 14.5 | 68.8 | — |
 | OvisOCR2 | open | 0.85B | none | — | 74.2 | 79.9 | unsupported | — |
 | Xiaomi-OCR-0 | open | 0.87B | none | — | 73.7 | 90.6 | unsupported | — |
 | OvisOCR | open | 1.4B | none | — | 72.2 | 78.2 | unsupported | — |
@@ -62,6 +64,8 @@ Scores use omni-parse-bench 1.7.0, regraded from each system's saved predictions
 Gemini 3.8 Flash's and GPT-5.6 Sol's layout scores use a separate run that asked each model for blocks.
 
 † Gemini 4 results combine one full pass with one rerun of every page that pass failed, made with the reader that accepts `bbox` (omni-parse-bench 1.6.0 and later); the full pass's other pages are unchanged. Carbon also has four pages that hit the output-token limit. See [the run notes](docs/gemini4-2026-11-10.md) for the first measurement.
+
+¶ LiteParse rows are new full runs (2,937 pages, none failed) graded with omni-parse-bench 1.8.0, whose headline matches 1.7.x: liteparse 2.21.1 from PyPI on CPU (an M2 Max), with its ocria-nano 1.0.0 models (`lit models pull ocria-nano`) or its built-in Tesseract (`ocr_backend: tesseract`).
 
 ‡ Gemini 4 costs include the original full pass **and** all failed-page reruns, divided by 2,937 pages; separate validation probes are excluded. These cumulative experiment costs are not fresh single-pass prices.
 
@@ -412,8 +416,10 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | Unlimited-OCR | 31.3 | 89.3 | 75.3 | 69.1 | 68.8 | 59.3 | 15.6 | 50.4 | 36.8 |
 | Infinity-Parser2-Flash | 63.6 | 93.5 | 67.5 | 75.6 | 77.5 | 73.7 | 33.6 | 71.8 | 41.0 |
 | DeepSeek-OCR-2 | 28.5 | 82.0 | 68.9 | 59.6 | 64.3 | 50.6 | 9.6 | 37.0 | 43.0 |
+| LiteParse + ocria-nano ¶ | 8.5 | 55.4 | 74.7 | 63.9 | 61.4 | 72.9 | 55.8 | 30.2 | 52.9 |
 | Indra OCR (Datalab) | 25.2 | 55.2 | 60.9 | 60.4 | 61.9 | 73.2 | 49.3 | 28.6 | 67.8 |
 | HunyuanOCR-1.5 | 40.2 | 67.4 | 63.3 | 58.1 | 65.1 | 53.7 | 45.3 | 50.5 | 42.6 |
+| LiteParse (Tesseract) ¶ | 2.0 | 54.0 | 18.9 | 35.2 | 32.2 | 47.1 | 15.6 | 5.9 | 31.5 |
 | OvisOCR2 | 36.6 | 94.0 | 79.9 | 78.9 | 72.5 | 58.2 | 49.9 | 52.5 | 31.0 |
 | Xiaomi-OCR-0 | 47.9 | 95.3 | 89.0 | 65.4 | 79.2 | 68.5 | 76.0 | 56.2 | 31.1 |
 | OvisOCR | 36.0 | 92.8 | 77.0 | 70.0 | 73.2 | 63.6 | 35.3 | 50.4 | 27.1 |
