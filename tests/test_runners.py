@@ -294,3 +294,46 @@ def test_a_present_that_is_absent_still_says_not_found(max_diffs):
 ])
 def test_an_order_item_cut_out_of_a_longer_number_says_so(before, after, text, why):
     assert R.order(R.Order(before, after, 0), html(f"<p>{text}</p>")) == (False, why)
+
+
+def _edited(n: int, k: int) -> tuple[str, str]:
+    """An n-letter cell and the same cell with its first k letters replaced by digits."""
+    want = "".join("abcdefghij"[i % 10] if i % 3 else "klmnopqrst"[i % 10] for i in range(n))
+    return want, "5" * k + want[k:]
+
+
+# Note: 1 - k/n is not exactly representable for most n, and rapidfuzz's ratio for k substitutions lands a
+# hair under it, so the cell comparisons need the same slack `present` has.
+# Past half the cell the floor `TABLE_MIN_RATIO` decides, not the edits.
+EDIT_CASES = [(n, k) for n in (3, 6, 7, 10, 26, 49) for k in (1, 2, 3) if k / n <= 0.5]
+
+
+@pytest.mark.parametrize("n, k", EDIT_CASES)
+def test_a_cell_allows_exactly_max_diffs_edits(n, k):
+    want, got = _edited(n, k)
+    table = html(f"<table><tr><td>{got}</td></tr></table>")
+    assert R.table_cell(R.TableCell(want, {}, k), table)[0]
+    assert not R.table_cell(R.TableCell(want, {}, k - 1), table)[0]
+
+
+@pytest.mark.parametrize("n, k", EDIT_CASES)
+def test_a_relation_allows_exactly_max_diffs_edits(n, k):
+    want, got = _edited(n, k)
+    table = html(f"<table><tr><th>Year</th><th>Total</th></tr><tr><td>{got}</td><td>1,240</td></tr></table>")
+    for kind, rel in (("left", "left"), ("top_heading", "top_heading")):
+        if kind == "left":
+            t = R.TableCell("1,240", {"left": want}, k)
+        else:
+            table = html(f"<table><tr><th>{got}</th></tr><tr><td>1,240</td></tr></table>")
+            t = R.TableCell("1,240", {"top_heading": want}, k)
+        assert R.table_cell(t, table)[0], (n, k, kind)
+        t = R.TableCell("1,240", {rel: want}, k - 1)
+        assert not R.table_cell(t, table)[0], (n, k, kind)
+
+
+@pytest.mark.parametrize("n, k", EDIT_CASES)
+def test_cell_headings_allow_exactly_max_diffs_edits(n, k):
+    want, got = _edited(n, k)
+    table = html(f"<table><tr><th>{got}</th></tr><tr><td>1,240</td></tr></table>")
+    assert R.table_cell(R.TableCell("1,240", {}, k, headings=(want,)), table)[0]
+    assert not R.table_cell(R.TableCell("1,240", {}, k - 1, headings=(want,)), table)[0]

@@ -488,7 +488,7 @@ def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_di
         over = "up" if kind in ("left", "right") else "left"
         cells = {_stand_in(table, c, over) for c in getattr(table, kind)[rc]}
     texts = [_fold_cell(table.text[c]) for c in cells]
-    if any(_cell_ratio(want, x) >= thr for x in texts):
+    if any(_cell_ratio(want, x) >= thr - EPS for x in texts):
         return ""
     if not texts:
         return f"no {kind} cell"
@@ -498,7 +498,7 @@ def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_di
 
 def _one_of(want: str, got: str, thr: float) -> bool:
     """Whether cell text `got`, or one of its lines, matches the folded `want`."""
-    return any(_cell_ratio(want, _fold_cell(x)) >= thr for x in {got, *got.split("\n")} if x.strip())
+    return any(_cell_ratio(want, _fold_cell(x)) >= thr - EPS for x in {got, *got.split("\n")} if x.strip())
 
 
 def _in_order(want: Sequence[str], got: Sequence[str], max_diffs: int) -> bool:
