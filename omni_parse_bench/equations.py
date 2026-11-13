@@ -18,9 +18,13 @@ from omni_parse_bench import normalize, views
 
 KATEX = Path(__file__).parent / "katex" / "katex.js"   # KaTeX 0.16.22, MIT (LICENSE beside it)
 # Note: KaTeX bundles mathtools' pre-2022 \coloneq (":-"); since 2022 it prints ":=", as \coloneqq does.
+# Note: KaTeX defines a literal U+00B7 as \cdotp, which is math-only and fails inside \text{..} ("Undefined
+# control sequence" for a macro the source never wrote, so recovery deletes nothing and the whole span
+# reads as empty). It is redefined to its math symbol in either mode.
 _RENDER = """(tex, display) => {
   try {
-    const macros = {"\\\\coloneq": "\\\\coloneqq", "\\\\Coloneq": "\\\\Coloneqq"};
+    const macros = {"\\\\coloneq": "\\\\coloneqq", "\\\\Coloneq": "\\\\Coloneqq",
+                    "\u00b7": "\\\\TextOrMath{$\\\\cdotp$}{\\\\cdotp}"};
     return {mathml: katex.renderToString(tex, {output: "mathml", displayMode: display, strict: "ignore",
                                                 throwOnError: true, trust: false, macros})};
   } catch (e) {
