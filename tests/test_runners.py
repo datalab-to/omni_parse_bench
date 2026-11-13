@@ -160,6 +160,14 @@ def test_cell_in_row_group():
     assert R.table_cell(t, html(lines))[0]
 
 
+def test_a_block_covering_half_a_place_holds_it_at_any_scale():
+    place = (0.623881554931733, 0.0, 0.9572148882650664, 0.5)
+    half = (0.623881554931733, 0.0, 0.7905482215983997, 0.5)
+    for scale in (1.0, 0.375):
+        t = R.LayoutKind(R.Text("x", 0, (tuple(x * scale for x in place),)), "text")
+        assert R.layout_kind(t, (R.Block("text", tuple(x * scale for x in half), ""),))[0], scale
+
+
 def test_layout_kind_reads_the_smallest_block_holding_the_place():
     place = ((0.1, 0.1, 0.4, 0.15),)
     page = R.Block("table", (0.0, 0.0, 1.0, 1.0), "")

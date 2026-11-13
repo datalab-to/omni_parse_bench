@@ -23,6 +23,9 @@ from omni_parse_bench.scorers.unit_tests import hyphenation
 EPS = 1e-9
 TABLE_MIN_RATIO = 0.5
 MIN_PLACE_COVER = 0.5
+# Note: a block covering exactly half a place has a coverage of 0.5 in exact arithmetic and a hair under or
+# over it in floats (areas of boxes that were scaled or summed), so the threshold gets the slack `EPS` gives.
+COVER_EPS = 1e-9
 # Note: a list item or a key-value field is running text for a `text` test; vendors differ in whether they
 # give each such line a block of its own, and the test asks only that it isn't a heading or a table.
 AS_TEXT = frozenset({"text", "list", "form"})
@@ -242,7 +245,7 @@ def holder(place: Sequence[Box], blocks: Sequence[Block]) -> Block | None:
     total = sum(_area(x) for x in place)
     if total <= 0: return None
     held = [b for b in blocks
-            if sum(_area(_intersection(x, b.bbox)) for x in place) / total >= MIN_PLACE_COVER]
+            if sum(_area(_intersection(x, b.bbox)) for x in place) / total >= MIN_PLACE_COVER - COVER_EPS]
     return min(held, key=lambda b: _area(b.bbox), default=None)
 
 

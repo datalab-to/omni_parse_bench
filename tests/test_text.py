@@ -37,6 +37,7 @@ def test_math_braces_survive_conversion():
     ("| Total | **$24,468** | **$1,200** |", ["Total", "$24,468", "$1,200"]),
     ("| $x_1$ | $y$ |", ["$x_1$", "$y$"]),
     ("| Loss | $f = (f_i)|_{|\\mathcal{B}|}$ |", ["Loss", "$f = (f_i)|_{|\\mathcal{B}|}$"]),
+    ("| $5 | x_1 | US$6 |", ["$5", "x_1", "US$6"]),
 ])
 def test_dollar_amounts_in_a_pipe_table_stay_in_their_cells(row, cells):
     h = markdown.to_html(f"| a | b | c | d |\n|---|---|---|---|\n{row}\n")
@@ -179,6 +180,10 @@ def test_a_line_end_dash_isnt_a_hyphen():
 
 def test_a_line_end_hyphen_before_a_capital_stays():
     assert normalize.fold("well-\nKnown") != normalize.fold("wellKnown")
+
+
+def test_a_line_end_hyphen_after_a_decomposed_letter_is_joined_as_after_a_composed_one():
+    assert normalize.fold("caf\u0065\u0301- ali") == normalize.fold("caf\u00e9- ali") == "caféali"
 
 
 def test_math_keeps_the_space_after_a_command_and_in_text():
