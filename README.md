@@ -46,6 +46,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | DeepSeek-OCR-2 | open | 3.4B | 75.2 | — | 64.2 | 70.0 | 91.4 | — |
 | Indra OCR (Datalab) | open | about 12M | 69.5 | — | 60.3 | 58.1 | 90.1 | — |
 | HunyuanOCR-1.5 | open | 1.0B | 64.6 | — | 50.5 | 61.9 | 81.4 | — |
+| LiteParse | open | n/a | 42.3 | — | 43.1 | 14.4 | 69.5 | — |
 | OvisOCR2 | open | 0.85B | none | — | 73.7 | 79.6 | unsupported | — |
 | OvisOCR | open | 1.4B | none | — | 71.8 | 77.9 | unsupported | — |
 | Xiaomi-OCR-0 | open | 0.87B | none | — | 73.3 | 90.4 | unsupported | — |
@@ -399,6 +400,7 @@ Each cell is the pass rate over every test carrying that tag, leaving out layout
 | DeepSeek-OCR-2 | 43.6 | 91.4 | 75.3 | 56.0 | 77.4 | 62.1 | 36.5 | 60.8 | 52.1 |
 | Indra OCR (Datalab) | 31.0 | 59.7 | 75.1 | 52.4 | 69.6 | 69.3 | 68.8 | 46.2 | 56.5 |
 | HunyuanOCR-1.5 | 42.1 | 53.0 | 70.6 | 53.2 | 72.1 | 54.8 | 49.2 | 65.6 | 53.0 |
+| LiteParse | 2.0 | 52.6 | 18.8 | 35.1 | 32.1 | 47.3 | 15.6 | 6.1 | 30.9 |
 | OvisOCR2 | 26.7 | 96.7 | 79.7 | 64.6 | 76.7 | 59.3 | 55.5 | 69.4 | 32.0 |
 | OvisOCR | 25.3 | 96.1 | 73.3 | 55.6 | 76.3 | 56.2 | 41.6 | 58.8 | 28.7 |
 | Xiaomi-OCR-0 | 47.9 | 94.9 | 88.9 | 65.3 | 78.9 | 68.5 | 76.1 | 56.2 | 29.7 |
