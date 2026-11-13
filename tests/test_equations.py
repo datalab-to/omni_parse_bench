@@ -268,3 +268,20 @@ def test_a_script_ending_in_a_digit_is_not_found_before_a_decimal_part(test, out
 def test_widely_spaced_dots_in_plain_text_are_an_ellipsis():
     v = views.html("<p>for 1, .  . ., n we have</p>")
     assert runners.present(runners.Present(runners.Latex(r"1,\ldots,n")), v)[0]
+
+
+@pytest.mark.parametrize("tex, want", [
+    (r"\text{kJ/(kg·K)}", ("k", "J", "/", "(", "k", "g", "·", "K", ")")),
+    (r"\text{·}", ("·",)),
+    (r"x·y", ("x", "·", "y")),
+    (r"\mathrm{kg·K}", ("k", "g", "·", "K")),
+    (r"\textit{a·b}", ("a", "·", "b")),
+])
+def test_a_literal_middle_dot_renders_in_text_and_in_math(tex, want):
+    assert equations.symbols(tex) == want
+
+
+def test_a_span_with_a_middle_dot_in_text_is_read_not_dropped():
+    assert equations.appears(r"\mathrm{kJ/(kg\cdot K)}", "<p>$\\text{kJ/(kg·K)}$</p>")[0]
+    assert equations.appears(r"\text{kJ/(kg·K)}", "<p>$\\text{kJ/(kg·K)}$</p>")[0]
+    assert not equations.appears(r"\mathrm{kJ/(kg\cdot M)}", "<p>$\\text{kJ/(kg·K)}$</p>")[0]

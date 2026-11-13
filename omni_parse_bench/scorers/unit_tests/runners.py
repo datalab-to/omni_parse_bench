@@ -69,6 +69,8 @@ def found(a: Arg, v: views.Html) -> Mark:
     ok, r, thr, window = _contains(a.text, v.text, a.max_diffs)
     if not ok and hyphenation.matches(a.text, v.text):
         return True, ""
+    if not ok and _only_glued(a.text, v.text):
+        return False, f"{a.text[:60]!r} found only inside a longer number"
     near = f"; closest {_excerpt(window)!r}" if window else ""
     return _mark(ok, f"{a.text[:60]!r} not found (best {r:.3f} < {thr:.3f}){near}")
 
@@ -111,15 +113,17 @@ def order(t: Order, v: views.Html) -> Mark:
     is missing, both again after `squeeze`, whose positions keep the folded text's order. An exact
     match counts only if it is not cut out of a longer number (`_edges_ok`)."""
     folded = normalize.fold(v.text)
+    cut = [False, False]
     for f in (normalize.fold, normalize.squeeze):
         hay = f(v.text)
         kept = [k for k, c in enumerate(folded) if not c.isspace()] if f is normalize.squeeze else None
 
-        a, b = (_unglued(fuzzysearch.find_near_matches(f(x), hay, max_l_dist=t.max_diffs), folded, kept)
-                for x in (t.before, t.after))
+        raw = [fuzzysearch.find_near_matches(f(x), hay, max_l_dist=t.max_diffs) for x in (t.before, t.after)]
+        a, b = (_unglued(m, folded, kept) for m in raw)
+        cut = [c or (bool(m) and not x) for c, m, x in zip(cut, raw, (a, b), strict=True)]
         if a and b: break
-    if not a: return False, f"'before' text {t.before[:40]!r} not found"
-    if not b: return False, f"'after' text {t.after[:40]!r} not found"
+    if not a: return False, f"'before' text {t.before[:40]!r} {_why_missing(cut[0])}"
+    if not b: return False, f"'after' text {t.after[:40]!r} {_why_missing(cut[1])}"
     if any(x.start < y.start for x in a for y in b):
         return True, ""
     return False, f"{t.before[:34]!r} does not appear before {t.after[:34]!r}"
@@ -323,13 +327,15 @@ def _number_pattern(core: str, written: str = "") -> re.Pattern[str]:
 
     A separator may stand only between thousands groups ("1,240", "1 240", "1240", never "12,40"),
     or where the test's own text puts one, so a copy as written always counts ("1.800.934.4850").
-    A number starts after anything but a digit or a digit's separator, so "No.12345" holds 12345; a
-    "-" is its sign only after a non-word character, so "E-4065" and "COVID-19" are positive."""
+    A number starts after anything but a digit or a digit's separator, so "No.12345" holds 12345, and
+    ends before anything but a digit or a separator and a digit, so "12.5" is not in "12.5.7" nor
+    "12.5,3", but is in "12.5. Next"; a "-" is its sign only after a non-word character, so "E-4065"
+    and "COVID-19" are positive."""
     whole, _, frac = core.partition(".")
     groups = [whole[max(0, i - 3):i] for i in range(len(whole), 0, -3)][::-1]
     digits = r"[,\.\u202f ]?".join(re.escape(g) for g in groups)
     if written and written != core: digits = f"(?:{digits}|{re.escape(written)})"
-    tail = r"[.,]" + re.escape(frac) if frac else r"(?![.,]\d)"
+    tail = (r"[.,]" + re.escape(frac) if frac else "") + r"(?![.,]\d)"
     return re.compile(r"(?<!\d)(?<!\d[.,])(?P<pre>(?<!\w)-(?=[\d$€£¥])|\(\s?)?(?:[$€£¥]\s?)?"
                       + digits + tail + r"(?P<pct>\s?%)?\)?(?![\d])")
 
@@ -416,6 +422,20 @@ def _edges_ok(want: str, hay: str, folded: str = "", kept: list[int] | None = No
             return True
         i = hay.find(want, i + 1)
     return False
+
+
+def _why_missing(cut: bool) -> str:
+    return "found only inside a longer number" if cut else "not found"
+
+
+def _only_glued(needle: str, text: str) -> bool:
+    """Whether `needle` is in `text` exactly but only cut out of a longer number (`_contains` fails it
+    on its edges): as `_contains` judges it, in the folded text, else in the squeezed."""
+    want, hay = normalize.fold(needle), normalize.fold(text)
+    if not want: return False
+    if want in hay: return not _edges_ok(want, hay)
+    squeezed = want.replace(" ", ""), hay.replace(" ", "")
+    return squeezed[0] in squeezed[1] and not _squeezed_ok(*squeezed, hay)
 
 
 def _squeezed_ok(want: str, hay: str, folded: str) -> bool:
