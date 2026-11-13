@@ -259,3 +259,38 @@ def test_an_image_description_beside_a_cells_text_doesnt_cost():
 def test_a_cell_that_is_only_an_image_reads_as_its_alt_text():
     v = html('<table><tr><td>Status</td><td><img alt="red circle"></td></tr></table>')
     assert R.table_cell(R.TableCell("red circle", {"left": "Status"}, 0), v)[0]
+
+
+def test_a_squeezed_present_cut_out_of_a_longer_number_says_so():
+    ok, why = R.present(R.Present(R.Text("7777777 77", 0)), html("<p>id 7777777777777777777 x</p>"))
+    assert not ok and why == "'7777777 77' found only inside a longer number"
+
+
+@pytest.mark.parametrize("max_diffs", [0, 1])
+@pytest.mark.parametrize("needle, text", [
+    ("Total: 40", "Total: 401"),
+    ("Total: 40", "x Total: 40.5"),
+])
+def test_a_present_cut_out_of_a_longer_number_says_so(needle, text, max_diffs):
+    ok, why = R.present(R.Present(R.Text(needle, max_diffs)), html(f"<p>{text}</p>"))
+    assert not ok and why == f"{needle!r} found only inside a longer number"
+
+
+@pytest.mark.parametrize("max_diffs", [0, 1])
+def test_a_present_that_is_absent_still_says_not_found(max_diffs):
+    ok, why = R.present(R.Present(R.Text("Total: 40", max_diffs)), html("<p>Subtotal 99</p>"))
+    assert not ok and why.startswith("'Total: 40' not found (best ")
+
+
+@pytest.mark.parametrize("before, after, text, why", [
+    ("1. Introduction", "2. Methods", "11. Introduction ... 2. Methods",
+     "'before' text '1. Introduction' found only inside a longer number"),
+    ("1. Introduction", "2. Methods", "1. Introduction ... 22. Methods",
+     "'after' text '2. Methods' found only inside a longer number"),
+    ("1. Intro duction", "2. Methods", "11. Introduction ... 2. Methods",
+     "'before' text '1. Intro duction' found only inside a longer number"),
+    ("1. Introduction", "2. Methods", "Preface ... 2. Methods",
+     "'before' text '1. Introduction' not found"),
+])
+def test_an_order_item_cut_out_of_a_longer_number_says_so(before, after, text, why):
+    assert R.order(R.Order(before, after, 0), html(f"<p>{text}</p>")) == (False, why)
