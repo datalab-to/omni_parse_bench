@@ -107,7 +107,8 @@ order: the cell before, the cell after, and the label at the start or the end of
 written in reading order puts its first cell at the right edge, so `left_heading` is the label at the right edge
 of the page and `right_heading` the one at the left edge. The same test then reads the same on a left-to-right
 table and its mirror. The scorer doesn't read `dir`, so `dir="rtl"` changes nothing: write the roles in the
-order of the html, not of the page. For example, an Arabic row `<th>المجموع</th><td>1,240</td>` is
+order of the html, not of the page. A model that copies an RTL table in page order, left to right, fails these
+tests, the same way one that reads an RTL page's columns left to right fails an `order` test. For example, an Arabic row `<th>المجموع</th><td>1,240</td>` is
 `{"cell": "1,240", "left_heading": "المجموع"}`.
 
 The neighbor roles (`up`, `left`, `top_heading`, ...) come from olmOCR-bench's and fr-bench-pdf2md's
