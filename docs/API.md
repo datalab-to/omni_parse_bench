@@ -14,8 +14,9 @@ Contents:
 5. [Predict](#predict): one page through one system;
 6. [Adapters](#adapters): the systems, and your own;
 7. [The dataset](#the-dataset): its folder, its manifest and its tests;
-8. [Your own scorer](#your-own-scorer): grading another way; and
-9. [What a run writes](#what-a-run-writes): the files, and slicing them.
+8. [Your own scorer](#your-own-scorer): grading another way;
+9. [What a run writes](#what-a-run-writes): the files, and slicing them; and
+10. [Intervals and comparisons](#intervals-and-comparisons): how far a score can be trusted.
 
 ## Run
 
@@ -355,3 +356,51 @@ unit_tests.summarize([x for x in lines if x["suite"] == "tables"])
 ```
 
 A failed page's details are its tests, each failed, so a slice counts them as the headline does.
+
+## Intervals and comparisons
+
+A document's tests pass or fail together, so a score rests on its documents more than on its tests. Two commands
+read a graded run's `unit_tests/scores.jsonl` and print JSON to stdout; the run's summary is not changed.
+
+```
+opb intervals RUN [--resamples 1000] [--seed 0] [--level 0.95]
+opb compare RUN_A RUN_B [--resamples 1000] [--seed 0] [--level 0.95]
+```
+
+`opb intervals` prints the summary's shape (`headline`, `families`, `per_tag`, `per_suite`, `per_test_type`,
+`per_arg_kind`, `per_derivation`) with each entry as `{"score", "low", "high", "tests", "documents", "draws"}`,
+`low` and `high` being the central `--level` of its score over `--resamples` draws of the documents (a cluster
+bootstrap). Every entry shares each draw, so the headline and the families agree. A slice with no tests is left
+out. The headline is a mean over every family, so a draw missing a family is not one of its draws; `draws` is
+how many draws an entry was present in.
+
+`low` and `high` are null for an entry of fewer than 5 documents, or one absent from more than 5% of the draws:
+the draws left would be those where it was present, and would show a score as surer than it is. A percentile
+interval on few documents is also optimistic: in a simulation a 95% interval covered the true score about 88% of
+the time at 10 documents and 93% at 30. Read a slice of few documents as rough.
+
+`opb compare` uses the documents both runs have, one draw for both, and prints for the headline, each family and
+each slice `{"a", "b", "gap", "low", "high", "documents", "draws", "excludes_zero"}`: `gap` is A minus B, and
+`excludes_zero` is whether its interval leaves out 0 (false when the interval is null). It says nothing about
+significance across slices: with many slices, some will exclude 0 by chance. `a` and `b` are scores over the
+paired documents only, so they need not equal each run's own summary, and an entry's `documents` is the union of
+the two runs' documents within the paired set. The headline is the mean over `headline_families`, those both
+runs have tests for. `documents_paired` and `documents_unpaired` (`{"a", "b"}`) say what was paired and what was
+left out; `entries_unpaired` (`{"a", "b"}`) counts the entries only one run has, which get no gap;
+`documents_mismatched` counts paired documents whose number of tests differs between the runs, a sign the two
+were not graded on the same tests. It raises when the runs share no document.
+
+Both are deterministic for a `--seed`, need at least 100 `--resamples`, and take several seconds to about half a
+minute for a full benchmark at the default. In Python, they take the score lines (`scores.jsonl`'s lines, read
+as JSON) and the same options as keywords:
+
+```python
+from omni_parse_bench import uncertainty
+
+uncertainty.intervals(pages, resamples=1000, seed=0, level=0.95)
+uncertainty.paired(pages_a, pages_b, resamples=1000, seed=0, level=0.95)
+```
+
+Pages of one `document` are one cluster. Copies of a page, or one source under several `document` values, count
+as separate documents, and an interval covers this dataset's documents only: see
+[design](design.md#score) for why.

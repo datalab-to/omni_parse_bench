@@ -9,6 +9,8 @@
     opb predict --system datalab --page pages/<page_id>.pdf        # one page through one system
     opb check --dataset <folder or hf://...>                       # is the dataset one opb can run?
     opb tests --dataset <folder or hf://...> > tests.jsonl         # every test as a JSON line
+    opb intervals RUN_DIR                                          # a graded run's scores with intervals
+    opb compare RUN_A RUN_B                                        # two runs, paired by document
     opb systems [NAME]                                             # the systems, or one's options
 
 A run is one config (omni-bench-core's `config`): the dataset, its manifest, the scorers, which rows, and
@@ -31,7 +33,7 @@ from typing import Any
 from omni_bench_core import config
 from omni_bench_core import run as runs
 
-from omni_parse_bench import data, errors, vocab
+from omni_parse_bench import data, errors, uncertainty, vocab
 from omni_parse_bench.scorers import unit_tests
 
 EXAMPLE_MODELS = ("openai/gpt-5.6-sol",)
@@ -289,6 +291,31 @@ def cmd_tests(a: argparse.Namespace) -> int:
     return 0
 
 
+def read_scores(folder: str) -> list[dict[str, Any]]:
+    """The score lines of a run's unit tests (`unit_tests/scores.jsonl`), as grading wrote them."""
+    path = Path(folder) / "unit_tests" / "scores.jsonl"
+    if not path.is_file():
+        raise ValueError(f"{folder} has no unit_tests/scores.jsonl; it is not a graded run (grade it with "
+                         "`opb grade`)")
+    return [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
+
+
+def cmd_intervals(a: argparse.Namespace) -> int:
+    """The run's headline, families and slices, each with an interval over its documents (a cluster
+    bootstrap), read from its scores.jsonl; the summary is not changed."""
+    print(json.dumps(uncertainty.intervals(read_scores(a.run), resamples=a.resamples, seed=a.seed,
+                                           level=a.level), indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_compare(a: argparse.Namespace) -> int:
+    """Two runs' scores compared over the documents both have: each score's gap (A minus B), its interval
+    over those documents, and whether the interval excludes 0 (`excludes_zero`)."""
+    print(json.dumps(uncertainty.paired(read_scores(a.run_a), read_scores(a.run_b), resamples=a.resamples,
+                                        seed=a.seed, level=a.level), indent=2, ensure_ascii=False))
+    return 0
+
+
 def cmd_systems(a: argparse.Namespace) -> int:
     """Every system, its outputs and the environment variables it needs; or one system's options, their
     defaults and what each does, then what its environment needs. The options are the adapter's own fields,
@@ -403,6 +430,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     tt.add_argument("--dataset", default=data.DEFAULT_DATASET, help=dataset_help)
     tt.add_argument("--manifest", default=data.MANIFEST, help=manifest_help)
 
+    iv = sub.add_parser("intervals", help="a run's scores, each with an interval over its documents")
+    iv.add_argument("run", help="a graded run's folder")
+    cp = sub.add_parser("compare", help="two runs' scores over the documents both have: gap and interval")
+    cp.add_argument("run_a", help="a graded run's folder; the gap is its score minus the other's")
+    cp.add_argument("run_b", help="a graded run's folder")
+    for q in (iv, cp):
+        q.add_argument("--resamples", type=int, default=1000,
+                       help="draws of the documents, at least 100 (default: %(default)s)")
+        q.add_argument("--seed", type=int, default=0, help="the draws' seed (default: %(default)s)")
+        q.add_argument("--level", type=float, default=0.95,
+                       help="the interval's share (default: %(default)s)")
+
     pl = sub.add_parser("systems", aliases=["providers"], help="list the systems, or one system's options")
     pl.add_argument("system", nargs="?", help="a system's name, to list its options and environment")
 
@@ -418,7 +457,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         a.cmd = "systems"
     cmd = {"init": cmd_init, "run": cmd_run, "resume": cmd_resume, "grade": cmd_grade,
            "score": cmd_score, "predict": cmd_predict, "check": cmd_check,
-           "tests": cmd_tests, "systems": cmd_systems, "reread": cmd_reread, "reparse": cmd_reread}[a.cmd]
+           "tests": cmd_tests, "intervals": cmd_intervals, "compare": cmd_compare,
+           "systems": cmd_systems, "reread": cmd_reread, "reparse": cmd_reread}[a.cmd]
     try:
         renamed(a)
         return cmd(a)

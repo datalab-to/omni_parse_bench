@@ -269,10 +269,15 @@ and a form's blank, filled and scanned copies are one form. The manifest's `docu
 records each page's document, set once when the page is added. So a score over few documents says less
 than its test count suggests.
 
-No score carries an uncertainty interval yet. An honest one has to account for the dependence above
-the document as well as within it (copies across suites, pages built and corrected by one process from
-one source), and comparing two systems is a paired question, document by document, rather than one of
-overlapping intervals. The `document` column is what such an interval would be built on.
+`opb intervals` puts an interval on each score, and `opb compare` compares two systems, both by resampling
+documents: a document's tests pass or fail together, so the documents, not the tests, are the sample. Pages
+with the same `document` are one cluster. Its limits are the dependence it can't see: copies of a page, or
+one source document under several `document` values (across suites, or built and corrected by one
+process), count as separate documents unless the manifest gives them one value. An interval says how much
+one system's score on this dataset moves with its choice of documents; it does not reach past this dataset,
+to other documents or to a change in the system. A comparison is paired, document by document, over the
+documents both runs have, not a comparison of two overlapping intervals. The summary itself carries no
+interval.
 
 ### Going from a test JSON to running the test
 
