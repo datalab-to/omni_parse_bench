@@ -102,6 +102,7 @@ glued to it. One clean copy anywhere is enough.
 | B | a gold ending in a letter is not | `x1` | `x1y` | pass | `edge-end-letter` |
 | P | spacing removed, then judged on the spaced text | `1 2` | `123` | fail | `edge-squeeze-glued` |
 | I | a space is not a digit | `1 2` | `12 3` | pass | `edge-squeeze-spaced` |
+| I | a spaced copy counts beside a glued one | `40` | `400 4 0` | pass | `edge-glued-and-spaced` |
 | I | digits spaced out | `305357` | `3 0 5 3 5 7` | pass | `edge-squeeze-digits` |
 | P | with `max_diffs` 1, an exact match is still guarded | `Total: 40` (md 1) | `Total: 400` | fail: `'Total: 40' found only inside a longer number` | `edge-fuzzy` |
 <!-- /cases -->

@@ -76,6 +76,7 @@ TABLES = [
         text("edge-end-letter", "B", "a gold ending in a letter is not", "x1", "x1y"),
         text("edge-squeeze-glued", "P", "spacing removed, then judged on the spaced text", "1 2", "123"),
         text("edge-squeeze-spaced", "I", "a space is not a digit", "1 2", "12 3"),
+        text("edge-glued-and-spaced", "I", "a spaced copy counts beside a glued one", "40", "400 4 0"),
         text("edge-squeeze-digits", "I", "digits spaced out", "305357", "3 0 5 3 5 7"),
         text("edge-fuzzy", "P", "with `max_diffs` 1, an exact match is still guarded", "Total: 40", "Total: 400", md=1, why=True),
     ),

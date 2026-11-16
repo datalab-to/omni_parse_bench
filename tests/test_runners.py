@@ -584,6 +584,19 @@ def test_a_squeezed_glued_copy_does_not_veto_a_fuzzy_match_elsewhere():
     assert not R.present(R.Present(R.Text("1 2 3 4", 1)), html("<p>12345</p>"))[0]
 
 
+@pytest.mark.parametrize("text, passes", [
+    ("<p>4 0</p>", True),
+    ("<p>400 4 0</p>", True),             # a glued copy does not veto a spaced one beside it
+    ("<p>400</p><p>4 0</p>", True),       # nor one in another paragraph
+    ("<p>140 4 0</p>", True),
+    ("<p>400</p>", False),
+    ("<p>4 00</p>", False),
+    ("<p>1400</p>", False),
+])
+def test_a_glued_copy_does_not_veto_a_spaced_copy_elsewhere(text, passes):
+    assert R.present(R.Present(R.Text("40", 0)), html(text))[0] is passes
+
+
 @pytest.mark.parametrize("md", [0, 1, 2])
 def test_order_more_edits_never_lose_an_exact_start(md):
     assert R.order(R.Order("a a", "a a", md), html("<p>a a a a</p>"))[0]

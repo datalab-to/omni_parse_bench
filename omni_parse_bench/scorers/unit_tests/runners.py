@@ -533,8 +533,8 @@ def _contains(needle: str, text: str, max_diffs: int,
     if ok and want and want in hay and not _edges_ok(want, hay):
         # Note: a copy cut out of a longer number does not count, nor any window of it ("total: 40" spends
         # its edit on "otal: 400"); a fuzzy match elsewhere still does, as one clean copy anywhere would.
-        if not _ratio(want, _unglue(want, hay), max_diffs)[0]:
-            return False, r, thr, ""
+        # The squeezed text is tried next: a spaced copy elsewhere ("400 4 0" holds "4 0") is a copy too.
+        ok = _ratio(want, _unglue(want, hay), max_diffs)[0]
     if ok:
         return True, r, thr, ""
     # fold has already collapsed all whitespace to ASCII spaces; reuse it for squeeze.

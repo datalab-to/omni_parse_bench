@@ -70,6 +70,7 @@ edge-end-digit	fail	'x1' found only inside a longer number
 edge-end-letter	pass
 edge-squeeze-glued	fail	'1 2' found only inside a longer number
 edge-squeeze-spaced	pass
+edge-glued-and-spaced	pass
 edge-squeeze-digits	pass
 edge-fuzzy	fail	'Total: 40' found only inside a longer number
 ## number-gold
