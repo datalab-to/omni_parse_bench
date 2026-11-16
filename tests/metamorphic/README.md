@@ -7,8 +7,9 @@ Each promise is a *relation*: change a page, or a test, in a way that should not
 known way), and the verdict should follow. Example: putting a passing answer in bold must not make its test
 fail.
 
-- The certificate lists the 67 relations its authors selected: 48 hold and 19 deviate. It is not every
-  relation of the scorer (see [Not covered](#not-covered)).
+- The certificate lists the 68 relations its authors selected: 56 hold and 12 deviate. It is not every
+  relation of the scorer (see [Not covered](#not-covered)). Five of the 12 (M1a to M1e) are about folding a
+  string twice, which the scorer never does and no document promises, so they change no score.
 - It is generated from the tests. CI fails if it is out of date, or if a status disagrees with its test.
 - This page is enough to read it. Links to `docs/scoring` add detail only.
 
@@ -35,10 +36,10 @@ A healthy run gives:
 
 | | passed | skipped | xfailed |
 |---|---|---|---|
-| this folder, no dataset | 69 | 11 | 21 |
-| this folder, with dataset | 79 | 1 | 21 |
-| whole suite, no dataset | 1055 | 20 | 21 |
-| whole suite, with dataset | 1069 | 6 | 21 |
+| this folder, no dataset | 79 | 11 | 14 |
+| this folder, with dataset | 89 | 1 | 14 |
+| whole suite, no dataset | 1154 | 21 | 14 |
+| whole suite, with dataset | 1169 | 6 | 14 |
 
 All four rows come from runs of this version.
 
@@ -306,4 +307,4 @@ Reference only; the sections above do not need it until a term is unfamiliar.
   - CI tries at most 300 examples per test, the same ones every run.
   - `HYPOTHESIS_PROFILE=deep` tries 5,000 new ones. CI never runs it.
 - **strict xfail**: a test marked as expected to fail. If it passes, pytest reports a failure.
-  The 19 deviations give 21 expected failures, because M11b runs as three cases (order, repeat, table_cell).
+  The 12 deviations give 14 expected failures, because M11b runs as three cases (order, repeat, table_cell).
