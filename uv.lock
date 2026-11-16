@@ -525,7 +525,7 @@ harness = [
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12" },
-    { name = "fuzzysearch", specifier = ">=0.7" },
+    { name = "fuzzysearch", specifier = ">=0.8.1,<0.9" },
     { name = "httpx", marker = "extra == 'harness'", specifier = ">=0.27" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.100" },
     { name = "markdown-it-py", marker = "extra == 'harness'", specifier = ">=3.0" },

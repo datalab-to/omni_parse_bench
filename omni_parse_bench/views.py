@@ -27,18 +27,30 @@ _BOX_TAG = re.compile(r"<(un)?checked\s*/?>", re.I)
 _INPUT_VALUE = re.compile(r"<input\b[^<>]*?\bvalue=(\"([^\"]*)\"|'([^']*)')[^<>]*>", re.I)
 _IMG_ALT = re.compile(r"<img\b[^<>]*\balt=(\"([^\"]*)\"|'([^']*)')[^<>]*>", re.I)
 _MD_IMAGE = re.compile(r"!\[([^\]]*)\]\([^)]*\)")
+# Note: a comment is removed with nothing in its place, as a browser draws it: "12<!-- -->5" reads "125".
 _COMMENT = re.compile(r"<!--.*?-->", re.S)
 _DOCTYPE = re.compile(r"<!DOCTYPE[^>]*>", re.I)
 # Note: <head> and <title> hold a document's metadata, which a browser never shows on the page.
 _SCRIPT = re.compile(r"<(script|style|head|title)\b.*?</\1>", re.S | re.I)
+# Note: a tag's attributes end at the first ">" outside a quoted value, so the ">" of title="a>b" does not end
+# the tag; a value is quoted only right after "=", as in a browser. A quoted value holds no "<", so a quote
+# left open never runs on across later tags: it falls back to ending at the next ">". The loop is possessive,
+# so a "<" that starts no tag costs one pass.
+_ATTRS = r"""(?:=\s*(?:"[^"<]*"|'[^'<]*')|[^<>])*+"""
 _BLOCK = re.compile(
     r"</?(?:table|thead|tbody|tfoot|tr|td|th|p|div|li|ul|ol|dl|dt|dd|h[1-6]|br|hr|section|article|"
     r"figure|figcaption|blockquote|pre|caption|header|footer|nav|aside|form|label|select|option|"
-    r"textarea|img)(?:\s[^<>]*)?/?>",
+    rf"textarea|img)(?:\s{_ATTRS})?/?>",
     re.I,
 )
-# Note: a tag has a tag's shape: its name, then attributes with no "<" in them, then ">", so the "<p" of
-# "p<q\leq r ... )>0" is no tag (`_INLINE`, `_BLOCK`, `_SUP`).
+# Note: a tag has a tag's shape: its name, then attributes with no "<" in them outside quotes, then ">", so
+# the "<p" of "p<q\leq r ... )>0" is no tag (`_INLINE`, `_BLOCK`, `_SUP`). A name may hold a namespace prefix,
+# as Word's <o:p> and <w:sdt> do.
+_TAG = rf"</?[A-Za-z][A-Za-z0-9:-]*(?:\s{_ATTRS})?/?>"
+# Note: a "<" before a letter that starts no tag is text, and is escaped before any tag is removed: else
+# removing the block tags after it ("<p>p <q</p><p>Total due</p><p>r> s</p>") would join it to a later ">"
+# into one tag shape that swallows every block between. `unescape` puts the "<" back last.
+_STRAY_LT = re.compile(rf"<(?=/?[A-Za-z])(?!{_TAG[1:]})")
 # Note: a block tag breaks the line, so a math span never crosses one ("<p>$5</p><p>$$x$$</p>"); a <br> or
 # an image may sit inside a span, and a reader sees them as a space.
 _LINE_BREAKING = re.compile(
@@ -57,10 +69,10 @@ def _block_break(m: re.Match[str]) -> str:
 
 # Note: a footnote marker or exponent set as <sup> would otherwise become digits of the number it
 # follows ("1,240<sup>1</sup>" read as 1,2401); a text test still finds "x2" in "x 2" by `squeeze`.
-_SUP = re.compile(r"<sup(?:\s[^<>]*)?/?>", re.I)
+_SUP = re.compile(rf"<sup(?:\s{_ATTRS})?/?>", re.I)
 # Note: a tag must start with a letter and hold no stray `<` or `>`, so "P < 0.05" and
 # "<name@example.com>" survive as text.
-_INLINE = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?/?>")
+_INLINE = re.compile(_TAG)
 
 
 # A block's kind. Each adapter maps its vendor's types onto these in a table a person decides; a vendor
@@ -106,7 +118,9 @@ def html(s: str) -> Html:
         <checked>, <unchecked>    -> ☒, ☐ (a vendor's own checkbox tags)
         <input value="v">         -> v
         <img alt="a">, ![a](..)   -> a
-        comments, doctype, script, style, head, title -> removed
+        comments                  -> removed
+        doctype, script, style, head, title -> a space
+        "<" before a letter that starts no tag -> kept as text
         <sup>                     -> a space, so a superscript never joins what it follows ("1,240 1")
         block tags                -> a space
         inline tags               -> removed
@@ -206,9 +220,10 @@ def reading(q: Seq, *, alt: bool = True) -> Seq:
     q = q.sub(_INPUT_VALUE, lambda m: f" {_quoted(m)} ")
     q = q.sub(_IMG_ALT, lambda m: f" {_quoted(m)} " if alt else " ")
     q = q.sub(_MD_IMAGE, lambda m: f" {m[1]} " if alt else " ")
-    for pattern in (_COMMENT, _DOCTYPE, _SCRIPT):
+    q = q.sub(_COMMENT, "")
+    for pattern in (_DOCTYPE, _SCRIPT):
         q = q.sub(pattern, " ")
-    q = q.sub(_SUP, " ").sub(_BLOCK, _block_break).sub(_INLINE, "")
+    q = q.sub(_STRAY_LT, "&lt;").sub(_SUP, " ").sub(_BLOCK, _block_break).sub(_INLINE, "")
     if q.lo is None: return Seq(_html.unescape(q.s))
     return q.sub(_CHARREF, lambda m: _html.unescape(m[0]))
 

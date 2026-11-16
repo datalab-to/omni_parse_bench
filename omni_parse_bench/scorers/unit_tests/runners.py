@@ -13,6 +13,8 @@ from collections.abc import Callable, Sequence
 from typing import Any, Literal, NamedTuple
 
 import fuzzysearch
+from fuzzysearch.common import group_matches
+from fuzzysearch.levenshtein import find_near_matches_levenshtein
 from rapidfuzz import fuzz
 
 from omni_parse_bench import normalize, tables, views
@@ -67,7 +69,12 @@ def found(a: Arg, v: views.Html) -> Mark:
     if isinstance(a, Number): return _number_found(a.number, v)
     if isinstance(a, Latex): return _latex_found(a.latex, v)
     ok, r, thr, window = _contains(a.text, v.text, a.max_diffs)
-    if not ok and hyphenation.matches(a.text, v.text):
+    # Note: fold reads a bracketed footnote marker as a spaced number (so a number test still sees it, and
+    # a gold that writes the marker finds it), which leaves it free only at the end of the gold:
+    # "Smith[1] and Jones" missed "Smith and Jones". Retry with the page's markers dropped.
+    if not ok and "[" in v.text and _contains(a.text, v.text, a.max_diffs, normalize.unmarked)[0]:
+        return True, ""
+    if not ok and hyphenation.matches(a.text, v.text, _cut_before, _cut_after):
         return True, ""
     if not ok and _only_glued(a.text, v.text):
         return False, f"{a.text[:60]!r} found only inside a longer number"
@@ -118,7 +125,7 @@ def order(t: Order, v: views.Html) -> Mark:
         hay = f(v.text)
         kept = [k for k, c in enumerate(folded) if not c.isspace()] if f is normalize.squeeze else None
 
-        raw = [fuzzysearch.find_near_matches(f(x), hay, max_l_dist=t.max_diffs) for x in (t.before, t.after)]
+        raw = [_near(f(x), hay, t.max_diffs) for x in (t.before, t.after)]
         a, b = (_unglued(m, folded, kept) for m in raw)
         cut = [c or (bool(m) and not x) for c, m, x in zip(cut, raw, (a, b), strict=True)]
         if a and b: break
@@ -399,18 +406,23 @@ def _glued(hay: str, i: int, j: int) -> bool:
     """Whether the span hay[i:j] is cut out of a longer number: a leading digit glued to a digit, a sign or
     a separator after a digit, a trailing digit glued to a digit or to a separator before one. A hyphen
     after a letter or digit is a hyphen, not a sign."""
-    if j <= i:
-        return False
-    before, after = hay[i - 1:i], hay[j:j + 1]
-    return (
-        hay[i].isdigit() and bool(before) and (
-            before.isdigit()
-            or (before in ".," and hay[i - 2:i - 1].isdigit())
-            or (before in "-\u2212+" and not hay[i - 2:i - 1].isalnum()))
-    ) or (
-        hay[j - 1].isdigit() and bool(after) and (
-            after.isdigit() or (after in ".," and hay[j + 1:j + 2].isdigit()))
-    )
+    return j > i and (_cut_before(hay, i) or _cut_after(hay, j))
+
+
+def _cut_before(hay: str, i: int) -> bool:
+    """`_glued`'s leading edge, for a match starting at i."""
+    before = hay[i - 1:i]
+    return hay[i].isdigit() and bool(before) and (
+        before.isdigit()
+        or (before in ".," and hay[i - 2:i - 1].isdigit())
+        or (before in "-\u2212+" and not hay[i - 2:i - 1].isalnum()))
+
+
+def _cut_after(hay: str, j: int) -> bool:
+    """`_glued`'s trailing edge, for a match ending before j."""
+    after = hay[j:j + 1]
+    return hay[j - 1].isdigit() and bool(after) and (
+        after.isdigit() or (after in ".," and hay[j + 1:j + 2].isdigit()))
 
 
 def _edges_ok(want: str, hay: str, folded: str = "", kept: list[int] | None = None) -> bool:
@@ -422,6 +434,37 @@ def _edges_ok(want: str, hay: str, folded: str = "", kept: list[int] | None = No
             return True
         i = hay.find(want, i + 1)
     return False
+
+
+def _near(want: str, hay: str, max_diffs: int) -> list:
+    """`want`'s matches in `hay` within `max_diffs` edits, every exact copy among them.
+
+    Note: with an edit to spend, fuzzysearch keeps one match per run of overlapping ones, so an exact copy
+    overlapping another match ("a a" in "a a a a") would lose its start.
+    Note: fuzzysearch picks that one match as the min of a set by (edits, -length); on a tie the pick
+    followed set order, i.e. the string hash, so a verdict changed with PYTHONHASHSEED. Every match tied
+    for best in its run is kept instead, which no hash order can change."""
+    if not max_diffs or not want: return fuzzysearch.find_near_matches(want, hay, max_l_dist=max_diffs)
+    found = []
+    for run in group_matches(find_near_matches_levenshtein(want, hay, max_diffs)):
+        best = min((m.dist, m.start - m.end) for m in run)
+        found += [m for m in run if (m.dist, m.start - m.end) == best]
+    found.sort()
+    spans = {(m.start, m.end) for m in found}
+    starts = [m.start() for m in re.finditer(f"(?={re.escape(want)})", hay)]
+    extra = [fuzzysearch.Match(i, i + len(want), 0, want) for i in starts if (i, i + len(want)) not in spans]
+    return found + extra
+
+
+def _unglue(want: str, hay: str, folded: str = "", kept: list[int] | None = None) -> str:
+    """`hay` with each exact copy of `want` cut out of a longer number (`_glued`) blanked out, so no window of
+    a rejected copy matches while a fuzzy match elsewhere still can (`kept`: see `_edges_ok`)."""
+    out = list(hay)
+    for m in re.finditer(f"(?={re.escape(want)})", hay):
+        i = m.start()
+        if _glued(folded or hay, *_folded_span(i, i + len(want), kept)):
+            out[i:i + len(want)] = "\0" * len(want)
+    return "".join(out)
 
 
 def _why_missing(cut: bool) -> str:
@@ -446,20 +489,26 @@ def _squeezed_ok(want: str, hay: str, folded: str) -> bool:
     return _edges_ok(want, hay, folded, [k for k, c in enumerate(folded) if c != " "])
 
 
-def _contains(needle: str, text: str, max_diffs: int) -> tuple[bool, float, float, str]:
+def _contains(needle: str, text: str, max_diffs: int,
+              fold_page: Callable[[str], str] = normalize.fold) -> tuple[bool, float, float, str]:
     """`contains`, and, when it fails, the best-matching window of the folded text (the squeezed, if that
-    matched better): lowercased, its spacing folded; "" when it passes or `needle` is empty."""
-    want, hay = normalize.fold(needle), normalize.fold(text)
+    matched better): lowercased, its spacing folded; "" when it passes or `needle` is empty. `fold_page`
+    folds `text` (`normalize.unmarked` drops its footnote markers)."""
+    want, hay = normalize.fold(needle), fold_page(text)
     ok, r, thr = _ratio(want, hay, max_diffs)
     if ok and want and want in hay and not _edges_ok(want, hay):
-        return False, r, thr, ""
+        # Note: a copy cut out of a longer number does not count, nor any window of it ("total: 40" spends
+        # its edit on "otal: 400"); a fuzzy match elsewhere still does, as one clean copy anywhere would.
+        if not _ratio(want, _unglue(want, hay), max_diffs)[0]:
+            return False, r, thr, ""
     if ok:
         return True, r, thr, ""
     # fold has already collapsed all whitespace to ASCII spaces; reuse it for squeeze.
     squeezed = want.replace(" ", ""), hay.replace(" ", "")
     ok, r2, _ = _ratio(*squeezed, max_diffs)
-    if ok and want:
-        ok = _squeezed_ok(*squeezed, hay)
+    if ok and want and not _squeezed_ok(*squeezed, hay):
+        kept = [k for k, c in enumerate(hay) if c != " "]
+        ok = _ratio(squeezed[0], _unglue(*squeezed, hay, kept), max_diffs)[0]
     window = "" if ok or not want else _window(*(squeezed if r2 > r else (want, hay)))[1]
     return ok, max(r, r2), thr, window
 

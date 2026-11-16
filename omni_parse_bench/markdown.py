@@ -14,7 +14,8 @@ _FRONT_MATTER = re.compile(r"^\s*---[ \t]*\n(?:[ \t]*[A-Za-z_][\w-]*:.*\n)+---[ 
 _CODE = re.compile(r"(?ms)^[ \t]*```[^\n]*\n.*?^[ \t]*```[ \t]*$|`[^`\n]+`")
 _EMAIL = re.compile(r"<(?=[^<>\s@]+@[^<>\s@]+>)")
 _OL_MARKER = re.compile(r"(?m)^([ \t]{0,3}\d{1,9})([.)])(?=[ \t]|$)")
-_UL_MARKER = re.compile(r"(?m)^([ \t]{0,3})([-+*])(?=[ \t])")
+# Note: a bullet alone on its line is escaped too, as "29." is: commonmark reads an empty item and drops it.
+_UL_MARKER = re.compile(r"(?m)^([ \t]{0,3})([-+*])(?=[ \t]|$)")
 _TABLE = re.compile(r"<table\b.*?</table>", re.S | re.I)
 # Note: commonmark's HTML block tags, and pre: markdown-it reads no escapes inside them.
 _HTML_ELEMENT = re.compile(

@@ -6,6 +6,8 @@ additional fuzzy edit allowance. Only text presence uses this fallback.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from omni_parse_bench import normalize
 
 
@@ -13,8 +15,11 @@ from omni_parse_bench import normalize
 # hyphens across wraps (test_published_korean_compound_regression); keep both readings here.
 
 
-def matches(needle: str, text: str) -> bool:
+def matches(needle: str, text: str, cut_before: Callable[[str, int], bool] | None = None,
+            cut_after: Callable[[str, int], bool] | None = None) -> bool:
     """An exact substring match that uses an evidenced continuation hyphen inside the match.
+    `cut_before(s, i)` and `cut_after(s, j)`, if given, reject a match starting at i or ending at j
+    of the text with its spaces.
 
     A small nondeterministic automaton consumes equal characters, or skips optional
     hyphens on either side. Equivalent states are merged at each text position: at
@@ -34,8 +39,12 @@ def matches(needle: str, text: str) -> bool:
     # Bit 1: no continuation used; bit 2: a continuation hyphen was retained or skipped.
     active = {}
     optional = sorted(want_optional)
+    # Note: the main path judges a match's edges, so this exact match must too (a space is not glued).
+    spaced = normalize.continuations(text, spaced=True)[0] if cut_before or cut_after else ""
+    kept = [k for k, c in enumerate(spaced) if c != " "]
     for j, c in enumerate(hay):
-        active[0] = active.get(0, 0) | 1  # A substring may start at each character.
+        if not (cut_before and cut_before(spaced, kept[j])):
+            active[0] = active.get(0, 0) | 1  # A substring may start at each character.
         following = {}
         for i, flags in active.items():
             if i < len(want) and want[i] == c:
@@ -48,7 +57,7 @@ def matches(needle: str, text: str) -> bool:
         for i in optional:
             if i in following:
                 following[i + 1] = following.get(i + 1, 0) | 2
-        if following.get(len(want), 0) & 2:
+        if following.get(len(want), 0) & 2 and not (cut_after and cut_after(spaced, kept[j] + 1)):
             return True
         active = following
     return False

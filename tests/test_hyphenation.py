@@ -103,6 +103,19 @@ def test_fallback_requires_a_continuation_inside_the_match():
     assert hyphenation.matches("মানুহৰ", "İ মানু- হৰ")
 
 
+@pytest.mark.parametrize("gold, page, passes", [
+    ("self-aware 40", "self-aware 400", False),
+    ("self-aware 40", "self-aware 40 0", True),
+    ("self-aware 40", "self-aware 40.", True),
+    ("12 self-aware", "112 self-aware", False),
+    ("12 self-aware", "1 12 self-aware", True),
+])
+def test_a_wrapped_compound_keeps_the_digit_edge(gold, page, passes):
+    # Unbroken and wrapped across a line, the same verdict: an exact match cut out of a longer number fails.
+    assert present(gold, page) is passes
+    assert present(gold, page.replace("-", "- ", 1)) is passes
+
+
 @pytest.mark.parametrize("first, letter, last", [("অ", "ক", "শেষ"), ("a", "b", "end")])
 def test_mixed_hyphen_interpretations_follow_the_presence_policy(first, letter, last):
     # J = joined, W = wrapping evidence, H = a required unspaced hyphen.

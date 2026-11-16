@@ -28,8 +28,12 @@ _BULLET = re.compile(r"(?m)^([ \t]*)[•‣◦▪▶∙●](?=\s|$)")
 # Note: dots and dashes fold as one mixed run ("hospital......-.-"), the other characters each in their
 # own run, so a full stop beside a blank stays ("here. ____"). A dash is a leader unless it is a sign:
 # before a digit and after a space ("....... -4.8%"); one glued to what precedes it ("-----5") is a leader.
+# A dash is any of the dash family that typography later makes "-" (`_DASH`): leaders run before it, so a
+# run of ― or − must be named here too, or it would survive as "---" ("Name ――― 5").
+_LEADER_DASH = "[-‐-―−]"
 _LEADERS = re.compile(
-    r"(?:(?:[.…·]|(?<=\S)[-–—]|[-–—](?!\d))\s*){3,}|(?:_\s*){3,}|(?:=\s*){3,}|(?:\*\s*){3,}")
+    rf"(?:(?:[.…·]|(?<=\S){_LEADER_DASH}|{_LEADER_DASH}(?!\d))\s*){{3,}}|(?:_\s*){{3,}}|(?:=\s*){{3,}}"
+    r"|(?:\*\s*){3,}")
 _DASH = re.compile("[‐-―−]")
 # Note: ꞌ (saltillo, a glottal stop in Amarasi) and ˈ (IPA primary stress) are typed as an ASCII apostrophe.
 _SQUOTE = re.compile("[‘’‚‛ʼ`´′ꞌꞋˈ]")
@@ -135,7 +139,26 @@ def fold(s: str) -> str:
     return _cased(s).lower()
 
 
-def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool = False) -> str:
+def unmarked(s: str) -> str:
+    """`fold` with each bracketed footnote marker removed rather than read as a spaced number, for a page:
+    "Smith[1] and Jones" -> "smith and jones". A marker between two digits stays " 1", so removing it never
+    joins two numbers ("12[3] 4")."""
+    return _cased(s, drop_footnotes=True).lower()
+
+
+def _footnote(m: re.Match, *, drop: bool) -> str:
+    s, i, j = m.string, m.start() - 1, m.end()
+    while i >= 0 and s[i].isspace():
+        i -= 1
+    while j < len(s) and s[j].isspace():
+        j += 1
+    if drop and not (i >= 0 and _DIGIT.match(s, i) and _DIGIT.match(s, j)):
+        return " "
+    return f" {m[1] or m[2]}"
+
+
+def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool = False,
+           drop_footnotes: bool = False) -> str:
     """The fold before lowercasing, for inspecting a continuation's original case."""
     # Note: composed first, so a letter written as a base and a combining accent ("e" + U+0301, as a macOS
     # text layer gives it) is one letter to the hyphen rule below, as "é" is.
@@ -148,7 +171,7 @@ def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool
     s = boxes(s)
     # Note: a space before the marker, so "12.3%[1]" isn't read as "12.3%1"; `squeeze` still
     # matches a text layer's "Probiotic1".
-    s = _FOOTNOTE.sub(lambda m: f" {m[1] or m[2]}", s)
+    s = _FOOTNOTE.sub(functools.partial(_footnote, drop=drop_footnotes), s)
     s = _BULLET.sub(r"\1 ", s)
     s = _LEADERS.sub(" ", s)
     s = typography(s, preserve_dashes=preserve_dashes)
@@ -193,8 +216,9 @@ def squeeze(s: str) -> str:
 
 
 @functools.lru_cache(maxsize=128)
-def continuations(s: str) -> tuple[str, frozenset[int]]:
-    """Folded, space-free text and positions of optional wrapping hyphens.
+def continuations(s: str, spaced: bool = False) -> tuple[str, frozenset[int]]:
+    """Folded, space-free text and positions of optional wrapping hyphens. With `spaced`, the text keeps
+    each run of whitespace as one space; the positions still count without them.
 
     Inspect original case and hyphen forms before folding them; retain wrapping hyphens so
     the presence matcher can choose either reading, including for Latin compounds.
@@ -216,7 +240,7 @@ def continuations(s: str) -> tuple[str, frozenset[int]]:
             offset += len(_WHITESPACE.sub("", cased[previous:i].lower()))
             previous = i
             optional.add(offset)
-    folded = _WHITESPACE.sub("", _DASH.sub("-", cased.lower()))
+    folded = _WHITESPACE.sub(" " if spaced else "", _DASH.sub("-", cased.lower()))
     return folded, frozenset(optional)
 
 

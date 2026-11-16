@@ -245,6 +245,29 @@ def test_a_footnote_marker_after_a_number_is_not_one_of_its_digits(output):
     assert not R.found(R.Number("1,2401"), html(output))[0]
 
 
+@pytest.mark.parametrize("gold, output", [
+    ("Smith and Jones", "<p>Smith[1] and Jones</p>"),
+    ("Smith and Jones", "<p>Smith [12] and Jones</p>"),
+    ("Smith and Jones", "<p>Smith[^a] and Jones</p>"),
+    ("1,240 units", "<p>1,240[1] units</p>"),
+    ("Smith", "<p>Smith[1]</p>"),
+])
+def test_a_bracketed_footnote_marker_inside_the_text_is_ignored(gold, output):
+    assert R.present(R.Present(R.Text(gold, 0)), html(output))[0]
+
+
+@pytest.mark.parametrize("gold, output, passes", [
+    ("[1] item", "<p>[1] item</p>", True),
+    ("x[2] and y", "<p>x[2] and y</p>", True),
+    ("x[2] and y", "<p>x and y</p>", False),
+    ("Smith 2 and Jones", "<p>Smith[1] and Jones</p>", False),
+    ("124", "<p>12[3]4</p>", False),
+    ("12 4", "<p>12[3] 4</p>", False),
+])
+def test_a_footnote_marker_is_ignored_only_on_the_page_and_never_joins_digits(gold, output, passes):
+    assert R.present(R.Present(R.Text(gold, 0)), html(output))[0] == passes
+
+
 def test_a_text_test_still_finds_a_superscript_written_inline():
     assert R.present(R.Present(R.Text("m2 area", 0)), html("<p>m<sup>2</sup> area</p>"))[0]
     assert R.order(R.Order("x2", "y", 0), html("<p>x<sup>2</sup> then y</p>"))[0]
@@ -337,3 +360,51 @@ def test_cell_headings_allow_exactly_max_diffs_edits(n, k):
     table = html(f"<table><tr><th>{got}</th></tr><tr><td>1,240</td></tr></table>")
     assert R.table_cell(R.TableCell("1,240", {}, k, headings=(want,)), table)[0]
     assert not R.table_cell(R.TableCell("1,240", {}, k - 1, headings=(want,)), table)[0]
+
+
+@pytest.mark.parametrize("text, passes", [
+    ("<p>Total: 41</p>", True),
+    ("<p>Total: 400</p><p>Total: 41</p>", True),     # a glued copy does not veto a separate fuzzy one
+    ("<p>Total: 41</p><p>Total: 400</p>", True),
+    ("<p>Total: 400</p>", False),                    # nor does any window of the glued copy count
+    ("<p>Total: 400</p><p>Total: 4</p>", True),
+])
+def test_a_glued_copy_does_not_veto_a_fuzzy_match_elsewhere(text, passes):
+    assert R.present(R.Present(R.Text("Total: 40", 1)), html(text))[0] is passes
+
+
+def test_a_squeezed_glued_copy_does_not_veto_a_fuzzy_match_elsewhere():
+    assert R.present(R.Present(R.Text("1 2 3 4", 1)), html("<p>12345</p><p>1235</p>"))[0]
+    assert not R.present(R.Present(R.Text("1 2 3 4", 1)), html("<p>12345</p>"))[0]
+
+
+@pytest.mark.parametrize("md", [0, 1, 2])
+def test_order_more_edits_never_lose_an_exact_start(md):
+    assert R.order(R.Order("a a", "a a", md), html("<p>a a a a</p>"))[0]
+    assert R.order(R.Order("Item 1", "Item 1 Item 1", md), html("<p>Item 1 Item 1 Item 1</p>"))[0]
+
+
+_SEED_PROBE = ("from omni_parse_bench.scorers.unit_tests import runners as R; "
+               "from omni_parse_bench import views; "
+               "print(R.order(R.Order('bba', 'b abb', 2), views.html('<p>b ba baa bbb ba</p>'))[0])")
+
+
+def test_order_verdict_does_not_depend_on_the_hash_seed():
+    # fuzzysearch keeps one match per run of overlapping ones, the min of a set; on a tie that pick
+    # followed the string hash, so this verdict passed under one PYTHONHASHSEED and failed under others.
+    import os
+    import subprocess
+    import sys
+    got = set()
+    for seed in range(8):
+        env = {**os.environ, "PYTHONHASHSEED": str(seed)}
+        out = subprocess.run([sys.executable, "-c", _SEED_PROBE], env=env, capture_output=True, text=True,
+                             check=True)
+        got.add(out.stdout.strip())
+    assert got == {"True"}, got
+
+
+def test_near_keeps_every_match_tied_for_best_in_a_run():
+    # 'b abb' with 2 edits: 'b ba b' at 0 and 'baa bb' at 5 overlap, both 2 edits, both 6 long.
+    spans = {(m.start, m.end, m.dist) for m in R._near("b abb", "b ba baa bbb ba", 2)}
+    assert {(0, 6, 2), (5, 11, 2)} <= spans
