@@ -88,8 +88,15 @@ It reads as: "some table in the output has a cell `167.8`, under the column head
 | present | `content` | | the arg is in the html |
 | order | `before`, `after` | | `before` is found before `after` in the html |
 | repeat | `content` | `expected_count` | the arg appears exactly that many times in the html, as whole words |
+| page_near_empty | none | `max_chars` | the html has at most `max_chars` non-space characters outside image alt text |
 | table_cell | `cell`; optional `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `section`; optional lists `headings`, `row_groups` | | some table in the html has the cell, with these neighbors and headings |
 | layout_kind | `content`, with its `place` | `kind` | the smallest block covering at least half of the place is labeled `kind` (one of `views.LABELS`); for `text`, a `list` or `form` block (a list item, or a form field or key-value pair) passes too |
+
+`page_near_empty` takes no args and settings exactly `{"max_chars": N}`, where N is a whole number,
+0 or more. Judge it from the page: it prints nothing a reader would transcribe beyond what the limit
+allows (a stamp, a folio number). Show-through from the other side counts as blank only where it can't
+be read as text. The runner counts non-space characters in the seen view, excluding image alt text.
+No dataset tests use this type yet.
 
 The table_cell roles mean:
 
@@ -117,6 +124,7 @@ hand-written form grids); they record the structure JATS stores and flattened ta
 
 Which kinds each type accepts (`scorers/unit_tests/tests.py`):
 
+- `page_near_empty`: no args;
 - `present`: `text`, `number` or `latex`;
 - `order`, `repeat` and `table_cell`: `text`; and
 - `layout_kind`: `text` with a `place`. Its text is shown to a reader and never compared.

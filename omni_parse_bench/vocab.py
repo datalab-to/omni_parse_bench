@@ -20,6 +20,7 @@ READS = {
     "present": "html",
     "order": "html",
     "repeat": "html",
+    "page_near_empty": "html",
     "table_cell": "html",
     "layout_kind": "blocks",
 }
@@ -27,7 +28,7 @@ READS = {
 # test type -> the capability it measures. The headline is the mean of the families' scores (each
 # family's flat over its tests), so how many tests a family has never sets its weight (docs/design.md).
 FAMILIES = {
-    "present": "text", "order": "text", "repeat": "text",
+    "present": "text", "order": "text", "repeat": "text", "page_near_empty": "text",
     "table_cell": "tables",
     "layout_kind": "layout",
 }

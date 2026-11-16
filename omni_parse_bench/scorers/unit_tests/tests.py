@@ -25,12 +25,13 @@ ARG_ROLES = {
     "present": ("content",),
     "order": ("before", "after"),
     "repeat": ("content",),
+    "page_near_empty": (),
     "table_cell": ("cell", "headings", "section", "row_groups", *RELATIONS),
     "layout_kind": ("content",),
 }
 LISTS = frozenset({"headings", "row_groups"})   # roles that take a list of args
 REQUIRED = {"present": ("content",), "order": ("before", "after"), "repeat": ("content",),
-            "table_cell": ("cell",), "layout_kind": ("content",)}
+            "page_near_empty": (), "table_cell": ("cell",), "layout_kind": ("content",)}
 assert set(ARG_ROLES) == set(REQUIRED) == set(runners.TYPES) == set(vocab.READS) == set(vocab.FAMILIES)
 
 
@@ -192,6 +193,10 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
                     raise ValueError(f"{where}: repeat's settings are exactly {{expected_count}}, how many "
                                      f"times its content appears, not {sorted(settings)}")
                 return runners.Repeat(text("content"), settings["expected_count"])
+            case "page_near_empty":
+                if set(settings) != {"max_chars"}:
+                    raise ValueError(f"{where}: page_near_empty's settings are exactly {{max_chars}}")
+                return runners.PageNearEmpty(settings["max_chars"])
             case "layout_kind":
                 if set(settings) != {"kind"}:
                     raise ValueError(f"{where}: layout_kind's settings are exactly {{kind}}")

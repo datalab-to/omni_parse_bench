@@ -13,6 +13,23 @@ def html(s: str) -> views.Html:
     return views.html(s)
 
 
+@pytest.mark.parametrize("source, count", [
+    ("", 0),
+    ("<p> \t\n&nbsp;\u2003</p>", 0),
+    ('<img alt="a blank, ruled sheet of paper">', 0),
+    ("<p>A caption</p>", 8),
+    ("<p>A</p><p>B</p>", 2),
+    ('<img alt="description"><p>Invented!</p>', 9),
+    ("<p>é 中!</p>", 3),
+])
+def test_page_near_empty_counts_non_space_characters_outside_alt_text(source, count):
+    v = html(source)
+    assert R.page_near_empty(R.PageNearEmpty(count), v) == (True, "")
+    if count:
+        assert R.page_near_empty(R.PageNearEmpty(count - 1), v) == (
+            False, f"{count} non-space characters (limit {count - 1})")
+
+
 def test_present_allows_exactly_the_edits_it_says():
     assert R.present(R.Present(R.Text("a" * 39, 2)), html("<p>" + "a" * 37 + "bb</p>"))[0]
     assert not R.present(R.Present(R.Text("a" * 39, 1)), html("<p>" + "a" * 37 + "bb</p>"))[0]
