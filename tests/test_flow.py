@@ -109,8 +109,8 @@ def test_an_html_only_system_is_predicted_graded_and_resumed(tmp_path):
     name = (g := b.run(Alpha(), tmp_path / "runs"))["run"]
     assert sorted(CALLS) == ["a-p0", "a-p1", "a-p2"]
     [s] = g["scorers"].values()
-    assert s["families"] == {"text": {"score": 1.0, "tests": 3, "documents": 3},
-                             "layout": {"score": 0.0, "tests": 3, "documents": 3}}, s
+    same = {"tests": 3, "documents": 3, "effective_documents": 3.0}
+    assert s["families"] == {"text": {"score": 1.0, **same}, "layout": {"score": 0.0, **same}}, s
     assert (s["headline"], s["coverage"], s["failed"]) == (0.5, 1.0, failed()), "no blocks: layout 0"
     assert s["headline_is"] == "score" and "partial" not in s
     assert g["cost"]["usd"] == 0.03
@@ -133,7 +133,8 @@ def test_a_page_wanting_nothing_the_system_supports_is_not_sent_and_fails_its_te
     assert (rec["output"], rec["error"], rec["cost"]["usd"]) == ({"pages": [{}]}, None, None), rec
     [s] = g["scorers"].values()
     assert (s["coverage"], s["failed"], s["rows"]) == (1.0, failed(), 3), "not a failed page: coverage is 1"
-    assert s["families"]["layout"] == {"score": 0.0, "tests": 3, "documents": 3}, s
+    layout = {"score": 0.0, "tests": 3, "documents": 3, "effective_documents": 3.0}
+    assert s["families"]["layout"] == layout, s
 
 
 def test_details_lines_are_test_lines_that_summarize_reads(tmp_path):

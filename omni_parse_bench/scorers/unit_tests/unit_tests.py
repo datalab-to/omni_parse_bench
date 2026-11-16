@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import collections
 import dataclasses
+import hashlib
 import statistics
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, ClassVar
 
 from omni_bench_core import scorer
 
-from omni_parse_bench import data, errors, vocab
+from omni_parse_bench import data, errors, pooling, vocab
 
 from . import compare
 from . import tests as _tests
@@ -29,10 +30,10 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     """Omni Parse Bench's scorer: each page's yes/no tests, run against its outputs. A test on an output the
     system didn't produce fails as "no <output> output", so a system with html alone scores 0 on layout.
 
-    - A page's line in scores.jsonl holds `tests`, `passed` and `per_family` (each family's `tests` and
-      `passed`), and the same counts by `per_tag`, `per_test_type`, `per_arg_kind` and `per_derivation`;
-      its `row` holds
-      the page's `document` and `suite`;
+    - A page's line in scores.jsonl holds `tests`, `passed` and `ids` (a digest of its test ids), and
+      `per_family` (each family's `tests`, `passed` and `ids`) and the same counts by `per_tag`,
+      `per_test_type`, `per_arg_kind` and `per_derivation`; its `row` holds the page's `document` and
+      `suite`;
     - its details (`details/<page_id>.jsonl`) hold one test line per test (`lines`); and
     - the summary is `summarize` over every page, a failed one with all its tests failed (`score_failure`):
       the families in the order text, tables, layout, and their mean as the headline, then the same scores
@@ -59,9 +60,10 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
     def score(self, pred: Mapping[str, Any], tests: Sequence[_tests.Test]) -> scorer.Score:
         vs = compare.score(pred, tests)
         by_id = {t.id: t for t in tests}
-        result = {"tests": len(vs), "passed": sum(v.result == "pass" for v in vs)} | _count(
+        result = {"tests": len(vs), "passed": sum(v.result == "pass" for v in vs),
+                  "ids": _ids(v.id for v in vs)} | _count(
             (v.result == "pass", (t := by_id[v.id]).test_type, t.derivation, t.tags,
-             _tests.arg_kinds(t.test_type, t.args)) for v in vs)
+             _tests.arg_kinds(t.test_type, t.args), t.id) for v in vs)
         return scorer.Score(result, [{"test_id": v.id, "test_type": (t := by_id[v.id]).test_type,
                                       "output_type": t.output_type, "derivation": t.derivation,
                                       "tags": list(t.tags), "args": t.args, "settings": t.settings,
@@ -137,10 +139,9 @@ def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.
 
 def summarize(lines: Iterable[Line]) -> dict[str, Any]:
     """Test lines (from `lines`) as one summary: `score`, the mean of the families' scores, and `families`,
-    each family's `score` (the share of its tests passed), `tests` and `documents`; then `per_tag`,
-    `per_suite`, `per_test_type`, `per_arg_kind` and `per_derivation`, each a slice's entries shaped as a
-    family's. `score`
-    is None when there are no tests, and a slice with no tests is left out.
+    each family's `score` (the share of its tests passed), `tests`, `documents` and `effective_documents`;
+    then `per_tag`, `per_suite`, `per_test_type`, `per_arg_kind` and `per_derivation`, each a slice's entries
+    shaped as a family's. `score` is None when there are no tests, and a slice with no tests is left out.
 
     Note: a test with several tags counts under each, so the tag slices' `tests` add up to at least the
     total; the suite, test type and derivation slices each add up to it exactly. The arg kind slice (text,
@@ -153,27 +154,52 @@ def summarize(lines: Iterable[Line]) -> dict[str, Any]:
 
     Note: a mean over families, each flat over its tests, so how many tests a family has never sets its
     weight. A document's tests pass or fail together (one misread table fails all its cells), so
-    `documents` says how much a score rests on."""
+    `documents` says how much a score rests on: a raw count. Scores are pooled over tests, so a document
+    with many tests weighs more, and `effective_documents` is what the documents are worth as equal-sized
+    ones (their test counts, summed over a document's pages, squared and summed, over the sum of their
+    squares), rounded to 1 decimal.
+
+    Note: a slice's key that selects exactly the same tests as another key of that slice carries
+    `same_tests_as`, the other keys, sorted. Nothing is merged or dropped; a report can show the group once.
+    It is found from a digest of each key's test ids that the page lines carry (`ids`), so lines graded
+    before it have none and make no twins: a key is compared only when every page that holds it has the
+    digest."""
     by_page: dict[str, list[Line]] = collections.defaultdict(list)
     for x in lines:
         by_page[x.get("page_id", x["document"])].append(x)
     return _summary(
         {"row": {"document": xs[0]["document"], **({"suite": xs[0]["suite"]} if "suite" in xs[0] else {})},
          "tests": len(xs), "passed": sum(x["result"] == "pass" for x in xs)}
+        | ({"ids": _ids(x["test_id"] for x in xs)} if all("test_id" in x for x in xs) else {})
         | _count((x["result"] == "pass", x["test_type"], x.get("derivation", ""), x.get("tags", ()),
-                  _tests.arg_kinds(x["test_type"], x.get("args", {})))
+                  _tests.arg_kinds(x["test_type"], x.get("args", {})), x.get("test_id"))
                  for x in xs)
         for xs in by_page.values())
 
 
-def _count(marks: Iterable[tuple[bool, str, str, Iterable[str], Iterable[str]]]
+MASK = 2 ** 64
+
+
+def _ids(test_ids: Iterable[str]) -> int:
+    """An order-independent digest of a set of test ids: the sum modulo 2**64 of a stable 64-bit hash of
+    each (blake2b, not `hash()`, which changes between runs). Two sets of tests with the same count and
+    digest are the same tests."""
+    return sum(int.from_bytes(hashlib.blake2b(i.encode(), digest_size=8).digest(), "big")
+               for i in test_ids) % MASK
+
+
+def _count(marks: Iterable[tuple[bool, str, str, Iterable[str], Iterable[str], str | None]]
            ) -> dict[str, dict[str, dict[str, int]]]:
-    """One page's counts, each as `{key: {"tests", "passed"}}`: `per_family`, `per_tag`, `per_test_type`,
-    `per_arg_kind` and `per_derivation`, from its tests' (passed, test type, derivation, tags, arg kinds). A
-    test counts once under each of its tags and of its arg kinds; a blank derivation counts under none."""
+    """One page's counts, each as `{key: {"tests", "passed", "ids"}}`: `per_family`, `per_tag`,
+    `per_test_type`, `per_arg_kind` and `per_derivation`, from its tests' (passed, test type, derivation,
+    tags, arg kinds, test id). A test counts once under each of its tags and of its arg kinds; a blank
+    derivation counts under none. `ids` is the digest of the key's test ids (`_ids`), left out of every
+    count when a test has no id."""
+    marks = list(marks)
+    with_ids = all(m[5] is not None for m in marks)
     out: dict[str, dict[str, dict[str, int]]] = {"per_family": {}, "per_tag": {}, "per_test_type": {},
                                                  "per_arg_kind": {}, "per_derivation": {}}
-    for ok, test_type, derivation, tags, arg_kinds in marks:
+    for ok, test_type, derivation, tags, arg_kinds, test_id in marks:
         keys = {"per_family": [vocab.FAMILIES[test_type]], "per_tag": dict.fromkeys(tags),
                 "per_test_type": [test_type], "per_arg_kind": dict.fromkeys(arg_kinds),
                 "per_derivation": [derivation] if derivation else []}
@@ -182,22 +208,46 @@ def _count(marks: Iterable[tuple[bool, str, str, Iterable[str], Iterable[str]]]
                 c = out[slice_].setdefault(k, {"tests": 0, "passed": 0})
                 c["tests"] += 1
                 c["passed"] += ok
+                if with_ids:
+                    c["ids"] = (c.get("ids", 0) + _ids([test_id])) % MASK   # type: ignore[list-item]
     return out
 
 
-def _entries(counts: Iterable[tuple[str, str, int, int]], order: Sequence[str] = ()) -> dict[str, Any]:
-    """From (key, document, passed, tests) counts, each key's `score`, `tests` and `documents`: the keys of
-    `order` first, then the rest sorted; a key with no tests is left out."""
+def _entries(counts: Iterable[tuple[Any, ...]], order: Sequence[str] = (), twins: bool = False
+             ) -> dict[str, Any]:
+    """From (key, document, passed, tests[, ids]) counts, each key's `score`, `tests`, `documents` (a raw
+    count), `effective_documents` (what the documents are worth as equal-sized ones, `pooling`, from each
+    document's tests summed over its pages) and, when `twins`, `same_tests_as`: the other keys selecting
+    exactly the same tests (same `tests` and `ids`), sorted. A key is compared only when every page that
+    holds it has `ids`, so older lines make no twins. The keys of `order` come first, then the rest sorted;
+    a key with no tests is left out."""
     tests: collections.Counter[str] = collections.Counter()
     passed: collections.Counter[str] = collections.Counter()
-    documents: dict[str, set[str]] = collections.defaultdict(set)
-    for key, document, k, n in counts:
+    per_doc: dict[str, collections.Counter[str]] = collections.defaultdict(collections.Counter)
+    digest: dict[str, int] = collections.defaultdict(int)
+    missing: set[str] = set()
+    for key, document, k, n, *ids in counts:
         tests[key] += n
         passed[key] += k
-        documents[key].add(document)
+        per_doc[key][document] += n
+        if ids and ids[0] is not None:
+            digest[key] = (digest[key] + ids[0]) % MASK
+        else:
+            missing.add(key)
     keys = [*order, *sorted(tests.keys() - set(order))]
-    return {k: {"score": passed[k] / n, "tests": n, "documents": len(documents[k])}
-            for k in keys if (n := tests[k])}
+    out = {k: {"score": passed[k] / n, "tests": n, "documents": len(per_doc[k]),
+               "effective_documents": round(pooling.effective_documents(per_doc[k].values()), 1)}
+           for k in keys if (n := tests[k])}
+    if twins:
+        same: dict[tuple[int, int], list[str]] = collections.defaultdict(list)
+        for k in out:
+            if k not in missing:
+                same[tests[k], digest[k]].append(k)
+        for group in same.values():
+            for k in group:
+                if len(group) > 1:
+                    out[k]["same_tests_as"] = sorted(set(group) - {k})
+    return out
 
 
 def _summary(pages: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
@@ -207,16 +257,16 @@ def _summary(pages: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     nothing to that slice."""
     pages = list(pages)
 
-    def counted(name: str) -> Iterable[tuple[str, str, int, int]]:
-        return ((k, x["row"]["document"], c["passed"], c["tests"])
+    def counted(name: str) -> Iterable[tuple[str, str, int, int, int | None]]:
+        return ((k, x["row"]["document"], c["passed"], c["tests"], c.get("ids"))
                 for x in pages for k, c in x.get(name, {}).items())
 
     families = _entries(counted("per_family"), vocab.FAMILY_ORDER)
     return {"score": float(statistics.fmean(x["score"] for x in families.values())) if families else None,
             "families": families,
-            "per_tag": _entries(counted("per_tag")),
-            "per_suite": _entries((x["row"]["suite"], x["row"]["document"], x["passed"], x["tests"])
-                                 for x in pages if "suite" in x["row"]),
-            "per_test_type": _entries(counted("per_test_type"), tuple(vocab.FAMILIES)),
-            "per_arg_kind": _entries(counted("per_arg_kind"), tuple(_tests.KINDS)),
-            "per_derivation": _entries(counted("per_derivation"))}
+            "per_tag": _entries(counted("per_tag"), twins=True),
+            "per_suite": _entries(((x["row"]["suite"], x["row"]["document"], x["passed"], x["tests"],
+                                    x.get("ids")) for x in pages if "suite" in x["row"]), twins=True),
+            "per_test_type": _entries(counted("per_test_type"), tuple(vocab.FAMILIES), twins=True),
+            "per_arg_kind": _entries(counted("per_arg_kind"), tuple(_tests.KINDS), twins=True),
+            "per_derivation": _entries(counted("per_derivation"), twins=True)}

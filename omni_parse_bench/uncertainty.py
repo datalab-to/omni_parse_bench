@@ -17,7 +17,7 @@ import statistics
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
-from omni_parse_bench import vocab
+from omni_parse_bench import pooling, vocab
 from omni_parse_bench.scorers.unit_tests import tests as _tests
 
 SLICES = ("families", "per_tag", "per_suite", "per_test_type", "per_arg_kind", "per_derivation")
@@ -103,13 +103,7 @@ def _scores(sparse: Mapping[tuple[str, str], Sequence[tuple[int, int, int]]], m:
     return out
 
 
-def _effective(counts: Iterable[int]) -> float:
-    """How many equal-sized documents the per-document test `counts` are worth: their sum squared over the
-    sum of their squares. It is the number of documents when the counts are equal, and falls as they skew;
-    0 for no tests."""
-    xs = list(counts)
-    sq = sum(x * x for x in xs)
-    return sum(xs) ** 2 / sq if sq else 0.0
+_effective = pooling.effective_documents   # see there
 
 
 def _quantile(xs: Sequence[float], q: float) -> float:
