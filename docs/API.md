@@ -14,8 +14,9 @@ Contents:
 5. [Predict](#predict): one page through one system;
 6. [Adapters](#adapters): the systems, and your own;
 7. [The dataset](#the-dataset): its folder, its manifest and its tests;
-8. [Your own scorer](#your-own-scorer): grading another way; and
-9. [What a run writes](#what-a-run-writes): the files, and slicing them.
+8. [Your own scorer](#your-own-scorer): grading another way;
+9. [What a run writes](#what-a-run-writes): the files, and slicing them; and
+10. [Intervals and comparisons](#intervals-and-comparisons): how far a score can be trusted.
 
 ## Run
 
@@ -355,3 +356,37 @@ unit_tests.summarize([x for x in lines if x["suite"] == "tables"])
 ```
 
 A failed page's details are its tests, each failed, so a slice counts them as the headline does.
+
+## Intervals and comparisons
+
+A document's tests pass or fail together, so a score rests on its documents more than on its tests. Two commands
+read a graded run's `unit_tests/scores.jsonl` and print JSON to stdout; the run's summary is not changed.
+
+```
+opb intervals RUN [--resamples 1000] [--seed 0] [--level 0.95]
+opb compare RUN_A RUN_B [--resamples 1000] [--seed 0] [--level 0.95]
+```
+
+`opb intervals` prints the summary's shape (`score`, `families`, `per_tag`, `per_suite`, `per_test_type`,
+`per_arg_kind`, `per_derivation`) with each entry as `{"score", "low", "high", "tests", "documents"}`, `low` and
+`high` being the central `--level` of its score over `--resamples` draws of the documents (a cluster bootstrap).
+Every entry shares each draw, so the headline and the families agree. A slice with no tests is left out.
+
+`opb compare` uses the documents both runs have, one draw for both, and prints for the headline, each family and
+each slice `{"a", "b", "gap", "low", "high", "documents", "separable"}`: `gap` is A minus B, and `separable` is
+whether its interval leaves out 0. `documents_paired` and `documents_unpaired` (`{"a", "b"}`) say what was paired
+and what was left out; it raises when the runs share no document. With many slices, some will separate by chance.
+
+Both are deterministic for a `--seed` and take a second or a few for a full benchmark. In Python, they take the
+score lines (`scores.jsonl`'s lines, read as JSON) and the same options as keywords:
+
+```python
+from omni_parse_bench import uncertainty
+
+uncertainty.intervals(pages, resamples=1000, seed=0, level=0.95)
+uncertainty.paired(pages_a, pages_b, resamples=1000, seed=0, level=0.95)
+```
+
+Pages of one `document` are one cluster. Copies of a page, or one source under several `document` values, count
+as separate documents, and an interval covers this dataset's documents only: see
+[design](design.md#score) for why.
