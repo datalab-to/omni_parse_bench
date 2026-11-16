@@ -15,8 +15,9 @@ Contents:
 6. [Adapters](#adapters): the systems, and your own;
 7. [The dataset](#the-dataset): its folder, its manifest and its tests;
 8. [Your own scorer](#your-own-scorer): grading another way;
-9. [What a run writes](#what-a-run-writes): the files, and slicing them; and
-10. [Intervals and comparisons](#intervals-and-comparisons): how far a score can be trusted.
+9. [What a run writes](#what-a-run-writes): the files, and slicing them;
+10. [Intervals and comparisons](#intervals-and-comparisons): how far a score can be trusted; and
+11. [Reliability](#reliability): which slices rank systems reproducibly.
 
 ## Run
 
@@ -404,3 +405,37 @@ uncertainty.paired(pages_a, pages_b, resamples=1000, seed=0, level=0.95)
 Pages of one `document` are one cluster. Copies of a page, or one source under several `document` values, count
 as separate documents, and an interval covers this dataset's documents only: see
 [design](design.md#score) for why.
+
+## Reliability
+
+A slice is reliable if it ranks systems the same way on different documents, and worth reading on its own if it
+says something the headline doesn't.
+
+```
+opb reliability RUN RUN RUN ... [--splits 100] [--seed 0] [--threshold 0.7] [--min-documents 10] [--flagged]
+```
+
+It needs at least 3 graded runs, named by their folders, and prints JSON to stdout. It uses the documents every
+run has (with the same number of tests in each; the rest are counted in `documents_dropped`), splits them at
+random into two halves `--splits` times (the same splits for every slice and run), and for each slice takes each
+run's pass rate in each half. `agreement` is the median over splits of the Spearman correlation between the
+halves' rankings of the runs (ties by average rank), stepped up with Spearman-Brown, `2r / (1 + r)`.
+`beyond_headline` is the same after taking from each run's slice pass rate, in each half, its pass rate on all
+the tests outside the slice in that half. A slice is `flag`ged when `beyond_headline` is below `--threshold`.
+
+Each slice (the kinds `intervals` prints) holds `{"documents", "tests", "agreement", "beyond_headline", "flag",
+"splits_used"}`. A slice of fewer than `--min-documents` documents, or one whose ranking is undefined (a half in
+which the runs don't differ, or which has no tests outside the slice) in more than 20% of the splits, has null
+numbers, `flag` false and a `reason`. `--flagged` prints only the flagged slices. A test with several tags counts
+under each of them, so the tests outside a tag slice leave out only the tests that carry that tag.
+
+The flag depends on the runs given: three near-identical systems rank by noise, and a half of few documents is
+noisy. It says a slice can't rank these systems reproducibly on this dataset, not that its tests are wrong, and it
+isn't corrected for reading many slices at once. In Python:
+
+```python
+from omni_parse_bench import uncertainty
+
+uncertainty.reliability({"run-a": pages_a, "run-b": pages_b, "run-c": pages_c},
+                        splits=100, seed=0, threshold=0.7, min_documents=10)
+```

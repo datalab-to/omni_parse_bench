@@ -279,6 +279,15 @@ to other documents or to a change in the system. A comparison is paired, documen
 documents both runs have, not a comparison of two overlapping intervals. The summary itself carries no
 interval.
 
+`opb reliability` says, for each slice, whether it can rank several systems reproducibly. It splits the
+documents in two at random many times and asks whether the two halves rank the systems alike
+(`agreement`), and whether they still do once each system's pass rate on the rest of the benchmark is
+taken from its pass rate on the slice (`beyond_headline`), which is what the slice tells that the headline
+doesn't. A slice with a low `beyond_headline` is flagged. The flag says the slice cannot rank these systems
+reproducibly on this dataset; it is not a statement about whether the slice's tests are right. It depends
+on which systems are in the set (a few near-identical systems rank by noise), a half of few documents is
+noisy, and nothing corrects for looking at many slices at once.
+
 ### Going from a test JSON to running the test
 
 `test_type` is the only link between a gold file and code. It's a key into one registry, which

@@ -11,6 +11,7 @@ library only. The summary itself is unchanged."""
 from __future__ import annotations
 
 import collections
+import itertools
 import random
 import statistics
 from collections.abc import Iterable, Mapping, Sequence
@@ -266,3 +267,167 @@ def paired(pages_a: Iterable[Mapping[str, Any]], pages_b: Iterable[Mapping[str, 
                   "entries_unpaired": {"a": sum(sk not in pb for sk in pa if sk != HEADLINE),
                                        "b": sum(sk not in pa for sk in pb if sk != HEADLINE)},
                   "interval": _method(resamples, seed, level)}
+
+
+def _ranks(xs: Sequence[float]) -> list[float]:
+    """The ranks of `xs`, from 1, a tie getting the average of the ranks it spans."""
+    order = sorted(range(len(xs)), key=xs.__getitem__)
+    out = [0.0] * len(xs)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and xs[order[j + 1]] == xs[order[i]]:
+            j += 1
+        for k in range(i, j + 1):
+            out[order[k]] = (i + j) / 2 + 1
+        i = j + 1
+    return out
+
+
+def _spearman(x: Sequence[float], y: Sequence[float]) -> float | None:
+    """Spearman's rank correlation (ties by average rank), or None when either side has no variance."""
+    rx, ry = _ranks(x), _ranks(y)
+    n = len(rx)
+    mx, my = sum(rx) / n, sum(ry) / n
+    sxx = sum((a - mx) ** 2 for a in rx)
+    syy = sum((b - my) ** 2 for b in ry)
+    if not sxx or not syy:
+        return None
+    return sum((a - mx) * (b - my) for a, b in zip(rx, ry, strict=True)) / (sxx * syy) ** 0.5
+
+
+def _brown(r: float | None) -> float | None:
+    """Spearman-Brown: the correlation of the two halves, stepped up to that of the whole."""
+    return None if r is None or r <= -1 else 2 * r / (1 + r)
+
+
+MIN_SYSTEMS = 3
+MAX_SKIPPED = 0.2     # a slice whose ranking is undefined in more than this share of splits has no numbers
+
+
+def reliability(runs: Mapping[str, Iterable[Mapping[str, Any]]], *, splits: int = 100, seed: int = 0,
+                threshold: float = 0.7, min_documents: int = 10) -> dict[str, Any]:
+    """Whether each slice can rank the systems in `runs` (name: score lines) reproducibly, by split-half
+    over documents. For each of `splits` random halves of the documents (the same for every slice and
+    system), each system's pass rate on the slice is taken in half A and in half B; `agreement` is the
+    median over splits of the Spearman correlation (ties by average rank) between the two halves' rankings
+    of the systems, stepped up with Spearman-Brown, r' = 2r / (1 + r). `beyond_headline` is the same after
+    taking from each system's slice pass rate, in each half, its pass rate on all the tests outside the
+    slice in that half, so that "good systems are good everywhere" is removed and what is left is what the
+    slice says that the rest of the benchmark does not. A slice is `flag`ged when `beyond_headline` is
+    below `threshold`.
+
+    The slices are those of `intervals`: `{kind: {key: {"documents", "tests", "agreement",
+    "beyond_headline", "flag", "splits_used"}}}`, an entry with no numbers saying why in `reason`: fewer
+    than `min_documents` documents, a test count that differs between systems, or a ranking undefined (no
+    variance in a half, no tests outside the slice) in more than 20% of the splits. Such an entry is not
+    flagged. Raises ValueError for fewer than 3 systems, or no document all of them have.
+
+    Only documents every system has, with the same number of tests in each, are used; the others are
+    counted in `documents_dropped`. The tests outside a slice are the page lines' `tests` and `passed` less
+    the slice's, so a test with several tags counts under each of them, and the other tests of a tag slice
+    leave out only the tests that carry that tag.
+
+    Note: the numbers depend on which systems are in `runs`: a few near-identical systems rank by noise,
+    and so does a half of few documents. They say a slice cannot rank these systems reproducibly on this
+    dataset, not that its tests are wrong, and nothing here corrects for looking at many slices at once."""
+    if isinstance(splits, bool) or not isinstance(splits, int) or splits < 10:
+        raise ValueError(f"splits must be an integer of at least 10, not {splits!r}")
+    if isinstance(min_documents, bool) or not isinstance(min_documents, int) or min_documents < 2:
+        raise ValueError(f"min_documents must be an integer of at least 2, not {min_documents!r}")
+    if len(runs) < MIN_SYSTEMS:
+        raise ValueError(f"reliability needs at least {MIN_SYSTEMS} systems, got {len(runs)}: with fewer, "
+                         "a ranking of them says nothing")
+    lines = {name: list(pages) for name, pages in runs.items()}
+    tables = {name: _table(pages) for name, pages in lines.items()}
+    totals: dict[str, dict[str, list[int]]] = {}
+    for name, pages in lines.items():
+        t = totals[name] = {}
+        for x in pages:
+            c = t.setdefault(x["row"]["document"], [0, 0])
+            c[0] += x["tests"]
+            c[1] += x["passed"]
+    names = list(runs)
+    common = set.intersection(*(set(t) for t in totals.values()))
+    if not common:
+        raise ValueError("the systems have no document in common, so there is nothing to split; check "
+                         "the runs are of the same dataset and manifest")
+    every = {d for t in totals.values() for d in t}
+    docs = sorted(d for d in common if len({t[d][0] for t in totals.values()}) == 1)
+    if len(docs) < 2:
+        raise ValueError("fewer than 2 documents have the same number of tests in every system")
+    index = {d: i for i, d in enumerate(docs)}
+    n_docs = len(docs)
+    total_n = [totals[names[0]][d][0] for d in docs]
+    total_p = {s: [totals[s][d][1] for d in docs] for s in names}
+
+    rng = random.Random(seed)
+    half = n_docs // 2
+    in_a: list[list[int]] = []
+    for _ in range(splits):
+        order = list(range(n_docs))
+        rng.shuffle(order)
+        flags = [0] * n_docs
+        for i in order[:half]:
+            flags[i] = 1
+        in_a.append(flags)
+    in_b = [[1 - f for f in flags] for flags in in_a]
+    # Note: a half's totals per system, once per split, for the tests outside each slice.
+    whole = [[(sum(itertools.compress(total_n, h)), [sum(itertools.compress(total_p[s], h)) for s in names])
+              for h in (fa, fb)] for fa, fb in zip(in_a, in_b, strict=True)]
+
+    out: dict[str, Any] = {}
+    for kind in SLICES:
+        present = {k for s in names for k in tables[s][kind]}
+        order = _ORDER.get(kind, ())
+        keys = [*(k for k in order if k in present), *sorted(present - set(order))]
+        out[kind] = {}
+        for key in keys:
+            per = {s: {d: c for d, c in tables[s][kind].get(key, {}).items() if d in index and c[0]}
+                   for s in names}
+            idx = sorted({index[d] for p in per.values() for d in p})
+            n = [per[names[0]].get(docs[i], (0, 0))[0] for i in idx]
+            entry: dict[str, Any] = {"documents": len(idx), "tests": sum(n), "agreement": None,
+                                     "beyond_headline": None, "flag": False, "splits_used": 0}
+            reason = None
+            if any([per[s].get(docs[i], (0, 0))[0] for i in idx] != n for s in names):
+                reason = "the systems do not have the same tests for this slice"
+            elif len(idx) < min_documents:
+                reason = f"fewer than {min_documents} documents"
+            if reason:
+                out[kind][key] = entry | {"reason": reason}
+                continue
+            passed = {s: [per[s].get(docs[i], (0, 0))[1] for i in idx] for s in names}
+            agree: list[float] = []
+            beyond: list[float] = []
+            for (a, b), fa, fb in zip(whole, in_a, in_b, strict=True):
+                halves = []
+                for (tn, tp), flags in ((a, fa), (b, fb)):
+                    keep = [flags[i] for i in idx]
+                    sn = sum(itertools.compress(n, keep))
+                    if not sn or tn - sn <= 0:
+                        halves = None
+                        break
+                    sp = [sum(itertools.compress(passed[s], keep)) for s in names]
+                    halves.append(([x / sn for x in sp],
+                                   [x / sn - (tp[j] - sp[j]) / (tn - sn) for j, x in enumerate(sp)]))
+                if halves is None:
+                    continue
+                r1 = _brown(_spearman(halves[0][0], halves[1][0]))
+                r2 = _brown(_spearman(halves[0][1], halves[1][1]))
+                if r1 is not None and r2 is not None:
+                    agree.append(r1)
+                    beyond.append(r2)
+            entry["splits_used"] = len(agree)
+            if len(agree) < (1 - MAX_SKIPPED) * splits:
+                out[kind][key] = entry | {"reason": "the ranking was undefined in more than 20% of "
+                                                    "the splits"}
+                continue
+            entry["agreement"] = statistics.median(agree)
+            entry["beyond_headline"] = statistics.median(beyond)
+            entry["flag"] = entry["beyond_headline"] < threshold
+            out[kind][key] = entry
+    return out | {"systems": len(names), "documents_used": n_docs, "documents_dropped": len(every) - n_docs,
+                  "reliability": {"method": "split-half over documents, Spearman-Brown corrected, median "
+                                  "over splits", "splits": splits, "seed": seed, "threshold": threshold,
+                                  "min_documents": min_documents}}
