@@ -9,7 +9,7 @@ authors = [{ name = "Datalab" }]
 dependencies = [
     "omni-bench-core>=0.14,<0.15",  # the shared core: tasks, adapters, scorers, runs and the loop over them
     "beautifulsoup4>=4.12",  # table structure
-    "fuzzysearch>=0.7",      # positional near-matches for order tests
+    "fuzzysearch>=0.8.1,<0.9",  # positional near-matches for order tests; _near uses its internals
     "mini-racer>=0.12",      # an embedded V8 that runs KaTeX, which equations are compared by
     "pylatexenc>=2.10",      # LaTeX spans -> text in the fold
     "rapidfuzz>=3.0",        # fuzzy containment for text and table cells

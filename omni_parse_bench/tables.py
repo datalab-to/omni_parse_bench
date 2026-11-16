@@ -73,15 +73,20 @@ def _text(td) -> str:
 
 
 def heading(table: Table, cell: Cell, direction: Direction) -> frozenset[Cell]:
-    """The heading cells reached walking from `cell` in `direction`, else the cells at the edge.
-    An empty heading cell (a blank corner, a header row's gap) isn't a heading: the walk goes on."""
+    """The heading cells reached walking from `cell` in `direction`, else the cells at the edge. The walk
+    stays in the rows `cell` covers (for `left` and `right`) or the columns it covers (for `up`), so a
+    cell that spans rows never leads it into another row. `cell` is not its own heading, and a heading cell
+    that has no other heading on its walk is read at the edge like any other cell. An empty heading cell
+    (a blank corner, a header row's gap) isn't a heading: the walk goes on."""
     step = getattr(table, direction)
+    lane = 1 if direction == "up" else 0   # the rows (left, right) or columns (up) the walk must share
+    mine = set(table.covers[cell][lane])
     seen, todo, headings, ends = set(), {cell}, set(), set()
     while todo:
         c = todo.pop()
         seen.add(c)
-        if c in table.headings and table.text.get(c, "").strip(): headings.add(c)
-        if nxt := step.get(c): todo |= nxt - seen
+        if c != cell and c in table.headings and table.text.get(c, "").strip(): headings.add(c)
+        if nxt := {n for n in step.get(c, ()) if mine & set(table.covers[n][lane])} - seen: todo |= nxt
         else: ends.add(c)
     return frozenset((headings or ends) - {cell})
 

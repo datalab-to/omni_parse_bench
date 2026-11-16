@@ -97,10 +97,32 @@ def test_a_squeezed_match_is_not_glued_to_the_digits_around_it(needle, text, pas
     assert R.present(R.Present(R.Text(needle, 0)), html(f"<p>{text}</p>"))[0] is passes
 
 
-def test_a_number_is_strict_on_digits_lenient_on_separators():
-    v = html("<p>total 1 234 567,89 EUR</p>")
+def test_a_number_is_strict_on_digits_and_separators():
+    v = html("<p>total 1 234 567,89 EUR and 1,234,567.89 USD</p>")
     assert R.found(R.Number("1,234,567.89"), v)[0]
     assert not R.found(R.Number("1,234,567.80"), v)[0]
+    assert not R.found(R.Number("1,234,567.89"), html("<p>total 1 234 567,89 EUR</p>"))[0]
+
+
+@pytest.mark.parametrize("gold, text, passes", [
+    ("1,240", "1,240", True),
+    ("1,240", "1240", False),
+    ("1,240", "1 240", False),
+    ("1,240", "1.240", False),
+    ("1240", "1,240", False),
+    ("1 240", "1\u202f240", True),
+    ("12.5", "12,5", False),
+    ("8.455", "8.455", True),
+    ("8.455", "score 8.455.", True),
+    ("8.455", "8,455", False),
+    ("8.455", "18.455", False),
+    ("8.455", "8.4551", False),
+    ("-4.8%", "(\u20134.8 %)", True),
+    ("1,240.00", "$1,240.00", True),
+])
+def test_a_number_matches_separators_as_the_gold_writes_them(gold, text, passes):
+    assert R.VALID["present"][0](R.Present(R.Number(gold)))
+    assert R.found(R.Number(gold), html(f"<p>{text}</p>"))[0] is passes
 
 
 @pytest.mark.parametrize("gold, text, passes", [
@@ -133,7 +155,8 @@ def test_a_number_sees_through_latex():
 
 
 @pytest.mark.parametrize("token, core", [
-    ("1,240.00", "1240.00"), ("(39%)", "39"), ("12,345", "12345"), ("4.500", None), ("16,17", None)])
+    ("1,240.00", "1240.00"), ("(39%)", "39"), ("12,345", "12345"), ("4.500", "4.500"), ("8.455", "8.455"),
+    ("0,250", "0.250"), ("16,17", None), ("12,5", None)])
 def test_number_reads_separators(token, core):
     n = R.number(token)
     assert (n.core if n else None) == core
@@ -214,6 +237,14 @@ def test_layout_kind_reads_the_smallest_block_holding_the_place():
     assert not R.layout_kind(t, (R.Block("heading", (0.5, 0.5, 0.9, 0.9), ""),))[0]
 
 
+def test_of_two_blocks_of_equal_area_the_first_listed_holds_the_place():
+    # Both areas are 0.02 in exact arithmetic; in floats the second is a hair smaller.
+    place = ((0.2, 0.8, 0.3, 0.9),)
+    heading, text = R.Block("heading", (0.2, 0.8, 0.4, 0.9), ""), R.Block("text", (0.2, 0.8, 0.3, 1.0), "")
+    assert R.holder(place, (heading, text)) is heading
+    assert R.holder(place, (text, heading)) is text
+
+
 def test_a_list_item_or_form_field_block_is_text_and_nothing_else_is():
     place = ((0.1, 0.1, 0.4, 0.15),)
     text, heading = (R.LayoutKind(R.Text("1. Mix well", 0, place), k) for k in ("text", "heading"))
@@ -262,6 +293,71 @@ def test_a_section_label_may_be_written_as_the_rows_first_cell():
 def test_a_footnote_marker_after_a_number_is_not_one_of_its_digits(output):
     assert R.found(R.Number("1,240"), html(output))[0]
     assert not R.found(R.Number("1,2401"), html(output))[0]
+
+
+@pytest.mark.parametrize("gold, output", [
+    ("Smith and Jones", "<p>Smith[1] and Jones</p>"),
+    ("Smith and Jones", "<p>Smith [12] and Jones</p>"),
+    ("Smith and Jones", "<p>Smith[^a] and Jones</p>"),
+    ("1,240 units", "<p>1,240[1] units</p>"),
+    ("Smith", "<p>Smith[1]</p>"),
+])
+def test_a_bracketed_footnote_marker_inside_the_text_is_ignored(gold, output):
+    assert R.present(R.Present(R.Text(gold, 0)), html(output))[0]
+
+
+@pytest.mark.parametrize("gold, output, passes", [
+    ("[1] item", "<p>[1] item</p>", True),
+    ("x[2] and y", "<p>x[2] and y</p>", True),
+    ("x[2] and y", "<p>x and y</p>", False),
+    ("Smith 2 and Jones", "<p>Smith[1] and Jones</p>", False),
+    ("124", "<p>12[3]4</p>", False),
+    ("12 4", "<p>12[3] 4</p>", False),
+])
+def test_a_footnote_marker_is_ignored_only_on_the_page_and_never_joins_digits(gold, output, passes):
+    assert R.present(R.Present(R.Text(gold, 0)), html(output))[0] == passes
+
+
+@pytest.mark.parametrize("output", ["<p><sup>1</sup>1,240</p>", "<p>Total<sup>1</sup>1,240</p>",
+                                    "<p><sup>1</sup><b>1,240</b></p>", "<p><sup>*</sup>1,240</p>"])
+def test_a_footnote_mark_before_a_number_is_not_one_of_its_digits(output):
+    assert R.found(R.Number("1,240"), html(output))[0]
+    assert not R.found(R.Number("11,240"), html(output))[0]
+
+
+def test_a_footnote_mark_before_a_negative_number_leaves_its_sign():
+    assert R.found(R.Number("-4.8%"), html("<p><sup>1</sup>-4.8%</p>"))[0]
+
+
+@pytest.mark.parametrize("gold, output", [
+    ("Probiotic strains", "<p>Probiotic<sup>1</sup> strains</p>"),
+    ("Smith and Jones", "<p>Smith<sup>12</sup> and Jones</p>"),
+    ("Smith and Jones", "<p>Smith <sup> 3 </sup> and Jones</p>"),
+    ("Smith and Jones", "<p>Smith<sup>†</sup> and Jones</p>"),
+    ("Smith and Jones", "<p>Smith<sup>**</sup> and Jones</p>"),
+    ("Smith and Jones", "<p><b>Smith</b><sup class='fn'><a href='#n1'>1</a></sup> and Jones</p>"),
+    ("Smith and Jones", "<p>Smith<sup>1</sup> and[2] Jones</p>"),
+])
+def test_a_footnote_mark_set_as_a_superscript_inside_the_text_is_ignored(gold, output):
+    assert R.present(R.Present(R.Text(gold, 0)), html(output))[0]
+
+
+@pytest.mark.parametrize("gold, output", [
+    # after a digit, a superscript is an exponent, not a mark
+    ("10 cells", "<p>10<sup>5</sup> cells</p>"),
+    ("10 cells", "<p>10<b></b><sup>5</sup> cells</p>"),
+    # only a short run of digits or a footnote symbol is a mark: not a word, an ordinal, or four digits
+    ("the place", "<p>the 1<sup>st</sup> place</p>"),
+    ("Smith and Jones", "<p>Smith<sup>a</sup> and Jones</p>"),
+    ("Smith and Jones", "<p>Smith<sup>1234</sup> and Jones</p>"),
+    ("H ion", "<p>H<sup>+</sup> ion</p>"),
+    # an exponent in math is never a mark
+    ("x + y", "<p>$x^2 + y^2$</p>"),
+    ("x + y", "<p>x² + y²</p>"),
+    ("x + y", "<p><math>x^{2} + y^{2}</math></p>"),
+])
+def test_a_superscript_that_is_no_footnote_mark_still_counts(gold, output):
+    assert not R.present(R.Present(R.Text(gold, 0)), html(output))[0]
 
 
 def test_a_text_test_still_finds_a_superscript_written_inline():
@@ -435,3 +531,84 @@ def test_right_heading_falls_back_to_the_last_cell_when_no_th_is_found():
 def test_right_heading_reads_a_colspan_cell_at_the_end_of_the_row():
     table = html("<table><tr><td>1,240</td><th colspan='2'>Sum</th></tr></table>")
     assert R.table_cell(R.TableCell("1,240", {"right_heading": "Sum"}, 0), table)[0]
+
+
+@pytest.mark.parametrize("markup, cell, role, want", [
+    ("<table><tr><th>Male</th><td>5</td></tr></table>", "Male", "right_heading", "5"),
+    ("<table><tr><td>5</td><th>Male</th></tr></table>", "Male", "left_heading", "5"),
+    ("<table><tr><td>x</td></tr><tr><th>Male</th></tr></table>", "Male", "top_heading", "x"),
+])
+def test_a_heading_cell_with_no_other_heading_reads_the_cell_at_the_edge(markup, cell, role, want):
+    assert R.table_cell(R.TableCell(cell, {role: want}, 0), html(markup))[0]
+
+
+SPAN = "<table><tr><td>a</td><td rowspan=2>m</td><th>H</th></tr><tr><td>5</td><td>z</td></tr></table>"
+
+
+def test_a_heading_walk_stays_in_the_rows_of_its_cell():
+    assert R.table_cell(R.TableCell("5", {"right_heading": "z"}, 0), html(SPAN))[0]
+    assert not R.table_cell(R.TableCell("5", {"right_heading": "H"}, 0), html(SPAN))[0]
+
+
+@pytest.mark.parametrize("blank", ["\u200b", "\ufeff", "\u00ad", "<math></math>", "<ol><li></li></ol>",
+                                   "<input type=hidden value=v>"])
+def test_page_near_empty_does_not_count_what_shows_nothing(blank):
+    assert R.page_near_empty(R.PageNearEmpty(0), html(f"<p>{blank}</p>")) == (True, "")
+
+
+def test_page_near_empty_counts_a_list_items_number():
+    assert not R.page_near_empty(R.PageNearEmpty(0), html("<ol><li>x</li></ol>"))[0]
+
+@pytest.mark.parametrize("text, passes", [
+    ("<p>Total: 41</p>", True),
+    ("<p>Total: 400</p><p>Total: 41</p>", True),     # a glued copy does not veto a separate fuzzy one
+    ("<p>Total: 41</p><p>Total: 400</p>", True),
+    ("<p>Total: 400</p>", False),                    # nor does any window of the glued copy count
+    ("<p>Total: 400</p><p>Total: 4</p>", True),
+])
+def test_a_glued_copy_does_not_veto_a_fuzzy_match_elsewhere(text, passes):
+    assert R.present(R.Present(R.Text("Total: 40", 1)), html(text))[0] is passes
+
+
+def test_a_squeezed_glued_copy_does_not_veto_a_fuzzy_match_elsewhere():
+    assert R.present(R.Present(R.Text("1 2 3 4", 1)), html("<p>12345</p><p>1235</p>"))[0]
+    assert not R.present(R.Present(R.Text("1 2 3 4", 1)), html("<p>12345</p>"))[0]
+
+
+@pytest.mark.parametrize("md", [0, 1, 2])
+def test_order_more_edits_never_lose_an_exact_start(md):
+    assert R.order(R.Order("a a", "a a", md), html("<p>a a a a</p>"))[0]
+    assert R.order(R.Order("Item 1", "Item 1 Item 1", md), html("<p>Item 1 Item 1 Item 1</p>"))[0]
+
+
+_SEED_PROBE = ("from omni_parse_bench.scorers.unit_tests import runners as R; "
+               "from omni_parse_bench import views; "
+               "print(R.order(R.Order('bba', 'b abb', 2), views.html('<p>b ba baa bbb ba</p>'))[0])")
+
+
+def test_order_verdict_does_not_depend_on_the_hash_seed():
+    # fuzzysearch keeps one match per run of overlapping ones, the min of a set; on a tie that pick
+    # followed the string hash, so this verdict passed under one PYTHONHASHSEED and failed under others.
+    import os
+    import subprocess
+    import sys
+    got = set()
+    for seed in range(8):
+        env = {**os.environ, "PYTHONHASHSEED": str(seed)}
+        out = subprocess.run([sys.executable, "-c", _SEED_PROBE], env=env, capture_output=True, text=True,
+                             check=True)
+        got.add(out.stdout.strip())
+    assert got == {"True"}, got
+
+
+def test_near_keeps_every_match_tied_for_best_in_a_run():
+    # 'b abb' with 2 edits: 'b ba b' at 0 and 'baa bb' at 5 overlap, both 2 edits, both 6 long.
+    spans = {(m.start, m.end, m.dist) for m in R._near("b abb", "b ba baa bbb ba", 2)}
+    assert {(0, 6, 2), (5, 11, 2)} <= spans
+
+
+def test_order_that_passes_with_fewer_edits_passes_with_more():
+    # 'aa' is in the squeezed text 'bbaabab' only, before 'aba'; with an edit to spend both are found in the
+    # folded text, out of order there, which must not stop the squeezed text from passing.
+    page = html("<p>b b a ab ab</p>")
+    assert [R.order(R.Order("aa", "a ba", k), page)[0] for k in range(2)] == [True, True]

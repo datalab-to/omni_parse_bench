@@ -21,15 +21,25 @@ _INVISIBLE = re.compile("[\ue000-\uf8ff" + "".join(
 _CHECKED = re.compile("[☑☒■▣✓✔✗✘]")
 _UNCHECKED = re.compile("[☐□◻◼❏▢⬜]")
 _BRACKET_CHECKED = re.compile(r"\[(?:[xX✓✗]|checked)\]", re.I)
-_BRACKET_UNCHECKED = re.compile(r"\[ ?\]|\[unchecked\]", re.I)
+_BRACKET_UNCHECKED = re.compile(r"\[[ \u2029]?\]|\[unchecked\]", re.I)   # a block break reads as a space
 _FOOTNOTE = re.compile(r"\[\^\s*(\w{1,3})\s*\]|\[\s*(\d{1,3})\s*\]")
 # Note: ■ isn't here; it's a checked box (_CHECKED).
-_BULLET = re.compile(r"(?m)^([ \t]*)[•‣◦▪▶∙●](?=\s|$)")
+# Note: a block break (`views.BREAK`) is white space before a bullet, as a space is, but no line start.
+_BULLET = re.compile(r"(?m)^([ \t\u2029]*)[•‣◦▪▶∙●](?=\s|$)")
+# Note: an ideographic full stop is a dot here (NFKC has made the half-width ｡ one already), though typography
+# makes it ASCII only later, so a run of them is a leader as a run of dots is ("目次。。。。5").
 # Note: dots and dashes fold as one mixed run ("hospital......-.-"), the other characters each in their
 # own run, so a full stop beside a blank stays ("here. ____"). A dash is a leader unless it is a sign:
 # before a digit and after a space ("....... -4.8%"); one glued to what precedes it ("-----5") is a leader.
+# A dash is any of the dash family that typography later makes "-" (`_DASH`): leaders run before it, so a
+# run of ― or − must be named here too, or it would survive as "---" ("Name ――― 5").
+_LEADER_DASH = "[-‐-―−]"
+# Note: white space may sit inside a run, but not a block break (`views.BREAK`): a run never spans two
+# paragraphs, so a text that ends in "_" keeps it beside a paragraph of "__".
+_IN_BLOCK_SPACE = r"[^\S\u2029]"
 _LEADERS = re.compile(
-    r"(?:(?:[.…·]|(?<=\S)[-–—]|[-–—](?!\d))\s*){3,}|(?:_\s*){3,}|(?:=\s*){3,}|(?:\*\s*){3,}")
+    rf"(?:(?:[.…·。]|(?<=\S){_LEADER_DASH}|{_LEADER_DASH}(?!\d)){_IN_BLOCK_SPACE}*){{3,}}"
+    rf"|(?:_{_IN_BLOCK_SPACE}*){{3,}}|(?:={_IN_BLOCK_SPACE}*){{3,}}|(?:\*{_IN_BLOCK_SPACE}*){{3,}}")
 _DASH = re.compile("[‐-―−]")
 # Note: ꞌ (saltillo, a glottal stop in Amarasi) and ˈ (IPA primary stress) are typed as an ASCII apostrophe.
 _SQUOTE = re.compile("[‘’‚‛ʼ`´′ꞌꞋˈ]")
@@ -66,10 +76,13 @@ _CJK_PUNCT = str.maketrans({
 # \[..\] and \(..\) are the same math as $$..$$ and $..$, written the other LaTeX way.
 _BRACKET_MATH = re.compile(r"\\\[([^\u2029]+?)\\\]")    # not across a block
 _PAREN_MATH = re.compile(r"\\\(([^\u2029]+?)\\\)")
+_OWN_DOLLAR = re.compile(r"(?<!\\)\$")    # an unescaped dollar
 _DIGIT = re.compile(r"[0-9]")   # ASCII only; `c in "0123456789"` is also true for ""
 _LATEX_RESIDUE = re.compile(r"[_^{}\\]")
 # A word broken at a line end: a hyphen (any of its forms), then the line break, or the space a
-# writer joined lines with. Not a dash, which can end a line before a lowercase word.
+# writer joined lines with. Not a dash, which can end a line before a lowercase word. A block break
+# (`views.BREAK`) is a line break here too: an output that writes one paragraph per printed line
+# ("<p>Head-</p><p>quarters</p>") breaks its words there.
 _LINE_HYPHEN = re.compile(r"(?<=[^\W\d_])[-\u2010\u2011]\s+([^\W\d_])")
 _DECIMAL_MIDDOT = re.compile(r"(?<=\d)[·∙](?=\d)")
 # Note: the CJK and half-width middle dots are the same dot as "·" (NFKC would turn ㆍ into a Hangul jamo and
@@ -111,7 +124,7 @@ def fold(s: str) -> str:
                          the spaces math mode doesn't render ("$c_{\text{MC}}$" -> "cMC", "$U$" -> "U",
                          "$$2 . 5 5$$" -> "2.55")
         line-end hyphens a word broken by a hyphen at a line end -> joined ("develop-\ners" and "develop- ers"
-                         -> "developers"), when a lowercase letter follows
+                         -> "developers"), when a lowercase letter follows; a block break is a line end
         superscripts     superscript digits after a digit set apart ("1,240¹" -> "1,240 1"), as views.text
                          sets apart a <sup>, so a footnote marker never joins the number it follows
         NFKC             compatibility forms -> canonical ("ﬁ" -> "fi"); just before it, ″ ‴ and TeX quotes
@@ -123,7 +136,8 @@ def fold(s: str) -> str:
         checkboxes       every checked glyph -> ☒, every unchecked glyph -> ☐; so are [x], [checked],
                          [ ] and [unchecked]
         markers          a footnote marker [1] or [^1] -> " 1"; a bullet glyph starting a line -> a space
-        leaders          runs of 3+ dots, dashes or underscores -> a space
+        leaders          runs of 3+ dots (ideographic full stops too), dashes or underscores -> a space;
+                         white space may sit inside a run, but not a block break
         typography       dash, quote (with primes, ꞌ, ˈ), space and arrow families unified; the fraction slash
                          -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII;
                          ş ţ -> ș ț; ״ -> "
@@ -135,11 +149,32 @@ def fold(s: str) -> str:
     return _cased(s).lower()
 
 
-def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool = False) -> str:
+def unmarked(s: str) -> str:
+    """`fold` with each bracketed footnote marker removed rather than read as a spaced number, for a page:
+    "Smith[1] and Jones" -> "smith and jones". A marker between two digits stays " 1", so removing it never
+    joins two numbers ("12[3] 4")."""
+    return _cased(s, drop_footnotes=True).lower()
+
+
+def _footnote(m: re.Match, *, drop: bool) -> str:
+    s, i, j = m.string, m.start() - 1, m.end()
+    while i >= 0 and s[i].isspace():
+        i -= 1
+    while j < len(s) and s[j].isspace():
+        j += 1
+    if drop and not (i >= 0 and _DIGIT.match(s, i) and _DIGIT.match(s, j)):
+        return " "
+    return f" {m[1] or m[2]}"
+
+
+def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool = False,
+           drop_footnotes: bool = False) -> str:
     """The fold before lowercasing, for inspecting a continuation's original case."""
     # Note: composed first, so a letter written as a base and a combining accent ("e" + U+0301, as a macOS
     # text layer gives it) is one letter to the hyphen rule below, as "é" is.
-    s = unicodedata.normalize("NFC", _latex_to_text(s))
+    # Note: the block breaks `views.text` leaves stay until the leaders are folded, so a leader run never
+    # joins two paragraphs; then they are the spaces they were. A line-end hyphen joins across one.
+    s = unicodedata.normalize("NFC", _math_to_text(s))
     # Note: only before a lowercase letter, so a line ending "-" before a capital or a digit stays.
     if not preserve_line_hyphens:
         s = _LINE_HYPHEN.sub(lambda m: m[1] if m[1].islower() else m[0], s)
@@ -148,9 +183,9 @@ def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool
     s = boxes(s)
     # Note: a space before the marker, so "12.3%[1]" isn't read as "12.3%1"; `squeeze` still
     # matches a text layer's "Probiotic1".
-    s = _FOOTNOTE.sub(lambda m: f" {m[1] or m[2]}", s)
+    s = _FOOTNOTE.sub(functools.partial(_footnote, drop=drop_footnotes), s)
     s = _BULLET.sub(r"\1 ", s)
-    s = _LEADERS.sub(" ", s)
+    s = _LEADERS.sub(" ", s).replace(views.BREAK, " ")
     s = typography(s, preserve_dashes=preserve_dashes)
     s = s.replace("…", "...").translate(_CJK_PUNCT)
     s = _DECIMAL_MIDDOT.sub(".", s).replace("♢", "◊").replace("≦", "≤")
@@ -193,8 +228,9 @@ def squeeze(s: str) -> str:
 
 
 @functools.lru_cache(maxsize=128)
-def continuations(s: str) -> tuple[str, frozenset[int]]:
-    """Folded, space-free text and positions of optional wrapping hyphens.
+def continuations(s: str, spaced: bool = False) -> tuple[str, frozenset[int]]:
+    """Folded, space-free text and positions of optional wrapping hyphens. With `spaced`, the text keeps
+    each run of whitespace as one space; the positions still count without them.
 
     Inspect original case and hyphen forms before folding them; retain wrapping hyphens so
     the presence matcher can choose either reading, including for Latin compounds.
@@ -216,7 +252,7 @@ def continuations(s: str) -> tuple[str, frozenset[int]]:
             offset += len(_WHITESPACE.sub("", cased[previous:i].lower()))
             previous = i
             optional.add(offset)
-    folded = _WHITESPACE.sub("", _DASH.sub("-", cased.lower()))
+    folded = _WHITESPACE.sub(" " if spaced else "", _DASH.sub("-", cased.lower()))
     return folded, frozenset(optional)
 
 
@@ -225,12 +261,6 @@ def _word_end(s: str, i: int) -> bool:
     while i >= 0 and unicodedata.category(s[i]).startswith("M"):
         i -= 1
     return i >= 0 and unicodedata.category(s[i]).startswith("L")
-
-
-def _latex_to_text(s: str) -> str:
-    """`s` with its math spans read as text, and the block breaks `views.text` leaves (they only bound a span)
-    as the spaces they were."""
-    return _math_to_text(s).replace(views.BREAK, " ")
 
 
 _HELD_DOLLAR = "\ue002"    # a dollar that is not a delimiter, for `find`
@@ -244,6 +274,8 @@ def read_math(q: views.Seq) -> tuple[views.Seq, list[mathspans.Span], list[maths
     third."""
     parens: list[mathspans.Span] = []
     held: list[tuple[int, int]] = []
+    placed: list[tuple[int, int]] = []    # where each \(..\) is in the text
+    apart: list[tuple[int, int]] = []     # where each \(..\) whose body holds no dollar is
     if "\\[" in q.s or "\\(" in q.s:
         # \(..\) and \[..\] are unambiguous math: no price rule; one we can't read stays as $..$.
         q = q.sub(_BRACKET_MATH, lambda m: f"$${m[1]}$$")
@@ -254,9 +286,9 @@ def read_math(q: views.Seq) -> tuple[views.Seq, list[mathspans.Span], list[maths
             kept.append((m[1], t, t != m[0]))
             return f"${m[1]}$" if t is None else t
 
-        placed: list[tuple[int, int]] = []
         q = q.sub(_PAREN_MATH, paren, placed)
         for (a, b), (body, t, read) in zip(placed, kept, strict=True):
+            if not _OWN_DOLLAR.search(body): apart.append((a, b))
             if t is None: held += [(a, b - 1)]
             # Note: a \(..\) the text path leaves as `$..$` (padded plain text) (or prose: that rule is
             # the text path's) is still math to a reader of equations, who is told so by its delimiters.
@@ -268,8 +300,11 @@ def read_math(q: views.Seq) -> tuple[views.Seq, list[mathspans.Span], list[maths
     for a, b in held:
         chars[a] = chars[b] = _HELD_DOLLAR
     fed = "".join(chars) if held else q.s
+    # Note: no dollar span holds a \(..\) or part of one (`mathspans`, rule 7), so both paths read it. A
+    # "\(" whose "\)" comes only after dollars of the text ("$a$ \( b $c$ d \)") is a stray: the dollars
+    # pair as if it were not there.
     found = [x._replace(body=q.s[x.start + (d := 2 if x.display else 1):x.end - d])
-             for x in mathspans.find(fed)]
+             for x in mathspans.find(fed, apart=tuple(apart))]
     if held:
         # Note: each of them is a pair of dollars of its own, read as the page reads its math.
         pads = mathspans.pads_math(q.s)

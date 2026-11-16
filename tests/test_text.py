@@ -28,6 +28,17 @@ def test_list_markers_stay_in_the_text():
     assert "- Hoces" in views.text(markdown.to_html("- Hoces probati jedan?\n"))
 
 
+@pytest.mark.parametrize("line", ["-", "*", "+"])
+def test_a_marker_alone_on_its_line_stays_in_the_text(line):
+    assert views.text(markdown.to_html(f"Revenue\n\n{line}\n\n12\n")).split() == ["Revenue", line, "12"]
+
+
+@pytest.mark.parametrize("md, tag", [("a\n\n---\n\nb\n", "<hr"), ("a\n\n***\n\nb\n", "<hr"),
+                                     ("- item\n", "<p>- item"), ("Title\n---\n", "<h2>Title")])
+def test_rules_items_and_underlined_headings_keep_their_reading(md, tag):
+    assert tag in markdown.to_html(md)
+
+
 def test_math_braces_survive_conversion():
     assert r"$\{x\}_1$" in markdown.to_html(r"Intro $\{x\}_1$ end")
 
@@ -87,6 +98,33 @@ def test_doctype_is_not_text():
 
 def test_less_than_sign_is_not_a_tag():
     assert "0.05" in views.text("<p>P < 0.05 and the rest of the page</p>")
+
+
+def test_a_less_than_sign_before_a_letter_does_not_swallow_the_blocks_after_it():
+    html = "<p>p <q</p><p>Total due</p><p>r> s</p>"
+    assert views.text(html).split() == ["p", "<q", "Total", "due", "r>", "s"]
+    assert runners.found(runners.Text("Total due", 0), views.html(html))[0]
+
+
+def test_a_comment_leaves_no_space():
+    assert views.text("<p>12<!-- a note -->5</p>").strip() == "125"
+    assert runners.found(runners.Number("125"), views.html("<p>12<!-- -->5</p>"))[0]
+
+
+@pytest.mark.parametrize("html", [
+    "<p>Total<o:p></o:p> due</p>",
+    "<p><w:sdt>Total</w:sdt> due<o:p/></p>",
+])
+def test_a_namespaced_tag_is_dropped_like_any_tag(html):
+    assert views.text(html).split() == ["Total", "due"]
+
+
+@pytest.mark.parametrize("html", [
+    '<p><a title="x>y">Total</a> due</p>',
+    "<p><span title='a>b' class=\"c\">Total</span> due</p>",
+])
+def test_a_greater_than_sign_in_a_quoted_attribute_does_not_end_the_tag(html):
+    assert views.text(html).split() == ["Total", "due"]
 
 
 def test_seen_view_leaves_out_image_alt_text():
@@ -338,6 +376,33 @@ def test_a_full_stop_before_a_blank_stays():
     assert normalize.fold("Sign here. ________") == "sign here."
 
 
+@pytest.mark.parametrize("mark", ["_", ".", "-", "=", "*"])
+def test_a_block_break_stops_a_leader_run(mark):
+    page = f"<p>a {mark}</p><p>{mark * 2}</p>"
+    assert normalize.fold(views.text(page)) == f"a {mark} {mark * 2}"
+    assert runners.found(runners.Text(f"a {mark}", 0), views.html(page))[0]
+    # Within a block, white space and a <br> or a newline still sit inside a run
+    for inside in (f"<p>a {mark} {mark} {mark} b</p>", f"<p>a {mark}<br>{mark * 2} b</p>",
+                   f"<p>a {mark}\n{mark * 2} b</p>"):
+        assert normalize.fold(views.text(inside)) == "a b", inside
+
+
+def test_a_line_end_hyphen_joins_across_a_block_break_as_across_a_line_break():
+    # An output that writes one paragraph per printed line breaks its words at a block break
+    for page in ("<p>Head-</p>\n<p>quarters</p>", "<p>Head-</p><p>quarters</p>", "<p>Head-<br>quarters</p>",
+                 "<p>Head-\nquarters</p>"):
+        assert normalize.fold(views.text(page)) == "headquarters", page
+    assert runners.order(runners.Order("Progressive Head- quarters", "New York", 0),
+                         views.html("<p>at the Progressive Head-</p>\n<p>quarters in New York</p>"))[0]
+
+
+def test_a_trailing_underscore_before_a_bullet_blank_passes_as_markdown_and_as_html():
+    md = markdown.to_html("lorem _\n\n• ____\n")
+    html = "<p>lorem _</p><p>• ____</p>"
+    for page in (md, html):
+        assert runners.found(runners.Text("lorem _", 0), views.html(page))[0], page
+
+
 @pytest.mark.parametrize("text, folded", [
     (r"$\ge$2 cas", "≥2 cas"), (r"$\pm$13.33", "±13.33"), (r"p $<$0.05", "p <0.05"), (r"n $=$12", "n =12"),
     (r"$-$5 dB", "-5 db"), (r"$x^2$1", "x21"), (r"$5\times$10", "5×10"), (r"$1.5\pm$0.2", "1.5±0.2"),
@@ -395,3 +460,23 @@ def test_spaced_variables_between_plain_dollars_are_prose():
 ])
 def test_mixed_dot_and_dash_leaders_fold_but_a_spaced_sign_stays(text, folded):
     assert normalize.fold(views.text(text)) == folded
+
+
+@pytest.mark.parametrize("text, folded", [
+    ("Name ――― 5", "name 5"), ("Name −−− 5", "name 5"), ("Name ‒‒‒‒ 5", "name 5"),
+    ("Name ‐‐‐ 5", "name 5"), ("Name ‑‑‑ 5", "name 5"), ("Total ―――――5", "total 5"),
+    ("Net ―――― −4.8%", "net -4.8%"),
+    ("Name ―― 5", "name -- 5"), ("5–7 and a — b", "5-7 and a - b"), ("a −5", "a -5"),
+])
+def test_leaders_are_any_dash_of_the_dash_family_but_a_pair_or_a_sign_stays(text, folded):
+    assert normalize.fold(text) == folded
+    assert normalize.fold(folded) == folded
+
+
+@pytest.mark.parametrize("text, folded", [
+    ("Name 。。。 5", "name 5"), ("Name ｡｡｡ 5", "name 5"), ("目次。。。。5", "目次 5"),
+    ("Name 。｡。 5", "name 5"), ("Name 。.。 5", "name 5"), ("Name 。 。 。 5", "name 5"),
+    ("Name 。。 5", "name .. 5"), ("好。", "好."),
+])
+def test_a_run_of_ideographic_full_stops_is_a_leader_but_a_pair_stays(text, folded):
+    assert normalize.fold(text) == folded

@@ -9,10 +9,13 @@ constants (a threshold, a fill ratio) are module constants here, never parameter
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Callable, Sequence
 from typing import Any, Literal, NamedTuple
 
 import fuzzysearch
+from fuzzysearch.common import group_matches
+from fuzzysearch.levenshtein import find_near_matches_levenshtein
 from rapidfuzz import fuzz
 
 from omni_parse_bench import normalize, tables, views
@@ -26,6 +29,10 @@ MIN_PLACE_COVER = 0.5
 # Note: a block covering exactly half a place has a coverage of 0.5 in exact arithmetic and a hair under or
 # over it in floats (areas of boxes that were scaled or summed), so the threshold gets the slack `EPS` gives.
 COVER_EPS = 1e-9
+# Note: two blocks of equal area in exact arithmetic can differ by a hair in floats ([0.2, 0.15, 0.4, 0.25]
+# and [0.2, 0.2, 0.6, 0.25] are both 0.02), so a block must be smaller by more than this to hold the place
+# instead of one listed before it.
+AREA_EPS = 1e-9
 # Note: a list item or a key-value field is running text for a `text` test; vendors differ in whether they
 # give each such line a block of its own, and the test asks only that it isn't a heading or a table.
 AS_TEXT = frozenset({"text", "list", "form"})
@@ -67,7 +74,14 @@ def found(a: Arg, v: views.Html) -> Mark:
     if isinstance(a, Number): return _number_found(a.number, v)
     if isinstance(a, Latex): return _latex_found(a.latex, v)
     ok, r, thr, window = _contains(a.text, v.text, a.max_diffs)
-    if not ok and hyphenation.matches(a.text, v.text):
+    # Note: fold reads a bracketed footnote marker as a spaced number (so a number test still sees it, and
+    # a gold that writes the marker finds it), and the text view a mark set as a superscript the same way,
+    # which leaves either free only at the end of the gold: "Smith[1] and Jones" and
+    # "Smith<sup>1</sup> and Jones" missed "Smith and Jones". Retry with the page's markers dropped.
+    if not ok and ((page := views.unmarked(v.html)) is not None or "[" in v.text) and _contains(
+            a.text, v.text if page is None else page, a.max_diffs, normalize.unmarked)[0]:
+        return True, ""
+    if not ok and hyphenation.matches(a.text, v.text, _cut_before, _cut_after):
         return True, ""
     if not ok and _only_glued(a.text, v.text):
         return False, f"{a.text[:60]!r} found only inside a longer number"
@@ -84,12 +98,12 @@ def present(t: Present, v: views.Html) -> Mark:
 
 
 def _number_found(text: str, v: views.Html) -> Mark:
-    """Digit-for-digit: strict on digits, decimal point, sign and percent; lenient on thousands
-    separators. Bounded by non-digits, so 123 never passes on 1234."""
+    """Digit-for-digit: strict on digits, separators as the gold writes them, sign and percent.
+    Bounded by non-digits, so 123 never passes on 1234."""
     n = number(text)
     assert n is not None, text
     written = _NUMBER.match(text.strip())["body"]
-    hits = list(_number_pattern(n.core, written).finditer(normalize.fold(v.text).translate(_NUM_CLEAN)))
+    hits = list(_number_pattern(written).finditer(normalize.fold(v.text).translate(_NUM_CLEAN)))
     if not hits:
         return False, f"{text!r} not found digit-for-digit"
     negative = [(m["pre"] or "").strip() == "-" for m in hits]
@@ -109,24 +123,29 @@ class Order(NamedTuple):
 
 
 def order(t: Order, v: views.Html) -> Mark:
-    """`before` comes before `after`, found as `contains` finds them: after `fold`, then, if either
-    is missing, both again after `squeeze`, whose positions keep the folded text's order. An exact
-    match counts only if it is not cut out of a longer number (`_edges_ok`)."""
+    """`before` comes before `after`, found as `contains` finds them: after `fold`, then, if either has
+    no exact match there, both again after `squeeze`, whose positions keep the folded text's
+    order. An exact match counts only if it is not cut out of a longer number (`_edges_ok`).
+
+    Note: whether to retry does not depend on the budget: with an edit to spend, both can be found in the
+    folded text out of order while the squeezed text, which passed with fewer edits, holds them in order."""
     folded = normalize.fold(v.text)
     cut = [False, False]
+    both = False
     for f in (normalize.fold, normalize.squeeze):
         hay = f(v.text)
         kept = [k for k, c in enumerate(folded) if not c.isspace()] if f is normalize.squeeze else None
 
-        raw = [fuzzysearch.find_near_matches(f(x), hay, max_l_dist=t.max_diffs) for x in (t.before, t.after)]
+        raw = [_near(f(x), hay, t.max_diffs) for x in (t.before, t.after)]
         a, b = (_unglued(m, folded, kept) for m in raw)
         cut = [c or (bool(m) and not x) for c, m, x in zip(cut, raw, (a, b), strict=True)]
-        if a and b: break
+        if a and b and any(x.start < y.start for x in a for y in b):
+            return True, ""
+        both = both or bool(a and b)
+        if all(any(not m.dist for m in x) for x in (a, b)): break
+    if both: return False, f"{t.before[:34]!r} does not appear before {t.after[:34]!r}"
     if not a: return False, f"'before' text {t.before[:40]!r} {_why_missing(cut[0])}"
-    if not b: return False, f"'after' text {t.after[:40]!r} {_why_missing(cut[1])}"
-    if any(x.start < y.start for x in a for y in b):
-        return True, ""
-    return False, f"{t.before[:34]!r} does not appear before {t.after[:34]!r}"
+    return False, f"'after' text {t.after[:40]!r} {_why_missing(cut[1])}"
 
 
 class Repeat(NamedTuple):
@@ -146,9 +165,18 @@ class PageNearEmpty(NamedTuple):
     max_chars: int
 
 
+# Note: marks the text view writes for an element that holds nothing: the `$$` of an empty <math>, the
+# number of an empty list item, the value of a hidden input.
+_NOTHING = re.compile(
+    r"<math\b[^<>]*>\s*</math>|<li\b[^<>]*>\s*</li>|<input\b[^<>]*\btype=[\"']?hidden\b[^<>]*>", re.I)
+
+
 def page_near_empty(t: PageNearEmpty, v: views.Html) -> Mark:
-    """A blank page yields at most `max_chars` non-space characters outside image alt text."""
-    n = len(re.sub(r"\s", "", v.seen))
+    """A blank page yields at most `max_chars` characters a reader sees outside image alt text: no white
+    space, no invisible format character (a zero-width space, a byte-order mark, a soft hyphen), and none of
+    the marks the text view writes for an element that holds nothing."""
+    seen = views.text(_NOTHING.sub("", v.html), alt=False)
+    n = sum(unicodedata.category(c) != "Cf" for c in re.sub(r"\s", "", seen))
     return _mark(n <= t.max_chars, f"{n} non-space characters (limit {t.max_chars})")
 
 
@@ -253,7 +281,8 @@ def layout_kind(t: LayoutKind, blocks: Sequence[Block]) -> Mark:
 
 
 def holder(place: Sequence[Box], blocks: Sequence[Block]) -> Block | None:
-    """The smallest block covering at least MIN_PLACE_COVER of the place's area, or None.
+    """The smallest block covering at least MIN_PLACE_COVER of the place's area, or None; of blocks of equal
+    area (within `AREA_EPS`), the first listed.
 
     Note: coverage of the place, not IoU, since a vendor's block may rightly be larger than our place (a list
     for an item), and the smallest is the most specific."""
@@ -261,7 +290,10 @@ def holder(place: Sequence[Box], blocks: Sequence[Block]) -> Block | None:
     if total <= 0: return None
     held = [b for b in blocks
             if sum(_area(_intersection(x, b.bbox)) for x in place) / total >= MIN_PLACE_COVER - COVER_EPS]
-    return min(held, key=lambda b: _area(b.bbox), default=None)
+    best = None
+    for b in held:
+        if best is None or _area(b.bbox) < _area(best.bbox) - AREA_EPS: best = b
+    return best
 
 
 # --------------------------------------------------------------------------- registry
@@ -310,8 +342,8 @@ def number(text: str) -> Digits | None:
 
     The decimal point is the last "." or "," followed by 1-2 digits (or any count after a "."), and
     every other separator is a thousands mark. One separator followed by exactly three digits is a
-    thousands mark after a ",", and ambiguous after a "."; "16,17" is ambiguous. Parentheses aren't
-    a sign.
+    thousands mark after a ",", and a decimal point after a "." ("8.455"). One "," followed by one or
+    two digits is ambiguous: "16,17" may be two numbers. Parentheses aren't a sign.
     """
     m = _NUMBER.match(text.strip())
     if not m: return None
@@ -320,8 +352,7 @@ def number(text: str) -> Digits | None:
     if len(seps) == 1:
         i = seps[0]
         whole, frac = core[:i], core[i + 1:]
-        if len(frac) == 3 and whole != "0":
-            if core[i] == ".": return None
+        if core[i] == "," and len(frac) == 3 and whole != "0":
             core = whole + frac
         elif core[i] == "," and len(frac) <= 2:
             return None
@@ -335,22 +366,16 @@ def number(text: str) -> Digits | None:
     return Digits(core, bool(m["sign"]), bool(m["pct"]))
 
 
-def _number_pattern(core: str, written: str = "") -> re.Pattern[str]:
-    """The number anywhere in a text, however its thousands are marked, or as `written`.
+def _number_pattern(written: str) -> re.Pattern[str]:
+    """The number anywhere in a text, its digits and separators as `written` ("1,240" is not in "1240",
+    "1 240" nor "1.240"; a space of any width is a space).
 
-    A separator may stand only between thousands groups ("1,240", "1 240", "1240", never "12,40"),
-    or where the test's own text puts one, so a copy as written always counts ("1.800.934.4850").
     A number starts after anything but a digit or a digit's separator, so "No.12345" holds 12345, and
     ends before anything but a digit or a separator and a digit, so "12.5" is not in "12.5.7" nor
     "12.5,3", but is in "12.5. Next"; a "-" is its sign only after a non-word character, so "E-4065"
     and "COVID-19" are positive."""
-    whole, _, frac = core.partition(".")
-    groups = [whole[max(0, i - 3):i] for i in range(len(whole), 0, -3)][::-1]
-    digits = r"[,\.\u202f ]?".join(re.escape(g) for g in groups)
-    if written and written != core: digits = f"(?:{digits}|{re.escape(written)})"
-    tail = (r"[.,]" + re.escape(frac) if frac else "") + r"(?![.,]\d)"
     return re.compile(r"(?<!\d)(?<!\d[.,])(?P<pre>(?<!\w)-(?=[\d$€£¥])|\(\s?)?(?:[$€£¥]\s?)?"
-                      + digits + tail + r"(?P<pct>\s?%)?\)?(?![\d])")
+                      + re.escape(written.translate(_NUM_CLEAN)) + r"(?![.,]\d)(?P<pct>\s?%)?\)?(?![\d])")
 
 
 # --------------------------------------------------------------------------- helpers
@@ -412,18 +437,23 @@ def _glued(hay: str, i: int, j: int) -> bool:
     """Whether the span hay[i:j] is cut out of a longer number: a leading digit glued to a digit, a sign or
     a separator after a digit, a trailing digit glued to a digit or to a separator before one. A hyphen
     after a letter or digit is a hyphen, not a sign."""
-    if j <= i:
-        return False
-    before, after = hay[i - 1:i], hay[j:j + 1]
-    return (
-        hay[i].isdigit() and bool(before) and (
-            before.isdigit()
-            or (before in ".," and hay[i - 2:i - 1].isdigit())
-            or (before in "-\u2212+" and not hay[i - 2:i - 1].isalnum()))
-    ) or (
-        hay[j - 1].isdigit() and bool(after) and (
-            after.isdigit() or (after in ".," and hay[j + 1:j + 2].isdigit()))
-    )
+    return j > i and (_cut_before(hay, i) or _cut_after(hay, j))
+
+
+def _cut_before(hay: str, i: int) -> bool:
+    """`_glued`'s leading edge, for a match starting at i."""
+    before = hay[i - 1:i]
+    return hay[i].isdigit() and bool(before) and (
+        before.isdigit()
+        or (before in ".," and hay[i - 2:i - 1].isdigit())
+        or (before in "-\u2212+" and not hay[i - 2:i - 1].isalnum()))
+
+
+def _cut_after(hay: str, j: int) -> bool:
+    """`_glued`'s trailing edge, for a match ending before j."""
+    after = hay[j:j + 1]
+    return hay[j - 1].isdigit() and bool(after) and (
+        after.isdigit() or (after in ".," and hay[j + 1:j + 2].isdigit()))
 
 
 def _edges_ok(want: str, hay: str, folded: str = "", kept: list[int] | None = None) -> bool:
@@ -435,6 +465,40 @@ def _edges_ok(want: str, hay: str, folded: str = "", kept: list[int] | None = No
             return True
         i = hay.find(want, i + 1)
     return False
+
+
+def _near(want: str, hay: str, max_diffs: int) -> list:
+    """`want`'s matches in `hay` within `max_diffs` edits: every exact copy, and the best matches of each
+    run of overlapping ones at each budget from 1 to `max_diffs`, so a larger budget keeps every match a
+    smaller one found.
+
+    Note: with an edit to spend, fuzzysearch keeps one match per run of overlapping ones, and a larger budget
+    makes longer runs: an exact copy overlapping another match ("a a" in "a a a a"), or a match one budget
+    found, would lose its start to a match that spends more edits.
+    Note: fuzzysearch picks that one match as the min of a set by (edits, -length); on a tie the pick
+    followed set order, i.e. the string hash, so a verdict changed with PYTHONHASHSEED. Every match tied
+    for best in its run is kept instead, which no hash order can change."""
+    if not max_diffs or not want: return fuzzysearch.find_near_matches(want, hay, max_l_dist=max_diffs)
+    found: dict[tuple[int, int], fuzzysearch.Match] = {}
+    for k in range(1, max_diffs + 1):
+        for run in group_matches(find_near_matches_levenshtein(want, hay, k)):
+            best = min((m.dist, m.start - m.end) for m in run)
+            for m in run:
+                if (m.dist, m.start - m.end) == best: found.setdefault((m.start, m.end), m)
+    for i in (m.start() for m in re.finditer(f"(?={re.escape(want)})", hay)):
+        found[i, i + len(want)] = fuzzysearch.Match(i, i + len(want), 0, want)
+    return sorted(found.values())
+
+
+def _unglue(want: str, hay: str, folded: str = "", kept: list[int] | None = None) -> str:
+    """`hay` with each exact copy of `want` cut out of a longer number (`_glued`) blanked out, so no window of
+    a rejected copy matches while a fuzzy match elsewhere still can (`kept`: see `_edges_ok`)."""
+    out = list(hay)
+    for m in re.finditer(f"(?={re.escape(want)})", hay):
+        i = m.start()
+        if _glued(folded or hay, *_folded_span(i, i + len(want), kept)):
+            out[i:i + len(want)] = "\0" * len(want)
+    return "".join(out)
 
 
 def _why_missing(cut: bool) -> str:
@@ -459,20 +523,26 @@ def _squeezed_ok(want: str, hay: str, folded: str) -> bool:
     return _edges_ok(want, hay, folded, [k for k, c in enumerate(folded) if c != " "])
 
 
-def _contains(needle: str, text: str, max_diffs: int) -> tuple[bool, float, float, str]:
+def _contains(needle: str, text: str, max_diffs: int,
+              fold_page: Callable[[str], str] = normalize.fold) -> tuple[bool, float, float, str]:
     """`contains`, and, when it fails, the best-matching window of the folded text (the squeezed, if that
-    matched better): lowercased, its spacing folded; "" when it passes or `needle` is empty."""
-    want, hay = normalize.fold(needle), normalize.fold(text)
+    matched better): lowercased, its spacing folded; "" when it passes or `needle` is empty. `fold_page`
+    folds `text` (`normalize.unmarked` drops its footnote markers)."""
+    want, hay = normalize.fold(needle), fold_page(text)
     ok, r, thr = _ratio(want, hay, max_diffs)
     if ok and want and want in hay and not _edges_ok(want, hay):
-        return False, r, thr, ""
+        # Note: a copy cut out of a longer number does not count, nor any window of it ("total: 40" spends
+        # its edit on "otal: 400"); a fuzzy match elsewhere still does, as one clean copy anywhere would.
+        if not _ratio(want, _unglue(want, hay), max_diffs)[0]:
+            return False, r, thr, ""
     if ok:
         return True, r, thr, ""
     # fold has already collapsed all whitespace to ASCII spaces; reuse it for squeeze.
     squeezed = want.replace(" ", ""), hay.replace(" ", "")
     ok, r2, _ = _ratio(*squeezed, max_diffs)
-    if ok and want:
-        ok = _squeezed_ok(*squeezed, hay)
+    if ok and want and not _squeezed_ok(*squeezed, hay):
+        kept = [k for k, c in enumerate(hay) if c != " "]
+        ok = _ratio(squeezed[0], _unglue(*squeezed, hay, kept), max_diffs)[0]
     window = "" if ok or not want else _window(*(squeezed if r2 > r else (want, hay)))[1]
     return ok, max(r, r2), thr, window
 
