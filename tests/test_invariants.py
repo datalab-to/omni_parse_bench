@@ -124,3 +124,10 @@ def test_the_table_builder_puts_each_arg_where_the_runner_looks(change):
     other = t.params._replace(**{k: t.params.relations | v if k == "relations" else v
                                  for k, v in change.items()})
     assert not runners.table_cell(t.params, views.html(table(other)))[0]
+
+
+def test_the_table_builder_puts_right_heading_at_the_end_of_the_row():
+    p = runners.TableCell("1,240", {"left_heading": "Total", "right": "3", "right_heading": "Sum"}, 0)
+    assert runners.table_cell(p, views.html(table(p)))[0]
+    wrong = p._replace(relations=p.relations | {"right_heading": "Total"})
+    assert not runners.table_cell(wrong, views.html(table(p)))[0]

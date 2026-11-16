@@ -96,16 +96,19 @@ The table_cell roles mean:
 - `cell`: the cell being checked. Always present;
 - `up`, `down`, `left`, `right`: the cell next to it in that direction;
 - `top_heading`: the heading over its column;
-- `left_heading`: the label at the start of its row, the first cell in the html's order (the right edge of a right-to-left table);
-- `right_heading`: the label at the end of its row, the last cell in the html's order (the left edge of a right-to-left table);
+- `left_heading`: the label at the start of its row: the nearest heading cell before it in the html's order, else the first cell of the row;
+- `right_heading`: the label at the end of its row: the nearest heading cell after it in the html's order, else the last cell of the row;
 - `headings`: every heading over its column, from the top down;
 - `section`: the nearest row above it that holds one label, such as "A. Overall cohort"; and
 - `row_groups`: the cells to its left that span its row and others, from left to right.
 
 `left`, `right`, `left_heading` and `right_heading` follow the order of the cells in the html, which is reading
 order: the cell before, the cell after, and the label at the start or the end of the row. A right-to-left table
-written in reading order (or with `dir="rtl"`) puts its first cell at the right edge, so one test reads the same
-in both directions. The scorer doesn't read `dir`; write such a test in html order.
+written in reading order puts its first cell at the right edge, so `left_heading` is the label at the right edge
+of the page and `right_heading` the one at the left edge. The same test then reads the same on a left-to-right
+table and its mirror. The scorer doesn't read `dir`, so `dir="rtl"` changes nothing: write the roles in the
+order of the html, not of the page. For example, an Arabic row `<th>المجموع</th><td>1,240</td>` is
+`{"cell": "1,240", "left_heading": "المجموع"}`.
 
 The neighbor roles (`up`, `left`, `top_heading`, ...) come from olmOCR-bench's and fr-bench-pdf2md's
 table tests. `headings`, `section` and `row_groups` come from the PubMed Central tests (and our
