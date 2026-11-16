@@ -376,33 +376,6 @@ def test_a_full_stop_before_a_blank_stays():
     assert normalize.fold("Sign here. ________") == "sign here."
 
 
-@pytest.mark.parametrize("mark", ["_", ".", "-", "=", "*"])
-def test_a_block_break_stops_a_leader_run(mark):
-    page = f"<p>a {mark}</p><p>{mark * 2}</p>"
-    assert normalize.fold(views.text(page)) == f"a {mark} {mark * 2}"
-    assert runners.found(runners.Text(f"a {mark}", 0), views.html(page))[0]
-    # Within a block, white space and a <br> or a newline still sit inside a run
-    for inside in (f"<p>a {mark} {mark} {mark} b</p>", f"<p>a {mark}<br>{mark * 2} b</p>",
-                   f"<p>a {mark}\n{mark * 2} b</p>"):
-        assert normalize.fold(views.text(inside)) == "a b", inside
-
-
-def test_a_line_end_hyphen_joins_across_a_block_break_as_across_a_line_break():
-    # An output that writes one paragraph per printed line breaks its words at a block break
-    for page in ("<p>Head-</p>\n<p>quarters</p>", "<p>Head-</p><p>quarters</p>", "<p>Head-<br>quarters</p>",
-                 "<p>Head-\nquarters</p>"):
-        assert normalize.fold(views.text(page)) == "headquarters", page
-    assert runners.order(runners.Order("Progressive Head- quarters", "New York", 0),
-                         views.html("<p>at the Progressive Head-</p>\n<p>quarters in New York</p>"))[0]
-
-
-def test_a_trailing_underscore_before_a_bullet_blank_passes_as_markdown_and_as_html():
-    md = markdown.to_html("lorem _\n\n• ____\n")
-    html = "<p>lorem _</p><p>• ____</p>"
-    for page in (md, html):
-        assert runners.found(runners.Text("lorem _", 0), views.html(page))[0], page
-
-
 @pytest.mark.parametrize("text, folded", [
     (r"$\ge$2 cas", "≥2 cas"), (r"$\pm$13.33", "±13.33"), (r"p $<$0.05", "p <0.05"), (r"n $=$12", "n =12"),
     (r"$-$5 dB", "-5 db"), (r"$x^2$1", "x21"), (r"$5\times$10", "5×10"), (r"$1.5\pm$0.2", "1.5±0.2"),
@@ -471,12 +444,3 @@ def test_mixed_dot_and_dash_leaders_fold_but_a_spaced_sign_stays(text, folded):
 def test_leaders_are_any_dash_of_the_dash_family_but_a_pair_or_a_sign_stays(text, folded):
     assert normalize.fold(text) == folded
     assert normalize.fold(folded) == folded
-
-
-@pytest.mark.parametrize("text, folded", [
-    ("Name 。。。 5", "name 5"), ("Name ｡｡｡ 5", "name 5"), ("目次。。。。5", "目次 5"),
-    ("Name 。｡。 5", "name 5"), ("Name 。.。 5", "name 5"), ("Name 。 。 。 5", "name 5"),
-    ("Name 。。 5", "name .. 5"), ("好。", "好."),
-])
-def test_a_run_of_ideographic_full_stops_is_a_leader_but_a_pair_stays(text, folded):
-    assert normalize.fold(text) == folded

@@ -172,42 +172,10 @@ def test_a_display_holding_inline_math_in_its_text_is_one_display():
     assert [(x.display, x.body) for x in spans] == [(True, tex)]
 
 
-# 7. No dollar span holds a \(..\) span, or part of one.
-@pytest.mark.parametrize("s", ["$5.00 a2&$", "$$ a2 $$", "$x a2$"])
-def test_no_dollar_span_holds_a_paren_span(s):
-    a2 = (s.index("a2"), s.index("a2") + 2)
-    assert mathspans.find(s)
-    assert not mathspans.find(s, apart=(a2,))
-    # nor part of one
-    assert not mathspans.find(s, apart=((a2[0] - 1, len(s) + 3),))
-
-
-def test_a_paren_span_leaves_the_dollar_spans_beside_it():
-    assert [x.body for x in mathspans.find("$y$ a2 $z$", apart=((4, 6),))] == ["y", "z"]
-    # a pair inside the place of one is not cut by it
-    assert [x.body for x in mathspans.find("$x$", apart=((0, 3),))] == ["x"]
-
-
 def test_a_display_does_not_swallow_the_inline_spans_after_it():
     html = "$$ a=b $$ then $ x_1 $ and $ y_2 $ and $$ c=d"
     assert [(x.display, x.body.strip()) for x in mathspans.find(html)][:1] == [(True, "a=b")]
     assert "x_1" in [x.body.strip() for x in mathspans.find(html) if not x.display]
-
-
-# A stray "\(" early on a page, and a "\)" only much later (a list's "2\)"), with dollar math between.
-STRAY_PAREN = ("<p>so x_1)$ \\( \\Upsilon$\nIf $J_{i}(\\mathbf{u})$, $u \\in \\Omega$ following assumptions "
-               "about the gradient are associated with the GNE.\n2\\)</p>")
-
-
-def test_a_stray_paren_does_not_unpair_the_dollar_math_after_it():
-    assert equations.appears(r"J_i(\mathbf{u}), u \in \Omega", STRAY_PAREN)[0]
-
-
-def test_a_paren_span_between_two_stray_dollars_is_read_by_both_paths():
-    html = "<p>$5.00 \\(a_2\\)&amp;$ </p>"
-    assert equations.spans(html) == [("a_2", False)]
-    assert equations.appears("a_2", html)[0]
-    assert normalize.fold(views.text(html)) == "$5.00 a2&$"
 
 
 # 13. The two paths read one text: the equation path pairs the dollars of the text the text path pairs
@@ -226,11 +194,6 @@ def test_a_paren_span_between_two_stray_dollars_is_read_by_both_paths():
     # \( \) is rewritten before the dollars are paired
     ("<p>$$y^2$$ \\(a_2\\) and $5.00 </p>", [("y^2", True), ("a_2", False)]),
     ("<p>$$y^2$$ <math>c_1</math> and $5.00 </p>", [("y^2", True), ("c_1", False)]),
-    # no dollar span holds a \( \): the dollars around one are strays (rule 7)
-    ("<p>$5.00 \\(a_2\\)&amp;$ </p>", [("a_2", False)]),
-    ("<p>$$y^2$$ \\(a_2\\) $$ </p>", [("y^2", True), ("a_2", False)]),
-    # a "\(" whose "\)" comes only after dollars is a stray: the dollars pair as if it were not there
-    (STRAY_PAREN, [(" \\( \\Upsilon", False), ("J_{i}(\\mathbf{u})", False), ("u \\in \\Omega", False)]),
     ("<p>$5 <math>x_1</math> $6</p>", [("x_1", False)]),
     # <br> is a space, not a character that is none
     ("<p>$5.00<br>$U$<br>$5.00</p>", [("U", False)]),
@@ -251,8 +214,8 @@ def text_path_math(html: str) -> list[tuple[str, bool]]:
     spans, calls, placed = [], [], []
     find, display, sub = mathspans.find, normalize._display_or_paren, views.Seq.sub
 
-    def spy_find(s, pads=None, apart=()):
-        out = find(s, pads, apart)
+    def spy_find(s, pads=None):
+        out = find(s, pads)
         if pads is not None: return out    # a \\(..\\) left as `$..$`, read alone: the paren is its span
         spans.append([(x.start, x.end, x.body.replace(normalize._HELD_DOLLAR, "$"), x.display) for x in out])
         return out

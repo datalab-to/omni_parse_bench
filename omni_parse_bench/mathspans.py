@@ -27,10 +27,6 @@ The rules, in one place:
 6. Padding is the producer's style, not the span's: `$ p $` is a variable on a page whose math is padded
    (`$ x_1 $` somewhere in the same text), and bare padding without that evidence is worth less than a
    hugging span.
-7. A dollar span never holds a `\\(..\\)` span, nor part of one: the `\\(..\\)` is math of its own, so the
-   dollars on either side of it are strays or pair elsewhere (`$5.00 \\(a_2\\) $` is a price, the math
-   `a_2`, and a stray dollar). The caller says where those spans are (`apart`), and leaves out a `\\(..\\)`
-   whose body holds a dollar: that is a stray `\\(` before dollar math, which the dollars pair around.
 """
 from __future__ import annotations
 
@@ -131,19 +127,12 @@ def _pads_math(s: str) -> bool:
     return False
 
 
-def find(s: str, pads: bool | None = None, apart: tuple[tuple[int, int], ...] = ()) -> list[Span]:
+def find(s: str, pads: bool | None = None) -> list[Span]:
     """The math spans of `s`, in order: `$$..$$` displays and single-dollar pairs whose body reads as math.
-    `pads` says whether the page pads its math (rule 6) when `s` is a part of a page; by default `s` says.
-    `apart` are the places [start, end) of `s` that hold a `\\(..\\)` span, which no dollar span may hold or
-    cut (rule 7)."""
+    `pads` says whether the page pads its math (rule 6) when `s` is a part of a page; by default `s` says."""
     if "$" not in s:
         return []
-    return _pair(s, _pads_math(s) if pads is None else pads, apart)
-
-
-def _crosses(a: int, b: int, apart: tuple[tuple[int, int], ...]) -> bool:
-    """Whether the characters a..b hold any of `apart`, or part of one, other than from inside it."""
-    return any(a < y and x < b and not (x <= a and b <= y) for x, y in apart)
+    return _pair(s, _pads_math(s) if pads is None else pads)
 
 
 def pads_math(s: str) -> bool:
@@ -184,7 +173,7 @@ def _tokens(s: str, start: int, end: int) -> list[_Token]:
     return out
 
 
-def _pair(s: str, pads: bool, apart: tuple[tuple[int, int], ...] = ()) -> list[Span]:
+def _pair(s: str, pads: bool) -> list[Span]:
     """The best reading of the dollars of `s` (rules 3 and 4): each dollar is used at most once, in a pair of
     adjacent tokens or as a stray. A `$$` token has two dollars: it may close one span and open the next.
     A single-dollar span stays on its line; a display may run over several."""
@@ -204,13 +193,11 @@ def _pair(s: str, pads: bool, apart: tuple[tuple[int, int], ...] = ()) -> list[S
                 strays = (0.0 if u else _stray(s, t.closer)) + _stray(s, t.opener)
             options = [(g[i + 1][0] - strays, "stray")]    # first, so that a tie leaves this dollar a stray
             body = s[t.opener + 1:toks[i + 1].closer] if i + 1 < n else ""
-            if (i + 1 < n and (t.run == 2 or u == 0) and not _LINE_END.search(body)
-                    and not (apart and _crosses(t.opener, toks[i + 1].closer + 1, apart))):
+            if i + 1 < n and (t.run == 2 or u == 0) and not _LINE_END.search(body):
                 unused = _stray(s, t.closer) if (t.run == 2 and u == 0) else 0.0
                 score = _score(body, s, toks[i + 1].closer, pads)[0]
                 options.append((score + g[i + 1][1] - unused, "inline"))
-            if (u == 0 and t.run == 2 and (j := _partner(toks, i)) is not None
-                    and not (apart and _crosses(t.pos, toks[j].pos + 2, apart))):
+            if u == 0 and t.run == 2 and (j := _partner(toks, i)) is not None:
                 nested = _nested_value(toks, i, j, s, pads)
                 options.append((_display_value(s[t.pos + 2:toks[j].pos]) + nested + g[j + 1][0], "display"))
             value, name = options[0]

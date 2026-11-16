@@ -29,7 +29,7 @@ A provider makes whatever calls it needs to fill the outputs a page's tests read
 Output types, test types, derivations and tags (bar script and language codes) are closed sets
 (`vocab.py`, `runners.TYPES`). New data is first checked against them; a value is added only when
 the existing ones can't describe it.
-Counts are of the published dataset: 2,937 pages, 16,304 tests.
+Counts are of the published dataset: 2,937 pages, 16,288 tests.
 
 ### Output types
 
@@ -49,7 +49,7 @@ is found in an output (`runners.found`):
 
 - text (`{"text", "max_diffs"}`, and optionally `place`, its boxes on the page): found within
   `max_diffs` edits, after both sides are folded;
-- a number (`{"number"}`): found digit for digit, lenient only on thousands separators; and
+- a number (`{"number"}`): found digit for digit, with its separators as written; and
 - an equation (`{"latex"}`): found by what KaTeX renders it to, or, for an equation plain text
   writes without loss, by its text reading. Its LaTeX must render to at least one symbol, else the
   test doesn't load: LaTeX that doesn't render would fail on every output, and LaTeX that renders
@@ -70,14 +70,17 @@ equations and table-cell comparisons retain their existing rules.
 
 | test type | reads | checks | args and settings | family | tests |
 |---|---|---|---|---|---:|
-| `present` | `html` | this content appears | `content` | text | 7,291 |
+| `present` | `html` | this content appears | `content` | text | 7,275 |
 | `order` | `html` | A comes before B | `before`, `after` (text) | text | 1,189 |
 | `repeat` | `html` | this line appears exactly N times | `content` (text); `expected_count` | text | 35 |
 | `page_near_empty` | `html` | a blank page yields at most N non-space characters | no args; `max_chars` | text | 0 |
 | `table_cell` | `html` | this cell exists with these neighbors, under these headings, in this section and in these row groups; the cell may be one line of a multi-line cell | `cell`, `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `headings`, `section`, `row_groups` (text) | tables | 5,386 |
 | `layout_kind` | `blocks` | the smallest block covering half of this line's place has this kind | `content` (text with a `place`); `kind` | layout | 2,403 |
 
-Of the `present` tests, 3,700 compare text, 3,268 an equation and 323 a number.
+Of the `present` tests, 3,684 compare text, 3,268 an equation and 323 a number.
+
+What each test type reads, ignores and penalizes, with the probes behind each statement, is in the
+[scoring reference](scoring/README.md).
 
 A `table_cell` test reads structure from the markup, not from how the page looks. A heading or
 row-group label covers the cells it is encoded over: merged (`colspan`, `rowspan`), repeated in each,

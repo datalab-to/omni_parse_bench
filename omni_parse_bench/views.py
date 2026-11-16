@@ -7,7 +7,6 @@
 """
 from __future__ import annotations
 
-import functools
 import html as _html
 import re
 from typing import NamedTuple
@@ -69,21 +68,11 @@ def _block_break(m: re.Match[str]) -> str:
 
 
 # Note: a footnote marker or exponent set as <sup> would otherwise become digits of the number it
-# follows ("1,240<sup>1</sup>" read as 1,2401), or of the number right after it ("<sup>1</sup>1,240" read as
-# 11,240, "<sup>1</sup>-4.8" as 1-4.8, a hyphen and no sign), so the opening tag is a space, and so is the
-# closing one before a number: a digit, or a sign or point and a digit, past any tags. A text test still finds
-# "x2" in "x 2" by `squeeze`.
+# follows ("1,240<sup>1</sup>" read as 1,2401); a text test still finds "x2" in "x 2" by `squeeze`.
 _SUP = re.compile(rf"<sup(?:\s{_ATTRS})?/?>", re.I)
-_SUP_END = re.compile(rf"</sup\s*>(?=(?:{_TAG})*[-+±‐-―−.]?\d)", re.I)
 # Note: a tag must start with a letter and hold no stray `<` or `>`, so "P < 0.05" and
 # "<name@example.com>" survive as text.
 _INLINE = re.compile(_TAG)
-# A footnote mark set as a superscript: a <sup> holding only one to three ASCII digits or one to three of
-# the footnote symbols * † ‡ § ¶ #, inline tags (a link) and white space aside. One right after a digit is no
-# mark (`_drop_mark`): it is an exponent ("10<sup>5</sup>"), or a mark that must not let its number join
-# what follows. Math writes its exponents with `^`, `<msup>` or a superscript character, never this tag.
-_FOOTNOTE_MARK = re.compile(
-    rf"<sup(?:\s{_ATTRS})?>(?:\s|{_TAG})*(?:[0-9]{{1,3}}|[*†‡§¶#]{{1,3}})(?:\s|{_TAG})*</sup\s*>", re.I)
 
 
 # A block's kind. Each adapter maps its vendor's types onto these in a table a person decides; a vendor
@@ -133,7 +122,6 @@ def html(s: str) -> Html:
         doctype, script, style, head, title -> a space
         "<" before a letter that starts no tag -> kept as text
         <sup>                     -> a space, so a superscript never joins what it follows ("1,240 1")
-        </sup> before a number    -> a space, so it never joins the number after it either
         block tags                -> a space
         inline tags               -> removed
         entities                  -> unescaped"""
@@ -222,10 +210,9 @@ class Seq:
 _CHARREF = re.compile(r"&(#[0-9]+;?|#[xX][0-9a-fA-F]+;?|[^\t\n\f <&#;]{1,32};?)")
 
 
-def reading(q: Seq, *, alt: bool = True, marks: bool = True) -> Seq:
+def reading(q: Seq, *, alt: bool = True) -> Seq:
     """What `text` writes, on a `Seq`: the same rewrites, so a tracking one says where in the HTML each
-    character of the text came from. Without `marks`, each footnote mark set as a superscript
-    (`_FOOTNOTE_MARK`) is a space (`unmarked`)."""
+    character of the text came from."""
     q = q.sub(_MATH, _math)
     if "<ol" in q.s.lower(): q = q.sub(_LIST_TAG, _numbering())
     q = q.sub(_CONTROL, lambda m: f" {CHECKED if _CHECKED_ATTR.search(m[0]) else UNCHECKED} ")
@@ -236,28 +223,9 @@ def reading(q: Seq, *, alt: bool = True, marks: bool = True) -> Seq:
     q = q.sub(_COMMENT, "")
     for pattern in (_DOCTYPE, _SCRIPT):
         q = q.sub(pattern, " ")
-    q = q.sub(_STRAY_LT, "&lt;")
-    if not marks: q = q.sub(_FOOTNOTE_MARK, _drop_mark)
-    q = q.sub(_SUP, " ").sub(_SUP_END, " ").sub(_BLOCK, _block_break).sub(_INLINE, "")
+    q = q.sub(_STRAY_LT, "&lt;").sub(_SUP, " ").sub(_BLOCK, _block_break).sub(_INLINE, "")
     if q.lo is None: return Seq(_html.unescape(q.s))
     return q.sub(_CHARREF, lambda m: _html.unescape(m[0]))
-
-
-@functools.lru_cache(maxsize=256)
-def unmarked(s: str) -> str | None:
-    """The text view with each footnote mark set as a superscript read as a space, not as its digits or
-    symbol ("Probiotic<sup>1</sup> strains" -> "Probiotic  strains"); None when `s` has no such mark. A mark
-    right after a digit stays, as in `text` ("10<sup>5</sup>" is an exponent)."""
-    if not _FOOTNOTE_MARK.search(s): return None
-    return reading(Seq(s), marks=False).s
-
-
-def _drop_mark(m: re.Match[str]) -> str:
-    """A footnote mark as a space, unless a digit comes right before it, past any tags."""
-    s, i = m.string, m.start()
-    while i and s[i - 1] == ">" and (j := s.rfind("<", 0, i - 1)) >= 0 and _INLINE.fullmatch(s, j, i):
-        i = j
-    return m[0] if i and s[i - 1].isdecimal() else " "
 
 
 def hold(s: str, pattern: re.Pattern[str], held: list[str] | None = None) -> tuple[str, list[str]]:

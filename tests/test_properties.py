@@ -4,7 +4,7 @@ tests/fixtures/invariants/, and on the published dataset's when OPB_DATASET is s
     surroundings  a test's own answer (`test_invariants.answer`) passes with unrelated text around it,
                   in blocks of its own or in the answer's block
     symmetry      text folds the same as a test's string and as an output's text view, however the
-                  output splits it into blocks (but a block break stops a leader run)
+                  output splits it into blocks
     digits        a number is found as written, and never with one digit changed
     edits         text within its `max_diffs` edits (substituted, inserted or dropped characters) is found
     no error      no HTML built from tags, entities, math, markdown and page marks is graded `error`
@@ -14,7 +14,6 @@ tests/fixtures/invariants/, and on the published dataset's when OPB_DATASET is s
 from __future__ import annotations
 
 import html as _html
-import itertools
 import os
 
 import pytest
@@ -66,10 +65,6 @@ def test_text_folds_the_same_however_an_output_splits_it_into_blocks(tokens, dat
     cuts = sorted(data.draw(st.sets(st.integers(1, max(1, len(tokens) - 1)), max_size=len(tokens) - 1)))
     tag = data.draw(st.sampled_from(["p", "td", "li", "div"]))
     lines = [" ".join(tokens[i:j]) for i, j in zip([0, *cuts], [*cuts, len(tokens)], strict=True)]
-    # Note: a block break stops a leader run, so a split between two leader characters rightly changes the
-    # fold (`test_a_block_break_stops_a_leader_run`).
-    ends = [(a.rstrip()[-1:], b.lstrip()[:1]) for a, b in itertools.pairwise(lines)]
-    assume(not any(x in "._-—" and y in "._-—" for x, y in ends if x and y))
     html = "".join(f"<{tag}>{_html.escape(x, quote=False)}</{tag}>" for x in lines)
     assert normalize.fold(views.text(html)) == normalize.fold(" ".join(tokens))
 

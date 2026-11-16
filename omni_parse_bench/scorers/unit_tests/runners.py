@@ -9,7 +9,6 @@ constants (a threshold, a fill ratio) are module constants here, never parameter
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections.abc import Callable, Sequence
 from typing import Any, Literal, NamedTuple
 
@@ -29,10 +28,6 @@ MIN_PLACE_COVER = 0.5
 # Note: a block covering exactly half a place has a coverage of 0.5 in exact arithmetic and a hair under or
 # over it in floats (areas of boxes that were scaled or summed), so the threshold gets the slack `EPS` gives.
 COVER_EPS = 1e-9
-# Note: two blocks of equal area in exact arithmetic can differ by a hair in floats ([0.2, 0.15, 0.4, 0.25]
-# and [0.2, 0.2, 0.6, 0.25] are both 0.02), so a block must be smaller by more than this to hold the place
-# instead of one listed before it.
-AREA_EPS = 1e-9
 # Note: a list item or a key-value field is running text for a `text` test; vendors differ in whether they
 # give each such line a block of its own, and the test asks only that it isn't a heading or a table.
 AS_TEXT = frozenset({"text", "list", "form"})
@@ -75,11 +70,9 @@ def found(a: Arg, v: views.Html) -> Mark:
     if isinstance(a, Latex): return _latex_found(a.latex, v)
     ok, r, thr, window = _contains(a.text, v.text, a.max_diffs)
     # Note: fold reads a bracketed footnote marker as a spaced number (so a number test still sees it, and
-    # a gold that writes the marker finds it), and the text view a mark set as a superscript the same way,
-    # which leaves either free only at the end of the gold: "Smith[1] and Jones" and
-    # "Smith<sup>1</sup> and Jones" missed "Smith and Jones". Retry with the page's markers dropped.
-    if not ok and ((page := views.unmarked(v.html)) is not None or "[" in v.text) and _contains(
-            a.text, v.text if page is None else page, a.max_diffs, normalize.unmarked)[0]:
+    # a gold that writes the marker finds it), which leaves it free only at the end of the gold:
+    # "Smith[1] and Jones" missed "Smith and Jones". Retry with the page's markers dropped.
+    if not ok and "[" in v.text and _contains(a.text, v.text, a.max_diffs, normalize.unmarked)[0]:
         return True, ""
     if not ok and hyphenation.matches(a.text, v.text, _cut_before, _cut_after):
         return True, ""
@@ -123,15 +116,11 @@ class Order(NamedTuple):
 
 
 def order(t: Order, v: views.Html) -> Mark:
-    """`before` comes before `after`, found as `contains` finds them: after `fold`, then, if either has
-    no exact match there, both again after `squeeze`, whose positions keep the folded text's
-    order. An exact match counts only if it is not cut out of a longer number (`_edges_ok`).
-
-    Note: whether to retry does not depend on the budget: with an edit to spend, both can be found in the
-    folded text out of order while the squeezed text, which passed with fewer edits, holds them in order."""
+    """`before` comes before `after`, found as `contains` finds them: after `fold`, then, if either
+    is missing, both again after `squeeze`, whose positions keep the folded text's order. An exact
+    match counts only if it is not cut out of a longer number (`_edges_ok`)."""
     folded = normalize.fold(v.text)
     cut = [False, False]
-    both = False
     for f in (normalize.fold, normalize.squeeze):
         hay = f(v.text)
         kept = [k for k, c in enumerate(folded) if not c.isspace()] if f is normalize.squeeze else None
@@ -139,13 +128,12 @@ def order(t: Order, v: views.Html) -> Mark:
         raw = [_near(f(x), hay, t.max_diffs) for x in (t.before, t.after)]
         a, b = (_unglued(m, folded, kept) for m in raw)
         cut = [c or (bool(m) and not x) for c, m, x in zip(cut, raw, (a, b), strict=True)]
-        if a and b and any(x.start < y.start for x in a for y in b):
-            return True, ""
-        both = both or bool(a and b)
-        if all(any(not m.dist for m in x) for x in (a, b)): break
-    if both: return False, f"{t.before[:34]!r} does not appear before {t.after[:34]!r}"
+        if a and b: break
     if not a: return False, f"'before' text {t.before[:40]!r} {_why_missing(cut[0])}"
-    return False, f"'after' text {t.after[:40]!r} {_why_missing(cut[1])}"
+    if not b: return False, f"'after' text {t.after[:40]!r} {_why_missing(cut[1])}"
+    if any(x.start < y.start for x in a for y in b):
+        return True, ""
+    return False, f"{t.before[:34]!r} does not appear before {t.after[:34]!r}"
 
 
 class Repeat(NamedTuple):
@@ -165,18 +153,9 @@ class PageNearEmpty(NamedTuple):
     max_chars: int
 
 
-# Note: marks the text view writes for an element that holds nothing: the `$$` of an empty <math>, the
-# number of an empty list item, the value of a hidden input.
-_NOTHING = re.compile(
-    r"<math\b[^<>]*>\s*</math>|<li\b[^<>]*>\s*</li>|<input\b[^<>]*\btype=[\"']?hidden\b[^<>]*>", re.I)
-
-
 def page_near_empty(t: PageNearEmpty, v: views.Html) -> Mark:
-    """A blank page yields at most `max_chars` characters a reader sees outside image alt text: no white
-    space, no invisible format character (a zero-width space, a byte-order mark, a soft hyphen), and none of
-    the marks the text view writes for an element that holds nothing."""
-    seen = views.text(_NOTHING.sub("", v.html), alt=False)
-    n = sum(unicodedata.category(c) != "Cf" for c in re.sub(r"\s", "", seen))
+    """A blank page yields at most `max_chars` non-space characters outside image alt text."""
+    n = len(re.sub(r"\s", "", v.seen))
     return _mark(n <= t.max_chars, f"{n} non-space characters (limit {t.max_chars})")
 
 
@@ -281,8 +260,7 @@ def layout_kind(t: LayoutKind, blocks: Sequence[Block]) -> Mark:
 
 
 def holder(place: Sequence[Box], blocks: Sequence[Block]) -> Block | None:
-    """The smallest block covering at least MIN_PLACE_COVER of the place's area, or None; of blocks of equal
-    area (within `AREA_EPS`), the first listed.
+    """The smallest block covering at least MIN_PLACE_COVER of the place's area, or None.
 
     Note: coverage of the place, not IoU, since a vendor's block may rightly be larger than our place (a list
     for an item), and the smallest is the most specific."""
@@ -290,10 +268,7 @@ def holder(place: Sequence[Box], blocks: Sequence[Block]) -> Block | None:
     if total <= 0: return None
     held = [b for b in blocks
             if sum(_area(_intersection(x, b.bbox)) for x in place) / total >= MIN_PLACE_COVER - COVER_EPS]
-    best = None
-    for b in held:
-        if best is None or _area(b.bbox) < _area(best.bbox) - AREA_EPS: best = b
-    return best
+    return min(held, key=lambda b: _area(b.bbox), default=None)
 
 
 # --------------------------------------------------------------------------- registry
@@ -468,26 +443,23 @@ def _edges_ok(want: str, hay: str, folded: str = "", kept: list[int] | None = No
 
 
 def _near(want: str, hay: str, max_diffs: int) -> list:
-    """`want`'s matches in `hay` within `max_diffs` edits: every exact copy, and the best matches of each
-    run of overlapping ones at each budget from 1 to `max_diffs`, so a larger budget keeps every match a
-    smaller one found.
+    """`want`'s matches in `hay` within `max_diffs` edits, every exact copy among them.
 
-    Note: with an edit to spend, fuzzysearch keeps one match per run of overlapping ones, and a larger budget
-    makes longer runs: an exact copy overlapping another match ("a a" in "a a a a"), or a match one budget
-    found, would lose its start to a match that spends more edits.
+    Note: with an edit to spend, fuzzysearch keeps one match per run of overlapping ones, so an exact copy
+    overlapping another match ("a a" in "a a a a") would lose its start.
     Note: fuzzysearch picks that one match as the min of a set by (edits, -length); on a tie the pick
     followed set order, i.e. the string hash, so a verdict changed with PYTHONHASHSEED. Every match tied
     for best in its run is kept instead, which no hash order can change."""
     if not max_diffs or not want: return fuzzysearch.find_near_matches(want, hay, max_l_dist=max_diffs)
-    found: dict[tuple[int, int], fuzzysearch.Match] = {}
-    for k in range(1, max_diffs + 1):
-        for run in group_matches(find_near_matches_levenshtein(want, hay, k)):
-            best = min((m.dist, m.start - m.end) for m in run)
-            for m in run:
-                if (m.dist, m.start - m.end) == best: found.setdefault((m.start, m.end), m)
-    for i in (m.start() for m in re.finditer(f"(?={re.escape(want)})", hay)):
-        found[i, i + len(want)] = fuzzysearch.Match(i, i + len(want), 0, want)
-    return sorted(found.values())
+    found = []
+    for run in group_matches(find_near_matches_levenshtein(want, hay, max_diffs)):
+        best = min((m.dist, m.start - m.end) for m in run)
+        found += [m for m in run if (m.dist, m.start - m.end) == best]
+    found.sort()
+    spans = {(m.start, m.end) for m in found}
+    starts = [m.start() for m in re.finditer(f"(?={re.escape(want)})", hay)]
+    extra = [fuzzysearch.Match(i, i + len(want), 0, want) for i in starts if (i, i + len(want)) not in spans]
+    return found + extra
 
 
 def _unglue(want: str, hay: str, folded: str = "", kept: list[int] | None = None) -> str:

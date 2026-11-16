@@ -1,0 +1,368 @@
+## readme-scoring
+score-headline	headline 0.58 (text 0.75, tables 0.00, layout 1.00)
+score-subset	headline 0.75 (text 0.50, layout 1.00)
+score-missing-output	pass; fail: no tables found; fail: no blocks output
+score-malformed	fail: malformed html output; fail: malformed html output; fail: no blocks output
+score-failed-page	fail: no html output; fail: no html output; fail: no blocks output
+## text-ignored
+text-case	pass
+text-case-greek	pass
+text-spacing	pass
+text-markup	pass
+text-dash	pass
+text-quote	pass
+text-ligature	pass
+text-fullwidth	pass
+text-superscript	pass
+text-zero-width	pass
+text-footnote	pass
+text-sup-marker	pass
+text-sup-inside	pass
+text-leaders	pass
+text-bullet	pass
+text-line-hyphen	pass
+text-compound	pass
+text-checkbox	pass
+text-math-letter	pass
+text-math-symbol	pass
+text-middot	pass
+text-glued-dash	pass
+text-transposition	pass
+## text-blind
+text-strike	pass
+text-loop	pass
+text-longer-word	pass
+text-letter-beside	pass
+text-currency-extra	pass
+text-alt	pass
+text-exponent	pass
+text-sup-unit	pass
+text-table-flat	pass
+text-fuzzy-wrong-gold	pass
+text-short-fuzzy	pass
+## text-penalized
+text-changed	fail	'Total' not found (best 0.800 < 1.000); closest 'totel'
+text-over-budget	fail	'Total' not found (best 0.600 < 0.800); closest 'tutel'
+text-diacritic	fail	'naïve' not found (best 0.800 < 1.000); closest 'naive'
+text-punctuation	fail	'Mr. Smith' not found (best 0.941 < 1.000); closest 'mr smith'
+text-thousands	fail	'1,240' not found (best 0.889 < 1.000); closest '1240'
+text-decimal-comma	fail	'1.5' not found (best 0.667 < 1.000); closest '1,5'
+text-currency-lost	fail	'$5.00' not found (best 0.889 < 1.000); closest '5.00'
+text-extra-word	fail	'Hello World' not found (best 0.706 < 1.000); closest 'hello '
+text-word-order	fail	'Hello World' not found (best 0.667 < 1.000); closest 'world'
+text-checkbox-state	fail	'☒ Yes' not found (best 0.889 < 1.000); closest ' yes'
+text-homoglyph	fail	'l' not found (best 0.000 < 1.000); closest '1'
+text-literal-stars	fail	'Total Due' not found (best 0.778 < 1.000); closest 'otal** du'
+text-caret	fail	'x^2' not found (best 0.800 < 1.000); closest 'x2'
+text-sup-exponent	fail	'10 cells' not found (best 0.857 < 1.000); closest ' cells'
+text-sign-after-leaders	fail	'Revenue 4.8' not found (best 0.909 < 1.000); closest 'revenue -4.'
+text-case-mapping	fail	'straße' not found (best 0.800 < 1.000); closest 'stra'
+## text-digit-edge
+edge-digit-after	fail	'Total: 40' found only inside a longer number
+edge-digit-before	fail	'4.8' found only inside a longer number
+edge-sign	fail	'4.8' found only inside a longer number
+edge-plus	fail	'4.8' found only inside a longer number
+edge-separator	fail	'4.8' found only inside a longer number
+edge-one-clean	pass
+edge-hyphen	pass
+edge-paren	pass
+edge-end-digit	fail	'x1' found only inside a longer number
+edge-end-letter	pass
+edge-squeeze-glued	fail	'1 2' found only inside a longer number
+edge-squeeze-spaced	pass
+edge-squeeze-digits	pass
+edge-fuzzy	fail	'Total: 40' found only inside a longer number
+## number-gold
+gold-point	12.5
+gold-point-long	1.2345678
+gold-point-three	1.240
+gold-comma-three	1240
+gold-comma-zero	0.250
+gold-comma-short	refused
+gold-comma-long	1.2345
+gold-two-seps	1240.5
+gold-sign-percent	-4.8%
+## number-ignored
+num-space-width	pass
+num-currency	pass
+num-percent-space	pass
+num-minus	pass
+num-parens	pass
+num-stop	pass
+num-latex	pass
+num-sup	pass
+num-sup-before	pass
+num-stop-decimals	pass
+num-leaders	pass
+## number-blind
+num-letters	pass
+num-word-hyphen	pass
+num-context	pass
+num-percent-extra	pass
+## number-penalized
+num-digit	fail	'-4.8%' not found digit-for-digit
+num-thousands-none	fail	'1,240' not found digit-for-digit
+num-thousands-added	fail	'1240' not found digit-for-digit
+num-thousands-space	fail	'1,240' not found digit-for-digit
+num-thousands-dot	fail	'1,240' not found digit-for-digit
+num-decimal-comma	fail	'12.5' not found digit-for-digit
+num-longer	fail	'123' not found digit-for-digit
+num-longer-before	fail	'1,240' not found digit-for-digit
+num-decimals-extra	fail	'12.5' not found digit-for-digit
+num-decimals-lost	fail	'1,240.00' not found digit-for-digit
+num-fraction-after	fail	'12' not found digit-for-digit
+num-tail	fail	'12.5' not found digit-for-digit
+num-leading-zero	fail	'0.5' not found digit-for-digit
+num-sign-lost	fail	'-4.8%' present but sign lost
+num-sign-added	fail	'4.8' present but sign added
+num-percent-lost	fail	'4.8%' present but percent lost
+num-parens-negative	fail	'-4.8' present but sign lost
+num-word-sign	fail	'-19' present but sign lost
+num-split	fail	'1,240' not found digit-for-digit
+num-exponent	fail	'42' not found digit-for-digit
+num-script	fail	'42' not found digit-for-digit
+## latex-ignored
+tex-display	pass
+tex-delimiters	pass
+tex-environment	pass
+tex-mathml	pass
+tex-spacing	pass
+tex-bold	pass
+tex-upright	pass
+tex-function	pass
+tex-dfrac	pass
+tex-limits	pass
+tex-synonym	pass
+tex-arrow	pass
+tex-variant	pass
+tex-hat	pass
+tex-minus	pass
+tex-left-right	pass
+tex-full-stop	pass
+tex-join-blocks	pass
+tex-display-break	pass
+tex-text-middot	pass
+tex-plain-text	pass
+tex-plain-sup	pass
+tex-plain-sub	pass
+## latex-blind
+tex-letter-beside	pass
+tex-prefix	pass
+tex-unknown-macro	pass
+tex-unknown-four	pass
+tex-dot	pass
+tex-outside-span	pass
+tex-bare-line	pass
+tex-split-cells	pass
+## latex-penalized
+tex-case	fail	equation not found (4 symbols; the output's math has 4)
+tex-symbol	fail	equation not found (4 symbols; the output's math has 4)
+tex-blackboard	fail	equation not found (1 symbols; the output's math has 1)
+tex-bar	fail	equation not found (5 symbols; the output's math has 5)
+tex-times	fail	equation not found (3 symbols; the output's math has 3)
+tex-sum	fail	equation not found (1 symbols; the output's math has 1)
+tex-varrho	fail	equation not found (3 symbols; the output's math has 3)
+tex-epsilon-in	fail	equation not found (3 symbols; the output's math has 3)
+tex-term	fail	equation not found (4 symbols; the output's math has 7)
+tex-sign	fail	equation not found (5 symbols; the output's math has 6)
+tex-number	fail	equation not found (3 symbols; the output's math has 4)
+tex-decimals	fail	equation not found (3 symbols; the output's math has 4)
+tex-prose	fail	equation not found (3 symbols; the output's math has 2)
+tex-fraction-text	fail	equation not found (5 symbols; the output's math has 3)
+tex-decimal-comma	fail	equation not found (3 symbols; the output's math has 3)
+tex-en-dash	fail	equation not found (3 symbols; the output's math has 3)
+tex-math-bold	fail	equation not found (3 symbols; the output's math has 3)
+tex-unknown-five	fail	no math in the output
+tex-no-math	fail	no math in the output
+tex-one-symbol	fail	no math in the output
+tex-plain-near	fail	no math in the output
+tex-bare-prose	fail	no math in the output
+tex-displays-prose	fail	equation not found (6 symbols; the output's math has 6)
+## order-rules
+ord-pass	pass
+ord-fold	pass
+ord-leaders	pass
+ord-line-hyphen	pass
+ord-any-pair	pass
+ord-glued	pass
+ord-overlap	pass
+ord-alt	pass
+ord-reversed	fail	'Alpha' does not appear before 'Beta'
+ord-missing	fail	'before' text 'Alpha' not found
+ord-same-start	fail	'Alpha' does not appear before 'Alpha Beta'
+ord-table	fail	'Alpha' does not appear before 'Beta'
+ord-transposition	fail	'before' text 'Alpha' not found
+ord-transposition-2	pass
+ord-more-edits	pass
+ord-digit-edge	fail	'before' text 'Total: 40' found only inside a longer number
+ord-compound	fail	'before' text 'self-aware' not found
+ord-case-hyphen	fail	'before' text 'R- M' not found
+## repeat-rules
+rep-pass	pass
+rep-case	pass
+rep-spacing	pass
+rep-cell	pass
+rep-alt-ignored	pass
+rep-line-hyphen	pass
+rep-blocks-glue	pass
+rep-underscore	pass
+rep-sign	pass
+rep-missing	fail	'Total' appears 1x, not 2x
+rep-extra	fail	'Total' appears 3x, not 2x
+rep-longer-word	fail	'Total' appears 0x, not 1x
+rep-digit	fail	'Total' appears 0x, not 1x
+rep-typo	fail	'Total' appears 0x, not 1x
+rep-alt-only	fail	'Total' appears 0x, not 1x
+rep-overlap	fail	'aa' appears 0x, not 1x
+rep-compound	fail	'self-aware' appears 0x, not 1x
+## near-empty-rules
+ne-blank	pass
+ne-spaces	pass
+ne-alt	pass
+ne-folio	pass
+ne-spacing	pass
+ne-image-only	pass
+ne-one-over	fail	3 non-space characters (limit 2)
+ne-invisible	pass
+ne-empty-math	pass
+ne-empty-item	pass
+ne-hidden-input	pass
+ne-item-number	fail	3 non-space characters (limit 0)
+ne-text	fail	8 non-space characters (limit 0)
+ne-cell	fail	1 non-space characters (limit 0)
+## cell-ignored
+cell-match	pass
+cell-case	pass
+cell-spacing	pass
+cell-bold	pass
+cell-alt-beside	pass
+cell-alt-only	pass
+cell-line	pass
+cell-second-table	pass
+cell-line-hyphen	pass
+cell-up	pass
+cell-left	pass
+cell-right-heading	pass
+cell-right-heading-last	pass
+cell-rtl-reading-order	pass
+cell-top-heading	pass
+cell-top-heading-outer	pass
+cell-headings-merged	pass
+cell-headings-beside	pass
+cell-section	pass
+cell-row-group	pass
+## cell-blind
+cell-insertions	pass
+cell-short	pass
+cell-dir-rtl	pass
+cell-any-table	pass
+cell-headings-td	pass
+## cell-penalized
+cell-changed	fail	no cell matching '1,240' in any table
+cell-format	fail	no cell matching '1,240' in any table
+cell-extra-text	fail	no cell matching '1,240' in any table
+cell-extra-decimal	fail	no cell matching '5' in any table
+cell-sup	fail	no cell matching '1,240' in any table
+cell-bracket	fail	no cell matching '1,240' in any table
+cell-stars	fail	no cell matching '1,240' in any table
+cell-paragraphs	fail	no cell matching '2024-01' in any table
+cell-right-heading-wrong	fail	cells matching '1,240' found, but: right_heading 'sum' doesn't match 'total' (0.00)
+cell-rtl-page-order	fail	cells matching '1,240' found, but: left_heading '٣' doesn't match 'المجموع' (0.00)
+cell-heading-self	pass
+cell-edge-self	fail	cells matching '5' found, but: no right_heading cell
+cell-heading-own-row	pass
+cell-heading-other-row	fail	cells matching '5' found, but: right_heading 'z' doesn't match 'h' (0.00)
+cell-up-wrong	fail	cells matching '1,300' found, but: up '1,240' doesn't match '9' (0.00)
+cell-top-heading-wrong	fail	cells matching '1,240' found, but: top_heading 'total' doesn't match 'year' (0.22)
+cell-headings-swapped	fail	cells matching '5' found, but: not under the headings 'A > Group'
+cell-section-wrong	fail	cells matching '6' found, but: not in the section 'Cohort 2' (nearest above: 'Cohort 1')
+cell-row-group-wrong	fail	cells matching '6' found, but: not in the row groups 'Female'
+cell-no-table	fail	no tables found
+cell-compound	fail	no cell matching 'self-aware' in any table
+## layout-rules
+lay-match	pass
+lay-list-is-text	pass
+lay-smallest	pass
+lay-half	pass
+lay-page-block	pass
+lay-text-unread	pass
+lay-tie	pass
+lay-tie-shapes	pass
+lay-wrong-label	fail	its block is labelled 'caption', not 'text': ''
+lay-heading-list	fail	its block is labelled 'list', not 'heading': ''
+lay-small-wrong	fail	its block is labelled 'heading', not 'text': ''
+lay-too-little	fail	no block covers 50% of its place
+lay-none	fail	no block covers 50% of its place
+## internals-markdown
+md-emphasis	bold it del code
+md-list	29. item - bullet
+md-image	chart of sales
+md-table	A | B | 1 | 2
+md-no-separator	no table
+md-amounts	a | b | c | $5 | x_1 | US$6
+md-math-cell	a | b | $x_1 | y$ | (empty)
+## internals-views
+view-tags	total due
+view-sub	h2o
+view-sup	1,240 1
+view-sup-before	1 -4.8 and x 2y
+view-ol	3. item
+view-input	name: bob
+view-checkbox	☒ yes
+view-hidden	body
+view-cells	a b c
+view-alt	see chart
+view-seen	see
+## internals-fold
+fold-math	cmc and 2.55
+fold-hyphen	developers, r- m
+fold-hyphen-block	headquarters developers
+fold-superscript	1,240 1
+fold-nfkc	final 12 m2 h2o 1/2 no
+fold-invisible	ab ab
+fold-checkbox	☒ yes ☐ no ☒ ok
+fold-footnote	smith 1 and 12 jones
+fold-bullet	one • two
+fold-leaders	name 5 a b c d
+fold-leaders-block	a _ __ b c
+fold-leader-cjk	目次 5 第一章 8
+fold-leader-sign	revenue -4.8
+fold-blank	name: __
+fold-typography	a-b a-b it's "hi" a b →
+fold-cjk	日本語.3%
+fold-middot	2.3 2⋅3
+fold-case	strasse straße α
+fold-kept	naïve mr. $5.00 **x**
+## internals-dollars
+dollar-pairs	a and b
+dollar-price	costs $5 and x2
+dollar-two-prices	$92,000; net +$60,000
+dollar-tie	cost $ and x now
+dollar-block	$a b$
+dollar-br	x1
+dollar-hug	p < 0.05
+dollar-padded	$p < 0.05 $
+dollar-pad-page	ab and x1
+dollar-pad-alone	$ ab $
+dollar-prose	$the quick brown fox$
+dollar-entity	x2
+dollar-escaped	x \$5 and \$6
+dollar-paren	$5.00 a2 $
+## internals-hyphen
+hyph-present	pass
+hyph-order	fail	'before' text 'self-aware' not found
+hyph-repeat	fail	'self-aware' appears 0x, not 1x
+hyph-cell	fail	no cell matching 'self-aware' in any table
+hyph-unspaced	fail	'develop-ers' not found (best 0.952 < 1.000); closest 'developers'
+## internals-edits
+edits-1	3050 cases, 0 passed above budget, 0 failed within budget
+edits-1-swap	1021 cases, 820 passed above budget, 0 failed within budget
+edits-2	2229 cases, 0 passed above budget, 0 failed within budget
+edits-2-swap	1782 cases, 1016 passed above budget, 0 failed within budget
+## internals-loader
+load-md-max	refused
+load-md-ok	loads
+load-repeat-md	refused
+load-shared-md	refused
+load-empty	refused
+load-latex-empty	refused
