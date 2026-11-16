@@ -1,6 +1,8 @@
 """Each runner on a hand-written output: the cases each runner's docstring describes."""
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from omni_parse_bench import views
@@ -337,3 +339,82 @@ def test_cell_headings_allow_exactly_max_diffs_edits(n, k):
     table = html(f"<table><tr><th>{got}</th></tr><tr><td>1,240</td></tr></table>")
     assert R.table_cell(R.TableCell("1,240", {}, k, headings=(want,)), table)[0]
     assert not R.table_cell(R.TableCell("1,240", {}, k - 1, headings=(want,)), table)[0]
+
+
+# --------------------------------------------------------------------------- right-to-left tables
+# A right-to-left table written in reading order puts its first cell at the right edge. The roles follow
+# the html's order, so it reads the same as its mirrored left-to-right table.
+
+RTL_ROW = ("<table><tr><th>المجموع</th><td>1,240</td><td>٣</td></tr></table>", "المجموع", "1,240", "٣")
+LTR_ROW = ("<table><tr><th>Total</th><td>1,240</td><td>3</td></tr></table>", "Total", "1,240", "3")
+
+
+@pytest.mark.parametrize("markup, label, cell, last", [RTL_ROW, LTR_ROW])
+def test_left_heading_is_the_first_cell_of_the_row_in_html_order(markup, label, cell, last):
+    table = html(markup)
+    assert R.table_cell(R.TableCell(cell, {"left_heading": label}, 0), table)[0]
+    assert not R.table_cell(R.TableCell(cell, {"left_heading": last}, 0), table)[0]
+
+
+@pytest.mark.parametrize("markup, first, cell, label", [
+    ("<table><tr><td>٣</td><td>1,240</td><th>المجموع</th></tr></table>", "٣", "1,240", "المجموع"),
+    ("<table><tr><td>3</td><td>1,240</td><th>Total</th></tr></table>", "3", "1,240", "Total"),
+])
+def test_right_heading_is_the_last_cell_of_the_row_in_html_order(markup, first, cell, label):
+    table = html(markup)
+    assert R.table_cell(R.TableCell(cell, {"right_heading": label}, 0), table)[0]
+    assert not R.table_cell(R.TableCell(cell, {"right_heading": first}, 0), table)[0]
+
+
+def test_dir_rtl_does_not_change_the_roles():
+    table = html('<table dir="rtl"><tr><th>المجموع</th><td>1,240</td><td>٣</td></tr></table>')
+    t = R.TableCell("1,240", {"left_heading": "المجموع", "left": "المجموع", "right": "٣"}, 0)
+    assert R.table_cell(t, table)[0]
+
+
+def test_right_heading_skips_empty_cells_like_left_heading():
+    table = html("<table><tr><td>1,240</td><td></td><th>Total</th></tr></table>")
+    assert R.table_cell(R.TableCell("1,240", {"right_heading": "Total"}, 0), table)[0]
+
+
+def test_right_heading_takes_a_max_diffs_edit():
+    table = html("<table><tr><td>1,240</td><th>Totaal</th></tr></table>")
+    assert R.table_cell(R.TableCell("1,240", {"right_heading": "Total"}, 1), table)[0]
+    assert not R.table_cell(R.TableCell("1,240", {"right_heading": "Total"}, 0), table)[0]
+
+
+def _mirror(markup: str) -> str:
+    """The same table with each row's cells in reverse order."""
+    rows = re.findall(r"<tr>(.*?)</tr>", markup)
+    cells = lambda row: re.findall(r"<t[hd].*?</t[hd]>", row)  # noqa: E731
+    return "<table>" + "".join("<tr>" + "".join(reversed(cells(r))) + "</tr>" for r in rows) + "</table>"
+
+
+# (table, the label at the start of the 1,240 row, the label at its end)
+MIRROR_CASES = [
+    ("<table><tr><th>Total</th><td>1,240</td><th>Sum</th></tr></table>", "Total", "Sum"),
+    ("<table><thead><tr><th>Item</th><th>Value</th><th>Rank</th></tr></thead>"
+     "<tr><th>Total</th><td>1,240</td><th>Sum</th></tr></table>", "Total", "Sum"),
+    ("<table><tr><th>A</th><td>x</td><th>B</th></tr><tr><th>Total</th><td>1,240</td><th>Sum</th></tr></table>",
+     "Total", "Sum"),
+]
+
+
+@pytest.mark.parametrize("markup, start, end", MIRROR_CASES)
+def test_a_mirrored_table_swaps_left_heading_and_right_heading(markup, start, end):
+    table, mirrored = html(markup), html(_mirror(markup))
+    for a, b, label in (("left_heading", "right_heading", start), ("right_heading", "left_heading", end)):
+        assert R.table_cell(R.TableCell("1,240", {a: label}, 0), table)[0]
+        assert R.table_cell(R.TableCell("1,240", {b: label}, 0), mirrored)[0]
+        assert not R.table_cell(R.TableCell("1,240", {b: label}, 0), table)[0]
+
+
+def test_right_heading_falls_back_to_the_last_cell_when_no_th_is_found():
+    table = html("<table><tr><td>1,240</td><td>3</td><td>Sum</td></tr></table>")
+    assert R.table_cell(R.TableCell("1,240", {"right_heading": "Sum"}, 0), table)[0]
+    assert not R.table_cell(R.TableCell("1,240", {"right_heading": "3"}, 0), table)[0]
+
+
+def test_right_heading_reads_a_colspan_cell_at_the_end_of_the_row():
+    table = html("<table><tr><td>1,240</td><th colspan='2'>Sum</th></tr></table>")
+    assert R.table_cell(R.TableCell("1,240", {"right_heading": "Sum"}, 0), table)[0]

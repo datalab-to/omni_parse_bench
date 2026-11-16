@@ -19,7 +19,7 @@ from . import runners
 FIELDS = ("id", "test_type", "output_type", "derivation", "tags", "args", "settings")
 KINDS = {"text": ("text", "max_diffs"), "number": ("number",), "latex": ("latex",)}
 OPTIONAL = {"text": ("place",)}     # fields an arg of that kind may have
-RELATIONS = ("up", "down", "left", "right", "top_heading", "left_heading")
+RELATIONS = ("up", "down", "left", "right", "top_heading", "left_heading", "right_heading")
 # The roles of each test type's args, the content it compares. Not `vocab.ROLES`, which are tags.
 ARG_ROLES = {
     "present": ("content",),

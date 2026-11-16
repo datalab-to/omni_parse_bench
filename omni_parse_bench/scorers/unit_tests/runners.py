@@ -147,7 +147,8 @@ def repeat(t: Repeat, v: views.Html) -> Mark:
 
 class TableCell(NamedTuple):
     cell: str
-    relations: dict[Literal["up", "down", "left", "right", "top_heading", "left_heading"], str]
+    relations: dict[Literal["up", "down", "left", "right",
+                            "top_heading", "left_heading", "right_heading"], str]
     max_diffs: int
     headings: tuple[str, ...] = ()      # the headings over its column, top to bottom
     section: str | None = None          # the section row nearest above it
@@ -481,7 +482,8 @@ def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_di
     """Why the cell at `rc` fails one relation, or "" when it holds."""
     thr = _cell_threshold(want, max_diffs)
     if kind.endswith("_heading"):
-        cells = tables.heading(table, rc, "up" if kind == "top_heading" else "left")
+        walk = {"top_heading": "up", "left_heading": "left", "right_heading": "right"}
+        cells = tables.heading(table, rc, walk[kind])
     else:
         # Note: an empty neighbour stands for the value written over it, above for left and right,
         # beside for up and down: a value over empty cells spans them.

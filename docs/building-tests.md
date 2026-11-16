@@ -88,7 +88,7 @@ It reads as: "some table in the output has a cell `167.8`, under the column head
 | present | `content` | | the arg is in the html |
 | order | `before`, `after` | | `before` is found before `after` in the html |
 | repeat | `content` | `expected_count` | the arg appears exactly that many times in the html, as whole words |
-| table_cell | `cell`; optional `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `section`; optional lists `headings`, `row_groups` | | some table in the html has the cell, with these neighbors and headings |
+| table_cell | `cell`; optional `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `section`; optional lists `headings`, `row_groups` | | some table in the html has the cell, with these neighbors and headings |
 | layout_kind | `content`, with its `place` | `kind` | the smallest block covering at least half of the place is labeled `kind` (one of `views.LABELS`); for `text`, a `list` or `form` block (a list item, or a form field or key-value pair) passes too |
 
 The table_cell roles mean:
@@ -96,10 +96,20 @@ The table_cell roles mean:
 - `cell`: the cell being checked. Always present;
 - `up`, `down`, `left`, `right`: the cell next to it in that direction;
 - `top_heading`: the heading over its column;
-- `left_heading`: the label at the start of its row;
+- `left_heading`: the label at the start of its row: the nearest heading cell before it in the html's order, else the first cell of the row;
+- `right_heading`: the label at the end of its row: the nearest heading cell after it in the html's order, else the last cell of the row;
 - `headings`: every heading over its column, from the top down;
 - `section`: the nearest row above it that holds one label, such as "A. Overall cohort"; and
 - `row_groups`: the cells to its left that span its row and others, from left to right.
+
+`left`, `right`, `left_heading` and `right_heading` follow the order of the cells in the html, which is reading
+order: the cell before, the cell after, and the label at the start or the end of the row. A right-to-left table
+written in reading order puts its first cell at the right edge, so `left_heading` is the label at the right edge
+of the page and `right_heading` the one at the left edge. The same test then reads the same on a left-to-right
+table and its mirror. The scorer doesn't read `dir`, so `dir="rtl"` changes nothing: write the roles in the
+order of the html, not of the page. A model that copies an RTL table in page order, left to right, fails these
+tests, the same way one that reads an RTL page's columns left to right fails an `order` test. For example, an Arabic row `<th>المجموع</th><td>1,240</td>` is
+`{"cell": "1,240", "left_heading": "المجموع"}`.
 
 The neighbor roles (`up`, `left`, `top_heading`, ...) come from olmOCR-bench's and fr-bench-pdf2md's
 table tests. `headings`, `section` and `row_groups` come from the PubMed Central tests (and our
