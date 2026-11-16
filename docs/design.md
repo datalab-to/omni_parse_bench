@@ -73,7 +73,7 @@ equations and table-cell comparisons retain their existing rules.
 | `present` | `html` | this content appears | `content` | text | 7,291 |
 | `order` | `html` | A comes before B | `before`, `after` (text) | text | 1,189 |
 | `repeat` | `html` | this line appears exactly N times | `content` (text); `expected_count` | text | 35 |
-| `table_cell` | `html` | this cell exists with these neighbors, under these headings, in this section and in these row groups; the cell may be one line of a multi-line cell | `cell`, `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `headings`, `section`, `row_groups` (text) | tables | 5,386 |
+| `table_cell` | `html` | this cell exists with these neighbors, under these headings, in this section and in these row groups; the cell may be one line of a multi-line cell | `cell`, `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `headings`, `section`, `row_groups` (text) | tables | 5,386 |
 | `layout_kind` | `blocks` | the smallest block covering half of this line's place has this kind | `content` (text with a `place`); `kind` | layout | 2,403 |
 
 Of the `present` tests, 3,700 compare text, 3,268 an equation and 323 a number.

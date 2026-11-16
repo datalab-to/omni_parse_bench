@@ -60,24 +60,29 @@ def table(p: runners.TableCell) -> str:
     """A table holding the cell where its args put it.
 
     Columns: an empty first column (so no row reads as a section label), the row groups, the
-    left_heading (a <th>), left, the cell, right. Rows: each heading (a <th> over the cell), the
-    top_heading (a <th>), the section (one cell across the table), up, the cell's row, down."""
+    left_heading (a <th>), left, the cell, right, right_heading (a <th>). Rows: each heading (a <th>
+    over the cell), the top_heading (a <th>), the section (one cell across the table), up, the cell's row,
+    down."""
     r = p.relations
-    cols = ["", *p.row_groups, r.get("left_heading"), r.get("left"), p.cell, r.get("right")]
-    width, at = len(cols), len(cols) - 2
+    cols = ["", *p.row_groups, r.get("left_heading"), r.get("left"), p.cell, r.get("right"),
+            r.get("right_heading")]
+    width, at = len(cols), len(cols) - 3
 
     def row(cells: Sequence[str | None], th: Sequence[int] = ()) -> str:
         tag = lambda j: "th" if j in th else "td"  # noqa: E731
         return "<tr>" + "".join(f"<{tag(j)}>{_html.escape(x or '')}</{tag(j)}>"
                                 for j, x in enumerate(cells)) + "</tr>"
 
-    over = lambda x: row([None] * at + [x, None], th=(at,))  # noqa: E731
+    pad = [None] * (width - at - 1)
+    over = lambda x: row([None] * at + [x, *pad], th=(at,))  # noqa: E731
     rows = [over(h) for h in p.headings]
     if "top_heading" in r: rows.append(over(r["top_heading"]))
     if p.section: rows.append(f"<tr><td colspan='{width}'>{_html.escape(p.section)}</td></tr>")
-    if "up" in r: rows.append(row([None] * at + [r["up"], None]))
-    rows.append(row(cols, th=(len(p.row_groups) + 1,) if "left_heading" in r else ()))
-    if "down" in r: rows.append(row([None] * at + [r["down"], None]))
+    if "up" in r: rows.append(row([None] * at + [r["up"], *pad]))
+    th = ((len(p.row_groups) + 1,) if "left_heading" in r else ()) \
+        + ((width - 1,) if "right_heading" in r else ())
+    rows.append(row(cols, th=th))
+    if "down" in r: rows.append(row([None] * at + [r["down"], *pad]))
     return "<table>" + "".join(rows) + "</table>"
 
 
