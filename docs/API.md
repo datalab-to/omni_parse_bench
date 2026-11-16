@@ -15,8 +15,9 @@ Contents:
 6. [Adapters](#adapters): the systems, and your own;
 7. [The dataset](#the-dataset): its folder, its manifest and its tests;
 8. [Your own scorer](#your-own-scorer): grading another way;
-9. [What a run writes](#what-a-run-writes): the files, and slicing them; and
-10. [Intervals and comparisons](#intervals-and-comparisons): how far a score can be trusted.
+9. [What a run writes](#what-a-run-writes): the files, and slicing them;
+10. [Intervals and comparisons](#intervals-and-comparisons): how far a score can be trusted; and
+11. [Reliability](#reliability): which slices rank systems reproducibly.
 
 ## Run
 
@@ -368,11 +369,18 @@ opb compare RUN_A RUN_B [--resamples 1000] [--seed 0] [--level 0.95]
 ```
 
 `opb intervals` prints the summary's shape (`headline`, `families`, `per_tag`, `per_suite`, `per_test_type`,
-`per_arg_kind`, `per_derivation`) with each entry as `{"score", "low", "high", "tests", "documents", "draws"}`,
+`per_arg_kind`, `per_derivation`) with each entry as `{"score", "low", "high", "tests", "documents", "effective_documents", "draws"}`,
 `low` and `high` being the central `--level` of its score over `--resamples` draws of the documents (a cluster
 bootstrap). Every entry shares each draw, so the headline and the families agree. A slice with no tests is left
 out. The headline is a mean over every family, so a draw missing a family is not one of its draws; `draws` is
 how many draws an entry was present in.
+
+Scores are pooled over tests, so a document with many tests weighs more than one with a few, and the
+bootstrap, which draws whole documents, already reflects that. `documents` is a raw count;
+`effective_documents` is what the information is worth: the sum of the documents' test counts squared over the sum
+of their squares, which is the document count when the documents are the same size and falls as they differ (for
+`compare`, over the paired documents, using the mean of the two runs' counts). Documents hold from 1 to over 100
+tests, and the tests in one are strongly correlated, so a slice of 54 documents can act like about 30.
 
 `low` and `high` are null for an entry of fewer than 5 documents, or one absent from more than 5% of the draws:
 the draws left would be those where it was present, and would show a score as surer than it is. A percentile
@@ -380,7 +388,7 @@ interval on few documents is also optimistic: in a simulation a 95% interval cov
 the time at 10 documents and 93% at 30. Read a slice of few documents as rough.
 
 `opb compare` uses the documents both runs have, one draw for both, and prints for the headline, each family and
-each slice `{"a", "b", "gap", "low", "high", "documents", "draws", "excludes_zero"}`: `gap` is A minus B, and
+each slice `{"a", "b", "gap", "low", "high", "documents", "effective_documents", "draws", "excludes_zero"}`: `gap` is A minus B, and
 `excludes_zero` is whether its interval leaves out 0 (false when the interval is null). It says nothing about
 significance across slices: with many slices, some will exclude 0 by chance. `a` and `b` are scores over the
 paired documents only, so they need not equal each run's own summary, and an entry's `documents` is the union of
@@ -404,3 +412,57 @@ uncertainty.paired(pages_a, pages_b, resamples=1000, seed=0, level=0.95)
 Pages of one `document` are one cluster. Copies of a page, or one source under several `document` values, count
 as separate documents, and an interval covers this dataset's documents only: see
 [design](design.md#score) for why.
+
+## Reliability
+
+A slice that ranks systems the same way on different documents is reliable; one that does so by something the
+other tests don't capture is worth reading on its own.
+
+```
+opb reliability RUN RUN RUN RUN RUN ... [--splits 100] [--seed 0] [--threshold 0.7] [--min-documents 10] [--random-halves] [--flagged]
+```
+
+It needs at least 5 graded runs (a rank correlation over fewer systems takes too few values to say anything),
+named by their folders, and prints JSON to stdout. It uses the documents every run has, with the same number of
+tests in each (the rest are counted in `documents_dropped`), splits them into two halves `--splits` times (the
+same splits for every slice and run), and takes each run's pass rate on the slice in each half. The halves are
+balanced by test count: the documents, ordered by their number of tests, are cut into consecutive pairs and each
+pair is split between the halves at random (an odd one out goes to a random half), so the halves hold nearly equal
+numbers of tests, which matters because scores are pooled over tests and a few large documents would otherwise
+fall mostly in one half. `--random-halves` (`balanced=False`) splits the documents purely at random instead.
+
+- `agreement` is the median over splits of the Spearman correlation between the two halves' rankings of the runs
+  (ties by average rank), stepped up with Spearman-Brown, `2r / (1 + r)` (r is clipped to [-1, 1], and -1 stays
+  -1).
+- `beyond_headline` fits, in each half, the runs' slice pass rates on their pass rates on the other tests by
+  least squares across the runs, and takes the same corrected correlation between half A's residuals and half B's.
+  It asks whether the slice ranks the runs by something the other tests don't. (The name is the stable key; the
+  quantity is not the headline.)
+- `flag` is true when `beyond_headline` is below `--threshold`, and then `kind` is `noisy` if `agreement` is below it
+  too (the slice cannot rank these runs reproducibly at all), else `redundant` (it ranks them, but only as the other
+  tests do). A slice that is not flagged ranks the runs reproducibly by more than the other tests.
+
+The other tests are all the tests outside the slice, taken from each page line's `tests` and `passed` less the
+slice's. A test with several tags counts under each of them, so the other tests of a tag slice leave out only the
+tests that carry that tag, and co-tagged tests stay in the other tests of the other tags.
+
+Each slice (the kinds `intervals` prints) holds `{"documents", "effective_documents", "tests", "agreement", "beyond_headline", "flag",
+"splits_used": {"agreement", "beyond_headline"}}`, and `kind` when flagged. A split is skipped for a number when it
+is undefined: a half has no slice tests (or, for `beyond_headline`, no tests outside the slice), or the runs'
+pass rates in a half (for `beyond_headline`, their pass rates on the other tests) have no variance. A number
+undefined in more than 20% of the splits is null, with a `reason`, and `flag` is false. A slice of fewer than
+`--min-documents` effective documents (compared with `effective_documents`, not the raw `documents`: ten documents
+of which one holds nearly all the tests are worth about one), or one covering all the tests ("no tests outside the slice"), also has null numbers.
+The counts `slices_with_numbers` and `slices_without_numbers` always cover every slice, also with `--flagged`,
+which prints only the flagged ones.
+
+The flag depends on the runs given: a few near-identical systems rank by noise, and a half of few documents is
+noisy. It says a slice can't rank these systems reproducibly, or only as the other tests do, on this dataset, not
+that its tests are wrong, and it isn't corrected for reading many slices at once. In Python:
+
+```python
+from omni_parse_bench import uncertainty
+
+uncertainty.reliability({"run-a": pages_a, "run-b": pages_b, ...},   # at least 5
+                        splits=100, seed=0, threshold=0.7, min_documents=10)
+```
