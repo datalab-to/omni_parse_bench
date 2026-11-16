@@ -102,12 +102,15 @@ TAG_DEFINITIONS = {
                     "scan or photo that shows two facing pages. Doesn't count: content that runs across the "
                     "full width (a title, or a table or figure spanning all columns), or the columns of a "
                     "table on a page that isn't laid out in columns.",
-    "tiny": "The content is printed small: noticeably smaller than the page's ordinary body text, as fine "
-            "print is, about 6 pt or less on a printed page. Counts: footnotes and legal fine print set "
-            "small, dense small type in tables or forms, small labels on drawings. Doesn't count: text set "
-            "a little smaller than body text, such as a running header; ordinary body text in a "
-            "low-resolution image; or text that only looks small because the whole page is photographed "
-            "from far away or, for a large sheet, shrunk to fit the image.",
+    "tiny": "The content is printed small: fine print, about 6.5 pt or less on a printed page, or visibly "
+            "smaller than the page's ordinary body text in the way fine print is. Counts: footnotes and "
+            "legal fine print set small, dense small type on forms, small labels on drawings, a line at "
+            "6 pt on a page whose body text is 10 pt. Doesn't count: ordinary table text at 7 to 9 pt "
+            "unless it is visibly smaller than the page's body text, text set a little smaller than body "
+            "text such as a running header, ordinary body text in a low-resolution image, or text that "
+            "only looks small because the whole page is photographed from far away or, for a large sheet, "
+            "shrunk to fit the image. When the size can't be told, judge by the page: would a reader call "
+            "this fine print?",
     "rotated": "The content's text is turned or tilted enough that a reader notices, as seen in the image: "
                "by about 90 or 180 degrees, set vertically, or tilted by about 5 degrees or more. Counts: a "
                "page turned on its side or upside down, vertical text, a table set sideways, a page "
