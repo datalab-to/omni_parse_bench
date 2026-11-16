@@ -297,47 +297,72 @@ def _spearman(x: Sequence[float], y: Sequence[float]) -> float | None:
 
 
 def _brown(r: float | None) -> float | None:
-    """Spearman-Brown: the correlation of the two halves, stepped up to that of the whole."""
-    return None if r is None or r <= -1 else 2 * r / (1 + r)
+    """Spearman-Brown: the correlation of the two halves, stepped up to that of the whole, `2r / (1 + r)`.
+    `r` is clipped to [-1, 1], -1 maps to -1 (the step is undefined there), and the result is clipped to
+    [-1, 1]."""
+    if r is None:
+        return None
+    r = max(-1.0, min(1.0, r))
+    return -1.0 if r == -1 else max(-1.0, min(1.0, 2 * r / (1 + r)))
 
 
-MIN_SYSTEMS = 3
-MAX_SKIPPED = 0.2     # a slice whose ranking is undefined in more than this share of splits has no numbers
+def _residuals(y: Sequence[float], x: Sequence[float]) -> list[float] | None:
+    """What is left of `y` after an ordinary least squares fit on `x` (across the systems), or None when
+    `x` has no variance."""
+    n = len(x)
+    mx, my = sum(x) / n, sum(y) / n
+    sxx = sum((a - mx) ** 2 for a in x)
+    if not sxx:
+        return None
+    slope = sum((a - mx) * (b - my) for a, b in zip(x, y, strict=True)) / sxx
+    return [b - my - slope * (a - mx) for a, b in zip(x, y, strict=True)]
+
+
+MIN_SYSTEMS = 5      # Spearman over fewer systems takes too few values to say anything
+MAX_SKIPPED = 0.2     # a number undefined in more than this share of the splits is left out
 
 
 def reliability(runs: Mapping[str, Iterable[Mapping[str, Any]]], *, splits: int = 100, seed: int = 0,
                 threshold: float = 0.7, min_documents: int = 10) -> dict[str, Any]:
-    """Whether each slice can rank the systems in `runs` (name: score lines) reproducibly, by split-half
-    over documents. For each of `splits` random halves of the documents (the same for every slice and
-    system), each system's pass rate on the slice is taken in half A and in half B; `agreement` is the
-    median over splits of the Spearman correlation (ties by average rank) between the two halves' rankings
-    of the systems, stepped up with Spearman-Brown, r' = 2r / (1 + r). `beyond_headline` is the same after
-    taking from each system's slice pass rate, in each half, its pass rate on all the tests outside the
-    slice in that half, so that "good systems are good everywhere" is removed and what is left is what the
-    slice says that the rest of the benchmark does not. A slice is `flag`ged when `beyond_headline` is
-    below `threshold`.
+    """Whether each slice ranks the systems in `runs` (name: score lines) reproducibly, and whether it does
+    so beyond what the rest of the benchmark does, by split-half over documents. For each of `splits`
+    random halves of the documents (the same for every slice and system), each system's pass rate on the
+    slice is taken in half A and in half B. `agreement` is the median over splits of the Spearman
+    correlation (ties by average rank) between the two halves' rankings of the systems, stepped up with
+    Spearman-Brown (`_brown`). `beyond_headline` fits, in each half, the systems' slice pass rates on their
+    pass rates on the other tests (all tests outside the slice, in that half) by least squares across the
+    systems, and takes the Spearman-Brown corrected correlation between half A's residuals and half B's:
+    whether the slice ranks the systems by something the other tests don't. A slice is `flag`ged when
+    `beyond_headline` is below `threshold`, and then `kind` is "noisy" if `agreement` is below it too (the
+    slice can't rank these systems reproducibly at all), else "redundant" (it ranks them, but only as the
+    other tests do).
 
     The slices are those of `intervals`: `{kind: {key: {"documents", "tests", "agreement",
-    "beyond_headline", "flag", "splits_used"}}}`, an entry with no numbers saying why in `reason`: fewer
-    than `min_documents` documents, a test count that differs between systems, or a ranking undefined (no
-    variance in a half, no tests outside the slice) in more than 20% of the splits. Such an entry is not
-    flagged. Raises ValueError for fewer than 3 systems, or no document all of them have.
+    "beyond_headline", "flag", "splits_used": {"agreement", "beyond_headline"}}}}`, with `kind` when
+    flagged. An entry without a number says why in `reason`, and is not flagged: fewer than
+    `min_documents` documents, a test count that differs between systems, no tests outside the slice, or
+    the number undefined in more than 20% of the splits. A split is undefined for `agreement` when a half
+    has no slice tests or the systems' pass rates in it have no variance, and for `beyond_headline`
+    also when a half has no tests outside the slice or the systems' pass rates on them have no variance;
+    each number counts its own splits (`splits_used`). Raises ValueError for fewer than 5 systems, or no
+    document all of them have.
 
     Only documents every system has, with the same number of tests in each, are used; the others are
     counted in `documents_dropped`. The tests outside a slice are the page lines' `tests` and `passed` less
     the slice's, so a test with several tags counts under each of them, and the other tests of a tag slice
-    leave out only the tests that carry that tag.
+    leave out only the tests that carry that tag: co-tagged tests stay in them for the other tags.
 
     Note: the numbers depend on which systems are in `runs`: a few near-identical systems rank by noise,
-    and so does a half of few documents. They say a slice cannot rank these systems reproducibly on this
-    dataset, not that its tests are wrong, and nothing here corrects for looking at many slices at once."""
+    and so does a half of few documents. They say a slice can't rank these systems reproducibly, or only
+    as the other tests do, on this dataset, not that its tests are wrong, and nothing here corrects for
+    looking at many slices at once."""
     if isinstance(splits, bool) or not isinstance(splits, int) or splits < 10:
         raise ValueError(f"splits must be an integer of at least 10, not {splits!r}")
     if isinstance(min_documents, bool) or not isinstance(min_documents, int) or min_documents < 2:
         raise ValueError(f"min_documents must be an integer of at least 2, not {min_documents!r}")
     if len(runs) < MIN_SYSTEMS:
-        raise ValueError(f"reliability needs at least {MIN_SYSTEMS} systems, got {len(runs)}: with fewer, "
-                         "a ranking of them says nothing")
+        raise ValueError(f"reliability needs at least {MIN_SYSTEMS} systems, got {len(runs)}: a rank "
+                         "correlation over fewer takes too few values to say anything")
     lines = {name: list(pages) for name, pages in runs.items()}
     tables = {name: _table(pages) for name, pages in lines.items()}
     totals: dict[str, dict[str, list[int]]] = {}
@@ -388,12 +413,15 @@ def reliability(runs: Mapping[str, Iterable[Mapping[str, Any]]], *, splits: int 
             idx = sorted({index[d] for p in per.values() for d in p})
             n = [per[names[0]].get(docs[i], (0, 0))[0] for i in idx]
             entry: dict[str, Any] = {"documents": len(idx), "tests": sum(n), "agreement": None,
-                                     "beyond_headline": None, "flag": False, "splits_used": 0}
+                                     "beyond_headline": None, "flag": False,
+                                     "splits_used": {"agreement": 0, "beyond_headline": 0}}
             reason = None
             if any([per[s].get(docs[i], (0, 0))[0] for i in idx] != n for s in names):
                 reason = "the systems do not have the same tests for this slice"
             elif len(idx) < min_documents:
                 reason = f"fewer than {min_documents} documents"
+            elif sum(n) >= sum(total_n):
+                reason = "no tests outside the slice"
             if reason:
                 out[kind][key] = entry | {"reason": reason}
                 continue
@@ -401,33 +429,44 @@ def reliability(runs: Mapping[str, Iterable[Mapping[str, Any]]], *, splits: int 
             agree: list[float] = []
             beyond: list[float] = []
             for (a, b), fa, fb in zip(whole, in_a, in_b, strict=True):
-                halves = []
+                rates, resid = [], []
                 for (tn, tp), flags in ((a, fa), (b, fb)):
                     keep = [flags[i] for i in idx]
                     sn = sum(itertools.compress(n, keep))
-                    if not sn or tn - sn <= 0:
-                        halves = None
+                    if not sn:
+                        rates = None
                         break
                     sp = [sum(itertools.compress(passed[s], keep)) for s in names]
-                    halves.append(([x / sn for x in sp],
-                                   [x / sn - (tp[j] - sp[j]) / (tn - sn) for j, x in enumerate(sp)]))
-                if halves is None:
+                    rates.append([x / sn for x in sp])
+                    resid.append(_residuals(rates[-1], [(tp[j] - x) / (tn - sn) for j, x in enumerate(sp)])
+                                 if tn > sn else None)
+                if rates is None:
                     continue
-                r1 = _brown(_spearman(halves[0][0], halves[1][0]))
-                r2 = _brown(_spearman(halves[0][1], halves[1][1]))
-                if r1 is not None and r2 is not None:
-                    agree.append(r1)
-                    beyond.append(r2)
-            entry["splits_used"] = len(agree)
-            if len(agree) < (1 - MAX_SKIPPED) * splits:
-                out[kind][key] = entry | {"reason": "the ranking was undefined in more than 20% of "
-                                                    "the splits"}
-                continue
-            entry["agreement"] = statistics.median(agree)
-            entry["beyond_headline"] = statistics.median(beyond)
-            entry["flag"] = entry["beyond_headline"] < threshold
+                if (r := _brown(_spearman(rates[0], rates[1]))) is not None:
+                    agree.append(r)
+                if None not in resid and (r := _brown(_spearman(resid[0], resid[1]))) is not None:
+                    beyond.append(r)
+            entry["splits_used"] = {"agreement": len(agree), "beyond_headline": len(beyond)}
+            need = (1 - MAX_SKIPPED) * splits
+            if len(agree) >= need:
+                entry["agreement"] = statistics.median(agree)
+            if len(beyond) >= need:
+                entry["beyond_headline"] = statistics.median(beyond)
+            late = [m for m in ("agreement", "beyond_headline") if entry[m] is None]
+            if late:
+                entry["reason"] = (f"{' and '.join(late)} undefined in more than 20% of the splits (no "
+                                   "variance between the systems in a half)")
+            if entry["beyond_headline"] is not None:
+                entry["flag"] = entry["beyond_headline"] < threshold
+                if entry["flag"]:
+                    entry["kind"] = ("noisy" if entry["agreement"] is None or entry["agreement"] < threshold
+                                     else "redundant")
             out[kind][key] = entry
+    kinds = [e for k in SLICES for e in out[k].values()]
     return out | {"systems": len(names), "documents_used": n_docs, "documents_dropped": len(every) - n_docs,
+                  "slices_with_numbers": sum(e["beyond_headline"] is not None for e in kinds),
+                  "slices_without_numbers": sum(e["beyond_headline"] is None for e in kinds),
                   "reliability": {"method": "split-half over documents, Spearman-Brown corrected, median "
-                                  "over splits", "splits": splits, "seed": seed, "threshold": threshold,
+                                  "over splits; beyond_headline on residuals from the other tests' "
+                                  "pass rate", "splits": splits, "seed": seed, "threshold": threshold,
                                   "min_documents": min_documents}}

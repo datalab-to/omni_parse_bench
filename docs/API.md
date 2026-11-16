@@ -408,34 +408,49 @@ as separate documents, and an interval covers this dataset's documents only: see
 
 ## Reliability
 
-A slice is reliable if it ranks systems the same way on different documents, and worth reading on its own if it
-says something the headline doesn't.
+A slice that ranks systems the same way on different documents is reliable; one that does so by something the
+other tests don't capture is worth reading on its own.
 
 ```
-opb reliability RUN RUN RUN ... [--splits 100] [--seed 0] [--threshold 0.7] [--min-documents 10] [--flagged]
+opb reliability RUN RUN RUN RUN RUN ... [--splits 100] [--seed 0] [--threshold 0.7] [--min-documents 10] [--flagged]
 ```
 
-It needs at least 3 graded runs, named by their folders, and prints JSON to stdout. It uses the documents every
-run has (with the same number of tests in each; the rest are counted in `documents_dropped`), splits them at
-random into two halves `--splits` times (the same splits for every slice and run), and for each slice takes each
-run's pass rate in each half. `agreement` is the median over splits of the Spearman correlation between the
-halves' rankings of the runs (ties by average rank), stepped up with Spearman-Brown, `2r / (1 + r)`.
-`beyond_headline` is the same after taking from each run's slice pass rate, in each half, its pass rate on all
-the tests outside the slice in that half. A slice is `flag`ged when `beyond_headline` is below `--threshold`.
+It needs at least 5 graded runs (a rank correlation over fewer systems takes too few values to say anything),
+named by their folders, and prints JSON to stdout. It uses the documents every run has, with the same number of
+tests in each (the rest are counted in `documents_dropped`), splits them at random into two halves `--splits`
+times (the same splits for every slice and run), and takes each run's pass rate on the slice in each half.
+
+- `agreement` is the median over splits of the Spearman correlation between the two halves' rankings of the runs
+  (ties by average rank), stepped up with Spearman-Brown, `2r / (1 + r)` (r is clipped to [-1, 1], and -1 stays
+  -1).
+- `beyond_headline` fits, in each half, the runs' slice pass rates on their pass rates on the other tests by
+  least squares across the runs, and takes the same corrected correlation between half A's residuals and half B's.
+  It asks whether the slice ranks the runs by something the other tests don't. (The name is the stable key; the
+  quantity is not the headline.)
+- `flag` is true when `beyond_headline` is below `--threshold`, and then `kind` is `noisy` if `agreement` is below it
+  too (the slice cannot rank these runs reproducibly at all), else `redundant` (it ranks them, but only as the other
+  tests do). A slice that is not flagged ranks the runs reproducibly by more than the other tests.
+
+The other tests are all the tests outside the slice, taken from each page line's `tests` and `passed` less the
+slice's. A test with several tags counts under each of them, so the other tests of a tag slice leave out only the
+tests that carry that tag, and co-tagged tests stay in the other tests of the other tags.
 
 Each slice (the kinds `intervals` prints) holds `{"documents", "tests", "agreement", "beyond_headline", "flag",
-"splits_used"}`. A slice of fewer than `--min-documents` documents, or one whose ranking is undefined (a half in
-which the runs don't differ, or which has no tests outside the slice) in more than 20% of the splits, has null
-numbers, `flag` false and a `reason`. `--flagged` prints only the flagged slices. A test with several tags counts
-under each of them, so the tests outside a tag slice leave out only the tests that carry that tag.
+"splits_used": {"agreement", "beyond_headline"}}`, and `kind` when flagged. A split is skipped for a number when it
+is undefined: a half has no slice tests (or, for `beyond_headline`, no tests outside the slice), or the runs'
+pass rates in a half (for `beyond_headline`, their pass rates on the other tests) have no variance. A number
+undefined in more than 20% of the splits is null, with a `reason`, and `flag` is false. A slice of fewer than
+`--min-documents` documents, or one covering all the tests ("no tests outside the slice"), also has null numbers.
+The counts `slices_with_numbers` and `slices_without_numbers` always cover every slice, also with `--flagged`,
+which prints only the flagged ones.
 
-The flag depends on the runs given: three near-identical systems rank by noise, and a half of few documents is
-noisy. It says a slice can't rank these systems reproducibly on this dataset, not that its tests are wrong, and it
-isn't corrected for reading many slices at once. In Python:
+The flag depends on the runs given: a few near-identical systems rank by noise, and a half of few documents is
+noisy. It says a slice can't rank these systems reproducibly, or only as the other tests do, on this dataset, not
+that its tests are wrong, and it isn't corrected for reading many slices at once. In Python:
 
 ```python
 from omni_parse_bench import uncertainty
 
-uncertainty.reliability({"run-a": pages_a, "run-b": pages_b, "run-c": pages_c},
+uncertainty.reliability({"run-a": pages_a, "run-b": pages_b, ...},   # at least 5
                         splits=100, seed=0, threshold=0.7, min_documents=10)
 ```

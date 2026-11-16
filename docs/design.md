@@ -279,14 +279,15 @@ to other documents or to a change in the system. A comparison is paired, documen
 documents both runs have, not a comparison of two overlapping intervals. The summary itself carries no
 interval.
 
-`opb reliability` says, for each slice, whether it can rank several systems reproducibly. It splits the
-documents in two at random many times and asks whether the two halves rank the systems alike
-(`agreement`), and whether they still do once each system's pass rate on the rest of the benchmark is
-taken from its pass rate on the slice (`beyond_headline`), which is what the slice tells that the headline
-doesn't. A slice with a low `beyond_headline` is flagged. The flag says the slice cannot rank these systems
-reproducibly on this dataset; it is not a statement about whether the slice's tests are right. It depends
-on which systems are in the set (a few near-identical systems rank by noise), a half of few documents is
-noisy, and nothing corrects for looking at many slices at once.
+`opb reliability` asks, for each slice, whether it ranks several systems reproducibly. It splits the documents in
+two at random many times and compares the two halves' rankings of the systems (`agreement`). It then does the
+same with what is left of each system's slice pass rate after taking out what its pass rate on the other tests
+predicts (`beyond_headline`): whether the slice ranks the systems by something the other tests don't. A slice
+with a low `beyond_headline` is flagged, as `noisy` when its `agreement` is low too (it can't rank these systems
+reproducibly at all) and `redundant` otherwise (it ranks them, but only as the other tests do). A flag is about
+this dataset and these systems, not about whether the slice's tests are right. It depends on which systems are
+in the set (at least 5, and near-identical ones rank by noise), a half of few documents is noisy, and nothing
+corrects for looking at many slices at once.
 
 ### Going from a test JSON to running the test
 

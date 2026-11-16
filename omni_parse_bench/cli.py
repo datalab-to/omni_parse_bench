@@ -11,7 +11,7 @@
     opb tests --dataset <folder or hf://...> > tests.jsonl         # every test as a JSON line
     opb intervals RUN_DIR                                          # a graded run's scores with intervals
     opb compare RUN_A RUN_B                                        # two runs, paired by document
-    opb reliability RUN RUN RUN ...                                # which slices rank systems reproducibly
+    opb reliability RUN RUN RUN ...                                # slices that rank systems reproducibly
     opb systems [NAME]                                             # the systems, or one's options
 
 A run is one config (omni-bench-core's `config`): the dataset, its manifest, the scorers, which rows, and
@@ -26,6 +26,7 @@ import functools
 import importlib.metadata
 import json
 import logging
+import math
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -318,11 +319,16 @@ def cmd_compare(a: argparse.Namespace) -> int:
 
 
 def cmd_reliability(a: argparse.Namespace) -> int:
-    """Whether each slice ranks the runs' systems reproducibly (split-half over documents), read from each
-    run's scores.jsonl, named by its folder. `--flagged` prints only the slices flagged."""
+    """Whether each slice ranks the runs' systems reproducibly (`agreement`) and beyond what the other tests
+    do (`beyond_headline`), by split-half over documents, read from each run's scores.jsonl, named by its
+    folder. `--flagged` prints only the flagged slices; the counts of slices with and without numbers stay."""
+    if not (math.isfinite(a.threshold) and -1 < a.threshold <= 1):
+        raise ValueError(f"--threshold must be a number above -1 and at most 1, not {a.threshold}")
+    if a.seed < 0:
+        raise ValueError(f"--seed must not be negative, not {a.seed}")
     names = [Path(r).resolve().name for r in a.runs]
     if len(set(names)) < len(names):
-        raise ValueError(f"the run folders must have different names, got {names}")
+        raise ValueError(f"a run is named by its folder's name, and these runs' folders share one: {names}")
     got = uncertainty.reliability({n: read_scores(r) for n, r in zip(names, a.runs, strict=True)},
                                   splits=a.splits, seed=a.seed, threshold=a.threshold,
                                   min_documents=a.min_documents)
@@ -459,15 +465,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         q.add_argument("--level", type=float, default=0.95,
                        help="the interval's share (default: %(default)s)")
 
-    rl = sub.add_parser("reliability", help="which slices rank several runs' systems reproducibly")
-    rl.add_argument("runs", nargs="+", help="graded runs' folders, at least 3")
+    rl = sub.add_parser("reliability",
+                        help="which slices rank systems reproducibly, and beyond the other tests")
+    rl.add_argument("runs", nargs="+", help="graded runs' folders, at least 5")
     rl.add_argument("--splits", type=int, default=100, help="random half-splits (default: %(default)s)")
     rl.add_argument("--seed", type=int, default=0, help="the splits' seed (default: %(default)s)")
     rl.add_argument("--threshold", type=float, default=0.7,
                     help="flag a slice whose beyond_headline is below this (default: %(default)s)")
     rl.add_argument("--min-documents", type=int, default=10,
                     help="fewest documents a slice needs for numbers (default: %(default)s)")
-    rl.add_argument("--flagged", action="store_true", help="print only the slices flagged")
+    rl.add_argument("--flagged", action="store_true",
+                    help="print only the flagged slices (noisy, or redundant with the other tests)")
 
     pl = sub.add_parser("systems", aliases=["providers"], help="list the systems, or one system's options")
     pl.add_argument("system", nargs="?", help="a system's name, to list its options and environment")
