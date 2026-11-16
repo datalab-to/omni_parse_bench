@@ -310,7 +310,7 @@ def cmd_intervals(a: argparse.Namespace) -> int:
 
 def cmd_compare(a: argparse.Namespace) -> int:
     """Two runs' scores compared over the documents both have: each score's gap (A minus B), its interval
-    over those documents, and whether the interval leaves out 0."""
+    over those documents, and whether the interval excludes 0 (`excludes_zero`)."""
     print(json.dumps(uncertainty.paired(read_scores(a.run_a), read_scores(a.run_b), resamples=a.resamples,
                                         seed=a.seed, level=a.level), indent=2, ensure_ascii=False))
     return 0
@@ -437,7 +437,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     cp.add_argument("run_b", help="a graded run's folder")
     for q in (iv, cp):
         q.add_argument("--resamples", type=int, default=1000,
-                       help="draws of the documents (default: %(default)s)")
+                       help="draws of the documents, at least 100 (default: %(default)s)")
         q.add_argument("--seed", type=int, default=0, help="the draws' seed (default: %(default)s)")
         q.add_argument("--level", type=float, default=0.95,
                        help="the interval's share (default: %(default)s)")
