@@ -97,7 +97,7 @@ It reads as: "some table in the output has a cell `167.8`, under the column head
 allows (a stamp, a folio number). Show-through from the other side counts as blank only where it can't
 be read as text. The runner counts non-space characters in the seen view, excluding image alt text, invisible format characters
 (a zero-width space, a byte-order mark, a soft hyphen) and the marks the text view writes for an element that
-holds nothing (an empty `<math>`, an empty list item, a hidden input).
+holds nothing (an empty `<math>`, an `<li>` holding only white space, a hidden input).
 No dataset tests use this type yet.
 
 The table_cell roles mean:

@@ -31,7 +31,7 @@ MIN_PLACE_COVER = 0.5
 COVER_EPS = 1e-9
 # Note: two blocks of equal area in exact arithmetic can differ by a hair in floats ([0.2, 0.15, 0.4, 0.25]
 # and [0.2, 0.2, 0.6, 0.25] are both 0.02), so a block must be smaller by more than this to hold the place
-# instead of one listed before it.
+# instead of one listed before it. It is relative to the area, so scaled boxes give the same verdict.
 AREA_EPS = 1e-9
 # Note: a list item or a key-value field is running text for a `text` test; vendors differ in whether they
 # give each such line a block of its own, and the test asks only that it isn't a heading or a table.
@@ -282,7 +282,7 @@ def layout_kind(t: LayoutKind, blocks: Sequence[Block]) -> Mark:
 
 def holder(place: Sequence[Box], blocks: Sequence[Block]) -> Block | None:
     """The smallest block covering at least MIN_PLACE_COVER of the place's area, or None; of blocks of equal
-    area (within `AREA_EPS`), the first listed.
+    area (within a relative `AREA_EPS`), the first listed.
 
     Note: coverage of the place, not IoU, since a vendor's block may rightly be larger than our place (a list
     for an item), and the smallest is the most specific."""
@@ -292,7 +292,7 @@ def holder(place: Sequence[Box], blocks: Sequence[Block]) -> Block | None:
             if sum(_area(_intersection(x, b.bbox)) for x in place) / total >= MIN_PLACE_COVER - COVER_EPS]
     best = None
     for b in held:
-        if best is None or _area(b.bbox) < _area(best.bbox) - AREA_EPS: best = b
+        if best is None or _area(b.bbox) < _area(best.bbox) * (1 - AREA_EPS): best = b
     return best
 
 

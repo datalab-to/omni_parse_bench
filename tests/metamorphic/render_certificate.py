@@ -146,8 +146,8 @@ def render() -> str:
     unpromised_note = ""
     if unpromised:
         unpromised_note = (
-            f" ({len(unpromised)} of them, {unpromised[0]} to {unpromised[-1]}, are about folding a string "
-            "twice, which the scorer never does and no document promises, so they change no score)")
+            f" ({len(unpromised)} of them, {', '.join(unpromised)}, are about folding a string twice, "
+            "which the scorer never does and no document promises, so they change no score)")
     return "\n".join([
         "# Certificate of the scorer's relations",
         "",

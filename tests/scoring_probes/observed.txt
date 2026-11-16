@@ -195,6 +195,7 @@ ord-transposition	fail	'before' text 'Alpha' not found
 ord-transposition-2	pass
 ord-more-edits	pass
 ord-digit-edge	fail	'before' text 'Total: 40' found only inside a longer number
+ord-footnote	fail	'before' text 'Smith and Jones' not found
 ord-compound	fail	'before' text 'self-aware' not found
 ord-case-hyphen	fail	'before' text 'R- M' not found
 ## repeat-rules

@@ -14,7 +14,7 @@ TABLES = [
         near_empty("ne-one-over", "P", "one character over the limit", 2, "<p>123</p>", why=True),
         near_empty("ne-invisible", "I", "an invisible format character (a zero-width space, a byte-order mark, a soft hyphen)", 0, "<p>\u200b\ufeff\u00ad</p>"),
         near_empty("ne-empty-math", "I", "an empty math element", 0, "<math></math>"),
-        near_empty("ne-empty-item", "I", "an empty list item", 0, "<ol><li></li></ol>"),
+        near_empty("ne-empty-item", "I", "an `<li>` holding only white space", 0, "<ol><li></li></ol>"),
         near_empty("ne-hidden-input", "I", "a hidden input", 0, "<input type=hidden value=v>"),
         near_empty("ne-item-number", "P", "a list item is text, with its number", 0, "<ol><li>x</li></ol>", why=True),
         near_empty("ne-text", "P", "a transcribed line", 0, "Total due", why=True),

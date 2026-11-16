@@ -250,8 +250,8 @@ A test's text and a provider's text view are compared after `fold` (normalize.py
 on both sides, whose docstring lists every rule. Among them: a LaTeX span reads as the text it
 renders, without the spaces math mode doesn't render ("$$2 . 5 5$$" is 2.55, "$U$" is U), and a word
 broken by a hyphen at a line end is joined. A run of three or more dots, dashes or underscores (a leader) is a
-space and never spans a block break; a footnote marker, written in brackets or set as a superscript, is ignored
-where it falls inside a phrase. [The scoring reference](scoring/internals.md) lists each rule with a case that
+space and never spans a block break; a present text test also retries with a footnote marker, written in brackets or set as a
+superscript, dropped where it falls inside a phrase (order, repeat and table_cell do not). [The scoring reference](scoring/internals.md) lists each rule with a case that
 shows it.
 
 The headline is the mean of the families' scores: text (present, order, repeat, page_near_empty), tables

@@ -60,11 +60,13 @@ def kept_for_m8b(place, blocks) -> bool:
     different labels (M16)."""
     total = sum(area(b) for b in place)
     return (all(abs(sum(area(intersection(x, blk)) for x in place) / total - 0.5) > 1e-6 for _, blk in blocks)
-            and all(abs(area(a) - area(b)) > 1e-9 or la == lb
+            and all(abs(area(a) - area(b)) > 1e-7 * max(area(a), area(b)) or la == lb
                     for i, (la, a) in enumerate(blocks) for lb, b in blocks[i + 1:]))
 
 
 @relation(HOLDS)
+@example(place=[(0, 0, 0.1, 0.1)], kind="text", scale=0.05, fx=0.0, fy=0.0,   # areas 1e-8 apart, then 2.5e-11
+         blocks=[("heading", (0, 0, 0.1000001, 0.1)), ("text", (0, 0, 0.1, 0.1))])
 @given(*INEXACT)
 def test_a_layout_verdict_survives_inexact_scaling_and_shifting(place, kind, blocks, scale, fx, fy):
     """A layout_kind verdict is unchanged when every box is scaled by 0.05 to 1 and shifted within the page,

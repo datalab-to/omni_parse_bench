@@ -327,7 +327,8 @@ NOTHING = ["", " ", "\n", " ", "​", "﻿", "­", "<br>", "<!-- c -->", "<p> <
 @given(st.text("abc ", max_size=6), st.lists(st.sampled_from(NOTHING), max_size=4), st.integers(0, 6))
 def test_adding_what_shows_nothing_does_not_change_a_near_empty_verdict(letters, extras, limit):
     """A page_near_empty verdict does not change when the page gains blanks, line breaks, comments, invisible
-    format characters, an image with a description, an empty element or a hidden input, in any place. [M28]
+    format characters, an image with a description, an empty `<math>`, an `<li>` of white space or a hidden
+    input, in any place. [M28]
     Why it matters for a score: a page is faulted for what a reader would see on it, and a blank page with an
     empty element on it is still blank."""
     # Given a page of letters, and the verdict at one limit

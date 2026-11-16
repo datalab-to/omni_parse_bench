@@ -8,22 +8,25 @@ known way), and the verdict should follow. Example: putting a passing answer in 
 fail.
 
 - The certificate lists the 68 relations its authors selected: 56 hold and 12 deviate. It is not every
-  relation of the scorer (see [Not covered](#not-covered)). Five of the 12 (M1a to M1e) are about folding a
-  string twice, which the scorer never does and no document promises, so they change no score.
+  relation of the scorer (see [Not covered](#not-covered)). Four of the 12 (M1a to M1c and M1e) are about
+  folding a string twice, which the scorer never does and no document promises, so they change no score; M1d is a
+  spelling equivalence on one fold, with an effect that was not measured.
 - It is generated from the tests. CI fails if it is out of date, or if a status disagrees with its test.
 - This page is enough to read it. Links to `docs/scoring` add detail only.
 
-**How the edges were found.** A fuzz sweep compared the scorer with a reference for every rule in
-`docs/scoring`. It covered fold, the text view, present (text and number), the equation test, order, repeat,
+**How the edges were found.** A fuzz sweep compared the scorer with a reference, written from `docs/scoring`
+and not published, for every rule in it. It covered fold, the text view, present (text and number), the equation test, order, repeat,
 table_cell, layout_kind, markdown against HTML, and adding blocks, reordering blocks and batching tests. Most
 edges it found are rows here: fixed ones as HOLDS, open ones as DEVIATES ('Not covered' lists the rest).
-The fixes changed no verdict on the cached leaderboard re-runs (measured by the authors, not re-runnable
-here). Its limit: it tried sampled inputs only, so a property with no disagreement
+Apart from the changes named below, the fixes changed no verdict on the cached leaderboard re-runs (an
+observation on those outputs, measured by the authors and not re-runnable here, not a guarantee for every output). Its limit: it tried sampled inputs only, so a property with no disagreement
 means none among its samples.
 
-One deliberate rule change does change verdicts: number tests match separators as the gold writes them (M12c).
-On the cached leaderboard re-runs, a few number passes become fails; each was judged a real punctuation error
-on review.
+Two deliberate changes can turn a pass into a fail. Number tests match separators as the gold writes them (M12c),
+and a `top_heading` is read only over the cell's own columns, no longer through a row that spans them. On the
+cached leaderboard re-runs, a few number passes and a few `top_heading` passes became fails; each was judged a
+real error on review. A few fail-to-pass changes came from the other fixes (a leader run or a footnote mark had
+hidden text the page did write).
 
 ## Run it
 
@@ -38,8 +41,8 @@ A healthy run gives:
 |---|---|---|---|
 | this folder, no dataset | 79 | 11 | 14 |
 | this folder, with dataset | 89 | 1 | 14 |
-| whole suite, no dataset | 1154 | 21 | 14 |
-| whole suite, with dataset | 1169 | 6 | 14 |
+| whole suite, no dataset | 1155 | 21 | 14 |
+| whole suite, with dataset | 1170 | 6 | 14 |
 
 All four rows come from runs of this version.
 
@@ -73,7 +76,7 @@ lists as deviating).
 
 - a counterexample;
 - why it has its label;
-- the effect on scores: *none seen*, *small* (a few verdicts change; the basis gives the count) or *unknown*;
+- the effect on scores: *none seen*, *small* (a small share of the tests it can touch change verdict; the basis says what was measured) or *unknown*;
 - how common it is;
 - who is affected.
 
@@ -148,7 +151,7 @@ Other commands:
 
 - score aggregation: family scores and the headline;
 - equation tests on real golds: M17 uses 8 handmade equations, and M10 compares readings, not real equations;
-- table_cell relations `section`, `row_groups` and `left_heading` (`down` only inside M6a's agreement check);
+- table_cell relations `section`, `row_groups` and `left_heading` beyond M27's mirror check (`down` only inside M6a's agreement check);
 - number tests' sign and percent rules (M12 and M20 cover digits, separators and tails only);
 - repeat's reading without image descriptions, and the equation test's plain-text fallback;
 - markdown beyond pipe tables and paragraphs;

@@ -119,7 +119,6 @@ These pages do not show:
 - the full lists of arrow and space characters that fold treats as one, and of the html tags that end a line;
 - whether a nested table's rows also count in the outer table, and that a table split over two `<table>`
   elements is two tables whose relations do not cross;
-- that `top_heading`, `left_heading` and `right_heading` fall back to the edge cell of a table with no heading cells;
 - how providers handle a rotated or cropped page for `layout_kind` places;
 - which unit test pins which rule;
 - counts by suite, by `max_diffs` and by table role.

@@ -245,6 +245,15 @@ def test_of_two_blocks_of_equal_area_the_first_listed_holds_the_place():
     assert R.holder(place, (text, heading)) is text
 
 
+def test_the_area_tie_does_not_depend_on_the_scale_of_the_boxes():
+    # The heading is 1e-6 larger in area than the text block: the text block holds the place at any scale.
+    for k in (1, 0.05, 0.001):
+        place = ((0, 0, 0.1 * k, 0.1 * k),)
+        heading = R.Block("heading", (0, 0, 0.1000001 * k, 0.1 * k), "")
+        text = R.Block("text", (0, 0, 0.1 * k, 0.1 * k), "")
+        assert R.holder(place, (heading, text)) is text, k
+
+
 def test_a_list_item_or_form_field_block_is_text_and_nothing_else_is():
     place = ((0.1, 0.1, 0.4, 0.15),)
     text, heading = (R.LayoutKind(R.Text("1. Mix well", 0, place), k) for k in ("text", "heading"))

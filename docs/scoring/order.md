@@ -30,6 +30,7 @@ order: a table reads row by row, and a two-column page is only as ordered as the
 | I | the same with 2 edits | `Alpha` before `Beta` (md 2) | `<p>Alhpa</p><p>Beta</p>` | pass | `ord-transposition-2` |
 | B | a larger budget passes what a smaller one did (md 0 passes too) | `aa` before `a ba` (md 1) | `<p>b b a ab ab</p>` | pass | `ord-more-edits` |
 | P | a digit continues a number | `Total: 40` before `ZZZ` | `<p>Total: 400</p><p>ZZZ</p>` | fail: `'before' text 'Total: 40' found only inside a longer number` | `ord-digit-edge` |
+| P | a footnote marker inside the phrase | `Smith and Jones` before `ZZZ` | `<p>Smith[1] and Jones</p><p>ZZZ</p>` | fail | `ord-footnote` |
 | P | hyphenated compound broken at a line end | `self-aware` before `ZZZ` | `<p>self- aware</p><p>ZZZ</p>` | fail | `ord-compound` |
 | P | a capital before a line-end hyphen | `R- M` before `ZZZ` | `<p>r- m</p><p>ZZZ</p>` | fail | `ord-case-hyphen` |
 <!-- /cases -->
@@ -38,6 +39,8 @@ order: a table reads row by row, and a two-column page is only as ordered as the
 
 - **Edits are true edit distance.** Two swapped letters cost 2 here and 1 in `present` (cases ord-transposition,
   text-transposition).
+- **No footnote retry.** `present` retries with a footnote marker dropped where it falls inside the phrase;
+  here the marker stays, so `Smith and Jones` is not found in `Smith[1] and Jones` (case ord-footnote).
 - **No hyphen fallback.** A hyphenated compound broken at a line end fails here and passes `present` (case
   ord-compound). A plain word broken at a line end passes both (case ord-line-hyphen).
 - **A capital before a line-end hyphen** keeps the hyphen, and case then matters: `R- M` is not found in `r- m`
