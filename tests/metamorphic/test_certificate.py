@@ -81,6 +81,27 @@ def test_every_deviation_cites_files_that_exist():
             assert all(f"`{case}`" in docs for case in ids.split(", ")), (label, ids)
 
 
+def test_what_a_deviation_quotes_is_in_the_files_it_cites():
+    """A phrase a deviation's 'why' quotes (in single quotes, 12 characters or more; '...' stands for words
+    left out) and a name it puts in backticks (an identifier, or a call written `name()`) is in one of the
+    files it cites, so a justification does not outlive the code or doc it names."""
+    missing = []
+    for label, e in DEVIATIONS.items():
+        why = e["why_this_status"]
+        paths = re.findall(r"(?:docs|omni_parse_bench)/[\w/.-]+\.(?:md|py)", why)
+        # a comment that runs over several lines is read as one: the `#` that starts each line is dropped
+        read = [re.sub(r"\n\s*#", " ", (ROOT / p).read_text()) for p in paths]
+        text = " ".join(" ".join(r.split()) for r in read).lower()
+        quoted = re.findall(r"(?<!\w)'([^']{12,}?)'(?!\w)", why)
+        ident = r"[A-Za-z_][\w.]{2,}(?:\(\))?"
+        names = [n for n in re.findall(r"`([^`]+)`", why) if re.fullmatch(ident, n)]
+        for q in quoted:
+            parts = [" ".join(x.split()).lower() for x in re.split(r"\.\.\.|…", q) if x.strip()]
+            missing += [(label, "quotes", x) for x in parts if x not in text]
+        missing += [(label, "names", n) for n in names if n.lower() not in text]
+    assert not missing, missing
+
+
 @pytest.mark.skipif(not LIVE, reason="needs the dataset: set OPB_DATASET to its root")
 def test_the_certificate_counts_the_real_tests_it_says():
     assert manifest_sha256(os.environ["OPB_DATASET"]) == MANIFEST_SHA256, \

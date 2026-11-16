@@ -39,10 +39,10 @@ A healthy run gives:
 
 | | passed | skipped | xfailed |
 |---|---|---|---|
-| this folder, no dataset | 79 | 11 | 14 |
-| this folder, with dataset | 89 | 1 | 14 |
-| whole suite, no dataset | 1155 | 21 | 14 |
-| whole suite, with dataset | 1170 | 6 | 14 |
+| this folder, no dataset | 80 | 11 | 14 |
+| this folder, with dataset | 90 | 1 | 14 |
+| whole suite, no dataset | 1163 | 21 | 14 |
+| whole suite, with dataset | 1178 | 6 | 14 |
 
 All four rows come from runs of this version.
 
