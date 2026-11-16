@@ -19,7 +19,7 @@ def test_a_tag_is_a_vocabulary_tag_a_language_or_a_script():
 
 
 def with_args(args: dict, test_type: str = "present", settings: dict | None = None, **fields) -> dict:
-    output = {"present": "html", "order": "html", "repeat": "html"}[test_type]
+    output = {"present": "html", "order": "html", "repeat": "html", "page_near_empty": "html"}[test_type]
     return {"id": "t", "test_type": test_type, "output_type": output, "derivation": "authored", "tags": [],
             "args": args, "settings": settings or {}} | fields
 
@@ -45,6 +45,31 @@ def with_args(args: dict, test_type: str = "present", settings: dict | None = No
 def test_a_bad_arg_or_setting_is_refused(t):
     with pytest.raises(ValueError):
         gold.test("p", t)
+
+
+@pytest.mark.parametrize("limit", [0, 1, 20])
+def test_page_near_empty_takes_no_args_and_a_limit(limit):
+    t = gold.test("p", with_args({}, "page_near_empty", {"max_chars": limit}))
+    assert t.params.max_chars == limit
+    assert t.output_type == "html"
+    assert gold.arg_kinds(t.test_type, t.args) == ()
+
+
+@pytest.mark.parametrize("settings", [
+    {}, {"max_chars": -1}, {"max_chars": 2.5}, {"max_chars": True}, {"max_chars": "0"},
+    {"max_chars": None}, {"max_chars": 0, "extra": 1},
+])
+def test_page_near_empty_refuses_invalid_settings(settings):
+    with pytest.raises(ValueError):
+        gold.test("p", with_args({}, "page_near_empty", settings))
+
+
+def test_page_near_empty_refuses_args_and_non_html_outputs():
+    with pytest.raises(ValueError, match="no role"):
+        gold.test("p", with_args({"content": {"text": "abc", "max_diffs": 0}},
+                                 "page_near_empty", {"max_chars": 20}))
+    with pytest.raises(ValueError, match="reads 'html'"):
+        gold.test("p", with_args({}, "page_near_empty", {"max_chars": 0}, output_type="blocks"))
 
 
 def test_max_diffs_may_be_one_less_than_the_folded_text():

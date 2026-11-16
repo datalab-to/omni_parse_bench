@@ -92,6 +92,7 @@ A test is a yes/no question about one page. Each test type belongs to one of thr
 | `present` | this text, number or equation appears | text |
 | `order` | text A comes before text B | text |
 | `repeat` | this line appears exactly N times | text |
+| `page_near_empty` | a blank page yields at most N non-space characters | text |
 | `table_cell` | this cell sits under these headings and beside these neighbors | tables |
 | `layout_kind` | the block holding this line is a heading, text or table | layout |
 

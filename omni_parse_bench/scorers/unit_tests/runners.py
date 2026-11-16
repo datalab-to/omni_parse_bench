@@ -142,6 +142,16 @@ def repeat(t: Repeat, v: views.Html) -> Mark:
     return _mark(n == t.expected_count, f"{t.text[:50]!r} appears {n}x, not {t.expected_count}x")
 
 
+class PageNearEmpty(NamedTuple):
+    max_chars: int
+
+
+def page_near_empty(t: PageNearEmpty, v: views.Html) -> Mark:
+    """A blank page yields at most `max_chars` non-space characters outside image alt text."""
+    n = len(re.sub(r"\s", "", v.seen))
+    return _mark(n <= t.max_chars, f"{n} non-space characters (limit {t.max_chars})")
+
+
 # --------------------------------------------------------------------------- tables
 
 
@@ -262,6 +272,7 @@ TYPES: dict[str, tuple[type, Runner]] = {
     "present": (Present, present),
     "order": (Order, order),
     "repeat": (Repeat, repeat),
+    "page_near_empty": (PageNearEmpty, page_near_empty),
     "table_cell": (TableCell, table_cell),
     "layout_kind": (LayoutKind, layout_kind),
 }
@@ -272,6 +283,7 @@ VALID: dict[str, tuple[Callable[[Any], bool], str]] = {
     "present": (lambda t: not isinstance(t.content, Number) or number(t.content.number) is not None,
                 "a number must read as one number, e.g. 1,240.00 or -4.8%"),
     "repeat": (lambda t: t.expected_count > 0, "expected_count must be a positive whole number"),
+    "page_near_empty": (lambda t: t.max_chars >= 0, "max_chars must be a whole number, 0 or more"),
     "layout_kind": (lambda t: bool(t.content.place) and t.kind in views.LABELS,
                     f"its content needs a place, and its kind must be one of {views.LABELS}"),
 }

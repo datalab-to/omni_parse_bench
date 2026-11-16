@@ -73,6 +73,7 @@ equations and table-cell comparisons retain their existing rules.
 | `present` | `html` | this content appears | `content` | text | 7,291 |
 | `order` | `html` | A comes before B | `before`, `after` (text) | text | 1,189 |
 | `repeat` | `html` | this line appears exactly N times | `content` (text); `expected_count` | text | 35 |
+| `page_near_empty` | `html` | a blank page yields at most N non-space characters | no args; `max_chars` | text | 0 |
 | `table_cell` | `html` | this cell exists with these neighbors, under these headings, in this section and in these row groups; the cell may be one line of a multi-line cell | `cell`, `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `headings`, `section`, `row_groups` (text) | tables | 5,386 |
 | `layout_kind` | `blocks` | the smallest block covering half of this line's place has this kind | `content` (text with a `place`); `kind` | layout | 2,403 |
 
@@ -245,7 +246,7 @@ on both sides, whose docstring lists every rule. Among them: a LaTeX span reads 
 renders, without the spaces math mode doesn't render ("$$2 . 5 5$$" is 2.55, "$U$" is U), and a word
 broken by a hyphen at a line end is joined.
 
-The headline is the mean of the families' scores: text (present, order, repeat), tables
+The headline is the mean of the families' scores: text (present, order, repeat, page_near_empty), tables
 (table_cell) and layout (layout_kind), each family's score the share of its tests passed
 (`vocab.FAMILIES` maps every test type to one). Weighting by family rather than by test means a
 family's weight never depends on how many tests it has: sampling more layout lines makes the layout
@@ -298,8 +299,8 @@ A test runs in four steps:
 - View: `score` builds each output's view once per page: `views.Html` (the HTML, its text view, and
   its seen view, the text without image alt text) for an HTML output, and the block list for
   `blocks`. Alt text holds an image's printed words or a description of it, so tests that credit
-  text read the text view and a test that faults extra text (`repeat`) reads the seen view: printed
-  words count wherever an output writes them, and a description never costs;
+  text read the text view and tests that fault extra text (`repeat`, `page_near_empty`) read the
+  seen view: printed words count wherever an output writes them, and a description never costs;
 - Mark: `runner(params, view)` returns `(passed, why)`. A runner is a pure function of its
   parameters and one output's value: it never reads a file, and never sees another output; and
 - File: the page's verdicts are counted per family on its line of `scores.jsonl`, for `summarize`, and
