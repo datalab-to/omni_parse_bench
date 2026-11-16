@@ -77,7 +77,7 @@ def test_a_slice_that_only_follows_skill_ranks_but_is_flagged_redundant(slope):
 def test_a_slice_of_few_documents_has_no_numbers_and_is_not_flagged():
     got = x_entry(systems(lambda i, s: s, n_docs=8), min_documents=10)
     assert got["agreement"] is None and got["beyond_headline"] is None and got["flag"] is False
-    assert "fewer than 10 documents" in got["reason"] and got["documents"] == 8
+    assert "fewer than 10 effective documents" in got["reason"] and got["documents"] == 8
 
 
 def test_fewer_than_five_systems_raises():
@@ -244,3 +244,96 @@ def test_the_command_checks_its_options_and_the_run_names(tmp_path):
     twin = graded(tmp_path / "other" / "run0", runs["sys0"])
     with pytest.raises(ValueError, match="folder's name"):
         cli.main(["reliability", *folders[:4], twin])
+
+
+def sized(sizes, px, *, seed=0, n_systems=N_SYSTEMS):
+    """{name: lines} with `sizes[j]` x tests in document j, the same for every system; system i passes
+    an x test with `px(i, skill)` and a base test with its skill."""
+    rng = random.Random(seed)
+    out = {}
+    for i in range(n_systems):
+        skill = skill_of(i, n_systems)
+        p = px(i, skill)
+        out[f"sys{i}"] = [page(f"d{j}", sum(rng.random() < skill for _ in range(PER)),
+                               sum(rng.random() < p for _ in range(m)), tests_x=m)
+                          for j, m in enumerate(sizes)]
+    return out
+
+
+def test_effective_documents_is_the_count_for_equal_documents_and_less_for_skewed_ones():
+    assert uncertainty._effective([4, 4, 4, 4, 4]) == 5
+    assert uncertainty._effective([3, 1]) == pytest.approx(1.6)     # 16 / 10
+    assert uncertainty._effective([9, 1, 1, 1]) == pytest.approx(144 / 84)
+    assert uncertainty._effective([]) == 0
+    got = uncertainty.intervals([page(f"d{j}", 5, 5) for j in range(10)], resamples=100)
+    assert got["per_tag"]["x"]["effective_documents"] == 10 == got["per_tag"]["x"]["documents"]
+    assert got["headline"]["effective_documents"] == 10
+
+
+def test_intervals_and_paired_report_effective_documents():
+    a = [page(f"d{j}", 5, 5, tests_x=1 if j else 40) for j in range(20)]
+    b = [page(f"d{j}", 4, 4, tests_x=1 if j else 40) for j in range(20)]
+    x = uncertainty.intervals(a, resamples=100)["per_tag"]["x"]
+    assert x["documents"] == 20 and x["effective_documents"] == pytest.approx(59 ** 2 / (1600 + 19), abs=0.05)
+    p = uncertainty.paired(a, b, resamples=100)
+    assert p["per_tag"]["x"]["documents"] == 20
+    assert p["per_tag"]["x"]["effective_documents"] == x["effective_documents"]
+    assert p["headline"]["effective_documents"] < 20
+
+
+def test_the_minimum_counts_effective_documents():
+    sizes = [100] + [1] * 9                  # 10 documents, but one holds nearly all the tests
+    got = x_entry(sized(sizes, lambda i, s: s), min_documents=10)
+    assert got["documents"] == 10 and got["effective_documents"] < 2
+    assert got["agreement"] is None and "effective documents" in got["reason"]
+
+
+def totals(flags, sizes):
+    a = sum(s for f, s in zip(flags, sizes, strict=True) if f)
+    return a, sum(sizes) - a
+
+
+def test_balanced_halves_hold_nearly_equal_numbers_of_tests_and_random_halves_do_not():
+    rng = random.Random(1)
+    sizes = [max(1, int(3 * rng.paretovariate(1.5))) for _ in range(300)]
+
+    def gap(balanced):     # the mean share of all tests by which the halves differ
+        halves = uncertainty._halves(sizes, 100, random.Random(2), balanced)
+        return sum(abs(a - b) for a, b in (totals(f, sizes) for f in halves)) / 100 / sum(sizes)
+
+    assert gap(True) < 0.01 and gap(False) > 4 * gap(True)
+    odd = [*sizes, 40]      # the odd one out goes to a random half
+    assert {sum(f) for f in uncertainty._halves(odd, 20, random.Random(2), True)} == {150, 151}
+    for flags in uncertainty._halves(sizes, 5, random.Random(3), True):
+        assert sum(flags) == 150                                # also equal in documents
+    even = uncertainty._halves([1, 2, 3, 4], 5, random.Random(0), True)
+    assert all(sum(f) == 2 for f in even)
+
+
+def test_balanced_halves_give_a_skewed_fixture_a_higher_agreement():
+    """Systems rank one way on the few large documents (most of the tests) and the other way on the many
+    small ones, so a random half that holds more large documents ranks them differently from the other:
+    halves balanced by test count hold the same mix."""
+    rng = random.Random(6)
+    sizes = [30] * 20 + [3] * 100
+    runs = {}
+    for i in range(N_SYSTEMS):
+        skill = skill_of(i)
+        lines = []
+        for j, m in enumerate(sizes):
+            p = 0.5 + (EFFECT[i] if m < 10 else -EFFECT[i])
+            lines.append(page(f"d{j}", sum(rng.random() < skill for _ in range(PER)),
+                              sum(rng.random() < p for _ in range(m)), tests_x=m))
+        runs[f"sys{i}"] = lines
+    on = x_entry(runs, balanced=True, min_documents=5)["agreement"]
+    off = x_entry(runs, balanced=False, min_documents=5)["agreement"]
+    assert on > off + 0.05, (on, off)     # 0.73 against 0.63 here; over 8 seeds, balanced won every time
+
+
+def test_the_balanced_option_is_recorded_and_cli_turns_it_off(tmp_path, capsys):
+    runs = systems(lambda i, s: s, n_systems=5, n_docs=40)
+    folders = [graded(tmp_path / f"run{i}", lines) for i, lines in enumerate(runs.values())]
+    assert uncertainty.reliability(runs, splits=20)["reliability"]["balanced"] is True
+    assert uncertainty.reliability(runs, splits=20, balanced=False)["reliability"]["balanced"] is False
+    assert cli.main(["reliability", *folders, "--splits", "20", "--random-halves"]) == 0
+    assert json.loads(capsys.readouterr().out)["reliability"]["balanced"] is False

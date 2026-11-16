@@ -103,6 +103,15 @@ def _scores(sparse: Mapping[tuple[str, str], Sequence[tuple[int, int, int]]], m:
     return out
 
 
+def _effective(counts: Iterable[int]) -> float:
+    """How many equal-sized documents the per-document test `counts` are worth: their sum squared over the
+    sum of their squares. It is the number of documents when the counts are equal, and falls as they skew;
+    0 for no tests."""
+    xs = list(counts)
+    sq = sum(x * x for x in xs)
+    return sum(xs) ** 2 / sq if sq else 0.0
+
+
 def _quantile(xs: Sequence[float], q: float) -> float:
     """The `q` quantile of sorted `xs`, by linear interpolation."""
     at = (len(xs) - 1) * q
@@ -156,10 +165,12 @@ def intervals(pages: Iterable[Mapping[str, Any]], *, resamples: int = 1000, seed
     `interval` says how it was made. Deterministic for a `seed`. A slice with no tests is left out. The
     headline is a mean over every family, so a draw missing a family is not one of its draws.
 
-    Note: pages with the same `row.document` are one document; pages of one source under different
-    document values are separate ones, and the interval says nothing of that dependence. A percentile
-    interval on few documents is too narrow (about 0.88 coverage at 10 documents, 0.93 at 30, for a 95%
-    interval); read a slice of few documents as rough."""
+    Note: scores are pooled over tests, so a document with many tests weighs more, and the draws of
+    documents already reflect that. `documents` is a raw count; `effective_documents` is what the tests are
+    worth as equal-sized documents. Pages with the same `row.document` are one document; pages of one
+    source under different document values are separate ones, and the interval says nothing of that
+    dependence. A percentile interval on few documents is too narrow (about 0.88 coverage at 10 documents,
+    0.93 at 30, for a 95% interval); read a slice of few documents as rough."""
     _check(resamples, level)
     table = _table(pages)
     docs = _documents(table)
@@ -174,13 +185,18 @@ def intervals(pages: Iterable[Mapping[str, Any]], *, resamples: int = 1000, seed
 
     def entry(sk: tuple[str, str]) -> dict[str, Any]:
         if sk == HEADLINE:
-            ts = [t for k in fams for _, t, _ in sparse[("families", k)]]
-            n, d = sum(ts), len({i for k in fams for i, _, _ in sparse[("families", k)]})
+            per_doc: dict[int, int] = collections.Counter()
+            for k in fams:
+                for i, t, _ in sparse[("families", k)]:
+                    per_doc[i] += t
         else:
-            n, d = sum(t for _, t, _ in sparse[sk]), len({i for i, _, _ in sparse[sk]})
+            per_doc = collections.Counter()
+            for i, t, _ in sparse[sk]:
+                per_doc[i] += t
+        n, d = sum(per_doc.values()), len(per_doc)
         low, high = _bounds(draws[sk], resamples, d, level)
         return {"score": point[sk], "low": low, "high": high, "tests": n, "documents": d,
-                "draws": len(draws[sk])}
+                "effective_documents": round(_effective(per_doc.values()), 1), "draws": len(draws[sk])}
 
     out: dict[str, Any] = {"headline": entry(HEADLINE) if HEADLINE in point else None}
     for s in SLICES:
@@ -191,7 +207,8 @@ def intervals(pages: Iterable[Mapping[str, Any]], *, resamples: int = 1000, seed
 def paired(pages_a: Iterable[Mapping[str, Any]], pages_b: Iterable[Mapping[str, Any]], *,
            resamples: int = 1000, seed: int = 0, level: float = 0.95) -> dict[str, Any]:
     """Two systems' score lines compared over the documents both have: for the headline (`headline`), each
-    family and each slice, `{"a", "b", "gap", "low", "high", "documents", "draws", "excludes_zero"}`. `gap`
+    family and each slice, `{"a", "b", "gap", "low", "high", "documents", "effective_documents", "draws",
+    "excludes_zero"}`. `gap`
     is a's score minus b's; `low` and `high` are the central `level` of the gap over `resamples` draws of
     the paired documents, one draw for both systems; `excludes_zero` is whether that interval leaves out 0.
     An interval is None (and `excludes_zero` False) as in `intervals`: for an entry of fewer than 5
@@ -241,11 +258,20 @@ def paired(pages_a: Iterable[Mapping[str, Any]], pages_b: Iterable[Mapping[str, 
             return {i for k in fams for i, _, _ in sp.get(("families", k), ())}
         return {i for i, _, _ in sp.get(sk, ())}
 
+    def counts_of(sp: Mapping[tuple[str, str], Any], sk: tuple[str, str]) -> dict[int, int]:
+        out: dict[int, int] = collections.Counter()
+        for key in ([("families", k) for k in fams] if sk == HEADLINE else [sk]):
+            for i, t, _ in sp.get(key, ()):
+                out[i] += t
+        return out
+
     def entry(sk: tuple[str, str]) -> dict[str, Any]:
         da_, db_ = docs_of(sa, sk), docs_of(sb, sk)
         low, high = _bounds(draws[sk], resamples, min(len(da_), len(db_)), level)
+        cnt = [(counts_of(sa, sk).get(i, 0) + counts_of(sb, sk).get(i, 0)) / 2 for i in da_ | db_]
         return {"a": pa[sk], "b": pb[sk], "gap": pa[sk] - pb[sk], "low": low, "high": high,
-                "documents": len(da_ | db_), "draws": len(draws[sk]),
+                "documents": len(da_ | db_), "effective_documents": round(_effective(cnt), 1),
+                "draws": len(draws[sk]),
                 "excludes_zero": low is not None and high is not None and (low > 0 or high < 0)}
 
     def total(sp: Mapping[tuple[str, str], Any]) -> dict[int, int]:
@@ -322,8 +348,33 @@ MIN_SYSTEMS = 5      # Spearman over fewer systems takes too few values to say a
 MAX_SKIPPED = 0.2     # a number undefined in more than this share of the splits is left out
 
 
+def _halves(sizes: Sequence[int], splits: int, rng: random.Random, balanced: bool) -> list[list[int]]:
+    """`splits` splits of the documents (their numbers of tests `sizes`) into halves, each a list of 1 for
+    a document in half A and 0 for one in B. Balanced: the documents, ordered by their number of tests
+    (ties at random), are cut into consecutive pairs and each pair is split between the halves at random,
+    an odd one out going to a random half, so the halves hold nearly equal numbers of tests. Otherwise
+    half A is `len(sizes) // 2` documents drawn at random."""
+    n = len(sizes)
+    out = []
+    for _ in range(splits):
+        order = list(range(n))
+        rng.shuffle(order)
+        flags = [0] * n
+        if balanced:
+            order.sort(key=sizes.__getitem__)
+            for k in range(0, n - 1, 2):
+                flags[order[k + rng.randrange(2)]] = 1
+            if n % 2:
+                flags[order[-1]] = rng.randrange(2)
+        else:
+            for i in order[:n // 2]:
+                flags[i] = 1
+        out.append(flags)
+    return out
+
+
 def reliability(runs: Mapping[str, Iterable[Mapping[str, Any]]], *, splits: int = 100, seed: int = 0,
-                threshold: float = 0.7, min_documents: int = 10) -> dict[str, Any]:
+                threshold: float = 0.7, min_documents: int = 10, balanced: bool = True) -> dict[str, Any]:
     """Whether each slice ranks the systems in `runs` (name: score lines) reproducibly, and whether it does
     so beyond what the rest of the benchmark does, by split-half over documents. For each of `splits`
     random halves of the documents (the same for every slice and system), each system's pass rate on the
@@ -337,17 +388,19 @@ def reliability(runs: Mapping[str, Iterable[Mapping[str, Any]]], *, splits: int 
     slice can't rank these systems reproducibly at all), else "redundant" (it ranks them, but only as the
     other tests do).
 
-    The slices are those of `intervals`: `{kind: {key: {"documents", "tests", "agreement",
-    "beyond_headline", "flag", "splits_used": {"agreement", "beyond_headline"}}}}`, with `kind` when
-    flagged. An entry without a number says why in `reason`, and is not flagged: fewer than
-    `min_documents` documents, a test count that differs between systems, no tests outside the slice, or
-    the number undefined in more than 20% of the splits. A split is undefined for `agreement` when a half
-    has no slice tests or the systems' pass rates in it have no variance, and for `beyond_headline`
-    also when a half has no tests outside the slice or the systems' pass rates on them have no variance;
-    each number counts its own splits (`splits_used`). Raises ValueError for fewer than 5 systems, or no
-    document all of them have.
+    The slices are those of `intervals`: `{kind: {key: {"documents", "effective_documents", "tests",
+    "agreement", "beyond_headline", "flag", "splits_used": {"agreement", "beyond_headline"}}}}`, with
+    `kind` when flagged. An entry without a number says why in `reason`, and is not flagged: fewer than
+    `min_documents` effective documents (`effective_documents`: the documents' worth when they hold unequal
+    numbers of tests, see `_effective`; `documents` is the raw count), a test count that differs between
+    systems, no tests outside the slice, or the number undefined in more than 20% of the splits. A split
+    is undefined for `agreement` when a half has no slice tests or the systems' pass rates in it have no
+    variance, and for `beyond_headline` also when a half has no tests outside the slice or the systems'
+    pass rates on them have no variance; each number counts its own splits (`splits_used`). Raises
+    ValueError for fewer than 5 systems, or no document all of them have.
 
-    Only documents every system has, with the same number of tests in each, are used; the others are
+    The halves are balanced by test count unless `balanced` is False (see `_halves`). Only documents every
+    system has, with the same number of tests in each, are used; the others are
     counted in `documents_dropped`. The tests outside a slice are the page lines' `tests` and `passed` less
     the slice's, so a test with several tags counts under each of them, and the other tests of a tag slice
     leave out only the tests that carry that tag: co-tagged tests stay in them for the other tags.
@@ -386,16 +439,7 @@ def reliability(runs: Mapping[str, Iterable[Mapping[str, Any]]], *, splits: int 
     total_n = [totals[names[0]][d][0] for d in docs]
     total_p = {s: [totals[s][d][1] for d in docs] for s in names}
 
-    rng = random.Random(seed)
-    half = n_docs // 2
-    in_a: list[list[int]] = []
-    for _ in range(splits):
-        order = list(range(n_docs))
-        rng.shuffle(order)
-        flags = [0] * n_docs
-        for i in order[:half]:
-            flags[i] = 1
-        in_a.append(flags)
+    in_a = _halves(total_n, splits, random.Random(seed), balanced)
     in_b = [[1 - f for f in flags] for flags in in_a]
     # Note: a half's totals per system, once per split, for the tests outside each slice.
     whole = [[(sum(itertools.compress(total_n, h)), [sum(itertools.compress(total_p[s], h)) for s in names])
@@ -412,14 +456,17 @@ def reliability(runs: Mapping[str, Iterable[Mapping[str, Any]]], *, splits: int 
                    for s in names}
             idx = sorted({index[d] for p in per.values() for d in p})
             n = [per[names[0]].get(docs[i], (0, 0))[0] for i in idx]
-            entry: dict[str, Any] = {"documents": len(idx), "tests": sum(n), "agreement": None,
+            eff = round(_effective(n), 1)
+            entry: dict[str, Any] = {"documents": len(idx), "effective_documents": eff, "tests": sum(n),
+                                     "agreement": None,
                                      "beyond_headline": None, "flag": False,
                                      "splits_used": {"agreement": 0, "beyond_headline": 0}}
             reason = None
             if any([per[s].get(docs[i], (0, 0))[0] for i in idx] != n for s in names):
                 reason = "the systems do not have the same tests for this slice"
-            elif len(idx) < min_documents:
-                reason = f"fewer than {min_documents} documents"
+            elif _effective(n) < min_documents:
+                reason = (f"fewer than {min_documents} effective documents (it has {len(idx)} documents "
+                          f"worth {eff})")
             elif sum(n) >= sum(total_n):
                 reason = "no tests outside the slice"
             if reason:
@@ -469,4 +516,4 @@ def reliability(runs: Mapping[str, Iterable[Mapping[str, Any]]], *, splits: int 
                   "reliability": {"method": "split-half over documents, Spearman-Brown corrected, median "
                                   "over splits; beyond_headline on residuals from the other tests' "
                                   "pass rate", "splits": splits, "seed": seed, "threshold": threshold,
-                                  "min_documents": min_documents}}
+                                  "min_documents": min_documents, "balanced": balanced}}

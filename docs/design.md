@@ -273,7 +273,9 @@ than its test count suggests.
 documents: a document's tests pass or fail together, so the documents, not the tests, are the sample. Pages
 with the same `document` are one cluster. Its limits are the dependence it can't see: copies of a page, or
 one source document under several `document` values (across suites, or built and corrected by one
-process), count as separate documents unless the manifest gives them one value. An interval says how much
+process), count as separate documents unless the manifest gives them one value. Scores are pooled over tests, so a
+document with many tests weighs more, and the resampling already reflects that; `documents` is a raw count and
+`effective_documents` is what the tests are worth as equal-sized documents. An interval says how much
 one system's score on this dataset moves with its choice of documents; it does not reach past this dataset,
 to other documents or to a change in the system. A comparison is paired, document by document, over the
 documents both runs have, not a comparison of two overlapping intervals. The summary itself carries no
@@ -284,7 +286,9 @@ two at random many times and compares the two halves' rankings of the systems (`
 same with what is left of each system's slice pass rate after taking out what its pass rate on the other tests
 predicts (`beyond_headline`): whether the slice ranks the systems by something the other tests don't. A slice
 with a low `beyond_headline` is flagged, as `noisy` when its `agreement` is low too (it can't rank these systems
-reproducibly at all) and `redundant` otherwise (it ranks them, but only as the other tests do). A flag is about
+reproducibly at all) and `redundant` otherwise (it ranks them, but only as the other tests do). The halves are balanced by test count, since scores are pooled over tests (a document with many tests weighs
+more) and a slice needs `min_documents` *effective* documents, the count its test counts are worth as equal-sized
+documents, not the raw count. A flag is about
 this dataset and these systems, not about whether the slice's tests are right. It depends on which systems are
 in the set (at least 5, and near-identical ones rank by noise), a half of few documents is noisy, and nothing
 corrects for looking at many slices at once.

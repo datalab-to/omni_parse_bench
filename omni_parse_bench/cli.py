@@ -331,7 +331,7 @@ def cmd_reliability(a: argparse.Namespace) -> int:
         raise ValueError(f"a run is named by its folder's name, and these runs' folders share one: {names}")
     got = uncertainty.reliability({n: read_scores(r) for n, r in zip(names, a.runs, strict=True)},
                                   splits=a.splits, seed=a.seed, threshold=a.threshold,
-                                  min_documents=a.min_documents)
+                                  min_documents=a.min_documents, balanced=not a.random_halves)
     if a.flagged:
         got = {k: ({key: e for key, e in v.items() if e["flag"]} if k in uncertainty.SLICES else v)
                for k, v in got.items()}
@@ -473,7 +473,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     rl.add_argument("--threshold", type=float, default=0.7,
                     help="flag a slice whose beyond_headline is below this (default: %(default)s)")
     rl.add_argument("--min-documents", type=int, default=10,
-                    help="fewest documents a slice needs for numbers (default: %(default)s)")
+                    help="fewest effective documents a slice needs for numbers (default: %(default)s)")
+    rl.add_argument("--random-halves", action="store_true",
+                    help="split the documents purely at random, not balanced by test count")
     rl.add_argument("--flagged", action="store_true",
                     help="print only the flagged slices (noisy, or redundant with the other tests)")
 
