@@ -47,6 +47,8 @@ TABLES = [
         "text-penalized",
         text("text-changed", "P", "a changed letter", "Total", "Totel", why=True),
         text("text-over-budget", "P", "more edits than `max_diffs`", "Total", "Tutel", md=1),
+        text("text-inserted", "P", "each inserted letter is an edit", "lorem ipsum dolor sit amet", "lorem izpsum dolqor sit amjet", md=2),
+        text("text-page-edge", "P", "a text at the edge of the page gets no extra edits", "lorem ipsum", "abc xxxem ipsum", md=2),
         text("text-diacritic", "P", "a dropped diacritic", "naïve", "naive"),
         text("text-punctuation", "P", "dropped punctuation", "Mr. Smith", "Mr Smith"),
         text("text-thousands", "P", "a dropped thousands separator", "1,240", "1240"),

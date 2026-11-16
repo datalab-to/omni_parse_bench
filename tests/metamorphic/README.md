@@ -65,7 +65,6 @@ Each row has: the relation's label, its promise, its status, the evidence, and t
   - It tries fewer when its input space runs out. The evidence then gives the count run in CI.
 - **DEVIATES**: the scorer does not keep the relation. Its test is a strict xfail that fails on its first example.
   - A strict xfail accepts any failed assertion, so a second cause could hide under an old label.
-  - M23a has a passing check that pins its cause: it breaks if the cause changes.
 
 **Evidence** is some of: the examples tried ("at most" a number, or the exact count when the input space runs
 out), the loaded tests drawn from, fixed cases, and the checks over every real test (with how many each relation
@@ -251,17 +250,14 @@ Reference only; the sections above do not need it until a term is unfamiliar.
   also compares cells with their spaces removed.
 - **text matching**: a text test looks for its folded string in the folded page.
   - It allows up to `max_diffs` edits, by a fuzzy match.
-  - Present adds a float slack EPS (1e-9), so k substitutions in n characters pass at the ratio 1 - k/n they
-    produce.
-  - Order uses edit distance.
-  - table_cell has the same slack.
+  - Present and order use edit distance (present counts an adjacent swap as one edit).
+  - table_cell compares a ratio with a float slack EPS (1e-9), so k substitutions in n characters pass at the
+    ratio 1 - k/n they produce.
 - **max_diffs** (the *edit budget*): the edits a test allows, after fold. Each matcher counts them its own way:
   - order: a character substituted, inserted or deleted is one edit (M3). A larger budget never fails a page
     that passed (M25a, M25b);
-  - present: a substituted character is one edit (M3). An inserted one can cost less, and so can one deleted
-    at the end of the text or from a page that holds only the text: 3 inserted letters can pass with
-    `max_diffs` 2 (M23a). Two swapped letters, or a letter moved a few places, count as one edit. A text that
-    starts or ends the page text gets about 1.5 times its budget for substituted letters (M23a);
+  - present: a character substituted, inserted or deleted, or two adjacent characters swapped, is one edit,
+    wherever the text sits in the page text (M3, M23a). A letter moved further costs what those edits do;
   - table_cell: a substituted character is one edit (M3); an inserted or deleted one costs about half (M23b).
 - **line-end hyphen**: a letter, a hyphen, then white space (`develop- ers`). Fold joins it when a lowercase
   letter follows, or when the letters before the hyphen and after the white space are all capitals (a heading

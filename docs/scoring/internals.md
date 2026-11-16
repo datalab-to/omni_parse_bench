@@ -146,12 +146,12 @@ for both the text tests and the equation test. Its rules:
 `max_diffs` counts character edits on the folded gold, and must be below its length. The three text matchers
 count edits differently:
 
-- `present` passes when the best-matching window scores at least `1 - max_diffs / length` (a rapidfuzz partial
-  ratio). For substituted letters this is true edit distance. It forgives more in two ways. Two swapped letters
-  count as one edit. And an inserted letter can cost less than one edit, as can a letter deleted at the end of
-  the gold or from a page that holds only the gold: three letters inserted into `lorem ipsum dolor sit amet`
-  pass with `max_diffs` 2.
-- `order` uses true edit distance (fuzzysearch), so two swapped letters count as two.
+- `present` passes when some part of the page text is at most `max_diffs` edits from the gold, wherever the
+  gold sits in the page text. A character substituted, inserted or deleted is one edit, and so are two
+  adjacent characters swapped (optimal string alignment: no character is edited twice). Three letters
+  inserted into `lorem ipsum dolor sit amet` need `max_diffs` 3, and a letter moved three places needs 2.
+  With `max_diffs` 0 it is a substring test.
+- `order` uses plain edit distance (fuzzysearch), so two swapped letters count as two.
 - `table_cell` compares whole cells with a ratio over both lengths, so an inserted character costs half an edit.
 
 Measured on random strings (the figures come from the installed rapidfuzz and fuzzysearch):
@@ -160,9 +160,9 @@ Measured on random strings (the figures come from the installed rapidfuzz and fu
 | rule | input | reads as | case |
 |---|---|---|---|
 | 1 random edit, no adjacent swap, `max_diffs` 1 | 4,000 random needles, seed 1 | `3050 cases, 0 passed above budget, 0 failed within budget` | `edits-1` |
-| 1 random edit, with adjacent swap, `max_diffs` 1 | 4,000 random needles, seed 1 | `1021 cases, 820 passed above budget, 0 failed within budget` | `edits-1-swap` |
+| 1 random edit, with adjacent swap, `max_diffs` 1 | 4,000 random needles, seed 1 | `1021 cases, 0 passed above budget, 0 failed within budget` | `edits-1-swap` |
 | 2 random edits, no adjacent swap, `max_diffs` 2 | 4,000 random needles, seed 1 | `2229 cases, 0 passed above budget, 0 failed within budget` | `edits-2` |
-| 2 random edits, with adjacent swap, `max_diffs` 2 | 4,000 random needles, seed 1 | `1782 cases, 1016 passed above budget, 0 failed within budget` | `edits-2-swap` |
+| 2 random edits, with adjacent swap, `max_diffs` 2 | 4,000 random needles, seed 1 | `1782 cases, 0 passed above budget, 0 failed within budget` | `edits-2-swap` |
 <!-- /cases -->
 
 ## The hyphen rule

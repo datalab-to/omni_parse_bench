@@ -3,7 +3,8 @@
 **Asks:** this string appears somewhere in the page's text. 3,684 tests; family text; reads `html`.
 
 The test folds the gold and the page text ([README](README.md#two-words-used-everywhere)) and looks for the gold
-as a substring, allowing up to `max_diffs` character edits. If that fails it tries again on the squeezed strings,
+as a substring, allowing up to `max_diffs` character edits (a character substituted, inserted or deleted, or
+two adjacent characters swapped, is one edit). If that fails it tries again on the squeezed strings,
 then once more allowing a hyphen at a line end to be kept or dropped. It does not ask where the string is, what
 element holds it, or what is next to it. The page text includes image descriptions (`alt`) and reads a table cell
 by cell ([internals.md](internals.md#the-text-view)).
@@ -65,6 +66,8 @@ What it penalizes:
 |---|---|---|---|---|---|
 | P | a changed letter | `Total` | `Totel` | fail: `'Total' not found (best 0.800 < 1.000); closest 'totel'` | `text-changed` |
 | P | more edits than `max_diffs` | `Total` (md 1) | `Tutel` | fail | `text-over-budget` |
+| P | each inserted letter is an edit | `lorem ipsum dolor sit amet` (md 2) | `lorem izpsum dolqor sit amjet` | fail | `text-inserted` |
+| P | a text at the edge of the page gets no extra edits | `lorem ipsum` (md 2) | `abc xxxem ipsum` | fail | `text-page-edge` |
 | P | a dropped diacritic | `naïve` | `naive` | fail | `text-diacritic` |
 | P | dropped punctuation | `Mr. Smith` | `Mr Smith` | fail | `text-punctuation` |
 | P | a dropped thousands separator | `1,240` | `1240` | fail | `text-thousands` |
@@ -139,4 +142,6 @@ that leaves out a unit's exponent passes (case text-sup-unit).
 
 A failure's why reads `'gold' found only inside a longer number` when the digit edge rejected every exact
 match, and otherwise `'gold' not found (best r < threshold); closest '...'`: the best match ratio, the ratio
-needed (`1 - max_diffs / length of the folded gold`), and the closest part of the page.
+needed (`1 - max_diffs / length of the folded gold`), and the closest part of the page. The ratio is
+rapidfuzz's partial ratio, a first pass that a page within budget always clears; when that passes with edits to
+spend, the edits are counted and the ratio is `1 - edits / length of the folded gold`.

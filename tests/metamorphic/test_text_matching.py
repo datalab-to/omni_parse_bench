@@ -9,7 +9,7 @@ import pytest
 from hypothesis import example, given
 from hypothesis import strategies as st
 
-from metamorphic.common import (BUG, CELL, HOLDS, INTENDED, ORDER, REPEAT, TEXT, answer_page,
+from metamorphic.common import (CELL, HOLDS, INTENDED, ORDER, REPEAT, TEXT, answer_page,
                                 deviation, escaped, every_real_test, more_evidence, passes, relation)
 from omni_parse_bench.normalize import fold
 from omni_parse_bench.scorers.unit_tests import runners
@@ -70,8 +70,8 @@ def test_a_test_that_passes_with_k_edits_allowed_passes_with_more(t, edits, rnd)
     """A text, order or table_cell test that passes with k edits allowed also passes with k + 1, and passes on
     its own answer at its own max_diffs. And on one fixed 26-character text with j = 0 to 3 of its inner
     letters edited, the budget needed is exactly j: for j substitutions in present, order and table_cell; for
-    j inserted or j deleted letters in order; for j deleted letters inside a longer line in present (M23a and
-    M23b give the edits present and table_cell forgive).
+    j inserted or j deleted letters in order; for j deleted letters inside a longer line in present (M23a
+    gives inserted and deleted letters in present; M23b gives the edits table_cell forgives).
     [M3]
     Why it matters for a score: a larger edit budget may only forgive more, never fail a page it passed."""
     # Given a test, and a page holding its answer written `edits` edits off
@@ -112,8 +112,7 @@ EDITS_DOMAIN = ("1-4 of the 22 inner letters of a fixed 26-character text, each 
                 "inserted before it")
 
 
-@relation(BUG, domain=EDITS_DOMAIN + "; the page holds the text alone or between other words")
-@deviation("M23a")
+@relation(HOLDS, domain=EDITS_DOMAIN + "; the page holds the text alone or between other words")
 @example(mode="insert", positions={7, 15, 24}, padded=False)
 @given(st.sampled_from(["insert", "delete"]), st.sets(st.sampled_from(INNER), min_size=1, max_size=4),
        st.booleans())
@@ -128,25 +127,25 @@ def test_present_needs_one_edit_per_inserted_or_deleted_letter(mode, positions, 
 
 
 @more_evidence()
-def test_present_forgives_the_edits_m23a_names():
-    """The causes M23a names, pinned. Present passes above its budget on: 3 inserted letters with budget 2; 5
-    characters deleted at the end with budget 3; 3 letters substituted in a text that ends or starts the page
-    text, with budget 2 (with a word on its other side too, it fails); a letter moved 3 places with budget 1.
-    [M23a]
-    Why it matters for a score: M23a's test accepts any failure; this check breaks if a cause changes."""
+def test_present_charges_the_edits_it_once_forgave():
+    """Present charges the edit distance on the pages M23a's test does not draw: 3 inserted letters need
+    budget 3; 3 letters deleted at the end need 3; 3 letters substituted in a text that ends or starts the
+    page text need 3, as with a word on each side; a letter moved 3 places needs 2; two adjacent letters
+    swapped need 1. [M23a]
+    Why it matters for a score: a text at the edge of the page, or a moved letter, gets no larger budget."""
     def verdicts(gold, page):
-        return [passes(runners.Present(runners.Text(gold, k)), f"<p>{page}</p>") for k in range(4)]
-    # Given a gold, and a page that edits it more than the budget allows
-    # When letters are inserted, or deleted at its end; Then a budget below their number passes
-    assert verdicts(ANCHOR, "lorem izpsum dolqor sit amjet") == [False, False, True, True]
-    assert verdicts(ANCHOR, "lorem ipsum dolor sit")[3]
-    # When the text ends or starts the page text, 3 of its letters substituted; Then budget 2 passes
-    assert verdicts("lorem ipsum", "abc xxxem ipsum") == [False, False, True, True]
-    assert verdicts("lorem ipsum", "lorem ipxxx abc") == [False, False, True, True]
-    # And with a word on the other side too, budget 2 fails
-    assert verdicts("lorem ipsum", "abc xxxem ipsum dolor") == [False, False, False, True]
-    # When a letter moves 3 places (edit distance 2); Then budget 1 passes
-    assert verdicts("abcdefgh", "zz acdebfgh zz") == [False, True, True, True]
+        return [passes(runners.Present(runners.Text(gold, k)), f"<p>{page}</p>") for k in range(5)]
+    # Given a gold, and a page that edits it; When the budget runs from 0 to 4
+    # Then letters inserted, or deleted at its end, need one edit each
+    assert needs_exactly(verdicts(ANCHOR, "lorem izpsum dolqor sit amjet"), 3)
+    assert needs_exactly(verdicts(ANCHOR, "lorem ipsum dolor sit a"), 3)
+    # And 3 substituted letters need 3, wherever the text sits in the page text
+    for page in ("abc xxxem ipsum", "lorem ipxxx abc", "abc xxxem ipsum dolor"):
+        assert needs_exactly(verdicts("lorem ipsum", page), 3), page
+    # And a letter moved 3 places needs its edit distance, 2
+    assert needs_exactly(verdicts("abcdefgh", "zz acdebfgh zz"), 2)
+    # And two adjacent letters swapped need 1
+    assert needs_exactly(verdicts("abcdefgh", "zz abdcefgh zz"), 1)
 
 
 @relation(INTENDED, domain=EDITS_DOMAIN)

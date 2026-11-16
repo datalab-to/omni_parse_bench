@@ -43,6 +43,8 @@ text-short-fuzzy	pass
 ## text-penalized
 text-changed	fail	'Total' not found (best 0.800 < 1.000); closest 'totel'
 text-over-budget	fail	'Total' not found (best 0.600 < 0.800); closest 'tutel'
+text-inserted	fail	'lorem ipsum dolor sit amet' not found (best 0.885 < 0.923); closest 'lorem izpsum dolqor sit am'
+text-page-edge	fail	'lorem ipsum' not found (best 0.727 < 0.818); closest 'em ipsum'
 text-diacritic	fail	'naïve' not found (best 0.800 < 1.000); closest 'naive'
 text-punctuation	fail	'Mr. Smith' not found (best 0.941 < 1.000); closest 'mr smith'
 text-thousands	fail	'1,240' not found (best 0.889 < 1.000); closest '1240'
@@ -364,9 +366,9 @@ hyph-cell-whole	fail	no cell matching 'self-aware' in any table
 hyph-unspaced	fail	'develop-ers' not found (best 0.952 < 1.000); closest 'developers'
 ## internals-edits
 edits-1	3050 cases, 0 passed above budget, 0 failed within budget
-edits-1-swap	1021 cases, 820 passed above budget, 0 failed within budget
+edits-1-swap	1021 cases, 0 passed above budget, 0 failed within budget
 edits-2	2229 cases, 0 passed above budget, 0 failed within budget
-edits-2-swap	1782 cases, 1016 passed above budget, 0 failed within budget
+edits-2-swap	1782 cases, 0 passed above budget, 0 failed within budget
 ## internals-loader
 load-md-max	refused
 load-md-ok	loads

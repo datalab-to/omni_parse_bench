@@ -132,17 +132,6 @@
     "who_is_affected": "a text test that ends in a hyphen (a word the gold keeps broken at a printed line end), on a page that puts the rest of the word in the next paragraph",
     "enumerated_over_real_tests": false
   },
-  "M23a": {
-    "status": "bug",
-    "description": "Present forgives inserted letters, and some deleted ones: j letters inserted into the text, or deleted from a page that holds only the text, or deleted at the text's end, can pass with a budget below j. Two more forms: a text that starts or ends the page text gets about 1.5 times its budget for substituted letters, and a letter moved a few places costs one edit.",
-    "counterexample": "Text('lorem ipsum dolor sit amet', k) passes on 'lorem izpsum dolqor sit amjet' (3 letters inserted) from k = 2, and on 'lorem ipsum dolor sit' (5 characters deleted at the end) from k = 3. Text('lorem ipsum', 2) passes on 'abc xxxem ipsum' (the text ends the page, its first 3 letters substituted) and fails on 'abc xxxem ipsum dolor'. Text('abcdefgh', 1) passes on 'zz acdebfgh zz' (b moved 3 places: edit distance 2)",
-    "why_this_status": "The scorer's docs promise a budget of edits: docs/scoring/present-text.md says present allows 'up to `max_diffs` character edits'; in omni_parse_bench/scorers/unit_tests/runners.py the `_ratio` docstring says it 'passes when the best partial match is within `max_diffs` edits', and the comment on `EPS` says 'rapidfuzz returns exactly that ratio for k edits'. That holds for substituted letters (M3), not for inserted ones: rapidfuzz's partial ratio scores an inserted letter as less than one edit. docs/scoring/internals.md (The edit budget) states the inserted and deleted letters measured here. It names swapped letters too, but not a text at the edge of the page text, nor a moved letter.",
-    "effect_on_scores": "small",
-    "effect_basis": "Measured on cached leaderboard re-runs (not included here): counting edits exactly would fail a small share of the tests that carry a budget, all of them pages that sit one edit or more over it, and none the other way. The budgets were set against the measure the scorer uses, so the published scores include this forgiveness and an exact count would lower them",
-    "how_common": "1,370 of the 3,684 real present text tests carry a max_diffs of 1 or more (counted when the dataset is set); the others have no edit to spend",
-    "who_is_affected": "text tests with max_diffs 1 or more: a page that adds letters inside the text, drops letters at its end, misreads letters where the text starts or ends the page text, or moves a letter, can pass with more edits than the test allows",
-    "enumerated_over_real_tests": false
-  },
   "M23b": {
     "status": "intended and documented",
     "description": "Table_cell compares whole cells by a ratio over both lengths, so an inserted or deleted letter costs about half an edit: j such letters can pass with a budget below j.",

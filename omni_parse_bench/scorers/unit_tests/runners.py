@@ -21,8 +21,9 @@ from rapidfuzz import fuzz
 from omni_parse_bench import normalize, tables, views
 from omni_parse_bench.scorers.unit_tests import hyphenation
 
-# Note: a test allowing k edits in an n-character string passes at ratio 1 - k/n, and rapidfuzz
-# returns exactly that ratio for k edits, which in binary lands a hair under it.
+# Note: a ratio test (table_cell, or present with no edit to spend) allowing k edits in an n-character string
+# passes at ratio 1 - k/n, and rapidfuzz returns exactly that ratio for k substitutions, which in binary lands
+# a hair under it.
 EPS = 1e-9
 TABLE_MIN_RATIO = 0.5
 MIN_PLACE_COVER = 0.5
@@ -439,12 +440,88 @@ def _mark(passed: bool, why: str) -> Mark:
 
 
 def _ratio(needle: str, hay: str, max_diffs: int) -> tuple[bool, float, float]:
-    """Fuzzy containment: passes when the best partial match is within `max_diffs` edits."""
+    """Fuzzy containment: passes when some substring of `hay` is within `max_diffs` edits of `needle`, an edit
+    being a character substituted, inserted or deleted, or two adjacent characters swapped (`_edits`).
+    Returns the verdict, the best match's ratio, and the threshold `1 - max_diffs / len(needle)`.
+
+    Note: rapidfuzz's partial ratio is the first pass, and with no edit to spend the only one (it is 1 only
+    for an exact copy). Its windows have the needle's length, so it scores a substring k edits off at 1 - k/n
+    or better, and a `hay` at least as long as `needle` that it fails is more than `max_diffs` edits off. It
+    forgives more than that (an inserted letter, a letter moved a few places, a text cut at an edge of
+    `hay`), so a fuzzy pass is confirmed by the edit count, and the ratio is then
+    `1 - edits / len(needle)`."""
     if not needle:
         return False, 0.0, 1.0
     thr = 1.0 - max_diffs / len(needle)
     r = _partial(needle, hay)
-    return r >= thr - EPS, r, thr
+    if not max_diffs or needle in hay or (r < thr - EPS and len(hay) >= len(needle)):
+        return r >= thr - EPS, r, thr
+    d = _edits(needle, hay, max_diffs)
+    return d <= max_diffs, 1.0 - d / len(needle), thr
+
+
+def _edits(needle: str, hay: str, max_diffs: int) -> int:
+    """The fewest edits that turn `needle` into some substring of `hay` (the empty one too), an edit being a
+    character substituted, inserted or deleted, or two adjacent characters swapped: the optimal string
+    alignment distance (restricted Damerau-Levenshtein), where no character is edited twice.
+
+    Note: a match within `max_diffs` edits keeps one of `2 * max_diffs + 1` pieces of `needle` intact
+    (an edit touches at most two), so only the stretches of `hay` around an exact copy of a piece are scanned
+    first; the whole of `hay` is scanned when they find none, or would not be shorter (`_edits_scan`)."""
+    n, k = len(needle), max_diffs
+    count = 2 * k + 1
+    step = n // count
+    if step >= 3:
+        spans = []
+        for i in range(count):
+            o = i * step
+            piece = needle[o:n if i == count - 1 else o + step]
+            p = hay.find(piece)
+            while p != -1:
+                spans.append((max(0, p - o - k), p - o + n + 2 * k))
+                p = hay.find(piece, p + 1)
+        spans.sort()
+        merged: list[list[int]] = []
+        for a, b in spans:
+            if merged and a <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], b)
+            else:
+                merged.append([a, b])
+        if sum(b - a for a, b in merged) < len(hay):
+            d = min((_edits_scan(needle, hay[a:b]) for a, b in merged), default=n)
+            if d <= k:
+                return d
+    return _edits_scan(needle, hay)
+
+
+def _edits_scan(needle: str, hay: str) -> int:
+    """`_edits` by one pass over the whole of `hay`: Hyyrö's bit-parallel form of Myers' algorithm, with the
+    transposition term, in its search form (a match may start anywhere in `hay`). One bit per character of
+    `needle`."""
+    m = len(needle)
+    full, top = (1 << m) - 1, 1 << (m - 1)
+    peq: dict[str, int] = {}
+    for i, c in enumerate(needle):
+        peq[c] = peq.get(c, 0) | 1 << i
+    vp, vn, d0, prev = full, 0, 0, 0
+    score = best = m
+    for c in hay:
+        eq = peq.get(c, 0)
+        tr = (((~d0) & eq) << 1) & prev
+        d0 = ((((eq & vp) + vp) ^ vp) | eq | vn | tr) & full
+        hp = (vn | ~(d0 | vp)) & full
+        hn = d0 & vp
+        if hp & top:
+            score += 1
+        elif hn & top:
+            score -= 1
+        x = (hp << 1) & full
+        vn = x & d0
+        vp = ((hn << 1) | ~(x | d0)) & full
+        prev = eq
+        if score < best:
+            best = score
+    return best
 
 
 def _partial(needle: str, hay: str) -> float:

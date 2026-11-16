@@ -35,6 +35,26 @@ def test_present_allows_exactly_the_edits_it_says():
     assert not R.present(R.Present(R.Text("a" * 39, 1)), html("<p>" + "a" * 37 + "bb</p>"))[0]
 
 
+@pytest.mark.parametrize("gold, page, edits", [
+    ("lorem ipsum dolor sit amet", "lorem izpsum dolqor sit amjet", 3),    # 3 letters inserted
+    ("lorem ipsum dolor sit amet", "lorem ipsum dolor sit a", 3),          # 3 letters deleted at the end
+    ("lorem ipsum dolor sit amet", "lorem ipsu dolr sit amet", 2),         # 2 deleted from a page of the gold
+    ("lorem ipsum", "abc xxxem ipsum", 3),                                 # 3 substituted, at the page's end
+    ("lorem ipsum", "lorem ipxxx abc", 3),                                 # and at its start
+    ("abcdefgh", "zz acdebfgh zz", 2),                                     # b moved 3 places
+    ("britian", "a britain b", 1),                                         # two letters swapped: one edit
+    ("total", "otatl", 2),                                                 # two swaps
+])
+def test_present_needs_one_edit_per_edit_at_any_place(gold, page, edits):
+    """A present text passes with `max_diffs` equal to the edit distance of its best match (a letter
+    substituted, inserted or deleted, or two adjacent letters swapped, is one edit), and fails with one fewer:
+    an inserted, deleted, or moved letter, or a text at the edge of the page, gets no discount."""
+    def passes(k):
+        return R.present(R.Present(R.Text(gold, k)), html(f"<p>{page}</p>"))[0]
+    assert passes(edits)
+    assert not passes(edits - 1)
+
+
 @pytest.mark.parametrize("needle, text, passes", [
     ("3 Park Street, Boston, Mass.", "13 Park Street, Boston, Mass.", False),
     ("10 000", "10 0000", False),

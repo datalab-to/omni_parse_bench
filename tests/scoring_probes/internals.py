@@ -3,7 +3,6 @@
 import collections
 import random
 
-import fuzzysearch
 from cases import cell, code, folds, order, reading, repeat, table, text
 
 from omni_parse_bench import markdown, normalize, tables, views, vocab
@@ -42,9 +41,22 @@ def loads(label, rule, test_type, args, expect, settings=None, show=None):
     return reading(label, rule, show or f"{test_type}: {shown}", expect, run)
 
 
+def osa(needle: str, hay: str) -> int:
+    """The fewest edits from `needle` to a substring of `hay`, an adjacent swap one edit: a plain DP."""
+    prev2, prev = None, [0] * (len(hay) + 1)
+    for i in range(1, len(needle) + 1):
+        cur = [i] + [0] * len(hay)
+        for j in range(1, len(hay) + 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (needle[i - 1] != hay[j - 1]))
+            if i > 1 and j > 1 and needle[i - 1] == hay[j - 2] and needle[i - 2] == hay[j - 1]:
+                cur[j] = min(cur[j], prev2[j - 2] + 1)
+        prev2, prev = prev, cur
+    return min(prev)
+
+
 def edits(k: int, swap: bool):
     """Random needles of 6-24 letters with k edits (substitutions, insertions, deletions, and adjacent swaps when
-    `swap`), seed 1: how often `present` passes at max_diffs k when the true edit distance is above k."""
+    `swap`), seed 1: how often `present` passes at max_diffs k when the edit distance (`osa`) is above k."""
     def run():
         rng = random.Random(1)
         letters = "abcdefghijklmnopqrstuvwxyz"
@@ -61,7 +73,7 @@ def edits(k: int, swap: bool):
                        "ins": out[:i] + rng.choice(letters) + out[i:], "del": out[:i] + out[i + 1:],
                        "swap": out[:i] + out[i + 1] + out[i] + out[i + 2:]}[kind]
             hay = f"zq {out} qz"
-            true = min((m.dist for m in fuzzysearch.find_near_matches(needle, hay, max_l_dist=k + 2)), default=99)
+            true = osa(needle, hay)
             passed = R.found(R.Text(needle, k), views.html(f"<p>{hay}</p>"))[0]
             counts["cases"] += 1
             counts["passed above budget"] += passed and true > k
@@ -157,9 +169,9 @@ TABLES = [
     table(
         "internals-edits",
         measure("edits-1", 1, False, "3050 cases, 0 passed above budget, 0 failed within budget"),
-        measure("edits-1-swap", 1, True, "1021 cases, 820 passed above budget, 0 failed within budget"),
+        measure("edits-1-swap", 1, True, "1021 cases, 0 passed above budget, 0 failed within budget"),
         measure("edits-2", 2, False, "2229 cases, 0 passed above budget, 0 failed within budget"),
-        measure("edits-2-swap", 2, True, "1782 cases, 1016 passed above budget, 0 failed within budget"),
+        measure("edits-2-swap", 2, True, "1782 cases, 0 passed above budget, 0 failed within budget"),
     ),
     table(
         "internals-loader",
