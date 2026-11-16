@@ -95,7 +95,9 @@ It reads as: "some table in the output has a cell `167.8`, under the column head
 `page_near_empty` takes no args and settings exactly `{"max_chars": N}`, where N is a whole number,
 0 or more. Judge it from the page: it prints nothing a reader would transcribe beyond what the limit
 allows (a stamp, a folio number). Show-through from the other side counts as blank only where it can't
-be read as text. The runner counts non-space characters in the seen view, excluding image alt text.
+be read as text. The runner counts non-space characters in the seen view, excluding image alt text, invisible format characters
+(a zero-width space, a byte-order mark, a soft hyphen) and the marks the text view writes for an element that
+holds nothing (an empty `<math>`, an empty list item, a hidden input).
 No dataset tests use this type yet.
 
 The table_cell roles mean:
@@ -161,7 +163,9 @@ checked by tagging (below) and by review.
   so `\frac{a}{b}` and `\dfrac{a}{b}` are equal;
 - `number` when the content must match digit for digit. Strict on digits, separators as written and
   sign, and an output may not drop a percent sign: `-4.8%` never matches `-4.9%`, and `1,240` never
-  matches `1240`; and
+  matches `1240` (a gold with one `.` and exactly three decimals, `8.455`, reads as a decimal; a gold the scorer
+  cannot read as one number, `12,5`, is refused when the test loads; see
+  [present-number.md](scoring/present-number.md)); and
 - `text` for everything else. Matched after `normalize.fold`, within the arg's `max_diffs` edits.
 
 The kind is never guessed from the characters: "2024" or "x = 1" could be any of the three, and a

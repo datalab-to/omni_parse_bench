@@ -109,6 +109,8 @@ Each test is tagged by what it checks:
 Tags never decide whether a test passes, or the headline. They are only for slicing the results, such as the score
 on handwriting alone. The full design is [`docs/design.md`](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/design.md).
 What each test reads, ignores and penalizes is in the [scoring reference](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/scoring/README.md).
+The scorer's own checks, and a certificate of the relations they keep and the deviations that remain, are in
+[`tests/metamorphic`](https://github.com/datalab-to/omni_parse_bench/blob/main/tests/metamorphic/README.md).
 
 ## Install
 
