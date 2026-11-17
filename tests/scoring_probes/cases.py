@@ -105,7 +105,13 @@ def order(label, mark, rule, before, after, out, md=0, **kw) -> Case:
 
 def repeat(label, mark, rule, gold, count, out, **kw) -> Case:
     return verdict(label, mark, rule, f"{code(gold)} ×{count}", out,
-                   lambda: _v(R.repeat(R.Repeat(gold, count), views.html(html(out)))), **kw)
+                   lambda: _v(R.repeat(R.Repeat(R.Text(gold, 0), count), views.html(html(out)))), **kw)
+
+
+def repeat_number(label, mark, rule, gold, count, out, **kw) -> Case:
+    """`repeat` with a number arg."""
+    return verdict(label, mark, rule, f"{code(gold)} ×{count}", out,
+                   lambda: _v(R.repeat(R.Repeat(R.Number(gold), count), views.html(html(out)))), **kw)
 
 
 def near_empty(label, mark, rule, max_chars, out, **kw) -> Case:

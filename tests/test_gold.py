@@ -57,6 +57,16 @@ def with_args(args: dict, test_type: str = "present", settings: dict | None = No
     with_args({"cell": {"text": "abc", "max_diffs": 0, "exact_case": True}}, "table_cell"),
     with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": True, "place": [[0, 0, 1, 1]]}},
               "layout_kind", {"kind": "text"}),
+    # ambiguous, as in present
+    with_args({"content": {"number": "12,5"}}, "repeat", {"expected_count": 2}),
+    with_args({"content": {"number": "1,240"}}, "repeat", {"expected_count": 0}),
+    with_args({"content": {"number": "1,240"}}, "repeat", {"expected_count": True}),
+    with_args({"content": {"number": "1,240"}}, "repeat", {}),
+    with_args({"content": {"number": "1,240"}}, "repeat", {"expected_count": 2, "max_diffs": 0}),
+    with_args({"content": {"number": 1240}}, "repeat", {"expected_count": 2}),
+    with_args({"content": {"latex": "x^2"}}, "repeat", {"expected_count": 2}),
+    with_args({"content": {"number": "1,240", "max_diffs": 0}}, "repeat", {"expected_count": 2}),
+    with_args({"content": {"text": "abc", "max_diffs": 1}}, "repeat", {"expected_count": 2}),
     with_args({"content": {"text": "abc", "max_diffs": 0}}, id=7),
     with_args({"content": {"text": "abc", "max_diffs": 0}}, id=" "),
 ])
@@ -110,6 +120,13 @@ def test_exact_case_is_a_bool_arg_field_of_a_present_text():
     assert gold.arg_kinds(t.test_type, t.args) == ("text",)
     t = gold.test("p", with_args({"content": {"text": "iPhone", "max_diffs": 0, "exact_case": False}}))
     assert t.params.content.exact_case is False
+
+
+@pytest.mark.parametrize("number", ["1,240", "-4.8%", "12.5", "0.0472", "1,240.00", "8.455"])
+def test_repeat_takes_a_number_and_a_count(number):
+    t = gold.test("p", with_args({"content": {"number": number}}, "repeat", {"expected_count": 3}))
+    assert t.params.content.number == number and t.params.expected_count == 3
+    assert gold.arg_kinds(t.test_type, t.args) == ("number",)
 
 
 @pytest.mark.parametrize("limit", [0, 1, 20])
