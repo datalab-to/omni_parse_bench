@@ -28,10 +28,11 @@ from omni_parse_bench.scorers.unit_tests import runners
 
 LIVE = bool(os.environ.get("OPB_DATASET")) and (DATASET / data.MANIFEST).exists()
 TESTS = scorer.check(data.read_manifest(DATASET)[1]) if LIVE else fixture_tests()
-# A page_near_empty test's answer is a blank page, which text around it would spoil: it has no part in the
-# properties that add text around an answer.
-HTML_TESTS = [t for t in TESTS if "html" in answer(t) and not isinstance(t.params, runners.PageNearEmpty)]
-INLINE_TESTS = [t for t in HTML_TESTS if answer(t)["html"].startswith("<p>")]
+HTML_TESTS = [t for t in TESTS if "html" in answer(t)]
+# A page_near_empty test's answer is a page with at most its limit of characters, which text around it would
+# spoil: the properties that add text around an answer leave it out.
+SURROUNDABLE = [t for t in HTML_TESTS if not isinstance(t.params, runners.PageNearEmpty)]
+INLINE_TESTS = [t for t in SURROUNDABLE if answer(t)["html"].startswith("<p>")]
 assert HTML_TESTS and INLINE_TESTS, "no html tests found: check tests/fixtures/invariants/ or OPB_DATASET"
 
 # Filler no test asks for, and the marks a page prints around its text. Note: no bare "$": two of them
@@ -47,7 +48,7 @@ def paragraphs(xs: list[str]) -> str:
     return "".join(f"<p>{_html.escape(x, quote=False)}</p>" for x in xs)
 
 
-@given(st.sampled_from(HTML_TESTS), st.lists(PARAGRAPH, max_size=3), st.lists(PARAGRAPH, max_size=3))
+@given(st.sampled_from(SURROUNDABLE), st.lists(PARAGRAPH, max_size=3), st.lists(PARAGRAPH, max_size=3))
 def test_an_answer_passes_with_paragraphs_around_it(t, before, after):
     [v] = scorer.score({"html": paragraphs(before) + answer(t)["html"] + paragraphs(after)}, [t])
     assert v.result == "pass", v.why
