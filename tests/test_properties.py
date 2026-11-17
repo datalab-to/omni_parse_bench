@@ -28,7 +28,9 @@ from omni_parse_bench.scorers.unit_tests import runners
 
 LIVE = bool(os.environ.get("OPB_DATASET")) and (DATASET / data.MANIFEST).exists()
 TESTS = scorer.check(data.read_manifest(DATASET)[1]) if LIVE else fixture_tests()
-HTML_TESTS = [t for t in TESTS if "html" in answer(t)]
+# A page_near_empty test's answer is a blank page, which text around it would spoil: it has no part in the
+# properties that add text around an answer.
+HTML_TESTS = [t for t in TESTS if "html" in answer(t) and not isinstance(t.params, runners.PageNearEmpty)]
 INLINE_TESTS = [t for t in HTML_TESTS if answer(t)["html"].startswith("<p>")]
 assert HTML_TESTS and INLINE_TESTS, "no html tests found: check tests/fixtures/invariants/ or OPB_DATASET"
 

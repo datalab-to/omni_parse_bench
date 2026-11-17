@@ -216,15 +216,16 @@ def test_the_page_text_ignores_entities(s):
 EXACT = [t for t in TEXT if t.params.content.max_diffs == 0 and fold(t.params.content.text)]
 # Characters a page may drop without changing what a text test compares, by the documented rules of fold
 # (docs/scoring/internals.md, Fold), restated here without calling the scorer.
-# A run of 3+ dots (… is 3; 。 and ｡ are dots too), dashes, _, = or *.
-LEADER = re.compile(r"[.\-\u2026。｡]+|_{3,}|={3,}|\*{3,}")
+# A run of 3+ dots (… is 3; 。 and ｡ are dots too) or dashes, with white space allowed inside it (". . ." and
+# "....  ...." are runs), or of 3+ _, = or *.
+LEADER = re.compile(r"[.\-\u2026。｡](?:\s*[.\-\u2026。｡])*|_{3,}|={3,}|\*{3,}")
 FOOTNOTE = re.compile(r"\[\^?\d+\]")                        # [12] or [^12]
 
 
 def why_a_deletion_cannot_count(text: str, i: int) -> str | None:
     """Why deleting text[i] cannot fail a text test, or None: the reasons are fold's documented rules."""
     c = text[i]
-    leaders = [m for m in LEADER.finditer(text) if len(m[0]) + 2 * m[0].count("…") >= 3]
+    leaders = [m for m in LEADER.finditer(text) if len(re.sub(r"\s", "", m[0])) + 2 * m[0].count("…") >= 3]
     if c.isspace(): return "white space"
     if unicodedata.category(c) in ("Cf", "Co"): return "an invisible or private-use character"
     if any(m.start() <= i < m.end() for m in leaders): return "part of a leader run"

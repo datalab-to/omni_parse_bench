@@ -47,6 +47,7 @@ def answer(t: gold.Test) -> dict[str, Any]:
         case runners.Present(content=runners.Latex(latex=x)): html = f"<p>$${e(x)}$$</p>"
         case runners.Order(): html = f"<p>{e(p.before)}</p><p>{e(p.after)}</p>"
         case runners.Repeat(): html = "".join(f"<p>{e(p.text)}</p>" for _ in range(p.expected_count))
+        case runners.PageNearEmpty(): html = ""     # a blank page is what it asks for
         case runners.TableCell(): html = table(p)
         case runners.LayoutKind():
             xs = p.content.place
@@ -96,7 +97,9 @@ def failures(tests: Sequence[gold.Test], outputs, want: str) -> list[str]:
 
 
 def test_an_empty_output_passes_no_test(tests):
-    bad = failures(tests, lambda t: EMPTY, "fail")
+    # A page_near_empty test asks for a blank page, so an empty output is its answer: it passes by definition.
+    asked = [t for t in tests if not isinstance(t.params, runners.PageNearEmpty)]
+    bad = failures(asked, lambda t: EMPTY, "fail")
     assert not bad, f"{len(bad)} tests pass on an empty output, e.g. {bad[:5]}"
 
 

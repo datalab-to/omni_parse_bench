@@ -1,0 +1,6 @@
+{"tests": [
+  {"id": "fx_blank_page", "test_type": "page_near_empty", "output_type": "html", "derivation": "authored",
+   "tags": [], "args": {}, "settings": {"max_chars": 20}},
+  {"id": "fx_blank_page_strict", "test_type": "page_near_empty", "output_type": "html", "derivation": "authored",
+   "tags": [], "args": {}, "settings": {"max_chars": 0}}
+]}
