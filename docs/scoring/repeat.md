@@ -13,10 +13,15 @@ copies there pass too, so a hyphenated compound broken at a line end counts (cas
 
 A repeat test with a **number** arg (`{"number": "1,240"}`) counts the copies the way `present` finds one
 ([present-number.md](present-number.md)): digit for digit, separators as the gold writes them, sign and percent
-as in that page. It reads the same text, without image descriptions, and takes the same gold (a number that
-reads as two numbers, `12,5`, is refused when the test loads). Each match counts once and matches never overlap;
-the hyphen reading below does not apply to it. `1,240` and `1240` are two numbers, so a page that writes a
-figure both ways holds one copy of each.
+as in that page, and it takes the same gold (a number that reads as two numbers, `12,5`, is refused when the
+test loads). It differs from `present` in what it reads: **line by line** (a block, a table cell and a `<br>`
+each end a line, so a space-grouped number is never counted across two cells), **without image descriptions**
+(`present` reads them), and without the digits a footnote mark (`<sup>2</sup>`, `[2]`) or the numbers a browser
+draws for an ordered list would add. A gold of plain or space-grouped digits is no copy where it continues a
+group of digits across a space (`500` in `12 500`, `12` in `12 500`); `present` finds a number there. Each
+match counts once and matches never overlap; the hyphen reading below does not apply to it. `1,240` and `1240`
+are two numbers, so a page that writes a figure both ways holds one copy of each. A copy that `repeat` counts
+is always one `present` finds.
 
 ## Rules
 
@@ -57,6 +62,13 @@ figure both ways holds one copy of each.
 | I | an image description is not a copy | `1,240` ×1 | `<p>1,240</p><img alt='1,240'>` | pass | `repn-alt-ignored` |
 | B | a percent sign the gold lacks | `4.8` ×1 | `4.8%` | pass | `repn-percent-extra` |
 | B | any place on the page, a page number too | `42` ×1 | `Page 42 of 100` | pass | `repn-context` |
+| I | two copies in two cells | `1,240` ×2 | `<table><tr><td>1,240</td><td>1,240</td></tr></table>` | pass | `repn-lines` |
+| I | two copies on one line | `1,240` ×2 | `<p>1,240 1,240</p>` | pass | `repn-same-line` |
+| I | a footnote mark is not a copy | `2` ×1 | `<p>Revenue<sup>2</sup> was 2</p>` | pass | `repn-footnote-mark` |
+| I | a list's numbers are not copies | `2` ×1 | `<ol><li>a</li><li>b 2</li></ol>` | pass | `repn-list-numbers` |
+| P | a space-grouped number in two cells | `12 500` ×1 | `<table><tr><td>12</td><td>500</td></tr></table>` | fail | `repn-cells-glue` |
+| P | three digits that continue a group | `500` ×1 | `Total 12 500` | fail | `repn-group-continued` |
+| P | digits followed by another group | `12` ×1 | `12 500` | fail | `repn-group-before` |
 | P | a missing copy | `1,240` ×2 | `1,240` | fail: `'1,240' appears 1x, not 2x` | `repn-missing` |
 | P | an extra copy | `1,240` ×2 | `<p>1,240</p><p>1,240</p><p>1,240</p>` | fail: `'1,240' appears 3x, not 2x` | `repn-extra` |
 | P | another separator | `1,240` ×1 | `1240` | fail | `repn-separator` |
@@ -82,6 +94,9 @@ figure both ways holds one copy of each.
 - **An underscore, hyphen or full stop is an edge**, so `Total_x` holds a `Total` (case rep-underscore), and a
   sign before a number is not seen (case rep-sign).
 - **Image descriptions never count**, in either direction (cases rep-alt-ignored, rep-alt-only).
+- **Digits that are not a number count**: a time (`12:30` holds a 12), a range (`10-12`), an ordinal (`2nd`), a
+  unit, the digits of LaTeX source (`$10^{3}$` holds no 10, `$x_2$` holds a 2) and a version (`1.2.3` holds no
+  `1.2`, but a 3). Choose a number the page does not repeat by chance.
 - **A number counts anywhere on the page**, as `present` finds it: a page number or a year is a copy
   (case repn-context), and a percent sign the gold lacks does not stop one (case repn-percent-extra). Choose a
   number of three digits or more, or a decimal, that the page does not repeat by chance.

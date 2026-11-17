@@ -190,6 +190,10 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
                 content = args["content"]
                 if _kind(where, "content", content) == "latex":
                     raise ValueError(f"{where}: repeat's content compares text or a number, not latex")
+                if "number" in content and not (isinstance(content["number"], str)
+                                                 and runners.number(content["number"]) is not None):
+                    raise ValueError(f"{where}: repeat's number must read as one number, "
+                                     "e.g. 1,240.00 or -4.8%")
                 if "text" in content and content["max_diffs"] != 0:
                     raise ValueError(f"{where}: repeat counts exact text: max_diffs must be 0")
                 if set(settings) != {"expected_count"}:

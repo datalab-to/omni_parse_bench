@@ -230,6 +230,13 @@ repn-minus	pass
 repn-alt-ignored	pass
 repn-percent-extra	pass
 repn-context	pass
+repn-lines	pass
+repn-same-line	pass
+repn-footnote-mark	pass
+repn-list-numbers	pass
+repn-cells-glue	fail	'12 500' appears 0x, not 1x
+repn-group-continued	fail	'500' appears 0x, not 1x
+repn-group-before	fail	'12' appears 0x, not 1x
 repn-missing	fail	'1,240' appears 1x, not 2x
 repn-extra	fail	'1,240' appears 3x, not 2x
 repn-separator	fail	'1,240' appears 0x, not 1x

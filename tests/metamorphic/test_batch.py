@@ -6,6 +6,7 @@ from hypothesis import strategies as st
 from test_invariants import answer
 
 from metamorphic.common import CELL, HOLDS, NUMBER, ORDER, REPEAT, REPEAT_NUMBER, TEXT, relation
+from omni_parse_bench import views
 from omni_parse_bench.scorers import unit_tests as scorer
 from omni_parse_bench.scorers.unit_tests import runners
 
@@ -26,6 +27,11 @@ def test_a_tests_verdict_does_not_depend_on_the_tests_scored_with_it(chosen, rnd
                if isinstance(t.params, (runners.Present, runners.Repeat))
                and isinstance(t.params.content, runners.Number)]
     assume(len(numbers) == len(set(numbers)))
+    # (and no repeat test's number is counted more often on the whole page than that test expects)
+    page = views.html("".join(answer(t)["html"] for t in chosen))
+    assume(all(runners._number_copies(t.params.content.number, page) == t.params.expected_count
+               for t in chosen if isinstance(t.params, runners.Repeat)
+               and isinstance(t.params.content, runners.Number)))
     output = {"html": "".join(answer(t)["html"] for t in chosen)}
     shuffled = list(chosen)
     rnd.shuffle(shuffled)

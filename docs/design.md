@@ -59,11 +59,10 @@ is found in an output (`runners.found`):
 
 A `layout_kind` test's text only labels its place; it is never compared.
 
-A `repeat` test counts a text or a number: its content is the same kind of arg, read as `present` reads it
-(text as whole words after folding; a number digit for digit, `runners._number_copies`), and `expected_count`
-says how many copies the page holds. The count, not the kind, is what a `repeat` test adds. A case-sensitive
-count (`exact_case` on a text arg, planned with its `present` counterpart) would change only how `_text_copies`
-folds; an arg's kind never decides the comparison on its own.
+A `repeat` test counts a text or a number: its content is the same kind of arg, and `expected_count` says how
+many copies the page holds. A text is counted as whole words after folding; a number is counted as `present`
+finds it (digit for digit, `runners._number_copies`), line by line and without the digits a footnote mark or a
+list adds; the count, not the kind, is what a `repeat` test adds.
 
 Text presence also accepts an exact match through an ambiguous wrapping hyphen:
 `মানু- হৰ` can match `মানুহৰ`. The hyphen must follow a letter or its combining marks,

@@ -215,6 +215,30 @@ def test_repeat_does_not_count_a_longer_word():
     ("8.4550", 1, "<p>8.455</p>", False),
     ("0.50", 1, "<p>0.5</p>", False),
     ("12.50", 1, "<p>1.250</p>", False),
+    # lines: a block or a <br> ends a line, a space groups digits within one
+    ("500", 1, "<p>Page 12</p><p>500 items</p>", True),
+    ("12 500", 1, "<p>Page 12</p><p>500 items</p>", False),
+    ("12 500", 1, "<table><tr><td>12</td><td>500</td></tr></table>", False),
+    ("12 500", 1, "<p>12<br>500</p>", False),
+    ("12 500", 1, "<p>Total 12 500</p>", True),
+    ("500", 2, "<p>Total 12 500</p><p>Fee 500</p>", False),
+    ("500", 1, "<p>Total 12 500</p><p>Fee 500</p>", True),
+    ("000", 2, "<p>1 000 000</p>", False),
+    ("12", 1, "<p>12 500</p>", False),
+    ("12", 1, "<p>12 5</p>", True),
+    ("10", 2, "<p>10<br>10</p>", True),
+    ("10", 2, "<p>10 10</p>", True),
+    # copies side by side on one line
+    ("1,240", 2, "<p>1,240 1,240</p>", True),
+    ("1,240", 2, "<p>1,240/1,240</p>", True),
+    ("10", 2, "<p>10-10</p>", True),
+    ("1,240", 1, "<p>1,240,1,240</p>", False),
+    ("5", 1, "<p>5,5</p>", False),
+    # digits the page does not print as a number: a footnote mark, a list's numbers
+    ("2", 1, "<p>Revenue<sup>2</sup> was 2</p>", True),
+    ("1", 1, "<p>Smith[1] scored 1</p>", True),
+    ("2", 1, "<ol><li>a</li><li>b 2</li></ol>", True),
+    ("2", 2, "<ol><li>a</li><li>b 2</li></ol>", False),
 ])
 def test_repeat_counts_a_number_as_present_finds_it(gold, count, text, passes):
     t = R.Repeat(R.Number(gold), count)
