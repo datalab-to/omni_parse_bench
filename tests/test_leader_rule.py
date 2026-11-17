@@ -34,6 +34,18 @@ LEADER_TEXTS = [
     "Total — — — — 12",
     "Total ―――― 12",
     "Total . . . . −5",
+    # a leader at an end of the text: fold drops it from the gold, whatever its length
+    "Total ...",
+    "Total...",
+    "... Total",
+    "Total . . .",
+    "Total …",
+    "Total … ",
+    "Total ..",
+    # from the published dataset's exact tests (panel questions and signature lines)
+    "Character: quiet, active, kind, funny ...",
+    "Other symptoms/problems related to...",
+    "DocuSigned by: Mark Worman 70ABE377123E401...",
 ]
 
 
