@@ -7,7 +7,7 @@
 A system's `blocks` are boxes with a label (`[x0, y0, x1, y1]`, fractions of the page, origin top left). The test
 has a *place*: one box per printed line. A block **covers** the place when it overlaps at least half of the
 place's area. The **holder** is the smallest covering block (on equal areas, the first listed; areas that differ
-by float rounding alone, by less than 1e-9 of the area, are equal). The test passes when the holder has the gold label; for `text`,
+within a relative 1e-9 of each other, which covers float rounding, are equal). The test passes when the holder has the gold label; for `text`,
 a `list` or `form` block passes too. The line's text is never compared.
 
 ## Rules

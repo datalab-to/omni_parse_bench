@@ -84,7 +84,8 @@ def test_every_deviation_cites_files_that_exist():
 def test_what_a_deviation_quotes_is_in_the_files_it_cites():
     """A phrase a deviation's 'why' quotes (in single quotes, 12 characters or more; '...' stands for words
     left out) and a name it puts in backticks (an identifier, or a call written `name()`) is in one of the
-    files it cites, so a justification does not outlive the code or doc it names."""
+    files it cites (a name as a whole word), so a justification does not outlive the code or doc it names.
+    Quotes under 12 characters and quotes with an apostrophe in them are not checked."""
     missing = []
     for label, e in DEVIATIONS.items():
         why = e["why_this_status"]
@@ -96,9 +97,15 @@ def test_what_a_deviation_quotes_is_in_the_files_it_cites():
         ident = r"[A-Za-z_][\w.]{2,}(?:\(\))?"
         names = [n for n in re.findall(r"`([^`]+)`", why) if re.fullmatch(ident, n)]
         for q in quoted:
-            parts = [" ".join(x.split()).lower() for x in re.split(r"\.\.\.|…", q) if x.strip()]
-            missing += [(label, "quotes", x) for x in parts if x not in text]
-        missing += [(label, "names", n) for n in names if n.lower() not in text]
+            at = 0   # the parts of a quote with words left out come in the file in the order they are quoted
+            for part in (" ".join(x.split()).lower() for x in re.split(r"\.\.\.|…", q) if x.strip()):
+                found = text.find(part, at)
+                if found < 0:
+                    missing.append((label, "quotes", part))
+                    break
+                at = found + len(part)
+        whole = [n for n in names if not re.search(rf"(?<!\w){re.escape(n.lower())}(?!\w)", text)]
+        missing += [(label, "names", n) for n in whole]
     assert not missing, missing
 
 

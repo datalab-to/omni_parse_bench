@@ -23,7 +23,7 @@ observation on those outputs, measured by the authors and not re-runnable here, 
 means none among its samples.
 
 Two deliberate changes can turn a pass into a fail. Number tests match separators as the gold writes them (M12c),
-and a `top_heading` is read only over the cell's own columns, no longer through a row that spans them. On the
+and a heading walk stays in the cell's own columns (`top_heading`) or rows (`left_heading`, `right_heading`), no longer through a cell that spans others. On the
 cached leaderboard re-runs, a few number passes and a few `top_heading` passes became fails; each was judged a
 real error on review. A few fail-to-pass changes came from the other fixes (a leader run or a footnote mark had
 hidden text the page did write).

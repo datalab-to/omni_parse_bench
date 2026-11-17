@@ -81,9 +81,9 @@ TAG_DEFINITIONS = {
                "Methods\". Doesn't count: a table's column or row headings, a figure's label, or bold words "
                "at the start of a paragraph.",
     "caption": "The content is the caption of a table or figure: the text that names and describes it, "
-               "usually starting \"Table 2\" or \"Figure 3\". Counts: a sub-caption of a figure's panel, "
-               "such as \"(a) ...\", even when it sits within the figure; a title printed outside the figure "
-               "image. "
+               "usually starting \"Table 2\" or \"Figure 3\". Counts: a sub-caption or a title of a figure's "
+               "panel, such as \"(a) ...\", even when it sits within the figure; a title printed outside the "
+               "figure image. "
                "Doesn't count: notes under a table, a figure's title printed inside the figure image "
                "(figure), or other text inside the figure.",
     "footnote": "The content is a note keyed to a mark in the text: a footnote at the foot of a page, an "
@@ -106,11 +106,11 @@ TAG_DEFINITIONS = {
             "smaller than the page's ordinary body text in the way fine print is. Counts: footnotes and "
             "legal fine print set small, dense small type on forms, small labels on drawings, a line at "
             "6 pt on a page whose body text is 10 pt. Doesn't count: ordinary table text at 7 to 9 pt "
-            "unless it is visibly smaller than the page's body text, text set a little smaller than body "
-            "text such as a running header, ordinary body text in a low-resolution image, or text that "
-            "only looks small because the whole page is photographed from far away or, for a large sheet, "
-            "shrunk to fit the image. When the size can't be told, judge by the page: would a reader call "
-            "this fine print?",
+            "unless it is smaller than the page's body text in the way fine print is, text set a little "
+            "smaller than body text such as a running header, ordinary body text in a low-resolution "
+            "image, or text that only looks small because the whole page is photographed from far away "
+            "or, for a large sheet, shrunk to fit the image. When the size can't be told, judge by the "
+            "page: would a reader call this fine print?",
     "rotated": "The content's text is turned or tilted enough that a reader notices, as seen in the image: "
                "by about 90 or 180 degrees, set vertically, or tilted by about 5 degrees or more. Counts: a "
                "page turned on its side or upside down, vertical text, a table set sideways, a page "
