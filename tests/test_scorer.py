@@ -56,18 +56,25 @@ def test_the_summary_is_the_score_the_families_and_the_slices():
     s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS))
     assert set(s) == {"score", "families", "per_tag", "per_suite", "per_test_type", "per_arg_kind",
                       "per_derivation"}
-    assert (s["score"], s["families"]) == (2 / 5, {"text": {"score": 2 / 5, "tests": 5, "documents": 1}})
+    assert (s["score"], s["families"]) == (2 / 5, {"text": E(2 / 5, 5)})
 
 
-SLICED = {"per_tag": {"eng": {"score": 2 / 3, "tests": 3, "documents": 1},
-                      "form": {"score": 0.0, "tests": 1, "documents": 1},
-                      "math": {"score": 0.0, "tests": 1, "documents": 1},
-                      "table": {"score": 0.0, "tests": 1, "documents": 1}},
-          "per_suite": {"s": {"score": 2 / 5, "tests": 5, "documents": 1}},
-          "per_test_type": {"present": {"score": 2 / 5, "tests": 5, "documents": 1}},
-          "per_arg_kind": {"text": {"score": 2 / 4, "tests": 4, "documents": 1},
-                           "latex": {"score": 0.0, "tests": 1, "documents": 1}},
-          "per_derivation": {"authored": {"score": 2 / 5, "tests": 5, "documents": 1}}}
+def E(score, tests, documents=1, effective=None):
+    """A summary entry: its score, tests, documents and effective documents (the document count when
+    the documents hold equal numbers of tests)."""
+    return {"score": score, "tests": tests, "documents": documents,
+            "effective_documents": float(documents) if effective is None else effective}
+
+
+SLICED = {"per_tag": {"eng": E(2 / 3, 3),
+                      "form": E(0.0, 1),
+                      "math": E(0.0, 1),
+                      "table": E(0.0, 1)},
+          "per_suite": {"s": E(2 / 5, 5)},
+          "per_test_type": {"present": E(2 / 5, 5)},
+          "per_arg_kind": {"text": E(2 / 4, 4),
+                           "latex": E(0.0, 1)},
+          "per_derivation": {"authored": E(2 / 5, 5)}}
 
 
 def _slices(s: dict) -> dict:
@@ -129,20 +136,20 @@ def test_documents_count_each_document_once_across_its_pages():
     xs = [base | {"page_id": p.page_id, "document": p.document, "suite": p.suite, "test_id": p.page_id,
                   "result": r} for p, r in zip(pages, ("pass", "fail", "pass"), strict=True)]
     s = summarize(xs)
-    assert s["per_tag"]["eng"] == {"score": 2 / 3, "tests": 3, "documents": 2}
-    assert s["per_suite"]["s"] == {"score": 2 / 3, "tests": 3, "documents": 2}
+    assert s["per_tag"]["eng"] == {"score": 2 / 3, "tests": 3, "documents": 2, "effective_documents": 1.8}
+    assert s["per_suite"]["s"] == {"score": 2 / 3, "tests": 3, "documents": 2, "effective_documents": 1.8}
 
 
 def test_a_test_line_without_suite_tags_or_derivation_is_still_summarized():
     s = summarize([{"document": "d", "test_type": "present", "result": "pass"}])
     assert s["score"] == 1.0 and _slices(s) == {k: {} for k in SLICED} | {"per_test_type": {
-        "present": {"score": 1.0, "tests": 1, "documents": 1}}}
+        "present": E(1.0, 1)}}
 
 
 def test_a_slice_of_test_lines_is_summarized_the_same_way():
     """Any other breakdown, such as one tag, is the same summary over the lines selected."""
     eng = [x for x in lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS) if "eng" in x["tags"]]
-    assert summarize(eng)["families"]["text"] == {"score": 2 / 3, "tests": 3, "documents": 1}
+    assert summarize(eng)["families"]["text"] == E(2 / 3, 3)
 
 
 def test_scores_are_floats_even_when_every_test_agrees():
@@ -152,6 +159,12 @@ def test_scores_are_floats_even_when_every_test_agrees():
 
 def test_a_pages_line_holds_its_counts_and_its_details_every_verdict():
     s = scorer.UnitTests().score({"html": "<p>alpha beta</p>"}, TESTS)
+    ids = s.result.pop("ids")       # a digest of the page's test ids, and of each key's, as an int
+    assert isinstance(ids, int) and 0 <= ids < 2 ** 64
+    for kind in ("per_tag", "per_arg_kind"):       # only the slices that can have twins carry a digest
+        assert all(isinstance(c.pop("ids"), int) for c in s.result[kind].values())
+    assert not any("ids" in c for kind in ("per_family", "per_test_type", "per_derivation")
+                   for c in s.result[kind].values())
     assert s.result == {"tests": 5, "passed": 2, "per_family": {"text": {"tests": 5, "passed": 2}},
                         "per_tag": {"eng": {"tests": 3, "passed": 2}, "table": {"tests": 1, "passed": 0},
                                     "form": {"tests": 1, "passed": 0}, "math": {"tests": 1, "passed": 0}},
@@ -169,7 +182,7 @@ def test_unit_tests_names_its_headline():
             "per_family": {"text": {"tests": 1, "passed": 1}}}
     assert scorer.UnitTests.headline == "score"
     s = scorer.UnitTests().summarize([line])     # a line kept before the slices were adds nothing to them
-    assert (s["score"], s["families"]) == (1.0, {"text": {"score": 1.0, "tests": 1, "documents": 1}})
+    assert (s["score"], s["families"]) == (1.0, {"text": E(1.0, 1)})
     assert _slices(s) == {k: {} for k in SLICED}
 
 
@@ -274,8 +287,8 @@ def test_headline_is_the_mean_of_the_graded_families():
         {"id": "k", "test_type": "table_cell", "tags": [], "args": {"cell": {"text": "1", "max_diffs": 0}}},
     )
     h = summarize(lines(score({"html": "<p>alpha beta</p>"}, tests), tests))
-    assert h["families"] == {"text": {"score": 2 / 3, "tests": 3, "documents": 1},
-                             "tables": {"score": 0, "tests": 1, "documents": 1}}
+    assert h["families"] == {"text": E(2 / 3, 3),
+                             "tables": E(0, 1)}
     assert h["score"] == (2 / 3 + 0) / 2   # each family weighs the same, however many tests it has
     only_text = summarize(lines(score({"html": "<p>alpha beta</p>"}, tests[:3]), tests))
     assert set(only_text["families"]) == {"text"}   # a family with no verdicts isn't in it

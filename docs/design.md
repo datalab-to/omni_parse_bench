@@ -263,7 +263,10 @@ arg kind, tag, suite or derivation) is computed from each test's verdict, kept i
 settings as the gold stated them, so a run's details say what each test looked for), and
 from `opb tests`
 ([API.md](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/API.md#a-slice-of-the-benchmark)): it is the same summary over the tests selected.
-Each family also counts the source documents its tests are from (`documents`), read off its lines. A document's tests
+Each family also counts the source documents its tests are from (`documents`, a raw count), read off its lines,
+and `effective_documents`, what they are worth as equal-sized documents (scores are pooled over tests, so a
+document with many tests weighs more). A tag or arg kind that has the same tests as another (by a 64-bit digest of their
+ids) carries `same_tests_as` naming it, so a report can show the pair once. A document's tests
 pass or fail together: one misread table fails all its cells, a page's image copy is the same page,
 and a form's blank, filled and scanned copies are one form. The manifest's `document` column
 records each page's document, set once when the page is added. So a score over few documents says less
