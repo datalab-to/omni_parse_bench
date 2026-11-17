@@ -161,6 +161,11 @@ def unmarked(s: str) -> str:
     return _cased(s, drop_footnotes=True).lower()
 
 
+def unmarked_cased(s: str) -> str:
+    """`unmarked` with case kept, as `fold_cased` is to `fold`."""
+    return _cased(s, drop_footnotes=True)
+
+
 def _footnote(m: re.Match, *, drop: bool) -> str:
     s, i, j = m.string, m.start() - 1, m.end()
     while i >= 0 and s[i].isspace():
@@ -170,6 +175,13 @@ def _footnote(m: re.Match, *, drop: bool) -> str:
     if drop and not (i >= 0 and _DIGIT.match(s, i) and _DIGIT.match(s, j)):
         return " "
     return f" {m[1] or m[2]}"
+
+
+def fold_cased(s: str) -> str:
+    """`fold` without its lowercasing: the same unification of glyphs, spacing, hyphens and markup, with
+    case kept, for a test that says its text must come out in the case it was printed (`present`'s
+    `exact_case`)."""
+    return _cased(s)
 
 
 def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool = False,
@@ -254,13 +266,15 @@ def squeeze(s: str) -> str:
 
 
 @functools.lru_cache(maxsize=128)
-def continuations(s: str, spaced: bool = False) -> tuple[str, frozenset[int]]:
+def continuations(s: str, spaced: bool = False, cased: bool = False) -> tuple[str, frozenset[int]]:
     """Folded, space-free text and positions of optional wrapping hyphens. With `spaced`, the text keeps
-    each run of whitespace as one space; the positions still count without them.
+    each run of whitespace as one space; the positions still count without them. With `cased` the text
+    keeps its case (for `present`'s `exact_case`).
 
     Inspect original case and hyphen forms before folding them; retain wrapping hyphens so
     the presence matcher can choose either reading, including for Latin compounds.
     """
+    keep_case = cased
     cased = _cased(s, preserve_dashes=True, preserve_line_hyphens=True)
     optional = set()
     offset, previous = 0, 0
@@ -276,10 +290,10 @@ def continuations(s: str, spaced: bool = False) -> tuple[str, frozenset[int]]:
                 and (not cased[j].isupper() and not cased[j].istitle() or _joins(cased, i, j))):
             # Lowercasing can expand characters. Count intervening segments, not every
             # character in Python or the whole prefix again for each wrapping hyphen.
-            offset += len(_WHITESPACE.sub("", cased[previous:i].lower()))
+            offset += len(_WHITESPACE.sub("", cased[previous:i] if keep_case else cased[previous:i].lower()))
             previous = i
             optional.add(offset)
-    folded = _WHITESPACE.sub(" " if spaced else "", _DASH.sub("-", cased.lower()))
+    folded = _WHITESPACE.sub(" " if spaced else "", _DASH.sub("-", cased if keep_case else cased.lower()))
     return folded, frozenset(optional)
 
 

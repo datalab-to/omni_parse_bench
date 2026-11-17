@@ -27,6 +27,9 @@ TABLES = [
         text("text-math-symbol", "I", "a symbol in math", "3σ", r"$3\sigma$"),
         text("text-middot", "I", "middle dot as a decimal point", "2.3", "2·3"),
         text("text-glued-dash", "I", "dashes glued to a number are a leader", "Revenue 5", "Revenue -----5"),
+        text("text-exact-case-kept", "I", "with `exact_case`, the case as printed", "iPhone", "I bought an iPhone", exact=True),
+        text("text-exact-case-folds", "I", "with `exact_case`, every other difference still folds", "Total Due", "<p><b>Total</b>  Due</p>", exact=True),
+        text("text-exact-case-line-hyphen", "I", "with `exact_case`, a word broken at a line end in its case", "Developers", "Develop- ers", exact=True),
         text("text-transposition", "I", "two letters swapped, within 1 edit", "Total", "Toatl", md=1),
     ),
     table(
@@ -62,6 +65,9 @@ TABLES = [
         text("text-caret", "P", "a `^` the gold writes as text", "x^2", "$x^2$"),
         text("text-sup-exponent", "P", "a superscript after a digit is an exponent, not a marker", "10 cells", "<p>10<sup>5</sup> cells</p>"),
         text("text-sign-after-leaders", "P", "a sign after leaders", "Revenue 4.8", "Revenue ....... -4.8"),
+        text("text-exact-case", "P", "with `exact_case`, a changed letter case", "iPhone", "I bought an iphone", exact=True),
+        text("text-exact-case-acronym", "P", "with `exact_case`, an acronym in lower case", "NASA", "Nasa launched", exact=True),
+        text("text-exact-case-line-hyphen-wrong", "P", "with `exact_case`, a word broken at a line end in another case", "Developers", "develop- ers", exact=True),
         text("text-case-mapping", "P", "a case change that changes letters", "straße", "STRASSE"),
     ),
     table(

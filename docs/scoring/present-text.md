@@ -9,6 +9,12 @@ then once more allowing a hyphen at a line end to be kept or dropped. It does no
 element holds it, or what is next to it. The page text includes image descriptions (`alt`) and reads a table cell
 by cell ([internals.md](internals.md#the-text-view)).
 
+Case is folded, unless the arg sets `exact_case`: then the same search, squeeze and hyphen retry run on
+strings that keep their case (every other fold still applies), so `iPhone` does not pass for `iphone`
+(cases `text-exact-case`, `text-exact-case-line-hyphen-wrong`) and does pass in its case through every other
+difference (cases `text-exact-case-kept`, `text-exact-case-folds`, `text-exact-case-line-hyphen`). With edits
+to spend, a changed letter's case costs one, so an exact-case test says 0.
+
 ## Rules
 
 What the test ignores:
@@ -38,6 +44,9 @@ What the test ignores:
 | I | a symbol in math | `3σ` | `$3\sigma$` | pass | `text-math-symbol` |
 | I | middle dot as a decimal point | `2.3` | `2·3` | pass | `text-middot` |
 | I | dashes glued to a number are a leader | `Revenue 5` | `Revenue -----5` | pass | `text-glued-dash` |
+| I | with `exact_case`, the case as printed | `iPhone` (exact case) | `I bought an iPhone` | pass | `text-exact-case-kept` |
+| I | with `exact_case`, every other difference still folds | `Total Due` (exact case) | `<p><b>Total</b>  Due</p>` | pass | `text-exact-case-folds` |
+| I | with `exact_case`, a word broken at a line end in its case | `Developers` (exact case) | `Develop- ers` | pass | `text-exact-case-line-hyphen` |
 | I | two letters swapped, within 1 edit | `Total` (md 1) | `Toatl` | pass | `text-transposition` |
 <!-- /cases -->
 
@@ -81,6 +90,9 @@ What it penalizes:
 | P | a `^` the gold writes as text | `x^2` | `$x^2$` | fail | `text-caret` |
 | P | a superscript after a digit is an exponent, not a marker | `10 cells` | `<p>10<sup>5</sup> cells</p>` | fail | `text-sup-exponent` |
 | P | a sign after leaders | `Revenue 4.8` | `Revenue ....... -4.8` | fail | `text-sign-after-leaders` |
+| P | with `exact_case`, a changed letter case | `iPhone` (exact case) | `I bought an iphone` | fail | `text-exact-case` |
+| P | with `exact_case`, an acronym in lower case | `NASA` (exact case) | `Nasa launched` | fail | `text-exact-case-acronym` |
+| P | with `exact_case`, a word broken at a line end in another case | `Developers` (exact case) | `develop- ers` | fail | `text-exact-case-line-hyphen-wrong` |
 | P | a case change that changes letters | `straße` | `STRASSE` | fail | `text-case-mapping` |
 <!-- /cases -->
 

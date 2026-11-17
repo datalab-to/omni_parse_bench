@@ -18,7 +18,7 @@ from . import runners
 
 FIELDS = ("id", "test_type", "output_type", "derivation", "tags", "args", "settings")
 KINDS = {"text": ("text", "max_diffs"), "number": ("number",), "latex": ("latex",)}
-OPTIONAL = {"text": ("place",)}     # fields an arg of that kind may have
+OPTIONAL = {"text": ("place", "exact_case")}     # fields an arg of that kind may have
 RELATIONS = ("up", "down", "left", "right", "top_heading", "left_heading", "right_heading")
 # The roles of each test type's args, the content it compares. Not `vocab.ROLES`, which are tags.
 ARG_ROLES = {
@@ -167,6 +167,10 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
         if (r in LISTS) != isinstance(v, list):
             raise ValueError(f"{where}: {r} takes {'a list of args' if r in LISTS else 'one arg'}")
         for a in v if isinstance(v, list) else [v]:
+            if isinstance(a, dict) and "exact_case" in a and not (
+                    test_type == "present" and r == "content" and "text" in a):
+                raise ValueError(f"{where}: exact_case is supported on a present test's text content only "
+                                 f"now, not on {test_type}'s {r}")
             match _kind(where, r, a):
                 case "text": _diffs(where, r, a)
                 case "latex": _renders(where, r, a)
@@ -235,7 +239,14 @@ def arg_kinds(test_type: str, args: Mapping[str, Any]) -> tuple[str, ...]:
 def _arg(where: str, role: str, a: Any) -> runners.Arg:
     """An arg as the runner's content: its kind is its key, never guessed from its value."""
     match _kind(where, role, a):
-        case "text": return runners.Text(a["text"], a["max_diffs"], _place(where, role, a.get("place", [])))
+        case "text":
+            if not isinstance(exact := a.get("exact_case", False), bool):
+                raise ValueError(f"{where}: {role}'s exact_case must be true or false, not {exact!r:.80}")
+            if exact and a["max_diffs"] != 0:
+                # Note: a case flip costs one edit, so any budget would let the wrong case pass.
+                raise ValueError(f"{where}: {role}'s exact_case needs max_diffs 0, not {a['max_diffs']!r}: "
+                                 f"an edit budget would spend itself on a changed case")
+            return runners.Text(a["text"], a["max_diffs"], _place(where, role, a.get("place", [])), exact)
         case "number": return runners.Number(a["number"])
         case _: return runners.Latex(a["latex"])
 
@@ -245,8 +256,8 @@ def _kind(where: str, role: str, a: Any) -> str:
     k = next((k for k, fs in KINDS.items()
               if isinstance(a, dict) and set(fs) <= set(a) <= {*fs, *OPTIONAL.get(k, ())}), None)
     if k is None:
-        raise ValueError(f"{where}: {role}={a!r:.80} isn't an arg: the fields {{text, max_diffs[, place]}}, "
-                         f"{{number}} or {{latex}}")
+        raise ValueError(f"{where}: {role}={a!r:.80} isn't an arg: the fields "
+                         f"{{text, max_diffs[, place][, exact_case]}}, {{number}} or {{latex}}")
     return k
 
 

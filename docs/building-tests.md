@@ -45,7 +45,9 @@ first.
   `top_heading`, and so on. The test type fixes which roles exist (`scorers.unit_tests.tests.ARG_ROLES`;
   not `vocab.ROLES`, which are the role tags, such as `heading`);
 - arg kind: how an arg is compared. An arg holds exactly one of three keys, `text`, `number` or
-  `latex`, and the key is the kind. A `text` arg may also hold `place`, a box per line on the page;
+  `latex`, and the key is the kind. A `text` arg may also hold `place`, a box per line on the page, and `exact_case`
+  (true or false, false when omitted), which keeps case in the comparison; for now only on a `present`
+  test's `content`;
 - settings: values that configure the check as a whole (`expected_count`, or `kind` for a
   block kind). Never content;
 - output type: which output the test reads: `html`, or `blocks` for `layout_kind`;
@@ -85,7 +87,7 @@ It reads as: "some table in the output has a cell `167.8`, under the column head
 
 | test_type | roles | settings | passes when |
 |---|---|---|---|
-| present | `content` | | the arg is in the html |
+| present | `content` | | the arg is in the html; a text arg `{text, max_diffs, exact_case, place}` with `exact_case: true` is found only in the case it was printed |
 | order | `before`, `after` | | `before` is found before `after` in the html |
 | repeat | `content` | `expected_count` | the arg appears exactly that many times in the html, as whole words |
 | page_near_empty | none | `max_chars` | the html has at most `max_chars` non-space characters outside image alt text |

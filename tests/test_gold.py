@@ -19,7 +19,8 @@ def test_a_tag_is_a_vocabulary_tag_a_language_or_a_script():
 
 
 def with_args(args: dict, test_type: str = "present", settings: dict | None = None, **fields) -> dict:
-    output = {"present": "html", "order": "html", "repeat": "html", "page_near_empty": "html"}[test_type]
+    output = {"present": "html", "order": "html", "repeat": "html", "page_near_empty": "html",
+              "table_cell": "html", "layout_kind": "blocks"}[test_type]
     return {"id": "t", "test_type": test_type, "output_type": output, "derivation": "authored", "tags": [],
             "args": args, "settings": settings or {}} | fields
 
@@ -39,12 +40,36 @@ def with_args(args: dict, test_type: str = "present", settings: dict | None = No
     with_args({"content": {"text": "abc", "max_diffs": 0}}, "repeat", {"expected_count": 0}),
     with_args({"content": {"text": "abc", "max_diffs": 0}}, "repeat", {"expected_count": -1}),
     with_args({"content": {"text": "abc", "max_diffs": 0}}, "repeat", {"expected_count": True}),
+    with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": "yes"}}),
+    with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": 1}}),
+    with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": None}}),
+    with_args({"content": {"text": "abcdef", "max_diffs": 1, "exact_case": True}}),  # budget
+    with_args({"content": {"number": "12", "exact_case": True}}),
+    with_args({"content": {"latex": "x", "exact_case": True}}),
+    with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": True}},
+              settings={"exact_case": True}),
+    with_args({"content": {"text": "abc", "max_diffs": 0}}, settings={"exact_case": True}),
+    with_args({"before": {"text": "abc", "max_diffs": 0, "exact_case": True},
+               "after": {"text": "xyz", "max_diffs": 0}}, "order"),
+    with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": True}}, "repeat",
+              {"expected_count": 1}),
+    with_args({"cell": {"text": "abc", "max_diffs": 0, "exact_case": True}}, "table_cell"),
+    with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": True, "place": [[0, 0, 1, 1]]}},
+              "layout_kind", {"kind": "text"}),
     with_args({"content": {"text": "abc", "max_diffs": 0}}, id=7),
     with_args({"content": {"text": "abc", "max_diffs": 0}}, id=" "),
 ])
 def test_a_bad_arg_or_setting_is_refused(t):
     with pytest.raises(ValueError):
         gold.test("p", t)
+
+
+def test_exact_case_is_a_bool_arg_field_of_a_present_text():
+    t = gold.test("p", with_args({"content": {"text": "iPhone", "max_diffs": 0, "exact_case": True}}))
+    assert t.params.content.exact_case is True
+    assert gold.arg_kinds(t.test_type, t.args) == ("text",)
+    t = gold.test("p", with_args({"content": {"text": "iPhone", "max_diffs": 0, "exact_case": False}}))
+    assert t.params.content.exact_case is False
 
 
 @pytest.mark.parametrize("limit", [0, 1, 20])

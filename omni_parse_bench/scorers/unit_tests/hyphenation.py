@@ -31,24 +31,26 @@ class Copy(NamedTuple):
 Cut = Callable[[str, int], bool]
 
 
-def matches(needle: str, text: str, cut_before: Cut | None = None, cut_after: Cut | None = None) -> bool:
+def matches(needle: str, text: str, cut_before: Cut | None = None, cut_after: Cut | None = None,
+            cased: bool = False) -> bool:
     """An exact substring match that uses an evidenced continuation hyphen inside the match.
     `cut_before(s, i)` and `cut_after(s, j)`, if given, reject a match starting at i or ending at j
-    of the text with its spaces."""
-    if not optional(needle, text):
+    of the text with its spaces. With `cased` both sides keep their case."""
+    if not optional(needle, text, cased=cased):
         return False
-    return any(c.continued for c in copies(needle, text, cut_before, cut_after))
+    return any(c.continued for c in copies(needle, text, cut_before, cut_after, cased))
 
 
-def optional(*strings: str) -> bool:
+def optional(*strings: str, cased: bool = False) -> bool:
     """Whether any of `strings` holds a continuation hyphen, the only thing the fallback can change."""
-    return any(normalize.continuations(s)[1] for s in strings)
+    return any(normalize.continuations(s, cased=cased)[1] for s in strings)
 
 
-def copies(needle: str, text: str, cut_before: Cut | None = None, cut_after: Cut | None = None) -> list[Copy]:
+def copies(needle: str, text: str, cut_before: Cut | None = None, cut_after: Cut | None = None,
+           cased: bool = False) -> list[Copy]:
     """Every exact match of `needle` in `text`, each hyphen of either side that a line broke after read kept
     or dropped, one `Copy` for each place a match ends and for each of: with or without such a hyphen.
-    `cut_before` and `cut_after` are as for `matches`.
+    `cut_before`, `cut_after` and `cased` are as for `matches`.
 
     A small nondeterministic automaton consumes equal characters, or skips optional
     hyphens on either side. Equivalent states are merged at each text position: at
@@ -56,8 +58,8 @@ def copies(needle: str, text: str, cut_before: Cut | None = None, cut_after: Cut
     Each state records whether a continuation hyphen was retained or skipped inside the match,
     and the earliest and latest place a match reaching it started.
     """
-    want, want_optional = normalize.continuations(needle)
-    hay, hay_optional = normalize.continuations(text)
+    want, want_optional = normalize.continuations(needle, cased=cased)
+    hay, hay_optional = normalize.continuations(text, cased=cased)
     if not want:
         return []
     # Dropping every hyphen is a necessary condition, never an acceptance rule.
@@ -66,7 +68,7 @@ def copies(needle: str, text: str, cut_before: Cut | None = None, cut_after: Cut
         return []
     optional_at = sorted(want_optional)
     # Note: the main path judges a match's edges, so this exact match must too (a space is not glued).
-    spaced = normalize.continuations(text, spaced=True)[0] if cut_before or cut_after else ""
+    spaced = normalize.continuations(text, spaced=True, cased=cased)[0] if cut_before or cut_after else ""
     kept = [k for k, c in enumerate(spaced) if c != " "]
     found: list[Copy] = []
     # (state, continued) -> (earliest start, latest start)
