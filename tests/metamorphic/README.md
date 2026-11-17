@@ -7,8 +7,8 @@ Each promise is a *relation*: change a page, or a test, in a way that should not
 known way), and the verdict should follow. Example: putting a passing answer in bold must not make its test
 fail.
 
-- The certificate lists the 68 relations its authors selected: 59 hold and 9 deviate. It is not every
-  relation of the scorer (see [Not covered](#not-covered)). Four of the 9 (M1a to M1c and M1e) are about
+- The certificate lists the 68 relations its authors selected: 60 hold and 8 deviate. It is not every
+  relation of the scorer (see [Not covered](#not-covered)). Four of the 8 (M1a to M1c and M1e) are about
   folding a string twice, which the scorer never does and no document promises, so they change no score.
 - It is generated from the tests. CI fails if it is out of date, or if a status disagrees with its test.
 - This page is enough to read it. Links to `docs/scoring` add detail only.
@@ -21,8 +21,8 @@ Apart from the changes named below, the fixes changed no verdict on the cached l
 observation on those outputs, measured by the authors and not re-runnable here, not a guarantee for every output). Its limit: it tried sampled inputs only, so a property with no disagreement
 means none among its samples.
 
-Two deliberate changes can turn a pass into a fail. Number tests match separators as the gold writes them (M12c),
-and a heading walk stays in the cell's own columns (`top_heading`) or rows (`left_heading`, `right_heading`), no longer through a cell that spans others. On the
+Three deliberate changes can turn a pass into a fail. Number tests match separators as the gold writes them (M12c),
+and a heading walk stays in the cell's own columns (`top_heading`) or rows (`left_heading`, `right_heading`), no longer through a cell that spans others. A present text test counts its edit budget as exact edits (M23a): on the cached leaderboard re-runs a small share of the text tests that carry a budget went from pass to fail, none the other way. On the
 cached leaderboard re-runs, a few number passes and a few `top_heading` passes became fails; each was judged a
 real error on review. A few fail-to-pass changes came from the other fixes (a leader run or a footnote mark had
 hidden text the page did write).
@@ -38,10 +38,10 @@ A healthy run gives:
 
 | | passed | skipped | xfailed |
 |---|---|---|---|
-| this folder, no dataset | 85 | 11 | 9 |
-| this folder, with dataset | 95 | 1 | 9 |
-| whole suite, no dataset | 1212 | 21 | 9 |
-| whole suite, with dataset | 1227 | 6 | 9 |
+| this folder, no dataset | 86 | 11 | 8 |
+| this folder, with dataset | 96 | 1 | 8 |
+| whole suite, no dataset | 1221 | 21 | 8 |
+| whole suite, with dataset | 1236 | 6 | 8 |
 
 All four rows come from runs of this version.
 

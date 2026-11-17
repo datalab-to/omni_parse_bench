@@ -136,6 +136,7 @@ that leaves out a unit's exponent passes (case text-sup-unit).
   ([present-number.md](present-number.md)) when sign and percent matter.
 - **Spacing is free, so an exponent is a digit.** `12` is found in `1<sup>2</sup>` (case text-exponent).
 - **Image descriptions pay.** A description that contains the string passes the test (case text-alt).
+- **Most budgets are real.** 1,370 of the 3,684 real present text tests allow 1 to 4 edits; the others allow none.
 - **Short golds and edit budgets are loose.** With one edit, `ab` is found in a page holding `a` (case
   text-short-fuzzy). How edits are counted is in [internals.md](internals.md#the-edit-budget).
 - **A table is flat text here.** A gold that spans two adjacent cells passes (case text-table-flat).

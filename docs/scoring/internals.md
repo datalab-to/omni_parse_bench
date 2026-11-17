@@ -154,7 +154,7 @@ count edits differently:
 - `order` uses plain edit distance (fuzzysearch), so two swapped letters count as two.
 - `table_cell` compares whole cells with a ratio over both lengths, so an inserted character costs half an edit.
 
-Measured on random strings (the figures come from the installed rapidfuzz and fuzzysearch):
+Measured on random strings (present's verdicts are judged against a plain dynamic program of the edit distance that counts an adjacent swap as one edit):
 
 <!-- cases:internals-edits -->
 | rule | input | reads as | case |

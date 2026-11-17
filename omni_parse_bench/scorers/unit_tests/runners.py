@@ -21,7 +21,7 @@ from rapidfuzz import fuzz
 from omni_parse_bench import normalize, tables, views
 from omni_parse_bench.scorers.unit_tests import hyphenation
 
-# Note: a ratio test (table_cell, or present with no edit to spend) allowing k edits in an n-character string
+# Note: a ratio test (table_cell, or present's first pass) allowing k edits in an n-character string
 # passes at ratio 1 - k/n, and rapidfuzz returns exactly that ratio for k substitutions, which in binary lands
 # a hair under it.
 EPS = 1e-9
@@ -479,6 +479,8 @@ def _edits(needle: str, hay: str, max_diffs: int) -> int:
             p = hay.find(piece)
             while p != -1:
                 spans.append((max(0, p - o - k), p - o + n + 2 * k))
+                if len(spans) > len(hay) // step:    # so many stretches that a whole-page scan is cheaper
+                    return _edits_scan(needle, hay)
                 p = hay.find(piece, p + 1)
         spans.sort()
         merged: list[list[int]] = []

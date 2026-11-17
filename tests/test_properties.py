@@ -159,7 +159,7 @@ def test_no_html_is_graded_an_error(t, html):
 
 @pytest.mark.skipif(not LIVE, reason="needs the dataset: set OPB_DATASET to its root")
 def test_the_real_tests_with_an_edit_budget_are_the_ones_the_certificate_counts():
-    """known_deviations.json (M23a, M23b) says how many real tests carry a `max_diffs` of 1 or more."""
+    """M23b's entry and present-text.md count the real tests that carry a `max_diffs` of 1 or more."""
     present = [t for t in TESTS
                if isinstance(t.params, runners.Present) and isinstance(t.params.content, runners.Text)]
     cells = [t for t in TESTS if isinstance(t.params, runners.TableCell)]
