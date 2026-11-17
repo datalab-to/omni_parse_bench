@@ -217,15 +217,41 @@ def test_the_page_text_ignores_entities(s):
 EXACT = [t for t in TEXT if t.params.content.max_diffs == 0 and fold(t.params.content.text)]
 # Characters a page may drop without changing what a text test compares, by the documented rules of fold
 # (docs/scoring/internals.md, Fold), restated here without calling the scorer.
-# A run of 3+ dots (… is 3; 。 and ｡ are dots too), dashes, _, = or *.
-LEADER = re.compile(r"[.\-\u2026。｡]+|_{3,}|={3,}|\*{3,}")
+# A leader run (normalize._LEADERS) is 3 or more items with white space (not a block break, U+2029) allowed
+# between them. An item is a dot (., ·, 。, ｡; … is three) or a dash of the family (-, ‐ to ―, −) that is
+# not a sign: one glued to what precedes it, or not before a digit ("....-4.8" and "... - 4.8" are leaders,
+# but ". . . -4.8" keeps its sign). Dots and dashes make one mixed run; _, = and * each make their own.
+_DASH_CLASS = "[-\u2010-\u2015\u2212]"
+_SPACE = r"[^\S\u2029]"
+_ITEM = rf"(?:[.\u00b7\u3002\uff61\u2026]|(?<=\S){_DASH_CLASS}|{_DASH_CLASS}(?!\d))"
+LEADER = re.compile(rf"{_ITEM}(?:{_SPACE}*{_ITEM})*|(?:_{_SPACE}*)+|(?:={_SPACE}*)+|(?:\*{_SPACE}*)+")
 FOOTNOTE = re.compile(r"\[\^?\d+\]")                        # [12] or [^12]
+
+
+def leader_items(run: str) -> int:
+    """The items of a leader run: its dots and dashes (… is three), or its _, = or *."""
+    kept = re.sub(r"[^.\u00b7\u3002\uff61\-\u2010-\u2015\u2212_=*]", "", run)
+    return len(kept) + 3 * run.count("\u2026")
+
+
+def leader_survives(text: str, i: int, run: re.Match) -> bool:
+    """Whether the run holding text[i] is still a leader once text[i] is deleted, so that fold reads both
+    texts alike: a run of 4 or more items loses one and keeps 3, but a run of exactly 3 stops being one (a
+    deletion that changes the folded text, which a page must not make). A run that is one character (an
+    ellipsis) can be deleted whole between spaces: fold turns the run into a space, and the space is what is
+    left."""
+    gone = text[:i] + text[i + 1:]
+    if run[0].strip() == text[i]:     # the run is this one character (an ellipsis)
+        return (run.start() == 0 or text[run.start() - 1].isspace()) and (
+            run.end() == len(text) or text[run.end()].isspace())
+    return any(m.start() < run.end() - 1 and m.end() > run.start()
+               for m in LEADER.finditer(gone) if leader_items(m[0]) >= 3)
 
 
 def why_a_deletion_cannot_count(text: str, i: int) -> str | None:
     """Why deleting text[i] cannot fail a text test, or None: the reasons are fold's documented rules."""
     c = text[i]
-    leaders = [m for m in LEADER.finditer(text) if len(m[0]) + 2 * m[0].count("…") >= 3]
+    leaders = [m for m in LEADER.finditer(text) if leader_items(m[0]) >= 3 and leader_survives(text, i, m)]
     if c.isspace(): return "white space"
     if unicodedata.category(c) in ("Cf", "Co"): return "an invisible or private-use character"
     if any(m.start() <= i < m.end() for m in leaders): return "part of a leader run"

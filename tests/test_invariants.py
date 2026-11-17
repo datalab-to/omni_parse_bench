@@ -48,6 +48,7 @@ def answer(t: gold.Test) -> dict[str, Any]:
         case runners.Order(): html = f"<p>{e(p.before)}</p><p>{e(p.after)}</p>"
         case runners.Repeat(content=runners.Text(text=x) | runners.Number(number=x)):
             html = "".join(f"<p>{e(x)}</p>" for _ in range(p.expected_count))
+        case runners.PageNearEmpty(): html = f"<p>{'x' * p.max_chars}</p>"     # as much as it allows
         case runners.TableCell(): html = table(p)
         case runners.LayoutKind():
             xs = p.content.place
@@ -97,8 +98,19 @@ def failures(tests: Sequence[gold.Test], outputs, want: str) -> list[str]:
 
 
 def test_an_empty_output_passes_no_test(tests):
-    bad = failures(tests, lambda t: EMPTY, "fail")
+    # A page_near_empty test asks for a page with at most max_chars characters, so an empty output passes
+    # it by definition; the next test checks that it fails one character over.
+    asked = [t for t in tests if not isinstance(t.params, runners.PageNearEmpty)]
+    bad = failures(asked, lambda t: EMPTY, "fail")
     assert not bad, f"{len(bad)} tests pass on an empty output, e.g. {bad[:5]}"
+
+
+def test_a_page_near_empty_test_passes_a_blank_page_and_fails_one_character_over_its_limit(tests):
+    blank = [t for t in tests if isinstance(t.params, runners.PageNearEmpty)]
+    assert not failures(blank, lambda t: EMPTY, "pass")
+    over = lambda t: {"html": f"<p>{'x' * (t.params.max_chars + 1)}</p>"}  # noqa: E731
+    bad = failures(blank, over, "fail")
+    assert not bad, f"{len(bad)} page_near_empty tests pass a page over their limit, e.g. {bad[:5]}"
 
 
 def test_each_tests_own_answer_passes_it(tests):

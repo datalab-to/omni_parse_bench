@@ -1,0 +1,8 @@
+{"tests": [
+  {"id": "fx_leader_spaced", "test_type": "present", "output_type": "html", "derivation": "authored",
+   "tags": ["table"], "args": {"content": {"text": "Hevesy Istvan . . . . . Julius Knaack", "max_diffs": 0}},
+   "settings": {}},
+  {"id": "fx_leader_dots", "test_type": "present", "output_type": "html", "derivation": "authored",
+   "tags": ["table"], "args": {"content": {"text": "Utelopande sedlar m. m ..................... totalt", "max_diffs": 0}},
+   "settings": {}}
+]}
