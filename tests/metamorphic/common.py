@@ -123,29 +123,29 @@ MANIFEST_SHA256 = "5cc5611ad6e1d32e0e39c91ce23da913e63ba775e414a7734c7d9c1768139
 # The loaded tests examples are drawn from: how many the fixtures hold (CI) and the dataset (checked by
 # test_certificate.py, the fixtures always and the dataset when OPB_DATASET is set).
 POOLS = {
-    "text, order, table_cell": ("text, order and table_cell tests", 8, 10_259),
+    "text, order, table_cell": ("text, order and table_cell tests", 10, 10_259),
     "repeat": ("repeat tests with text", 1, 35),
     "repeat number": ("repeat tests with a number", 6, 0),
-    "text, number": ("text and number tests", 5, 4_007),
+    "text, number": ("text and number tests", 7, 4_007),
     "layout": ("layout_kind tests", 3, 2_403),
     "number": ("number tests", 2, 323),
     "digit-edged text, repeat": ("text and repeat tests with a digit at an end", 2, 431),
-    "exact text": ("text tests with max_diffs 0", 2, 2_314),
-    "text, order, repeat, table_cell": ("text, order, repeat and table_cell tests", 9, 10_294),
-    "batch": ("text, number, order, repeat and table_cell tests", 17, 10_617),
+    "exact text": ("text tests with max_diffs 0", 4, 2_314),
+    "text, order, repeat, table_cell": ("text, order, repeat and table_cell tests", 11, 10_294),
+    "batch": ("text, number, order, repeat and table_cell tests", 19, 10_617),
 }
 
 # The Hypothesis tests whose input space runs out in CI before the profile's max_examples, and how many
 # examples each draws there (per parametrized case; @example cases not counted). The certificate prints these
 # counts; test_certificate.py counts them again.
 RUN_IN_CI = {
-    "test_a_footnote_mark_after_the_answer_does_not_change_a_present_verdict": 5,
+    "test_a_footnote_mark_after_the_answer_does_not_change_a_present_verdict": 7,
     "test_a_span_starting_in_an_images_alt_text_is_read_the_same": 12,
     "test_an_equation_in_an_equivalent_form_passes_its_test": 8,
     "test_changing_one_digit_of_a_number_fails_its_test": 72,
     "test_a_digit_glued_to_a_number_fails_its_test": 40,
-    "test_deleting_a_character_of_an_exact_text_fails_its_test": 2,
-    "test_a_page_in_another_case_passes_every_text_test": 18,
+    "test_deleting_a_character_of_an_exact_text_fails_its_test": 4,
+    "test_a_page_in_another_case_passes_every_text_test": 22,
     "test_a_digit_glued_to_a_loaded_digit_edged_test_fails_it": 10,
 }
 
