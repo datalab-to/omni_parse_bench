@@ -47,6 +47,8 @@ What the test ignores:
 | I | with `exact_case`, the case as printed | `iPhone` (exact case) | `I bought an iPhone` | pass | `text-exact-case-kept` |
 | I | with `exact_case`, every other difference still folds | `Total Due` (exact case) | `<p><b>Total</b>  Due</p>` | pass | `text-exact-case-folds` |
 | I | with `exact_case`, a word broken at a line end in its case | `Developers` (exact case) | `Develop- ers` | pass | `text-exact-case-line-hyphen` |
+| I | with `exact_case`, a checkbox word in another case is still the one mark | `[Checked] Yes` (exact case) | `[checked] Yes` | pass | `text-exact-case-checkbox` |
+| I | with `exact_case`, an unchecked word in capitals is still the one mark | `[unchecked] No` (exact case) | `[UNCHECKED] No` | pass | `text-exact-case-unchecked` |
 | I | two letters swapped, within 1 edit | `Total` (md 1) | `Toatl` | pass | `text-transposition` |
 <!-- /cases -->
 
@@ -55,6 +57,8 @@ What it does not look at, so a wrong output passes:
 <!-- cases:text-blind -->
 | | difference | gold | output | verdict | case |
 |---|---|---|---|---|---|
+| B | with `exact_case`, the string in an image description in its case | `Total` (exact case) | `<img alt='Total'>` | pass | `text-exact-case-alt` |
+| B | with `exact_case`, text styled to look uppercase counts as the case it is written in | `nasa` (exact case) | `<p><span style='text-transform:uppercase'>nasa</span></p>` | pass | `text-exact-case-css-lower` |
 | B | struck-through text still counts | `Total Due` | `<p><s>Total Due</s></p>` | pass | `text-strike` |
 | B | the string repeated in a loop | `Total Due` | `Total Due Total Due Total Due` | pass | `text-loop` |
 | B | a longer word holds the string | `Total` | `Totally` | pass | `text-longer-word` |
@@ -93,6 +97,8 @@ What it penalizes:
 | P | with `exact_case`, a changed letter case | `iPhone` (exact case) | `I bought an iphone` | fail | `text-exact-case` |
 | P | with `exact_case`, an acronym in lower case | `NASA` (exact case) | `Nasa launched` | fail | `text-exact-case-acronym` |
 | P | with `exact_case`, a word broken at a line end in another case | `Developers` (exact case) | `develop- ers` | fail | `text-exact-case-line-hyphen-wrong` |
+| P | with `exact_case`, an uppercase gold on text that only looks uppercase (`text-transform`) | `NASA` (exact case) | `<p><span style='text-transform:uppercase'>nasa</span></p>` | fail | `text-exact-case-css-upper` |
+| P | with `exact_case`, a capital on text in small caps written in lower case | `Nasa` (exact case) | `<p><span style='font-variant:small-caps'>nasa</span></p>` | fail | `text-exact-case-small-caps` |
 | P | a case change that changes letters | `straße` | `STRASSE` | fail | `text-case-mapping` |
 <!-- /cases -->
 

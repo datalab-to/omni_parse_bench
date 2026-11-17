@@ -96,7 +96,7 @@ def of(*kinds):
 
 
 def exact_case_tests():
-    """The loaded tests whose text arg sets `exact_case` (the fixtures hold one; M29 to M33 use them)."""
+    """The loaded tests whose text arg sets `exact_case` (the fixtures hold two; M29 runs them)."""
     return [t for t in TESTS if is_exact(t.params)]
 
 

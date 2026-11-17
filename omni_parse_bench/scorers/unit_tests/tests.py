@@ -167,10 +167,17 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
         if (r in LISTS) != isinstance(v, list):
             raise ValueError(f"{where}: {r} takes {'a list of args' if r in LISTS else 'one arg'}")
         for a in v if isinstance(v, list) else [v]:
-            if isinstance(a, dict) and "exact_case" in a and not (
-                    test_type == "present" and r == "content" and "text" in a):
-                raise ValueError(f"{where}: exact_case is supported on a present test's text content only "
-                                 f"now, not on {test_type}'s {r}")
+            if isinstance(a, dict) and "exact_case" in a:
+                if "text" not in a and (kind := next((k for k in ("number", "latex") if k in a), None)):
+                    raise ValueError(f"{where}: {r}: exact_case compares text only, not a {kind}")
+                if "text" in a and not isinstance(a["exact_case"], bool):
+                    raise ValueError(f"{where}: {r}'s exact_case must be true or false, "
+                                     f"not {a['exact_case']!r:.80}")
+                # Note: an explicit false is the default, so any text arg may say it; true is for a present
+                # test's content only for now.
+                if "text" in a and a["exact_case"] and not (test_type == "present" and r == "content"):
+                    raise ValueError(f"{where}: exact_case: true is supported on a present test's text "
+                                     f"content only for now, not on {test_type}'s {r}")
             match _kind(where, r, a):
                 case "text": _diffs(where, r, a)
                 case "latex": _renders(where, r, a)

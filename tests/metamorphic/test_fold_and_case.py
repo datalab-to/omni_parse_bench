@@ -425,7 +425,8 @@ def test_swapping_the_case_of_one_letter_fails_exact_case_and_passes_without_it(
     assert not passes(exact(s), page, exact=True)
 
 
-CASE_FLIP_NOTE = ("the first cased letter of every real text string swapped: exact_case fails on each")
+CASE_FLIP_NOTE = ("those with a cased letter (and no checkbox [x]) pass in their own case and fail with "
+                  "their first cased letter swapped, under exact_case")
 
 
 @every_real_test("text strings", note=CASE_FLIP_NOTE)

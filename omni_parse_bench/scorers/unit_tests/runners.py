@@ -48,7 +48,7 @@ Mark = tuple[bool, str]                            # passed, and why not
 
 class Text(NamedTuple):
     text: str
-    max_diffs: int      # edits allowed, after `normalize.fold`
+    max_diffs: int      # edits allowed, after `normalize.fold` (`normalize.fold_cased` with exact_case)
     place: tuple[Box, ...] = ()     # where it is printed: a box per line, page fractions; () when not pinned
     exact_case: bool = False    # compare with case kept (`normalize.fold_cased`); a `present` content only
 
@@ -662,8 +662,8 @@ def _squeezed_ok(want: str, hay: str, folded: str) -> bool:
 def _contains(needle: str, text: str, max_diffs: int, fold_page: Callable[[str], str] = normalize.fold,
               fold_needle: Callable[[str], str] = normalize.fold) -> tuple[bool, float, float, str]:
     """`contains`, and, when it fails, the best-matching window of the folded text (the squeezed, if that
-    matched better): lowercased, its spacing folded; "" when it passes or `needle` is empty. `fold_page`
-    folds `text` (`normalize.unmarked` drops its footnote markers)."""
+    matched better): lowercased (case kept under `fold_cased`), its spacing folded; "" when it passes or
+    `needle` is empty. `fold_page` folds `text` (`normalize.unmarked` drops its footnote markers)."""
     want, hay = fold_needle(needle), fold_page(text)
     ok, r, thr = _ratio(want, hay, max_diffs)
     if ok and want and want in hay and not _edges_ok(want, hay):

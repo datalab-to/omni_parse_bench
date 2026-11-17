@@ -671,6 +671,15 @@ def test_order_that_passes_with_fewer_edits_passes_with_more():
     ("Anglo-Saxon law", "<p>Anglo- saxon law</p>", False, True),
     ("Xylophonic", "<p>Xylo- phonic</p>", True, True),
     ("Xylophonic", "<p>xylo- phonic</p>", True, False),
+    ("Probiotic Bacteria", "<p>ProbioticBacteria</p>", True, True),          # the squeeze keeps case too
+    ("Probiotic Bacteria", "<p>Probioticbacteria</p>", True, False),
+    ("Probiotic Bacteria", "<p>Probioticbacteria</p>", False, True),
+    ("Probiotic", "<p>Probiotic1</p>", True, True),
+    ("Probiotic", "<p>probiotic1</p>", True, False),
+    ("Smith and Jones", "<p>Smith[1] and Jones</p>", True, True),            # the bracket-marker retry
+    ("Smith and Jones", "<p>smith[1] and Jones</p>", True, False),
+    ("Smith and Jones", "<p>smith[1] and Jones</p>", False, True),
+    ("Smith and Jones", "<p>smith<sup>1</sup> and Jones</p>", True, False),
 ])
 def test_present_exact_case_keeps_case_and_every_other_fold(gold, page, exact, passes):
     got, why = R.present(R.Present(R.Text(gold, 0, (), exact)), html(page))
@@ -690,7 +699,7 @@ def test_exact_case_is_an_arg_field_of_a_present_text_only():
     for bad in ("yes", 1, None):
         with pytest.raises(ValueError, match="exact_case"):
             parse({"content": arg | {"exact_case": bad}})
-    with pytest.raises(ValueError, match="present"):
+    with pytest.raises(ValueError, match="compares text only, not a number"):
         parse({"content": {"number": "12", "exact_case": True}})
     with pytest.raises(ValueError, match="present"):
         parse({"before": arg | {"exact_case": True}, "after": arg}, test_type="order")

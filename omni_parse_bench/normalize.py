@@ -147,7 +147,8 @@ def fold(s: str) -> str:
                          quotes in a row (TeX's `` and '', or a mixed pair '’) -> "; the fraction slash
                          -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII; ş ţ -> ș ț; ״ -> "
         symbols          decimal middle dots -> "."; ♢ -> ◊; ≦ -> ≤
-        case, spacing    lowercased; whitespace collapsed and trimmed
+        case, spacing    lowercased (case kept for an arg with exact_case: `fold_cased`); whitespace
+                         collapsed and trimmed
 
     Case is folded because it isn't what a parse is paid for; digits, letters and their order are.
     """

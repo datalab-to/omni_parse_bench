@@ -65,6 +65,45 @@ def test_a_bad_arg_or_setting_is_refused(t):
         gold.test("p", t)
 
 
+def _roles(exact):
+    """One test of every type that takes a text arg, each text arg saying `exact_case: exact`."""
+    t = lambda **k: {"text": "abc", "max_diffs": 0, "exact_case": exact} | k  # noqa: E731
+    return {
+        "present": with_args({"content": t()}),
+        "order": with_args({"before": t(), "after": t(text="xyz")}, "order"),
+        "repeat": with_args({"content": t()}, "repeat", {"expected_count": 1}),
+        "table_cell": with_args({"cell": t(), "headings": [t(text="head")], "section": t(text="sec"),
+                                 "row_groups": [t(text="grp")], "left": t(text="l")}, "table_cell"),
+        "layout_kind": with_args({"content": t(place=[[0.1, 0.1, 0.5, 0.2]])}, "layout_kind",
+                                 {"kind": "text"}),
+    }
+
+
+@pytest.mark.parametrize("role", ["present", "order", "repeat", "table_cell", "layout_kind"])
+def test_an_explicit_exact_case_false_is_accepted_wherever_a_text_arg_is(role):
+    t = gold.test("p", _roles(False)[role])
+    assert gold.arg_kinds(t.test_type, t.args) in {("text",), ()}    # as without the field
+
+
+@pytest.mark.parametrize("role", ["order", "repeat", "table_cell", "layout_kind"])
+def test_exact_case_true_is_refused_outside_a_present_test(role):
+    with pytest.raises(ValueError, match="present test's text content only for now"):
+        gold.test("p", _roles(True)[role])
+
+
+@pytest.mark.parametrize("role", ["present", "order", "table_cell"])
+def test_exact_case_must_be_a_bool_on_every_role(role):
+    with pytest.raises(ValueError, match="true or false"):
+        gold.test("p", _roles("no")[role])
+
+
+@pytest.mark.parametrize("arg, kind", [({"number": "12"}, "number"), ({"latex": "x"}, "latex")])
+@pytest.mark.parametrize("value", [True, False])
+def test_exact_case_on_a_number_or_latex_arg_names_its_kind(arg, kind, value):
+    with pytest.raises(ValueError, match=f"exact_case compares text only, not a {kind}"):
+        gold.test("p", with_args({"content": arg | {"exact_case": value}}))
+
+
 def test_exact_case_is_a_bool_arg_field_of_a_present_text():
     t = gold.test("p", with_args({"content": {"text": "iPhone", "max_diffs": 0, "exact_case": True}}))
     assert t.params.content.exact_case is True

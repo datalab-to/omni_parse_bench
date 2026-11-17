@@ -67,9 +67,16 @@ arg then passes only when its text is found with its case kept: `normalize.fold_
 changed letter's case as an edit, so such a test must say 0 (the loader refuses a larger budget). Numbers and equations have no case, and the other test types do not read it yet, so the field is refused
 there when the test loads. The text must also have a cased letter (`123` has no case to keep), or the field is refused.
 
-`exact_case` keeps the case of letters only. Two folds that are not case still apply: a checkbox mark
-(`[x]` and `[X]`, `[checked]` and `[Checked]` are one checked box) and the glyph unification of NFKC (`µ`
-micro sign and `μ` Greek mu are one letter).
+`exact_case` keeps the case of letters only, and it compares the page's text, not how it looks. Limits:
+- Two folds that are not case still apply: a checkbox mark (`[x]` and `[X]`, `[checked]` and `[Checked]`,
+  `[unchecked]` and `[UNCHECKED]` are one box each, since the checkbox patterns ignore case) and the glyph
+  unification of NFKC (`µ` micro sign and `μ` Greek mu are one letter).
+- Styling that changes how text looks, not what it is, is not read: `text-transform: uppercase` or small caps
+  on lowercase text leaves the text lowercase, so an uppercase gold fails on a page that only looks uppercase,
+  and a lowercase gold passes on it (cases `text-exact-case-css-upper`, `text-exact-case-small-caps`,
+  `text-exact-case-css-lower`).
+- Image descriptions (`alt`) are part of the text, so a string there counts, in its case
+  (`text-exact-case-alt`).
 
 Text presence also accepts an exact match through an ambiguous wrapping hyphen:
 `মানু- হৰ` can match `মানুহৰ`. The hyphen must follow a letter or its combining marks,

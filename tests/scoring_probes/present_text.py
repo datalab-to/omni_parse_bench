@@ -30,10 +30,14 @@ TABLES = [
         text("text-exact-case-kept", "I", "with `exact_case`, the case as printed", "iPhone", "I bought an iPhone", exact=True),
         text("text-exact-case-folds", "I", "with `exact_case`, every other difference still folds", "Total Due", "<p><b>Total</b>  Due</p>", exact=True),
         text("text-exact-case-line-hyphen", "I", "with `exact_case`, a word broken at a line end in its case", "Developers", "Develop- ers", exact=True),
+        text("text-exact-case-checkbox", "I", "with `exact_case`, a checkbox word in another case is still the one mark", "[Checked] Yes", "[checked] Yes", exact=True),
+        text("text-exact-case-unchecked", "I", "with `exact_case`, an unchecked word in capitals is still the one mark", "[unchecked] No", "[UNCHECKED] No", exact=True),
         text("text-transposition", "I", "two letters swapped, within 1 edit", "Total", "Toatl", md=1),
     ),
     table(
         "text-blind",
+        text("text-exact-case-alt", "B", "with `exact_case`, the string in an image description in its case", "Total", "<img alt='Total'>", exact=True),
+        text("text-exact-case-css-lower", "B", "with `exact_case`, text styled to look uppercase counts as the case it is written in", "nasa", "<p><span style='text-transform:uppercase'>nasa</span></p>", exact=True),
         text("text-strike", "B", "struck-through text still counts", "Total Due", "<p><s>Total Due</s></p>"),
         text("text-loop", "B", "the string repeated in a loop", "Total Due", "Total Due Total Due Total Due"),
         text("text-longer-word", "B", "a longer word holds the string", "Total", "Totally"),
@@ -68,6 +72,8 @@ TABLES = [
         text("text-exact-case", "P", "with `exact_case`, a changed letter case", "iPhone", "I bought an iphone", exact=True),
         text("text-exact-case-acronym", "P", "with `exact_case`, an acronym in lower case", "NASA", "Nasa launched", exact=True),
         text("text-exact-case-line-hyphen-wrong", "P", "with `exact_case`, a word broken at a line end in another case", "Developers", "develop- ers", exact=True),
+        text("text-exact-case-css-upper", "P", "with `exact_case`, an uppercase gold on text that only looks uppercase (`text-transform`)", "NASA", "<p><span style='text-transform:uppercase'>nasa</span></p>", exact=True),
+        text("text-exact-case-small-caps", "P", "with `exact_case`, a capital on text in small caps written in lower case", "Nasa", "<p><span style='font-variant:small-caps'>nasa</span></p>", exact=True),
         text("text-case-mapping", "P", "a case change that changes letters", "straße", "STRASSE"),
     ),
     table(
