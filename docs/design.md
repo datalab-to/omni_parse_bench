@@ -132,6 +132,7 @@ select tests and are scored one tag at a time (summarize the tests of one tag), 
 | `human_review` | a recorded correction of a test | 180 |
 | `model_review` | a vision model read the page, blind to which reading was the test's, and corrected the test, for a test type an audit cleared | 102 |
 | `upstream_frbench` | written by fr-bench-pdf2md for its hand-filled forms | 74 |
+| `computed` | computed from a definition (a function at the arguments printed on the page) or matched to a digital twin of the page, kept only where it agrees with the print | 0 |
 
 ## Data layout
 

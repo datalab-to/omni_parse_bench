@@ -18,6 +18,13 @@ def test_a_tag_is_a_vocabulary_tag_a_language_or_a_script():
             gold.test("p", present([bad]))
 
 
+def test_a_derivation_is_one_of_the_closed_list():
+    ok = present([]) | {"derivation": "computed"}
+    assert gold.test("p", ok).derivation == "computed"
+    with pytest.raises(ValueError, match="unknown derivation"):
+        gold.test("p", present([]) | {"derivation": "guessed"})
+
+
 def with_args(args: dict, test_type: str = "present", settings: dict | None = None, **fields) -> dict:
     output = {"present": "html", "order": "html", "repeat": "html", "page_near_empty": "html"}[test_type]
     return {"id": "t", "test_type": test_type, "output_type": output, "derivation": "authored", "tags": [],

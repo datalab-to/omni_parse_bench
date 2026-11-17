@@ -187,6 +187,7 @@ The arg's characters come from a source, and `derivation` records which (`vocab.
 | `extractor_agreement` | independent text extractors agreed on the line |
 | `human_review` | a correction or confirmation by a person, recorded per test |
 | `model_review` | a correction by a vision model, used only where a person had not decided and only on test types where it matched a person's decisions |
+| `computed` | the value was computed from its definition (a function at the arguments printed on the page), or matched to a digital twin of the page, and the test is kept only where it agrees with the print |
 
 No model we used to establish or tag an answer is one whose results are reported. A person
 correcting a test could see reported systems' readings beside the page, and checked any reading they
