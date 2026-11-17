@@ -9,23 +9,31 @@ constants (a threshold, a fill ratio) are module constants here, never parameter
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Callable, Sequence
 from typing import Any, Literal, NamedTuple
 
 import fuzzysearch
+from fuzzysearch.common import group_matches
+from fuzzysearch.levenshtein import find_near_matches_levenshtein
 from rapidfuzz import fuzz
 
 from omni_parse_bench import normalize, tables, views
 from omni_parse_bench.scorers.unit_tests import hyphenation
 
-# Note: a test allowing k edits in an n-character string passes at ratio 1 - k/n, and rapidfuzz
-# returns exactly that ratio for k edits, which in binary lands a hair under it.
+# Note: a ratio test (table_cell, or present's first pass) allowing k edits in an n-character string
+# passes at ratio 1 - k/n, and rapidfuzz returns exactly that ratio for k substitutions, which in binary lands
+# a hair under it.
 EPS = 1e-9
 TABLE_MIN_RATIO = 0.5
 MIN_PLACE_COVER = 0.5
 # Note: a block covering exactly half a place has a coverage of 0.5 in exact arithmetic and a hair under or
 # over it in floats (areas of boxes that were scaled or summed), so the threshold gets the slack `EPS` gives.
 COVER_EPS = 1e-9
+# Note: two blocks of equal area in exact arithmetic can differ by a hair in floats ([0.2, 0.15, 0.4, 0.25]
+# and [0.2, 0.2, 0.6, 0.25] are both 0.02), so a block must be smaller by more than this to hold the place
+# instead of one listed before it. It is relative to the area, so scaled boxes give the same verdict.
+AREA_EPS = 1e-9
 # Note: a list item or a key-value field is running text for a `text` test; vendors differ in whether they
 # give each such line a block of its own, and the test asks only that it isn't a heading or a table.
 AS_TEXT = frozenset({"text", "list", "form"})
@@ -67,7 +75,14 @@ def found(a: Arg, v: views.Html) -> Mark:
     if isinstance(a, Number): return _number_found(a.number, v)
     if isinstance(a, Latex): return _latex_found(a.latex, v)
     ok, r, thr, window = _contains(a.text, v.text, a.max_diffs)
-    if not ok and hyphenation.matches(a.text, v.text):
+    # Note: fold reads a bracketed footnote marker as a spaced number (so a number test still sees it, and
+    # a gold that writes the marker finds it), and the text view a mark set as a superscript the same way,
+    # which leaves either free only at the end of the gold: "Smith[1] and Jones" and
+    # "Smith<sup>1</sup> and Jones" missed "Smith and Jones". Retry with the page's markers dropped.
+    if not ok and ((page := views.unmarked(v.html)) is not None or "[" in v.text) and _contains(
+            a.text, v.text if page is None else page, a.max_diffs, normalize.unmarked)[0]:
+        return True, ""
+    if not ok and hyphenation.matches(a.text, v.text, _cut_before, _cut_after):
         return True, ""
     if not ok and _only_glued(a.text, v.text):
         return False, f"{a.text[:60]!r} found only inside a longer number"
@@ -84,12 +99,12 @@ def present(t: Present, v: views.Html) -> Mark:
 
 
 def _number_found(text: str, v: views.Html) -> Mark:
-    """Digit-for-digit: strict on digits, decimal point, sign and percent; lenient on thousands
-    separators. Bounded by non-digits, so 123 never passes on 1234."""
+    """Digit-for-digit: strict on digits, separators as the gold writes them, sign and percent.
+    Bounded by non-digits, so 123 never passes on 1234."""
     n = number(text)
     assert n is not None, text
     written = _NUMBER.match(text.strip())["body"]
-    hits = list(_number_pattern(n.core, written).finditer(normalize.fold(v.text).translate(_NUM_CLEAN)))
+    hits = list(_number_pattern(written).finditer(normalize.fold(v.text).translate(_NUM_CLEAN)))
     if not hits:
         return False, f"{text!r} not found digit-for-digit"
     negative = [(m["pre"] or "").strip() == "-" for m in hits]
@@ -109,24 +124,46 @@ class Order(NamedTuple):
 
 
 def order(t: Order, v: views.Html) -> Mark:
-    """`before` comes before `after`, found as `contains` finds them: after `fold`, then, if either
-    is missing, both again after `squeeze`, whose positions keep the folded text's order. An exact
-    match counts only if it is not cut out of a longer number (`_edges_ok`)."""
+    """`before` comes before `after`, found as `contains` finds them: after `fold`, then, if either has
+    no exact match there, both again after `squeeze`, whose positions keep the folded text's
+    order. An exact match counts only if it is not cut out of a longer number (`_edges_ok`).
+
+    Note: whether to retry does not depend on the budget: with an edit to spend, both can be found in the
+    folded text out of order while the squeezed text, which passed with fewer edits, holds them in order."""
     folded = normalize.fold(v.text)
     cut = [False, False]
+    both = False
     for f in (normalize.fold, normalize.squeeze):
         hay = f(v.text)
         kept = [k for k, c in enumerate(folded) if not c.isspace()] if f is normalize.squeeze else None
 
-        raw = [fuzzysearch.find_near_matches(f(x), hay, max_l_dist=t.max_diffs) for x in (t.before, t.after)]
+        raw = [_near(f(x), hay, t.max_diffs) for x in (t.before, t.after)]
         a, b = (_unglued(m, folded, kept) for m in raw)
         cut = [c or (bool(m) and not x) for c, m, x in zip(cut, raw, (a, b), strict=True)]
-        if a and b: break
-    if not a: return False, f"'before' text {t.before[:40]!r} {_why_missing(cut[0])}"
-    if not b: return False, f"'after' text {t.after[:40]!r} {_why_missing(cut[1])}"
-    if any(x.start < y.start for x in a for y in b):
+        if a and b and any(x.start < y.start for x in a for y in b):
+            return True, ""
+        both = both or bool(a and b)
+        if all(any(not m.dist for m in x) for x in (a, b)): break
+    if _order_hyphenated(t, v):
         return True, ""
-    return False, f"{t.before[:34]!r} does not appear before {t.after[:34]!r}"
+    if both: return False, f"{t.before[:34]!r} does not appear before {t.after[:34]!r}"
+    if not a: return False, f"'before' text {t.before[:40]!r} {_why_missing(cut[0])}"
+    return False, f"'after' text {t.after[:40]!r} {_why_missing(cut[1])}"
+
+
+def _order_hyphenated(t: Order, v: views.Html) -> bool:
+    """Whether `before` comes before `after` when a hyphen a line broke after, on the page or in either
+    string, is read kept or dropped (`hyphenation.copies`): an exact copy of each, starting in order, one of
+    them reading such a hyphen. The fallback `present` has, for a pair; it spends no edits."""
+    if not hyphenation.optional(t.before, t.after, v.text):
+        return False
+    a, b = (hyphenation.copies(x, v.text, _cut_before, _cut_after) for x in (t.before, t.after))
+    first = min((c.first for c in a), default=None)
+    first_continued = min((c.first for c in a if c.continued), default=None)
+    last = max((c.last for c in b), default=None)
+    last_continued = max((c.last for c in b if c.continued), default=None)
+    return any(x is not None and y is not None and x < y
+               for x, y in ((first_continued, last), (first, last_continued)))
 
 
 class Repeat(NamedTuple):
@@ -135,20 +172,64 @@ class Repeat(NamedTuple):
 
 
 def repeat(t: Repeat, v: views.Html) -> Mark:
-    """The line appears exactly N times, as a whole run of words: a longer word doesn't count."""
+    """The line appears exactly N times, as a whole run of words: a longer word doesn't count. When the count
+    is not N, it is counted again with each hyphen a line broke after, on the page or in the line, read kept
+    or dropped (`_hyphenated_count`), and N copies there pass too."""
     chars = [c for c in normalize.fold(t.text) if not c.isspace()]
     pattern = r"(?<![^\W_])" + r"\s*".join(re.escape(c) for c in chars) + r"(?![^\W_])"
     n = len(re.findall(pattern, normalize.fold(v.seen)))
-    return _mark(n == t.expected_count, f"{t.text[:50]!r} appears {n}x, not {t.expected_count}x")
+    if n == t.expected_count:
+        return True, ""
+    h = _hyphenated_count(t.text, v.seen)
+    if h == t.expected_count:
+        return True, ""
+    how = "" if h is None else " (reading line-end hyphens kept or dropped)"
+    return False, f"{t.text[:50]!r} appears {n if h is None else h}x{how}, not {t.expected_count}x"
+
+
+_WORD_CHAR = re.compile(r"[^\W_]")
+
+
+def _hyphenated_count(text: str, page: str) -> int | None:
+    """How many copies of `text` the page holds as whole words when each hyphen a line broke after, on the
+    page or in `text`, may be read kept or dropped; None when no copy reads such a hyphen (the count is then
+    the main one's to give).
+
+    Each copy is counted once, read with or without its hyphen, and copies that overlap are counted as a scan
+    from the start takes them, as the main count does: a page that writes the word once whole and once broken
+    holds two copies, never three."""
+    if not hyphenation.optional(text, page):
+        return None
+    copies = hyphenation.copies(text, page, lambda s, i: i > 0 and bool(_WORD_CHAR.match(s, i - 1)),
+                                lambda s, j: bool(_WORD_CHAR.match(s, j)))
+    if not any(c.continued for c in copies):
+        return None
+    ends: dict[int, int] = {}
+    for c in copies:
+        ends[c.end] = min(c.first, ends.get(c.end, c.first))
+    n, taken = 0, 0
+    for first, end in sorted((first, end) for end, first in ends.items()):
+        if first >= taken:
+            n, taken = n + 1, end
+    return n
 
 
 class PageNearEmpty(NamedTuple):
     max_chars: int
 
 
+# Note: marks the text view writes for an element that holds nothing: the `$$` of an empty <math>, the
+# number of an empty list item, the value of a hidden input.
+_NOTHING = re.compile(
+    r"<math\b[^<>]*>\s*</math>|<li\b[^<>]*>\s*</li>|<input\b[^<>]*\btype=[\"']?hidden\b[^<>]*>", re.I)
+
+
 def page_near_empty(t: PageNearEmpty, v: views.Html) -> Mark:
-    """A blank page yields at most `max_chars` non-space characters outside image alt text."""
-    n = len(re.sub(r"\s", "", v.seen))
+    """A blank page yields at most `max_chars` characters a reader sees outside image alt text: no white
+    space, no invisible format character (a zero-width space, a byte-order mark, a soft hyphen), and none of
+    the marks the text view writes for an element that holds nothing."""
+    seen = views.text(_NOTHING.sub("", v.html), alt=False)
+    n = sum(unicodedata.category(c) != "Cf" for c in re.sub(r"\s", "", seen))
     return _mark(n <= t.max_chars, f"{n} non-space characters (limit {t.max_chars})")
 
 
@@ -187,9 +268,9 @@ def table_cell(t: TableCell, v: views.Html) -> Mark:
     expected = {k: _fold_cell(x) for k, x in t.relations.items() if x}
     reasons = []
     for table in ts:
-        for rc in [rc for rc, x in table.text.items() if _one_of(cell, x, thr)]:
+        for rc in [rc for rc, x in table.text.items() if _one_of(cell, x, thr, t.cell)]:
             failed = [why for k, want in expected.items()
-                      if (why := _relation(table, rc, k, want, t.max_diffs))]
+                      if (why := _relation(table, rc, k, want, t.max_diffs, t.relations[k]))]
             failed += _structure(t, table, rc)
             if not failed:
                 return True, ""
@@ -253,7 +334,8 @@ def layout_kind(t: LayoutKind, blocks: Sequence[Block]) -> Mark:
 
 
 def holder(place: Sequence[Box], blocks: Sequence[Block]) -> Block | None:
-    """The smallest block covering at least MIN_PLACE_COVER of the place's area, or None.
+    """The smallest block covering at least MIN_PLACE_COVER of the place's area, or None; of blocks of equal
+    area (within a relative `AREA_EPS`), the first listed.
 
     Note: coverage of the place, not IoU, since a vendor's block may rightly be larger than our place (a list
     for an item), and the smallest is the most specific."""
@@ -261,7 +343,10 @@ def holder(place: Sequence[Box], blocks: Sequence[Block]) -> Block | None:
     if total <= 0: return None
     held = [b for b in blocks
             if sum(_area(_intersection(x, b.bbox)) for x in place) / total >= MIN_PLACE_COVER - COVER_EPS]
-    return min(held, key=lambda b: _area(b.bbox), default=None)
+    best = None
+    for b in held:
+        if best is None or _area(b.bbox) < _area(best.bbox) * (1 - AREA_EPS): best = b
+    return best
 
 
 # --------------------------------------------------------------------------- registry
@@ -310,8 +395,8 @@ def number(text: str) -> Digits | None:
 
     The decimal point is the last "." or "," followed by 1-2 digits (or any count after a "."), and
     every other separator is a thousands mark. One separator followed by exactly three digits is a
-    thousands mark after a ",", and ambiguous after a "."; "16,17" is ambiguous. Parentheses aren't
-    a sign.
+    thousands mark after a ",", and a decimal point after a "." ("8.455"). One "," followed by one or
+    two digits is ambiguous: "16,17" may be two numbers. Parentheses aren't a sign.
     """
     m = _NUMBER.match(text.strip())
     if not m: return None
@@ -320,8 +405,7 @@ def number(text: str) -> Digits | None:
     if len(seps) == 1:
         i = seps[0]
         whole, frac = core[:i], core[i + 1:]
-        if len(frac) == 3 and whole != "0":
-            if core[i] == ".": return None
+        if core[i] == "," and len(frac) == 3 and whole != "0":
             core = whole + frac
         elif core[i] == "," and len(frac) <= 2:
             return None
@@ -335,22 +419,16 @@ def number(text: str) -> Digits | None:
     return Digits(core, bool(m["sign"]), bool(m["pct"]))
 
 
-def _number_pattern(core: str, written: str = "") -> re.Pattern[str]:
-    """The number anywhere in a text, however its thousands are marked, or as `written`.
+def _number_pattern(written: str) -> re.Pattern[str]:
+    """The number anywhere in a text, its digits and separators as `written` ("1,240" is not in "1240",
+    "1 240" nor "1.240"; a space of any width is a space).
 
-    A separator may stand only between thousands groups ("1,240", "1 240", "1240", never "12,40"),
-    or where the test's own text puts one, so a copy as written always counts ("1.800.934.4850").
     A number starts after anything but a digit or a digit's separator, so "No.12345" holds 12345, and
     ends before anything but a digit or a separator and a digit, so "12.5" is not in "12.5.7" nor
     "12.5,3", but is in "12.5. Next"; a "-" is its sign only after a non-word character, so "E-4065"
     and "COVID-19" are positive."""
-    whole, _, frac = core.partition(".")
-    groups = [whole[max(0, i - 3):i] for i in range(len(whole), 0, -3)][::-1]
-    digits = r"[,\.\u202f ]?".join(re.escape(g) for g in groups)
-    if written and written != core: digits = f"(?:{digits}|{re.escape(written)})"
-    tail = (r"[.,]" + re.escape(frac) if frac else "") + r"(?![.,]\d)"
     return re.compile(r"(?<!\d)(?<!\d[.,])(?P<pre>(?<!\w)-(?=[\d$€£¥])|\(\s?)?(?:[$€£¥]\s?)?"
-                      + digits + tail + r"(?P<pct>\s?%)?\)?(?![\d])")
+                      + re.escape(written.translate(_NUM_CLEAN)) + r"(?![.,]\d)(?P<pct>\s?%)?\)?(?![\d])")
 
 
 # --------------------------------------------------------------------------- helpers
@@ -362,12 +440,90 @@ def _mark(passed: bool, why: str) -> Mark:
 
 
 def _ratio(needle: str, hay: str, max_diffs: int) -> tuple[bool, float, float]:
-    """Fuzzy containment: passes when the best partial match is within `max_diffs` edits."""
+    """Fuzzy containment: passes when some substring of `hay` is within `max_diffs` edits of `needle`, an edit
+    being a character substituted, inserted or deleted, or two adjacent characters swapped (`_edits`).
+    Returns the verdict, the best match's ratio, and the threshold `1 - max_diffs / len(needle)`.
+
+    Note: rapidfuzz's partial ratio is the first pass, and with no edit to spend the only one (it is 1 only
+    for an exact copy). Its windows have the needle's length, so it scores a substring k edits off at 1 - k/n
+    or better, and a `hay` at least as long as `needle` that it fails is more than `max_diffs` edits off. It
+    forgives more than that (an inserted letter, a letter moved a few places, a text cut at an edge of
+    `hay`), so a fuzzy pass is confirmed by the edit count, and the ratio is then
+    `1 - edits / len(needle)`."""
     if not needle:
         return False, 0.0, 1.0
     thr = 1.0 - max_diffs / len(needle)
     r = _partial(needle, hay)
-    return r >= thr - EPS, r, thr
+    if not max_diffs or needle in hay or (r < thr - EPS and len(hay) >= len(needle)):
+        return r >= thr - EPS, r, thr
+    d = _edits(needle, hay, max_diffs)
+    return d <= max_diffs, 1.0 - d / len(needle), thr
+
+
+def _edits(needle: str, hay: str, max_diffs: int) -> int:
+    """The fewest edits that turn `needle` into some substring of `hay` (the empty one too), an edit being a
+    character substituted, inserted or deleted, or two adjacent characters swapped: the optimal string
+    alignment distance (restricted Damerau-Levenshtein), where no character is edited twice.
+
+    Note: a match within `max_diffs` edits keeps one of `2 * max_diffs + 1` pieces of `needle` intact
+    (an edit touches at most two), so only the stretches of `hay` around an exact copy of a piece are scanned
+    first; the whole of `hay` is scanned when they find none, or would not be shorter (`_edits_scan`)."""
+    n, k = len(needle), max_diffs
+    count = 2 * k + 1
+    step = n // count
+    if step >= 3:
+        spans = []
+        for i in range(count):
+            o = i * step
+            piece = needle[o:n if i == count - 1 else o + step]
+            p = hay.find(piece)
+            while p != -1:
+                spans.append((max(0, p - o - k), p - o + n + 2 * k))
+                if len(spans) > len(hay) // step:    # so many stretches that a whole-page scan is cheaper
+                    return _edits_scan(needle, hay)
+                p = hay.find(piece, p + 1)
+        spans.sort()
+        merged: list[list[int]] = []
+        for a, b in spans:
+            if merged and a <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], b)
+            else:
+                merged.append([a, b])
+        if sum(b - a for a, b in merged) < len(hay):
+            d = min((_edits_scan(needle, hay[a:b]) for a, b in merged), default=n)
+            if d <= k:
+                return d
+    return _edits_scan(needle, hay)
+
+
+def _edits_scan(needle: str, hay: str) -> int:
+    """`_edits` by one pass over the whole of `hay`: Hyyrö's bit-parallel form of Myers' algorithm, with the
+    transposition term, in its search form (a match may start anywhere in `hay`). One bit per character of
+    `needle`."""
+    m = len(needle)
+    full, top = (1 << m) - 1, 1 << (m - 1)
+    peq: dict[str, int] = {}
+    for i, c in enumerate(needle):
+        peq[c] = peq.get(c, 0) | 1 << i
+    vp, vn, d0, prev = full, 0, 0, 0
+    score = best = m
+    for c in hay:
+        eq = peq.get(c, 0)
+        tr = (((~d0) & eq) << 1) & prev
+        d0 = ((((eq & vp) + vp) ^ vp) | eq | vn | tr) & full
+        hp = (vn | ~(d0 | vp)) & full
+        hn = d0 & vp
+        if hp & top:
+            score += 1
+        elif hn & top:
+            score -= 1
+        x = (hp << 1) & full
+        vn = x & d0
+        vp = ((hn << 1) | ~(x | d0)) & full
+        prev = eq
+        if score < best:
+            best = score
+    return best
 
 
 def _partial(needle: str, hay: str) -> float:
@@ -412,18 +568,23 @@ def _glued(hay: str, i: int, j: int) -> bool:
     """Whether the span hay[i:j] is cut out of a longer number: a leading digit glued to a digit, a sign or
     a separator after a digit, a trailing digit glued to a digit or to a separator before one. A hyphen
     after a letter or digit is a hyphen, not a sign."""
-    if j <= i:
-        return False
-    before, after = hay[i - 1:i], hay[j:j + 1]
-    return (
-        hay[i].isdigit() and bool(before) and (
-            before.isdigit()
-            or (before in ".," and hay[i - 2:i - 1].isdigit())
-            or (before in "-\u2212+" and not hay[i - 2:i - 1].isalnum()))
-    ) or (
-        hay[j - 1].isdigit() and bool(after) and (
-            after.isdigit() or (after in ".," and hay[j + 1:j + 2].isdigit()))
-    )
+    return j > i and (_cut_before(hay, i) or _cut_after(hay, j))
+
+
+def _cut_before(hay: str, i: int) -> bool:
+    """`_glued`'s leading edge, for a match starting at i."""
+    before = hay[i - 1:i]
+    return hay[i].isdigit() and bool(before) and (
+        before.isdigit()
+        or (before in ".," and hay[i - 2:i - 1].isdigit())
+        or (before in "-\u2212+" and not hay[i - 2:i - 1].isalnum()))
+
+
+def _cut_after(hay: str, j: int) -> bool:
+    """`_glued`'s trailing edge, for a match ending before j."""
+    after = hay[j:j + 1]
+    return hay[j - 1].isdigit() and bool(after) and (
+        after.isdigit() or (after in ".," and hay[j + 1:j + 2].isdigit()))
 
 
 def _edges_ok(want: str, hay: str, folded: str = "", kept: list[int] | None = None) -> bool:
@@ -435,6 +596,40 @@ def _edges_ok(want: str, hay: str, folded: str = "", kept: list[int] | None = No
             return True
         i = hay.find(want, i + 1)
     return False
+
+
+def _near(want: str, hay: str, max_diffs: int) -> list:
+    """`want`'s matches in `hay` within `max_diffs` edits: every exact copy, and the best matches of each
+    run of overlapping ones at each budget from 1 to `max_diffs`, so a larger budget keeps every match a
+    smaller one found.
+
+    Note: with an edit to spend, fuzzysearch keeps one match per run of overlapping ones, and a larger budget
+    makes longer runs: an exact copy overlapping another match ("a a" in "a a a a"), or a match one budget
+    found, would lose its start to a match that spends more edits.
+    Note: fuzzysearch picks that one match as the min of a set by (edits, -length); on a tie the pick
+    followed set order, i.e. the string hash, so a verdict changed with PYTHONHASHSEED. Every match tied
+    for best in its run is kept instead, which no hash order can change."""
+    if not max_diffs or not want: return fuzzysearch.find_near_matches(want, hay, max_l_dist=max_diffs)
+    found: dict[tuple[int, int], fuzzysearch.Match] = {}
+    for k in range(1, max_diffs + 1):
+        for run in group_matches(find_near_matches_levenshtein(want, hay, k)):
+            best = min((m.dist, m.start - m.end) for m in run)
+            for m in run:
+                if (m.dist, m.start - m.end) == best: found.setdefault((m.start, m.end), m)
+    for i in (m.start() for m in re.finditer(f"(?={re.escape(want)})", hay)):
+        found[i, i + len(want)] = fuzzysearch.Match(i, i + len(want), 0, want)
+    return sorted(found.values())
+
+
+def _unglue(want: str, hay: str, folded: str = "", kept: list[int] | None = None) -> str:
+    """`hay` with each exact copy of `want` cut out of a longer number (`_glued`) blanked out, so no window of
+    a rejected copy matches while a fuzzy match elsewhere still can (`kept`: see `_edges_ok`)."""
+    out = list(hay)
+    for m in re.finditer(f"(?={re.escape(want)})", hay):
+        i = m.start()
+        if _glued(folded or hay, *_folded_span(i, i + len(want), kept)):
+            out[i:i + len(want)] = "\0" * len(want)
+    return "".join(out)
 
 
 def _why_missing(cut: bool) -> str:
@@ -459,20 +654,26 @@ def _squeezed_ok(want: str, hay: str, folded: str) -> bool:
     return _edges_ok(want, hay, folded, [k for k, c in enumerate(folded) if c != " "])
 
 
-def _contains(needle: str, text: str, max_diffs: int) -> tuple[bool, float, float, str]:
+def _contains(needle: str, text: str, max_diffs: int,
+              fold_page: Callable[[str], str] = normalize.fold) -> tuple[bool, float, float, str]:
     """`contains`, and, when it fails, the best-matching window of the folded text (the squeezed, if that
-    matched better): lowercased, its spacing folded; "" when it passes or `needle` is empty."""
-    want, hay = normalize.fold(needle), normalize.fold(text)
+    matched better): lowercased, its spacing folded; "" when it passes or `needle` is empty. `fold_page`
+    folds `text` (`normalize.unmarked` drops its footnote markers)."""
+    want, hay = normalize.fold(needle), fold_page(text)
     ok, r, thr = _ratio(want, hay, max_diffs)
     if ok and want and want in hay and not _edges_ok(want, hay):
-        return False, r, thr, ""
+        # Note: a copy cut out of a longer number does not count, nor any window of it ("total: 40" spends
+        # its edit on "otal: 400"); a fuzzy match elsewhere still does, as one clean copy anywhere would.
+        # The squeezed text is tried next: a spaced copy elsewhere ("400 4 0" holds "4 0") is a copy too.
+        ok = _ratio(want, _unglue(want, hay), max_diffs)[0]
     if ok:
         return True, r, thr, ""
     # fold has already collapsed all whitespace to ASCII spaces; reuse it for squeeze.
     squeezed = want.replace(" ", ""), hay.replace(" ", "")
     ok, r2, _ = _ratio(*squeezed, max_diffs)
-    if ok and want:
-        ok = _squeezed_ok(*squeezed, hay)
+    if ok and want and not _squeezed_ok(*squeezed, hay):
+        kept = [k for k, c in enumerate(hay) if c != " "]
+        ok = _ratio(squeezed[0], _unglue(*squeezed, hay, kept), max_diffs)[0]
     window = "" if ok or not want else _window(*(squeezed if r2 > r else (want, hay)))[1]
     return ok, max(r, r2), thr, window
 
@@ -490,8 +691,10 @@ def _cell_ratio(a: str, b: str) -> float:
     return max(fuzz.ratio(a, b), fuzz.ratio(a.replace(" ", ""), b.replace(" ", ""))) / 100.0
 
 
-def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_diffs: int) -> str:
-    """Why the cell at `rc` fails one relation, or "" when it holds."""
+def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_diffs: int,
+              raw: str = "") -> str:
+    """Why the cell at `rc` fails one relation, or "" when it holds. `raw` is the gold as written, for the
+    hyphen fallback (`_hyphenated_cell`)."""
     thr = _cell_threshold(want, max_diffs)
     if kind.endswith("_heading"):
         walk = {"top_heading": "up", "left_heading": "left", "right_heading": "right"}
@@ -504,25 +707,50 @@ def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_di
     texts = [_fold_cell(table.text[c]) for c in cells]
     if any(_cell_ratio(want, x) >= thr - EPS for x in texts):
         return ""
+    if raw and any(_hyphenated_cell(raw, table.text[c]) for c in cells):
+        return ""
     if not texts:
         return f"no {kind} cell"
     best = max(texts, key=lambda x: _cell_ratio(want, x))
     return f"{kind} {best!r} doesn't match {want!r} ({_cell_ratio(want, best):.2f})"
 
 
-def _one_of(want: str, got: str, thr: float) -> bool:
-    """Whether cell text `got`, or one of its lines, matches the folded `want`."""
-    return any(_cell_ratio(want, _fold_cell(x)) >= thr - EPS for x in {got, *got.split("\n")} if x.strip())
+def _one_of(want: str, got: str, thr: float, raw: str = "") -> bool:
+    """Whether cell text `got`, or one of its lines, matches the folded `want`; or, given `raw` (the gold as
+    written), is it with a hyphen a line broke after read kept or dropped (`_hyphenated_cell`)."""
+    lines = [x for x in {got, *got.split("\n")} if x.strip()]
+    return (any(_cell_ratio(want, _fold_cell(x)) >= thr - EPS for x in lines)
+            or bool(raw) and any(_hyphenated_cell(raw, x) for x in lines))
+
+
+# A hyphen (or a form NFKC makes one) with white space after it, perhaps past marks: a cell without one, on
+# either side, has no hyphen a line broke after, so the fallback is not tried.
+_MAY_WRAP = re.compile(r"[-\u2010\u2011\ufe63\uff0d]\W*?\s")
+
+
+def _hyphenated_cell(raw: str, got: str) -> bool:
+    """Whether the gold `raw` is the whole cell text `got` when a hyphen a line broke after, in either, is
+    read kept or dropped, as `present` reads one (`hyphenation.matches`): exactly, spending no edits."""
+    if not (_MAY_WRAP.search(raw) or _MAY_WRAP.search(got)):
+        return False
+    return hyphenation.matches(raw, got, lambda s, i: i > 0, lambda s, j: j < len(s))
 
 
 def _in_order(want: Sequence[str], got: Sequence[str], max_diffs: int) -> bool:
     """Whether `want` appears in `got` in order, others between allowed; one cell of `got` may hold
-    several consecutive items of `want` joined."""
+    several consecutive items of `want` joined. A cell may also match through the hyphen fallback, but only
+    when the plain reading fails: a cell that takes several items through a broken hyphen must not leave an
+    item to a later cell that the plain reading would have matched."""
+    return _greedy(want, got, max_diffs, False) or _greedy(want, got, max_diffs, True)
+
+
+def _greedy(want: Sequence[str], got: Sequence[str], max_diffs: int, wrapped: bool) -> bool:
     i = 0
     for g in got:
         for n in range(len(want) - i, 0, -1):
-            joined = _fold_cell(" ".join(want[i:i + n]))
-            if _one_of(joined, g, _cell_threshold(joined, max_diffs)):
+            raw = " ".join(want[i:i + n])
+            joined = _fold_cell(raw)
+            if _one_of(joined, g, _cell_threshold(joined, max_diffs), raw if wrapped else ""):
                 i += n
                 break
     return i == len(want)
@@ -548,8 +776,8 @@ def _structure(t: TableCell, table: tables.Table, rc: tables.Cell) -> list[str]:
         # still names the row below it.
         first = next((c for c in table.grid[min(table.covers[rc][0])] if c is not None), None)
         groups += [table.text[first]] if first is not None and first != rc else []
-        in_run = any(_one_of(want, " ".join(run[i:]), thr) for i in range(len(run)))
-        if not in_run and not any(_one_of(want, g, thr) for g in groups):
+        in_run = any(_one_of(want, " ".join(run[i:]), thr, t.section) for i in range(len(run)))
+        if not in_run and not any(_one_of(want, g, thr, t.section) for g in groups):
             out.append(f"not in the section {t.section!r} (nearest above: {' '.join(run) or 'none'!r})")
     return out
 

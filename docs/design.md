@@ -29,7 +29,7 @@ A provider makes whatever calls it needs to fill the outputs a page's tests read
 Output types, test types, derivations and tags (bar script and language codes) are closed sets
 (`vocab.py`, `runners.TYPES`). New data is first checked against them; a value is added only when
 the existing ones can't describe it.
-Counts are of the published dataset: 2,937 pages, 16,304 tests.
+Counts are of the published dataset: 2,937 pages, 16,288 tests.
 
 ### Output types
 
@@ -49,7 +49,9 @@ is found in an output (`runners.found`):
 
 - text (`{"text", "max_diffs"}`, and optionally `place`, its boxes on the page): found within
   `max_diffs` edits, after both sides are folded;
-- a number (`{"number"}`): found digit for digit, lenient only on thousands separators; and
+- a number (`{"number"}`): found digit for digit, with its separators as written (`1,240` is not found as
+  `1240`, `1 240` or `1.240`). A number the scorer cannot read as one number, such as `12,5`, whose comma could be
+  a decimal or a thousands mark, doesn't load; and
 - an equation (`{"latex"}`): found by what KaTeX renders it to, or, for an equation plain text
   writes without loss, by its text reading. Its LaTeX must render to at least one symbol, else the
   test doesn't load: LaTeX that doesn't render would fail on every output, and LaTeX that renders
@@ -59,25 +61,30 @@ A `layout_kind` test's text only labels its place; it is never compared.
 
 Text presence also accepts an exact match through an ambiguous wrapping hyphen:
 `মানু- হৰ` can match `মানুহৰ`. The hyphen must follow a letter or its combining marks,
-have whitespace after it, and precede a letter that is neither uppercase nor titlecase.
+have whitespace after it, and precede a letter that is neither uppercase nor titlecase (or, in a heading in
+capitals, a capital after a word in capitals).
 The rule applies to the gold and the prediction alike, as the existing Latin line-break rule does.
 The original hyphenated interpretation remains available, so a wrapped compound still
 matches its hyphenated gold. An unspaced compound hyphen remains required; dashes and
 numeric signs receive no new exemption. This fallback must actually omit a continuation
 hyphen inside the match, or retain one that the Latin line-break rule would remove,
-and does not add fuzzy letter edits. Order, repetition, numbers,
-equations and table-cell comparisons retain their existing rules.
+and does not add fuzzy letter edits. Order, repetition and table-cell comparisons accept the same exact
+reading where their own comparison fails, and add no other way to pass; numbers and equations retain their
+existing rules.
 
 | test type | reads | checks | args and settings | family | tests |
 |---|---|---|---|---|---:|
-| `present` | `html` | this content appears | `content` | text | 7,291 |
+| `present` | `html` | this content appears | `content` | text | 7,275 |
 | `order` | `html` | A comes before B | `before`, `after` (text) | text | 1,189 |
 | `repeat` | `html` | this line appears exactly N times | `content` (text); `expected_count` | text | 35 |
-| `page_near_empty` | `html` | a blank page yields at most N non-space characters | no args; `max_chars` | text | 0 |
+| `page_near_empty` | `html` | a blank page yields at most N non-space characters (not invisible format characters, nor the marks the text view writes for an element that holds nothing) | no args; `max_chars` | text | 0 |
 | `table_cell` | `html` | this cell exists with these neighbors, under these headings, in this section and in these row groups; the cell may be one line of a multi-line cell | `cell`, `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `headings`, `section`, `row_groups` (text) | tables | 5,386 |
 | `layout_kind` | `blocks` | the smallest block covering half of this line's place has this kind | `content` (text with a `place`); `kind` | layout | 2,403 |
 
-Of the `present` tests, 3,700 compare text, 3,268 an equation and 323 a number.
+Of the `present` tests, 3,684 compare text, 3,268 an equation and 323 a number.
+
+What each test type reads, ignores and penalizes, with the probes behind each statement, is in the
+[scoring reference](scoring/README.md).
 
 A `table_cell` test reads structure from the markup, not from how the page looks. A heading or
 row-group label covers the cells it is encoded over: merged (`colspan`, `rowspan`), repeated in each,
@@ -244,7 +251,10 @@ check(pages) -> tests                            # every test of a dataset, and 
 A test's text and a provider's text view are compared after `fold` (normalize.py), the same function
 on both sides, whose docstring lists every rule. Among them: a LaTeX span reads as the text it
 renders, without the spaces math mode doesn't render ("$$2 . 5 5$$" is 2.55, "$U$" is U), and a word
-broken by a hyphen at a line end is joined.
+broken by a hyphen at a line end is joined. A run of three or more dots, dashes or underscores (a leader) is a
+space and never spans a block break; a present text test also retries with a footnote marker, written in brackets or set as a
+superscript, dropped where it falls inside a phrase (order, repeat and table_cell do not). [The scoring reference](scoring/internals.md) lists each rule with a case that
+shows it.
 
 The headline is the mean of the families' scores: text (present, order, repeat, page_near_empty), tables
 (table_cell) and layout (layout_kind), each family's score the share of its tests passed

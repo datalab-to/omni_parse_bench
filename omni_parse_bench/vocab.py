@@ -53,8 +53,9 @@ TAG_DEFINITIONS = {
              "so a cell is read by the column heading above it, the row label beside it, or both. Counts: "
              "header cells, body cells, row labels and section rows; a grid with no printed headings when "
              "several rows repeat the same columns (a price list, a spec sheet of names and values). "
-             "Doesn't count: a form whose fields each have their own label, even when the fields are in "
-             "boxes or lined up in rows; the table's caption or notes; two columns of prose.",
+             "A table drawn inside a figure is a table, not figure text. Doesn't count: a form whose "
+             "fields each have their own label, even when the fields are in boxes or lined up in rows; "
+             "the table's caption or notes; two columns of prose.",
     "math": "The content is mathematical notation: an equation, a formula, or a symbol or expression set as "
             "mathematics. Counts: display and inline equations, a lone variable or Greek letter set as "
             "mathematics. Doesn't count: an ordinary number in text, a unit, a chemical formula written as "
@@ -67,7 +68,9 @@ TAG_DEFINITIONS = {
             "report's table.",
     "figure": "The content is text drawn inside a figure: a chart, plot, diagram, map, drawing or photo. "
               "Counts: axis labels, tick labels, legends, labels on a diagram, text in a photo. Doesn't "
-              "count: the figure's caption or body text beside the figure.",
+              "count: the figure's caption or body text beside the figure, a sub-caption such as \"(a)\" "
+              "or a panel title (caption), or a table drawn inside a figure (table). A figure's title "
+              "printed inside the figure image is figure text.",
     "header_footer": "The content is a running header or footer: text in the top or bottom margin that "
                      "belongs to the publication rather than to this page's content. Counts: a running "
                      "title, journal name, author names, chapter title, date line or page number in the "
@@ -78,8 +81,11 @@ TAG_DEFINITIONS = {
                "Methods\". Doesn't count: a table's column or row headings, a figure's label, or bold words "
                "at the start of a paragraph.",
     "caption": "The content is the caption of a table or figure: the text that names and describes it, "
-               "usually starting \"Table 2\" or \"Figure 3\". Doesn't count: notes under a table, or text "
-               "inside the figure.",
+               "usually starting \"Table 2\" or \"Figure 3\". Counts: a sub-caption or a title of a figure's "
+               "panel, such as \"(a) ...\", even when it sits within the figure; a title printed outside the "
+               "figure image. "
+               "Doesn't count: notes under a table, a figure's title printed inside the figure image "
+               "(figure), or other text inside the figure.",
     "footnote": "The content is a note keyed to a mark in the text: a footnote at the foot of a page, an "
                 "endnote, or a note under a table. Counts: table notes like \"a P < 0.05 versus control\" "
                 "and source lines under a table. Doesn't count: a running footer, or an entry of a "
@@ -96,12 +102,15 @@ TAG_DEFINITIONS = {
                     "scan or photo that shows two facing pages. Doesn't count: content that runs across the "
                     "full width (a title, or a table or figure spanning all columns), or the columns of a "
                     "table on a page that isn't laid out in columns.",
-    "tiny": "The content is printed small: noticeably smaller than the page's ordinary body text, as fine "
-            "print is, about 6 pt or less on a printed page. Counts: footnotes and legal fine print set "
-            "small, dense small type in tables or forms, small labels on drawings. Doesn't count: text set "
-            "a little smaller than body text, such as a running header; ordinary body text in a "
-            "low-resolution image; or text that only looks small because the whole page is photographed "
-            "from far away or, for a large sheet, shrunk to fit the image.",
+    "tiny": "The content is printed small: fine print, about 6.5 pt or less on a printed page, or visibly "
+            "smaller than the page's ordinary body text in the way fine print is. Counts: footnotes and "
+            "legal fine print set small, dense small type on forms, small labels on drawings, a line at "
+            "6 pt on a page whose body text is 10 pt. Doesn't count: ordinary table text at 7 to 9 pt "
+            "unless it is smaller than the page's body text in the way fine print is, text set a little "
+            "smaller than body text such as a running header, ordinary body text in a low-resolution "
+            "image, or text that only looks small because the whole page is photographed from far away "
+            "or, for a large sheet, shrunk to fit the image. When the size can't be told, judge by the "
+            "page: would a reader call this fine print?",
     "rotated": "The content's text is turned or tilted enough that a reader notices, as seen in the image: "
                "by about 90 or 180 degrees, set vertically, or tilted by about 5 degrees or more. Counts: a "
                "page turned on its side or upside down, vertical text, a table set sideways, a page "
