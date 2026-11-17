@@ -177,9 +177,13 @@ def repeat(t: Repeat, v: views.Html) -> Mark:
     chars = [c for c in normalize.fold(t.text) if not c.isspace()]
     pattern = r"(?<![^\W_])" + r"\s*".join(re.escape(c) for c in chars) + r"(?![^\W_])"
     n = len(re.findall(pattern, normalize.fold(v.seen)))
-    if n != t.expected_count and _hyphenated_count(t.text, v.seen) == t.expected_count:
+    if n == t.expected_count:
         return True, ""
-    return _mark(n == t.expected_count, f"{t.text[:50]!r} appears {n}x, not {t.expected_count}x")
+    h = _hyphenated_count(t.text, v.seen)
+    if h == t.expected_count:
+        return True, ""
+    how = "" if h is None else " (reading line-end hyphens kept or dropped)"
+    return False, f"{t.text[:50]!r} appears {n if h is None else h}x{how}, not {t.expected_count}x"
 
 
 _WORD_CHAR = re.compile(r"[^\W_]")

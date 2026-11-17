@@ -206,11 +206,16 @@ def _joins(s: str, i: int, j: int) -> bool:
     if s[j].islower():
         return True
     start, end = i, j
-    while start > 0 and s[start - 1].isalpha():
+    while start > 0 and _in_word(s[start - 1]):
         start -= 1
-    while end < len(s) and s[end].isalpha():
+    while end < len(s) and _in_word(s[end]):
         end += 1
     return s[start:i].isupper() and s[j:end].isupper()
+
+
+def _in_word(c: str) -> bool:
+    """A letter, or a mark that stays on its letter (an accent a precomposed letter does not have)."""
+    return c.isalpha() or unicodedata.category(c).startswith("M")
 
 
 def boxes(s: str) -> str:

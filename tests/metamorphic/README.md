@@ -40,8 +40,8 @@ A healthy run gives:
 |---|---|---|---|
 | this folder, no dataset | 85 | 11 | 9 |
 | this folder, with dataset | 95 | 1 | 9 |
-| whole suite, no dataset | 1210 | 21 | 9 |
-| whole suite, with dataset | 1225 | 6 | 9 |
+| whole suite, no dataset | 1212 | 21 | 9 |
+| whole suite, with dataset | 1227 | 6 | 9 |
 
 All four rows come from runs of this version.
 

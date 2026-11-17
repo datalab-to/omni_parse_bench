@@ -125,6 +125,13 @@ def test_order_repeat_and_table_cell_read_a_broken_compound_either_way(t, page):
     assert runs(t, page)
 
 
+def test_a_repeat_that_fails_reports_the_count_the_fallback_read():
+    ok, why = R.repeat(R.Repeat("self-aware", 2), views.html("<p>self- aware</p>"))
+    assert not ok and "appears 1x (reading line-end hyphens kept or dropped), not 2x" in why
+    ok, why = R.repeat(R.Repeat("total", 2), views.html("<p>total</p>"))
+    assert not ok and why.endswith("appears 1x, not 2x")
+
+
 def test_the_hyphen_fallback_never_fails_headings_the_plain_reading_matches():
     # A cell that takes several headings through a broken hyphen must not leave one to a later cell that the
     # plain reading would have matched: the plain reading is tried first.

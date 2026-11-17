@@ -359,7 +359,7 @@ hyph-repeat	pass
 hyph-cell	pass
 hyph-gold	pass
 hyph-repeat-both	pass
-hyph-repeat-once	fail	'self-aware' appears 0x, not 2x
+hyph-repeat-once	fail	'self-aware' appears 1x (reading line-end hyphens kept or dropped), not 2x
 hyph-cell-whole	fail	no cell matching 'self-aware' in any table
 hyph-unspaced	fail	'develop-ers' not found (best 0.952 < 1.000); closest 'developers'
 ## internals-edits

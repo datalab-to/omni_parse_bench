@@ -66,7 +66,7 @@ a digit set apart; compatibility forms unified (NFKC) and invisible characters r
 footnote brackets and line-start bullets removed; leaders removed (runs of 3 or more dots, ideographic full stops
 `。` among them, even though full-width punctuation is made ASCII only later); dash, quote, space and arrow
 families unified, then two single quotes in a row read as a double quote (TeX's ``` `` ``` and `''`, or a mixed
-pair `'’`); full-width punctuation made ASCII; a decimal middle dot made a point; spacing collapsed;
+pair `'’`, so an apostrophe next to a quote mark reads as a double quote too: `Smiths'’` is `smiths"`); full-width punctuation made ASCII; a decimal middle dot made a point; spacing collapsed;
 lowercase. A run of three single quotes reads its first two as the double quote (`'''` is `"'`).
 
 White space may sit inside a leader run, and a `<br>` or a newline is white space. A block break (the end of a

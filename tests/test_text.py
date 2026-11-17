@@ -205,6 +205,13 @@ def test_two_single_quotes_of_any_mix_are_a_double_quote(pair):
     assert normalize.fold("it’s") == "it's"
 
 
+def test_an_accent_that_stays_on_its_letter_does_not_end_a_word_for_the_capitals_hyphen():
+    # fold reads the whole word before and after the hyphen, marks included
+    assert normalize.fold("Пе\u0301РЕ- ДЕЛ") == "пе\u0301ре- дел"   # mixed case before the hyphen: it is kept
+    assert normalize.fold("AB- Q\u0301r") == "ab- q\u0301r"          # mixed case after it
+    assert normalize.fold("ПЕ\u0301РЕ- ДЕЛ") == "пе\u0301редел"       # all capitals on both sides: joined
+
+
 def test_a_run_of_three_single_quotes_reads_its_first_two_as_a_double_quote():
     assert normalize.fold("a'''b") == "a\"'b"
     assert normalize.fold("a‘’’b") == normalize.fold("a'''b")
