@@ -76,6 +76,6 @@ TABLES = [
         cell("cell-section-wrong", "P", "a wrong section", "6", C, section="Cohort 2", show=show("C"), why=True),
         cell("cell-row-group-wrong", "P", "a wrong row group", "6", C, row_groups=["Female"], show=show("C"), why=True),
         cell("cell-no-table", "P", "pipes in a paragraph are not a table", "1,240", "<p>| 2024 | 1,240 |</p>", why=True),
-        cell("cell-compound", "P", "hyphenated compound broken at a line end", "self-aware", "<table><tr><td>self- aware</td></tr></table>"),
+        cell("cell-compound", "I", "hyphenated compound broken at a line end", "self-aware", "<table><tr><td>self- aware</td></tr></table>"),
     ),
 ]

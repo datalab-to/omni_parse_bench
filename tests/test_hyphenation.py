@@ -98,9 +98,52 @@ def test_order_and_repeat_keep_their_existing_rules():
     t = R.Order("ab", "cd", 0)
     assert not R.order(t, views.html("cd ab c d"))[0]
     assert not R.order(t, views.html("cd ab c d X- য"))[0]
-    # Continuation tolerance is deliberately confined to text presence.
-    assert not R.order(R.Order("মানুহৰ", "শেষ", 0), views.html("মানু- হৰ শেষ"))[0]
     assert R.repeat(R.Repeat("মানুহৰ", 0), views.html("অঁমানু- হৰ"))[0]
+
+
+def runs(t, page):
+    return {R.Order: R.order, R.Repeat: R.repeat, R.TableCell: R.table_cell}[type(t)](t, views.html(page))[0]
+
+
+@pytest.mark.parametrize("t, page", [
+    (R.Order("self-aware", "tail", 0), "<p>self- aware</p><p>tail</p>"),
+    (R.Order("self- aware", "tail", 0), "<p>self-aware</p><p>tail</p>"),
+    (R.Order("head", "self-aware", 0), "<p>head</p><p>self-<br>aware</p>"),
+    (R.Order("মানুহৰ", "শেষ", 0), "মানু- হৰ শেষ"),
+    (R.Repeat("self-aware", 1), "<p>self- aware</p>"),
+    (R.Repeat("self- aware", 1), "<p>self-aware</p>"),
+    (R.TableCell("self-aware", {}, 0), "<table><tr><td>self- aware</td></tr></table>"),
+    (R.TableCell("self- aware", {}, 0), "<table><tr><td>self-aware</td></tr></table>"),
+    (R.TableCell("x", {"right": "self-aware"}, 0), "<table><tr><td>x</td><td>self- aware</td></tr></table>"),
+    (R.TableCell("x", {"top_heading": "Primary- Revision"}, 0),
+     "<table><tr><th>PRIMARY- REVISION</th></tr><tr><td>x</td></tr></table>"),
+    (R.TableCell("x", {}, 0, headings=("self-aware",)),
+     "<table><tr><th>self- aware</th></tr><tr><td>x</td></tr></table>"),
+])
+def test_order_repeat_and_table_cell_read_a_broken_compound_either_way(t, page):
+    # As present does: a hyphen a line broke after, on the page or in the gold, read kept or dropped.
+    assert runs(t, page)
+
+
+@pytest.mark.parametrize("t, page", [
+    (R.Order("tail", "self-aware", 0), "<p>self- aware</p><p>tail</p>"),       # still in order only
+    (R.Order("self-aware", "tail", 0), "<p>self-awre</p><p>tail</p>"),         # no edits to spend
+    (R.Repeat("self-aware", 1), "<p>xself- aware</p>"),                        # still whole words
+    (R.TableCell("self-aware", {}, 0), "<table><tr><td>self- aware x</td></tr></table>"),   # the whole cell
+    (R.TableCell("self-aware", {}, 0), "<table><tr><td>selfaware</td></tr></table>"),       # unspaced
+])
+def test_the_hyphen_fallback_adds_no_other_way_to_pass(t, page):
+    assert not runs(t, page)
+
+
+@pytest.mark.parametrize("count, passes", [(1, True), (2, True), (3, False)])
+def test_repeat_counts_a_word_written_whole_and_broken_as_two_copies(count, passes):
+    # The main count sees the whole copy (1); the fallback reads both, each once (2), never more. With 1 the
+    # main count passes, as it did: the fallback only adds a way to pass.
+    page = "<p>self-aware</p><p>self- aware</p>"
+    assert runs(R.Repeat("self-aware", count), page) is passes
+    assert runs(R.Repeat("self-aware", 2), "<p>self- aware</p><p>self- aware</p>")
+    assert not runs(R.Repeat("self-aware", 2), "<p>self- aware</p>")
 
 
 def test_fallback_requires_a_continuation_inside_the_match():

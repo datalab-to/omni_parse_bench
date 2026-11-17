@@ -343,17 +343,8 @@ def test_a_word_in_upper_case_passes_even_when_upper_case_changes_its_letters(wo
     assert passes(runners.Present(runners.Text(word, 0)), f"<p>{word.upper()}</p>")
 
 
-# The real order and table_cell tests whose gold writes a line-end hyphen in mixed case ('Primary- Revision',
-# 'R- Matrix', 'Head- quarters'): fold keeps or joins it by the case each side writes, so the page in another
-# case reads it the other way. Present accepts either reading (M11a); order and table_cell do not (M11b).
-HYPHEN_BY_CASE = {"23_189451", "p5_PMC12399732.1_t0_head_12_1", *(
-    f"p5_PMC1838420.1_t2_head_{x}" for x in ("10_5", "10_8", "12_5", "12_6", "12_7", "12_8", "14_5", "14_6",
-                                             "14_7", "14_8", "4_8", "6_8"))}
-
-
-CASE_NOTE = (f"all except the {len(known_ids('M15b'))} listed under M15b and the {len(HYPHEN_BY_CASE)} "
-             "order and table_cell tests whose gold writes a line-end hyphen in mixed case (M11b); upper and "
-             "lower case give the same verdict on every real test but those listed under M15b")
+CASE_NOTE = (f"all except the {len(known_ids('M15b'))} listed under M15b; upper and lower case give the same "
+             "verdict on every real test but those")
 
 
 @every_real_test("text tests", note=CASE_NOTE)
@@ -367,14 +358,11 @@ def test_every_real_text_test_passes_on_its_answer_in_another_case():
     upper, swapped, lower = ({t.id for t in tests
                               if passes(t.params, answer_page(with_strings_changed(t.params, f)))}
                              for f in (str.upper, str.swapcase, str.lower))
-    # Then upper and lower case give the same verdict (M2e), but on those listed under M15b
+    # Then upper and lower case give the same verdict (M2e, M15b), but on those listed under M15b
     assert not (upper ^ lower) - known_ids("M15b"), sorted((upper ^ lower) - known_ids("M15b"))
-    # And those failing in another case are those with a line-end hyphen in mixed case (M11b) and those with a
-    # letter whose upper case lowers to other letters (M15b), as known_deviations.json lists them
+    # And those failing in another case are those with the letters of M15b, as known_deviations.json lists
+    # them; none is left over (M15b), a line-end hyphen in mixed case included: present, order, repeat and
+    # table_cell read such a hyphen kept or dropped (M11a, M11b)
     failing = {t.id for t in tests} - (upper & swapped)
-    strings = {t.id: text_strings(t.params) for t in tests}
-    hyphen = {i for i in failing if any(LINE_END_HYPHEN_ANY.search(x) for x in strings[i])}
-    assert hyphen == HYPHEN_BY_CASE, {"new": sorted(hyphen - HYPHEN_BY_CASE),
-                                      "gone": sorted(HYPHEN_BY_CASE - hyphen)}
-    found, known = failing - hyphen, known_ids("M15b")
-    assert found == known, ("M15b", {"new": sorted(found - known), "gone": sorted(known - found)})
+    assert failing == known_ids("M15b"), {"new": sorted(failing - known_ids("M15b")),
+                                          "gone": sorted(known_ids("M15b") - failing)}

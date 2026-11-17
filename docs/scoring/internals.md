@@ -171,16 +171,26 @@ A word broken at a line end (`develop- ers`) is joined by fold when a lowercase 
 It is joined too when the letters before the hyphen and the letters after the break are all capitals (a heading
 in capitals, `DEVELOP- ERS`), so the same words fold the same in upper case and in lower case. A capital after a
 word in lower or mixed case keeps the hyphen (`Anglo- Saxon`), and so does a digit after it.
-`present` alone also accepts a hyphenated compound broken the same way (`self- aware` for `self-aware`): when its
-other comparisons fail, it tries the match with each such hyphen kept or dropped, without spending edits.
+
+A hyphenated compound broken the same way (`self- aware` for `self-aware`) is accepted too, by a fallback each
+text test type tries only where its own comparison fails: the match is tried with each hyphen a line broke after,
+on the page or in the gold, kept or dropped, exactly, without spending edits. `present` tries it for its text,
+`order` for its pair (a copy of each, in order, one of them read through such a hyphen), `table_cell` for each
+cell it compares (the whole cell), and `repeat` for its count: there each copy is counted once, whether read
+with or without its hyphen, so a page that writes the word once whole and once broken holds two copies. The
+fallback only adds a way to pass: a test that passes without it passes with it.
 
 <!-- cases:internals-hyphen -->
 | | difference | gold | output | verdict | case |
 |---|---|---|---|---|---|
 | I | `present`: kept or dropped hyphen, either reading | `self-aware` | `self- aware` | pass | `hyph-present` |
-| P | `order`: the hyphen is dropped | `self-aware` before `ZZZ` | `<p>self- aware</p><p>ZZZ</p>` | fail | `hyph-order` |
-| P | `repeat`: the hyphen is dropped | `self-aware` ×1 | `self- aware` | fail | `hyph-repeat` |
-| P | `table_cell`: the hyphen is dropped | `self-aware` | `<table><tr><td>self- aware</td></tr></table>` | fail | `hyph-cell` |
+| I | `order`: the same fallback, for the pair | `self-aware` before `ZZZ` | `<p>self- aware</p><p>ZZZ</p>` | pass | `hyph-order` |
+| I | `repeat`: the same fallback, for the count | `self-aware` ×1 | `self- aware` | pass | `hyph-repeat` |
+| I | `table_cell`: the same fallback, for each cell | `self-aware` | `<table><tr><td>self- aware</td></tr></table>` | pass | `hyph-cell` |
+| I | a gold that holds the break passes on the word whole | `self- aware` before `ZZZ` | `<p>self-aware</p><p>ZZZ</p>` | pass | `hyph-gold` |
+| I | `repeat`: a copy whole and a copy broken are two copies | `self-aware` ×2 | `<p>self-aware</p><p>self- aware</p>` | pass | `hyph-repeat-both` |
+| P | `repeat`: each copy counts once, read with or without its hyphen | `self-aware` ×2 | `self- aware` | fail | `hyph-repeat-once` |
+| P | `table_cell`: the fallback matches the whole cell, exactly | `self-aware` | `<table><tr><td>self- awre</td></tr></table>` | fail | `hyph-cell-whole` |
 | P | an unspaced hyphen is never optional | `develop-ers` | `developers` | fail | `hyph-unspaced` |
 <!-- /cases -->
 

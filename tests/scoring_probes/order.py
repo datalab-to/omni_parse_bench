@@ -22,7 +22,7 @@ TABLES = [
         order("ord-more-edits", "B", "a larger budget passes what a smaller one did (md 0 passes too)", "aa", "a ba", "<p>b b a ab ab</p>", md=1),
         order("ord-digit-edge", "P", "a digit continues a number", "Total: 40", "ZZZ", "<p>Total: 400</p><p>ZZZ</p>", why=True),
         order("ord-footnote", "P", "a footnote marker inside the phrase", "Smith and Jones", "ZZZ", "<p>Smith[1] and Jones</p><p>ZZZ</p>"),
-        order("ord-compound", "P", "hyphenated compound broken at a line end", "self-aware", "ZZZ", "<p>self- aware</p><p>ZZZ</p>"),
+        order("ord-compound", "I", "hyphenated compound broken at a line end", "self-aware", "ZZZ", "<p>self- aware</p><p>ZZZ</p>"),
         order("ord-case-hyphen", "I", "a line-end hyphen in capitals reads as in lower case", "RE- M", "ZZZ", "<p>re- m</p><p>ZZZ</p>"),
     ),
 ]

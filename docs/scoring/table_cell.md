@@ -7,7 +7,9 @@ neighbours (`up`, `down`, `left`, `right`), heading cells (`top_heading`, `left_
 The test reads tables from the markup (`<table>`, `rowspan`, `colspan`, `<th>`), not from how the page looks:
 aligned text or pipes in a paragraph are not a table. It compares whole cells after fold, with a ratio that
 allows `max_diffs` edits, and also with spaces removed. A cell may match by one of its lines (lines are made by
-`<br>`). The test passes when one matching cell satisfies every stated role.
+`<br>`). A cell that does not match is tried once more, exactly and whole, with each hyphen a line broke after (in
+the gold or the cell) read kept or dropped, so a hyphenated compound broken at a line end matches, as in `present`
+(case cell-compound). The test passes when one matching cell satisfies every stated role.
 
 - `up`, `down`, `left`, `right`: the neighbouring cell. An empty neighbour stands for the value written over it
   (above, for `left` and `right`; to the left, for `up` and `down`).
@@ -120,7 +122,7 @@ What it penalizes:
 | P | a wrong section | `6`, section `Cohort 2` | C | fail: `cells matching '6' found, but: not in the section 'Cohort 2' (nearest above: 'Cohort 1')` | `cell-section-wrong` |
 | P | a wrong row group | `6`, row groups `Female` | C | fail: `cells matching '6' found, but: not in the row groups 'Female'` | `cell-row-group-wrong` |
 | P | pipes in a paragraph are not a table | `1,240` | `<p>\| 2024 \| 1,240 \|</p>` | fail: `no tables found` | `cell-no-table` |
-| P | hyphenated compound broken at a line end | `self-aware` | `<table><tr><td>self- aware</td></tr></table>` | fail | `cell-compound` |
+| I | hyphenated compound broken at a line end | `self-aware` | `<table><tr><td>self- aware</td></tr></table>` | pass | `cell-compound` |
 <!-- /cases -->
 
 ## Blind spots
@@ -131,7 +133,6 @@ What it penalizes:
 - **A test with no relations is a cell-shaped `present`.** Any cell of any table will do (case cell-any-table).
 - **`headings` read any cell above**, not only heading cells (case cell-headings-td).
 - **Footnote markers cost here** and not in `present` (cases cell-sup, text-sup-marker).
-- **No hyphen fallback**: a hyphenated compound broken at a line end is not found (case cell-compound).
 - **A cell is not its own edge heading**: the last cell of a row fails a `right_heading` test for itself (case
   cell-edge-self).
 - **A right-to-left table copied in page order fails**: the roles are written in the html's order, so a row copied

@@ -292,10 +292,12 @@ LOWER = st.text(string.ascii_lowercase, min_size=2, max_size=6)
 GLUE = st.sampled_from(["<br>", " ", "\n", "<br> "])
 
 
-def broken_word_check(kind: str, left: str, right: str, glue: str):
+def broken_word_check(kind: str, left: str, right: str, glue: str, in_gold: bool = False):
     """The test of kind `kind` for 'left-right', and the page holding the word broken after its hyphen by
-    `glue`."""
+    `glue`; with `in_gold`, the test for the word broken by a space and the page holding 'left-right'."""
     word, broken = f"{left}-{right}", f"{left}-{glue}{right}"
+    if in_gold:
+        word, broken = f"{left}- {right}" if glue else word, word
     return {"present": (runners.Present(runners.Text(word, 0)), f"<p>{broken}</p>"),
             "order": (runners.Order(word, "tail", 0), f"<p>{broken}</p><p>tail</p>"),
             "repeat": (runners.Repeat(word, 1), f"<p>{broken}</p>"),
@@ -318,20 +320,21 @@ def test_present_finds_a_hyphenated_word_broken_at_its_hyphen(left, right, glue)
         assert passes(params, page), page
 
 
-@relation(INTENDED)
-@deviation("M11b")
+@relation(HOLDS)
 @pytest.mark.parametrize("kind", ["order", "repeat", "table_cell"])
 @example(left="aa", right="bb", glue="<br>")
 @example(left="aa", right="bb", glue=" ")
 @given(LOWER, LOWER, GLUE)
 def test_other_text_tests_find_a_hyphenated_word_broken_at_its_hyphen(kind, left, right, glue):
-    """Order, repeat and table_cell tests for a hyphenated word pass when it breaks after the hyphen. [M11b]
-    Why it matters for a score: as for M11a, for the test types other than present."""
+    """Order, repeat and table_cell tests for a hyphenated word pass when it breaks after the hyphen, and a
+    test whose gold holds the word broken after its hyphen passes on the word whole. [M11b]
+    Why it matters for a score: as for M11a, for the test types other than present; a gold that holds the
+    break is an artefact of its source, not what a page must write."""
     # Given a test for 'left-right'; When the page holds it whole, then broken after the hyphen
-    # Then both pass
-    for g in ("", glue):
-        params, page = broken_word_check(kind, left, right, g)
-        assert passes(params, page), page
+    # Then both pass; and a test for 'left- right' passes on 'left-right'
+    for g, in_gold in (("", False), (glue, False), (glue, True)):
+        params, page = broken_word_check(kind, left, right, g, in_gold)
+        assert passes(params, page), (params, page)
 
 # -------------------------------------------------------------------- a digit glued to an answer
 

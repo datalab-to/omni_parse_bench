@@ -145,9 +145,13 @@ TABLES = [
     table(
         "internals-hyphen",
         text("hyph-present", "I", "`present`: kept or dropped hyphen, either reading", "self-aware", "self- aware"),
-        order("hyph-order", "P", "`order`: the hyphen is dropped", "self-aware", "ZZZ", "<p>self- aware</p><p>ZZZ</p>"),
-        repeat("hyph-repeat", "P", "`repeat`: the hyphen is dropped", "self-aware", 1, "self- aware"),
-        cell("hyph-cell", "P", "`table_cell`: the hyphen is dropped", "self-aware", "<table><tr><td>self- aware</td></tr></table>"),
+        order("hyph-order", "I", "`order`: the same fallback, for the pair", "self-aware", "ZZZ", "<p>self- aware</p><p>ZZZ</p>"),
+        repeat("hyph-repeat", "I", "`repeat`: the same fallback, for the count", "self-aware", 1, "self- aware"),
+        cell("hyph-cell", "I", "`table_cell`: the same fallback, for each cell", "self-aware", "<table><tr><td>self- aware</td></tr></table>"),
+        order("hyph-gold", "I", "a gold that holds the break passes on the word whole", "self- aware", "ZZZ", "<p>self-aware</p><p>ZZZ</p>"),
+        repeat("hyph-repeat-both", "I", "`repeat`: a copy whole and a copy broken are two copies", "self-aware", 2, "<p>self-aware</p><p>self- aware</p>"),
+        repeat("hyph-repeat-once", "P", "`repeat`: each copy counts once, read with or without its hyphen", "self-aware", 2, "self- aware"),
+        cell("hyph-cell-whole", "P", "`table_cell`: the fallback matches the whole cell, exactly", "self-aware", "<table><tr><td>self- awre</td></tr></table>"),
         text("hyph-unspaced", "P", "an unspaced hyphen is never optional", "develop-ers", "developers"),
     ),
     table(

@@ -143,9 +143,26 @@ def order(t: Order, v: views.Html) -> Mark:
             return True, ""
         both = both or bool(a and b)
         if all(any(not m.dist for m in x) for x in (a, b)): break
+    if _order_hyphenated(t, v):
+        return True, ""
     if both: return False, f"{t.before[:34]!r} does not appear before {t.after[:34]!r}"
     if not a: return False, f"'before' text {t.before[:40]!r} {_why_missing(cut[0])}"
     return False, f"'after' text {t.after[:40]!r} {_why_missing(cut[1])}"
+
+
+def _order_hyphenated(t: Order, v: views.Html) -> bool:
+    """Whether `before` comes before `after` when a hyphen a line broke after, on the page or in either
+    string, is read kept or dropped (`hyphenation.copies`): an exact copy of each, starting in order, one of
+    them reading such a hyphen. The fallback `present` has, for a pair; it spends no edits."""
+    if not hyphenation.optional(t.before, t.after, v.text):
+        return False
+    a, b = (hyphenation.copies(x, v.text, _cut_before, _cut_after) for x in (t.before, t.after))
+    first = min((c.first for c in a), default=None)
+    first_continued = min((c.first for c in a if c.continued), default=None)
+    last = max((c.last for c in b), default=None)
+    last_continued = max((c.last for c in b if c.continued), default=None)
+    return any(x is not None and y is not None and x < y
+               for x, y in ((first_continued, last), (first, last_continued)))
 
 
 class Repeat(NamedTuple):
@@ -154,11 +171,42 @@ class Repeat(NamedTuple):
 
 
 def repeat(t: Repeat, v: views.Html) -> Mark:
-    """The line appears exactly N times, as a whole run of words: a longer word doesn't count."""
+    """The line appears exactly N times, as a whole run of words: a longer word doesn't count. When the count
+    is not N, it is counted again with each hyphen a line broke after, on the page or in the line, read kept
+    or dropped (`_hyphenated_count`), and N copies there pass too."""
     chars = [c for c in normalize.fold(t.text) if not c.isspace()]
     pattern = r"(?<![^\W_])" + r"\s*".join(re.escape(c) for c in chars) + r"(?![^\W_])"
     n = len(re.findall(pattern, normalize.fold(v.seen)))
+    if n != t.expected_count and _hyphenated_count(t.text, v.seen) == t.expected_count:
+        return True, ""
     return _mark(n == t.expected_count, f"{t.text[:50]!r} appears {n}x, not {t.expected_count}x")
+
+
+_WORD_CHAR = re.compile(r"[^\W_]")
+
+
+def _hyphenated_count(text: str, page: str) -> int | None:
+    """How many copies of `text` the page holds as whole words when each hyphen a line broke after, on the
+    page or in `text`, may be read kept or dropped; None when no copy reads such a hyphen (the count is then
+    the main one's to give).
+
+    Each copy is counted once, read with or without its hyphen, and copies that overlap are counted as a scan
+    from the start takes them, as the main count does: a page that writes the word once whole and once broken
+    holds two copies, never three."""
+    if not hyphenation.optional(text, page):
+        return None
+    copies = hyphenation.copies(text, page, lambda s, i: i > 0 and bool(_WORD_CHAR.match(s, i - 1)),
+                                lambda s, j: bool(_WORD_CHAR.match(s, j)))
+    if not any(c.continued for c in copies):
+        return None
+    ends: dict[int, int] = {}
+    for c in copies:
+        ends[c.end] = min(c.first, ends.get(c.end, c.first))
+    n, taken = 0, 0
+    for first, end in sorted((first, end) for end, first in ends.items()):
+        if first >= taken:
+            n, taken = n + 1, end
+    return n
 
 
 class PageNearEmpty(NamedTuple):
@@ -215,9 +263,9 @@ def table_cell(t: TableCell, v: views.Html) -> Mark:
     expected = {k: _fold_cell(x) for k, x in t.relations.items() if x}
     reasons = []
     for table in ts:
-        for rc in [rc for rc, x in table.text.items() if _one_of(cell, x, thr)]:
+        for rc in [rc for rc, x in table.text.items() if _one_of(cell, x, thr, t.cell)]:
             failed = [why for k, want in expected.items()
-                      if (why := _relation(table, rc, k, want, t.max_diffs))]
+                      if (why := _relation(table, rc, k, want, t.max_diffs, t.relations[k]))]
             failed += _structure(t, table, rc)
             if not failed:
                 return True, ""
@@ -560,8 +608,10 @@ def _cell_ratio(a: str, b: str) -> float:
     return max(fuzz.ratio(a, b), fuzz.ratio(a.replace(" ", ""), b.replace(" ", ""))) / 100.0
 
 
-def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_diffs: int) -> str:
-    """Why the cell at `rc` fails one relation, or "" when it holds."""
+def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_diffs: int,
+              raw: str = "") -> str:
+    """Why the cell at `rc` fails one relation, or "" when it holds. `raw` is the gold as written, for the
+    hyphen fallback (`_hyphenated_cell`)."""
     thr = _cell_threshold(want, max_diffs)
     if kind.endswith("_heading"):
         walk = {"top_heading": "up", "left_heading": "left", "right_heading": "right"}
@@ -574,15 +624,33 @@ def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_di
     texts = [_fold_cell(table.text[c]) for c in cells]
     if any(_cell_ratio(want, x) >= thr - EPS for x in texts):
         return ""
+    if raw and any(_hyphenated_cell(raw, table.text[c]) for c in cells):
+        return ""
     if not texts:
         return f"no {kind} cell"
     best = max(texts, key=lambda x: _cell_ratio(want, x))
     return f"{kind} {best!r} doesn't match {want!r} ({_cell_ratio(want, best):.2f})"
 
 
-def _one_of(want: str, got: str, thr: float) -> bool:
-    """Whether cell text `got`, or one of its lines, matches the folded `want`."""
-    return any(_cell_ratio(want, _fold_cell(x)) >= thr - EPS for x in {got, *got.split("\n")} if x.strip())
+def _one_of(want: str, got: str, thr: float, raw: str = "") -> bool:
+    """Whether cell text `got`, or one of its lines, matches the folded `want`; or, given `raw` (the gold as
+    written), is it with a hyphen a line broke after read kept or dropped (`_hyphenated_cell`)."""
+    lines = [x for x in {got, *got.split("\n")} if x.strip()]
+    return (any(_cell_ratio(want, _fold_cell(x)) >= thr - EPS for x in lines)
+            or bool(raw) and any(_hyphenated_cell(raw, x) for x in lines))
+
+
+# A hyphen (or a form NFKC makes one) with white space after it, perhaps past marks: a cell without one, on
+# either side, has no hyphen a line broke after, so the fallback is not tried.
+_MAY_WRAP = re.compile(r"[-\u2010\u2011\ufe63\uff0d]\W*?\s")
+
+
+def _hyphenated_cell(raw: str, got: str) -> bool:
+    """Whether the gold `raw` is the whole cell text `got` when a hyphen a line broke after, in either, is
+    read kept or dropped, as `present` reads one (`hyphenation.matches`): exactly, spending no edits."""
+    if not (_MAY_WRAP.search(raw) or _MAY_WRAP.search(got)):
+        return False
+    return hyphenation.matches(raw, got, lambda s, i: i > 0, lambda s, j: j < len(s))
 
 
 def _in_order(want: Sequence[str], got: Sequence[str], max_diffs: int) -> bool:
@@ -591,8 +659,9 @@ def _in_order(want: Sequence[str], got: Sequence[str], max_diffs: int) -> bool:
     i = 0
     for g in got:
         for n in range(len(want) - i, 0, -1):
-            joined = _fold_cell(" ".join(want[i:i + n]))
-            if _one_of(joined, g, _cell_threshold(joined, max_diffs)):
+            raw = " ".join(want[i:i + n])
+            joined = _fold_cell(raw)
+            if _one_of(joined, g, _cell_threshold(joined, max_diffs), raw):
                 i += n
                 break
     return i == len(want)
@@ -618,8 +687,8 @@ def _structure(t: TableCell, table: tables.Table, rc: tables.Cell) -> list[str]:
         # still names the row below it.
         first = next((c for c in table.grid[min(table.covers[rc][0])] if c is not None), None)
         groups += [table.text[first]] if first is not None and first != rc else []
-        in_run = any(_one_of(want, " ".join(run[i:]), thr) for i in range(len(run)))
-        if not in_run and not any(_one_of(want, g, thr) for g in groups):
+        in_run = any(_one_of(want, " ".join(run[i:]), thr, t.section) for i in range(len(run)))
+        if not in_run and not any(_one_of(want, g, thr, t.section) for g in groups):
             out.append(f"not in the section {t.section!r} (nearest above: {' '.join(run) or 'none'!r})")
     return out
 

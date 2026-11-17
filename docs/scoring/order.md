@@ -6,8 +6,11 @@
 Both strings are folded and searched in the folded page text, allowing up to `max_diffs` edits (both share one
 budget). If either is not written exactly in the folded text, both are searched again in the squeezed text. The
 test passes when any match of `before` starts before any match of `after`. A larger budget keeps every match a
-smaller one found, so it never fails a page that passes with fewer edits. The page text follows the html's source
-order: a table reads row by row, and a two-column page is only as ordered as the system wrote it.
+smaller one found, so it never fails a page that passes with fewer edits. When the pair is not found in order,
+both are tried once more, exactly, with each hyphen a line broke after (on the page or in a string) read kept or
+dropped, as `present` does: a hyphenated compound broken at a line end passes (case ord-compound). The page
+text follows the html's source order: a table reads row by row, and a two-column page is only as ordered as the
+system wrote it.
 
 ## Rules
 
@@ -31,7 +34,7 @@ order: a table reads row by row, and a two-column page is only as ordered as the
 | B | a larger budget passes what a smaller one did (md 0 passes too) | `aa` before `a ba` (md 1) | `<p>b b a ab ab</p>` | pass | `ord-more-edits` |
 | P | a digit continues a number | `Total: 40` before `ZZZ` | `<p>Total: 400</p><p>ZZZ</p>` | fail: `'before' text 'Total: 40' found only inside a longer number` | `ord-digit-edge` |
 | P | a footnote marker inside the phrase | `Smith and Jones` before `ZZZ` | `<p>Smith[1] and Jones</p><p>ZZZ</p>` | fail | `ord-footnote` |
-| P | hyphenated compound broken at a line end | `self-aware` before `ZZZ` | `<p>self- aware</p><p>ZZZ</p>` | fail | `ord-compound` |
+| I | hyphenated compound broken at a line end | `self-aware` before `ZZZ` | `<p>self- aware</p><p>ZZZ</p>` | pass | `ord-compound` |
 | I | a line-end hyphen in capitals reads as in lower case | `RE- M` before `ZZZ` | `<p>re- m</p><p>ZZZ</p>` | pass | `ord-case-hyphen` |
 <!-- /cases -->
 
@@ -41,8 +44,6 @@ order: a table reads row by row, and a two-column page is only as ordered as the
   text-transposition).
 - **No footnote retry.** `present` retries with a footnote marker dropped where it falls inside the phrase;
   here the marker stays, so `Smith and Jones` is not found in `Smith[1] and Jones` (case ord-footnote).
-- **No hyphen fallback.** A hyphenated compound broken at a line end fails here and passes `present` (case
-  ord-compound). A plain word broken at a line end passes both (case ord-line-hyphen).
 - Like `present`, it has a digit edge on each string and no word edge (cases ord-digit-edge, ord-glued).
 
 ## Blind spots

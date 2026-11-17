@@ -197,7 +197,7 @@ ord-transposition-2	pass
 ord-more-edits	pass
 ord-digit-edge	fail	'before' text 'Total: 40' found only inside a longer number
 ord-footnote	fail	'before' text 'Smith and Jones' not found
-ord-compound	fail	'before' text 'self-aware' not found
+ord-compound	pass
 ord-case-hyphen	pass
 ## repeat-rules
 rep-pass	pass
@@ -216,7 +216,7 @@ rep-digit	fail	'Total' appears 0x, not 1x
 rep-typo	fail	'Total' appears 0x, not 1x
 rep-alt-only	fail	'Total' appears 0x, not 1x
 rep-overlap	fail	'aa' appears 0x, not 1x
-rep-compound	fail	'self-aware' appears 0x, not 1x
+rep-compound	pass
 ## near-empty-rules
 ne-blank	pass
 ne-spaces	pass
@@ -280,7 +280,7 @@ cell-headings-swapped	fail	cells matching '5' found, but: not under the headings
 cell-section-wrong	fail	cells matching '6' found, but: not in the section 'Cohort 2' (nearest above: 'Cohort 1')
 cell-row-group-wrong	fail	cells matching '6' found, but: not in the row groups 'Female'
 cell-no-table	fail	no tables found
-cell-compound	fail	no cell matching 'self-aware' in any table
+cell-compound	pass
 ## layout-rules
 lay-match	pass
 lay-list-is-text	pass
@@ -354,9 +354,13 @@ dollar-escaped	x \$5 and \$6
 dollar-paren	$5.00 a2 $
 ## internals-hyphen
 hyph-present	pass
-hyph-order	fail	'before' text 'self-aware' not found
-hyph-repeat	fail	'self-aware' appears 0x, not 1x
-hyph-cell	fail	no cell matching 'self-aware' in any table
+hyph-order	pass
+hyph-repeat	pass
+hyph-cell	pass
+hyph-gold	pass
+hyph-repeat-both	pass
+hyph-repeat-once	fail	'self-aware' appears 0x, not 2x
+hyph-cell-whole	fail	no cell matching 'self-aware' in any table
 hyph-unspaced	fail	'develop-ers' not found (best 0.952 < 1.000); closest 'developers'
 ## internals-edits
 edits-1	3050 cases, 0 passed above budget, 0 failed within budget

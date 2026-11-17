@@ -21,6 +21,6 @@ TABLES = [
         repeat("rep-typo", "P", "a changed character", "Total", 1, "Tota1"),
         repeat("rep-alt-only", "P", "only in an image description", "Total", 1, "<img alt='Total'>"),
         repeat("rep-overlap", "P", "copies that overlap", "aa", 1, "aaaa"),
-        repeat("rep-compound", "P", "hyphenated compound broken at a line end", "self-aware", 1, "self- aware"),
+        repeat("rep-compound", "I", "hyphenated compound broken at a line end", "self-aware", 1, "self- aware"),
     ),
 ]

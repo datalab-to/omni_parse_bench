@@ -81,17 +81,6 @@
     "real_ids": [],
     "promised": false
   },
-  "M11b": {
-    "status": "intended and documented",
-    "description": "Only present accepts a hyphenated word broken after its hyphen. Order, repeat and table_cell fold 'aa- bb' to 'aabb', whether the page or the gold holds the break.",
-    "counterexample": "Order('aa-bb', 'tail') fails on `<p>aa-<br>bb</p><p>tail</p>`. The reverse also fails: Order('self- aware', 'tail') on `<p>self-aware</p><p>tail</p>`, while present passes both",
-    "why_this_status": "The label covers the direction this relation tests: a page that breaks the word. The docstring of omni_parse_bench/scorers/unit_tests/hyphenation.py says 'Only text presence uses this fallback', and docs/scoring/internals.md (The hyphen rule, cases hyph-order, hyph-repeat, hyph-cell) shows those three tests failing. The reverse direction, a gold that holds the broken word ('self- aware') against a page that writes 'self-aware', also passes present and fails the other three. It follows from fold joining a line-end hyphen in every string, the gold's included (docs/scoring/internals.md, The hyphen rule). It is an artefact in the gold, not a verdict the docs promise.",
-    "effect_on_scores": "small",
-    "effect_basis": "Measured on cached leaderboard re-runs (not included here): extending the hyphen fallback to order, repeat and table_cell would change the verdict of a handful of tests, all from fail to pass. Both directions occur. In most the gold holds the broken word: a correct page failed because of an artefact in the gold",
-    "how_common": "Measured on cached leaderboard re-runs (not included here): a handful of tests; and 14 real order and table_cell tests whose gold writes a line-end hyphen in mixed case ('Primary- Revision') fail on their answer in another case, which reads the hyphen the other way (M15a's check over every real test)",
-    "who_is_affected": "a page that breaks a hyphenated word after its hyphen fails order, repeat and table_cell tests of that word (present accepts it); and a correct page fails those tests when the gold holds the broken word",
-    "enumerated_over_real_tests": false
-  },
   "M15b": {
     "status": "intended and documented",
     "description": "Fold lowercases and does not casefold, so a letter whose upper case lowers to other letters is lost.",

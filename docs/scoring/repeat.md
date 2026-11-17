@@ -5,7 +5,10 @@
 
 The test folds the gold and the page text, drops the gold's spaces and allows any spacing between its characters.
 It counts matches that are whole words: no letter or digit may be glued to either end. It allows no edits
-(`max_diffs` must be 0) and reads the text **without** image descriptions.
+(`max_diffs` must be 0) and reads the text **without** image descriptions. When the count is not N, it counts
+again with each hyphen a line broke after (on the page or in the gold) read kept or dropped, each copy once, and N
+copies there pass too, so a hyphenated compound broken at a line end counts (case rep-compound; detail in
+[internals.md](internals.md#the-hyphen-rule)).
 
 ## Rules
 
@@ -28,7 +31,7 @@ It counts matches that are whole words: no letter or digit may be glued to eithe
 | P | a changed character | `Total` ×1 | `Tota1` | fail | `rep-typo` |
 | P | only in an image description | `Total` ×1 | `<img alt='Total'>` | fail | `rep-alt-only` |
 | P | copies that overlap | `aa` ×1 | `aaaa` | fail | `rep-overlap` |
-| P | hyphenated compound broken at a line end | `self-aware` ×1 | `self- aware` | fail | `rep-compound` |
+| I | hyphenated compound broken at a line end | `self-aware` ×1 | `self- aware` | pass | `rep-compound` |
 <!-- /cases -->
 
 ## Blind spots
@@ -39,6 +42,5 @@ It counts matches that are whole words: no letter or digit may be glued to eithe
 - **An underscore, hyphen or full stop is an edge**, so `Total_x` holds a `Total` (case rep-underscore), and a
   sign before a number is not seen (case rep-sign).
 - **Image descriptions never count**, in either direction (cases rep-alt-ignored, rep-alt-only).
-- **No hyphen fallback**: a hyphenated compound broken at a line end is not found (case rep-compound).
 
 The why reads `'gold' appears Nx, not Mx`.

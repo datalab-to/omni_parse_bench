@@ -265,7 +265,9 @@ Reference only; the sections above do not need it until a term is unfamiliar.
   - table_cell: a substituted character is one edit (M3); an inserted or deleted one costs about half (M23b).
 - **line-end hyphen**: a letter, a hyphen, then white space (`develop- ers`). Fold joins it when a lowercase
   letter follows, or when the letters before the hyphen and after the white space are all capitals (a heading
-  in capitals, `DEVELOP- ERS`), so a word folds the same in upper case as in lower case (M2e).
+  in capitals, `DEVELOP- ERS`), so a word folds the same in upper case as in lower case (M2e). Where their own
+  comparison fails, present, order, repeat and table_cell also read such a hyphen, on the page or in the gold,
+  kept or dropped, exactly (a hyphenated compound broken after its hyphen: M11a, M11b).
 - **text view**: a page's HTML as plain text.
   - Tags are dropped, namespaced ones (`<o:p>`) too; a `>` inside a quoted attribute does not end a tag (M24c,
     M24d).
@@ -312,4 +314,4 @@ Reference only; the sections above do not need it until a term is unfamiliar.
   - CI tries at most 300 examples per test, the same ones every run.
   - `HYPOTHESIS_PROFILE=deep` tries 5,000 new ones. CI never runs it.
 - **strict xfail**: a test marked as expected to fail. If it passes, pytest reports a failure.
-  The 10 deviations give 12 expected failures, because M11b runs as three cases (order, repeat, table_cell).
+  Each of the 9 deviations gives one expected failure.
