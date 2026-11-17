@@ -242,6 +242,11 @@ def _arg(where: str, role: str, a: Any) -> runners.Arg:
         case "text":
             if not isinstance(exact := a.get("exact_case", False), bool):
                 raise ValueError(f"{where}: {role}'s exact_case must be true or false, not {exact!r:.80}")
+            if exact and not any(c.lower() != c.upper() for c in normalize.fold_cased(str(a["text"]))):
+                # Note: nothing in it has a case, so the flag would do nothing, and a test that says it checks
+                # case should check it.
+                raise ValueError(f"{where}: {role}'s exact_case needs a text with a cased letter, "
+                                 f"and {a['text']!r:.80} has none")
             if exact and a["max_diffs"] != 0:
                 # Note: a case flip costs one edit, so any budget would let the wrong case pass.
                 raise ValueError(f"{where}: {role}'s exact_case needs max_diffs 0, not {a['max_diffs']!r}: "

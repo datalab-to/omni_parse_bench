@@ -275,25 +275,25 @@ def continuations(s: str, spaced: bool = False, cased: bool = False) -> tuple[st
     the presence matcher can choose either reading, including for Latin compounds.
     """
     keep_case = cased
-    cased = _cased(s, preserve_dashes=True, preserve_line_hyphens=True)
+    text = _cased(s, preserve_dashes=True, preserve_line_hyphens=True)
     optional = set()
     offset, previous = 0, 0
-    for match in _WRAP_HYPHEN.finditer(cased):
+    for match in _WRAP_HYPHEN.finditer(text):
         i = match.start()
-        if not _word_end(cased, i - 1):
+        if not _word_end(text, i - 1):
             continue
         j = i + 1
-        while j < len(cased) and cased[j].isspace():
+        while j < len(text) and text[j].isspace():
             j += 1
         # Note: optional where fold would join the word (`_joins`), and before an uncased letter too.
-        if (j < len(cased) and unicodedata.category(cased[j]).startswith("L")
-                and (not cased[j].isupper() and not cased[j].istitle() or _joins(cased, i, j))):
+        if (j < len(text) and unicodedata.category(text[j]).startswith("L")
+                and (not text[j].isupper() and not text[j].istitle() or _joins(text, i, j))):
             # Lowercasing can expand characters. Count intervening segments, not every
             # character in Python or the whole prefix again for each wrapping hyphen.
-            offset += len(_WHITESPACE.sub("", cased[previous:i] if keep_case else cased[previous:i].lower()))
+            offset += len(_WHITESPACE.sub("", text[previous:i] if keep_case else text[previous:i].lower()))
             previous = i
             optional.add(offset)
-    folded = _WHITESPACE.sub(" " if spaced else "", _DASH.sub("-", cased if keep_case else cased.lower()))
+    folded = _WHITESPACE.sub(" " if spaced else "", _DASH.sub("-", text if keep_case else text.lower()))
     return folded, frozenset(optional)
 
 

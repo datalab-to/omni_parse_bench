@@ -425,29 +425,29 @@ def test_swapping_the_case_of_one_letter_fails_exact_case_and_passes_without_it(
     assert not passes(exact(s), page, exact=True)
 
 
-CASE_FLIP_NOTE = ("the first cased letter of every real text test swapped: exact_case fails on each")
+CASE_FLIP_NOTE = ("the first cased letter of every real text string swapped: exact_case fails on each")
 
 
-@every_real_test("text tests", note=CASE_FLIP_NOTE)
-def test_every_real_text_test_fails_with_one_letter_case_swapped_under_exact_case():
-    """Every real text test, were its arg to set exact_case, fails on its text with its first cased letter
-    swapped, and passes on its own answer, but those with a checkbox ([x]: fold reads [x] and [X] as one
+@every_real_test("text strings", note=CASE_FLIP_NOTE)
+def test_every_real_text_string_fails_with_one_letter_case_swapped_under_exact_case():
+    """Every real text string, were it the text of an arg that sets exact_case, fails with its first cased
+    letter swapped, and passes in its own case, but those with a checkbox ([x]: fold reads [x] and [X] as one
     checked box). [M30, M29]
     Why it matters for a score: it checks the setting on real strings: a hyphen, a footnote or a squeeze path
     that lowercased would let a wrong-case page through on some of them."""
-    # Given every real text test with a cased letter; When its arg sets exact_case
+    # Given every text string of every real test; When it is the text of an arg that sets exact_case
     bad_flip, bad_own = [], []
-    for t in TEXT:
-        p, text = t.params, t.params.content.text
-        # Note: a checkbox "[x]" or "[X]" is the same checked box (a mark, not a letter), so it has no case
-        if not has_cased_letter(text) or re.search(r"\[[xX]\]", text):
-            continue
-        e = runners.Present(p.content._replace(exact_case=True, max_diffs=0))
-        # Then it passes on its answer, and fails with a letter's case swapped
-        if not passes(e, answer_page(e), exact=True):
-            bad_own.append(t.id)
-        if passes(e, f"<p>{escaped(flipped(text, 0))}</p>", exact=True):
-            bad_flip.append(t.id)
+    for t in TESTS:
+        for n, text in enumerate(text_strings(t.params)):
+            # Note: a checkbox "[x]" or "[X]" is one checked box (a mark, not a letter): no case
+            if not has_cased_letter(text) or re.search(r"\[[xX]\]", text):
+                continue
+            e = exact(text)
+            # Then it passes on its answer, and fails with a letter's case swapped
+            if not passes(e, answer_page(e), exact=True):
+                bad_own.append(f"{t.id}#{n}")
+            if passes(e, f"<p>{escaped(flipped(text, 0))}</p>", exact=True):
+                bad_flip.append(f"{t.id}#{n}")
     assert not bad_own and not bad_flip, {"own": bad_own[:5], "flip": bad_flip[:5]}
 
 

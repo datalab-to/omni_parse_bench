@@ -698,3 +698,11 @@ def test_exact_case_is_an_arg_field_of_a_present_text_only():
         parse({"content": arg | {"exact_case": True}}, {"expected_count": 1}, "repeat")
     with pytest.raises(ValueError, match="present"):
         parse({"cell": arg | {"exact_case": True}}, test_type="table_cell")
+
+
+def test_exact_case_names_a_glued_number_not_a_case_when_both_apply():
+    """Wrong case and a number glued on both fail; the reason says what the test's own fold sees."""
+    got, why = R.present(R.Present(R.Text("Total: 40", 0, (), True)), html("<p>total: 400</p>"))
+    assert not got and "not found" in why
+    got, why = R.present(R.Present(R.Text("Total: 40", 0, (), True)), html("<p>Total: 400</p>"))
+    assert not got and "longer number" in why

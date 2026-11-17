@@ -88,7 +88,7 @@ def found(a: Arg, v: views.Html) -> Mark:
         return True, ""
     if not ok and hyphenation.matches(a.text, v.text, _cut_before, _cut_after, cased=a.exact_case):
         return True, ""
-    if not ok and _only_glued(a.text, v.text):
+    if not ok and _only_glued(a.text, v.text, fold_one):
         return False, f"{a.text[:60]!r} found only inside a longer number"
     near = f"; closest {_excerpt(window)!r}" if window else ""
     return _mark(ok, f"{a.text[:60]!r} not found (best {r:.3f} < {thr:.3f}){near}")
@@ -640,10 +640,11 @@ def _why_missing(cut: bool) -> str:
     return "found only inside a longer number" if cut else "not found"
 
 
-def _only_glued(needle: str, text: str) -> bool:
+def _only_glued(needle: str, text: str, fold: Callable[[str], str] = normalize.fold) -> bool:
     """Whether `needle` is in `text` exactly but only cut out of a longer number (`_contains` fails it
-    on its edges): as `_contains` judges it, in the folded text, else in the squeezed."""
-    want, hay = normalize.fold(needle), normalize.fold(text)
+    on its edges): as `_contains` judges it, in the folded text, else in the squeezed. `fold` is the fold
+    the test compares with (`normalize.fold_cased` for an `exact_case` arg)."""
+    want, hay = fold(needle), fold(text)
     if not want: return False
     if want in hay: return not _edges_ok(want, hay)
     squeezed = want.replace(" ", ""), hay.replace(" ", "")

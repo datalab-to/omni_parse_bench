@@ -44,6 +44,7 @@ def with_args(args: dict, test_type: str = "present", settings: dict | None = No
     with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": 1}}),
     with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": None}}),
     with_args({"content": {"text": "abcdef", "max_diffs": 1, "exact_case": True}}),  # budget
+    with_args({"content": {"text": "123 456", "max_diffs": 0, "exact_case": True}}),  # no cased letter
     with_args({"content": {"number": "12", "exact_case": True}}),
     with_args({"content": {"latex": "x", "exact_case": True}}),
     with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": True}},

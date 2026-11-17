@@ -65,7 +65,11 @@ arg then passes only when its text is found with its case kept: `normalize.fold_
 (glyphs, spacing, quotes, dashes, hyphens) and leaves case alone, on both sides, in every path of `found`
 (footnote markers, hyphen wrapping, squeezed text). `max_diffs` then counts a
 changed letter's case as an edit, so such a test must say 0 (the loader refuses a larger budget). Numbers and equations have no case, and the other test types do not read it yet, so the field is refused
-there when the test loads.
+there when the test loads. The text must also have a cased letter (`123` has no case to keep), or the field is refused.
+
+`exact_case` keeps the case of letters only. Two folds that are not case still apply: a checkbox mark
+(`[x]` and `[X]`, `[checked]` and `[Checked]` are one checked box) and the glyph unification of NFKC (`µ`
+micro sign and `μ` Greek mu are one letter).
 
 Text presence also accepts an exact match through an ambiguous wrapping hyphen:
 `মানু- হৰ` can match `মানুহৰ`. The hyphen must follow a letter or its combining marks,
