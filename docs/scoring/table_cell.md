@@ -7,7 +7,7 @@ neighbours (`up`, `down`, `left`, `right`), heading cells (`top_heading`, `left_
 The test reads tables from the markup (`<table>`, `rowspan`, `colspan`, `<th>`), not from how the page looks:
 aligned text or pipes in a paragraph are not a table. It compares whole cells after fold, with a ratio that
 allows `max_diffs` edits, and also with spaces removed. A cell may match by one of its lines (lines are made by
-`<br>`). A cell that does not match is tried once more, exactly and whole, with each hyphen a line broke after (in
+`<br>`). A cell that does not match is tried once more, exactly, as the whole cell or one of its lines, with each hyphen a line broke after (in
 the gold or the cell) read kept or dropped, so a hyphenated compound broken at a line end matches, as in `present`
 (case cell-compound). The test passes when one matching cell satisfies every stated role.
 

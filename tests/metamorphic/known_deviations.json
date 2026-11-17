@@ -1,7 +1,7 @@
 {
   "M1a": {
     "status": "known limitation",
-    "description": "Fold keeps a line-end hyphen before a capital that follows a word in lower or mixed case, then lowercases, so a second fold joins the word.",
+    "description": "Fold keeps a line-end hyphen before a capital that follows a word in lower or mixed case, then case folds, so a second fold joins the word.",
     "counterexample": "fold('a- B') = 'a- b', but fold('a- b') = 'ab'",
     "why_this_status": "No doc promises that folding twice changes nothing, and the scorer folds each string once, so no verdict can change. The second-fold outcome follows from a documented rule but is not itself documented. The rule: the fold docstring in omni_parse_bench/normalize.py, 'a word broken by a hyphen at a line end -> joined ... when a lowercase letter follows', and the code comment above it, 'only before a lowercase letter, or between two words in capitals, so a line ending \"-\" before a capital after a word in lower or mixed case ... stays'.",
     "effect_on_scores": "none seen",
@@ -86,8 +86,8 @@
     "description": "Fold lowercases and does not casefold, so a letter whose upper case lowers to other letters is lost.",
     "counterexample": "'straße' -> 'STRASSE' -> 'strasse'; Turkish 'ı' -> 'I' -> 'i'; polytonic 'ᾳ' -> 'ΑΙ'",
     "why_this_status": "The fold docstring in omni_parse_bench/normalize.py says 'lowercased'; docs/scoring/internals.md (Fold, case fold-case: 'no letter is changed into others') shows 'STRASSE' and 'straße' folding apart.",
-    "effect_on_scores": "unknown",
-    "effect_basis": "not measured: it was not re-scored on cached leaderboard re-runs, and this package holds no system outputs to measure it with. The 15 real tests it touches are listed, so it can change their verdicts",
+    "effect_on_scores": "small",
+    "effect_basis": "Measured on cached leaderboard re-runs (not included here): folding with full case folding, which would close this, turned no fail into a pass and failed a few tests that pass today, because a letter that folds to two (ß, an iota-subscript letter) misread as one other letter then costs two edits. The tests this touches are written in lower case on real pages, so the lowercasing stays",
     "how_common": "15 real tests: 12 in polytonic Greek, 2 with dotless ı, 1 with ß",
     "who_is_affected": "a page that writes such a word in upper case fails a test whose gold is in lower case",
     "enumerated_over_real_tests": true,

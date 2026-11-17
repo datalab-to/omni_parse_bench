@@ -655,13 +655,19 @@ def _hyphenated_cell(raw: str, got: str) -> bool:
 
 def _in_order(want: Sequence[str], got: Sequence[str], max_diffs: int) -> bool:
     """Whether `want` appears in `got` in order, others between allowed; one cell of `got` may hold
-    several consecutive items of `want` joined."""
+    several consecutive items of `want` joined. A cell may also match through the hyphen fallback, but only
+    when the plain reading fails: a cell that takes several items through a broken hyphen must not leave an
+    item to a later cell that the plain reading would have matched."""
+    return _greedy(want, got, max_diffs, False) or _greedy(want, got, max_diffs, True)
+
+
+def _greedy(want: Sequence[str], got: Sequence[str], max_diffs: int, wrapped: bool) -> bool:
     i = 0
     for g in got:
         for n in range(len(want) - i, 0, -1):
             raw = " ".join(want[i:i + n])
             joined = _fold_cell(raw)
-            if _one_of(joined, g, _cell_threshold(joined, max_diffs), raw):
+            if _one_of(joined, g, _cell_threshold(joined, max_diffs), raw if wrapped else ""):
                 i += n
                 break
     return i == len(want)

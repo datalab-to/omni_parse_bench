@@ -67,7 +67,7 @@ footnote brackets and line-start bullets removed; leaders removed (runs of 3 or 
 `。` among them, even though full-width punctuation is made ASCII only later); dash, quote, space and arrow
 families unified, then two single quotes in a row read as a double quote (TeX's ``` `` ``` and `''`, or a mixed
 pair `'’`); full-width punctuation made ASCII; a decimal middle dot made a point; spacing collapsed;
-lowercase.
+lowercase. A run of three single quotes reads its first two as the double quote (`'''` is `"'`).
 
 White space may sit inside a leader run, and a `<br>` or a newline is white space. A block break (the end of a
 paragraph, cell or other block tag) is not: a leader run stops at it. For a line-end hyphen a block break is a
@@ -170,13 +170,15 @@ Measured on random strings (the figures come from the installed rapidfuzz and fu
 A word broken at a line end (`develop- ers`) is joined by fold when a lowercase letter follows, in every test.
 It is joined too when the letters before the hyphen and the letters after the break are all capitals (a heading
 in capitals, `DEVELOP- ERS`), so the same words fold the same in upper case and in lower case. A capital after a
-word in lower or mixed case keeps the hyphen (`Anglo- Saxon`), and so does a digit after it.
+word in lower or mixed case keeps the hyphen (`Anglo- Saxon`), and so does a digit after it. The compound fallback below is exact: a compound broken this way that also needs an
+edit elsewhere fails, in capitals as in lower case. As in lower case, a text that ends at the hyphen of a word
+the page goes on to break (`ANGLO-` before `ANGLO- SAXON`) no longer matches once the page continues it.
 
 A hyphenated compound broken the same way (`self- aware` for `self-aware`) is accepted too, by a fallback each
 text test type tries only where its own comparison fails: the match is tried with each hyphen a line broke after,
 on the page or in the gold, kept or dropped, exactly, without spending edits. `present` tries it for its text,
 `order` for its pair (a copy of each, in order, one of them read through such a hyphen), `table_cell` for each
-cell it compares (the whole cell), and `repeat` for its count: there each copy is counted once, whether read
+cell it compares (the whole cell, or one of its lines), and `repeat` for its count: there each copy is counted once, whether read
 with or without its hyphen, so a page that writes the word once whole and once broken holds two copies. The
 fallback only adds a way to pass: a test that passes without it passes with it.
 

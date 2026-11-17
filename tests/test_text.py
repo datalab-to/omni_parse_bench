@@ -205,6 +205,11 @@ def test_two_single_quotes_of_any_mix_are_a_double_quote(pair):
     assert normalize.fold("it’s") == "it's"
 
 
+def test_a_run_of_three_single_quotes_reads_its_first_two_as_a_double_quote():
+    assert normalize.fold("a'''b") == "a\"'b"
+    assert normalize.fold("a‘’’b") == normalize.fold("a'''b")
+
+
 def test_fold_leaves_money_alone():
     assert "$1,000.01" in normalize.fold("b $1,000.01 to $2,000.00")
     # prose between two "$" with one LaTeX-like character in it isn't math

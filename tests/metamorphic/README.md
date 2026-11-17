@@ -7,8 +7,8 @@ Each promise is a *relation*: change a page, or a test, in a way that should not
 known way), and the verdict should follow. Example: putting a passing answer in bold must not make its test
 fail.
 
-- The certificate lists the 68 relations its authors selected: 58 hold and 10 deviate. It is not every
-  relation of the scorer (see [Not covered](#not-covered)). Four of the 10 (M1a to M1c and M1e) are about
+- The certificate lists the 68 relations its authors selected: 59 hold and 9 deviate. It is not every
+  relation of the scorer (see [Not covered](#not-covered)). Four of the 9 (M1a to M1c and M1e) are about
   folding a string twice, which the scorer never does and no document promises, so they change no score.
 - It is generated from the tests. CI fails if it is out of date, or if a status disagrees with its test.
 - This page is enough to read it. Links to `docs/scoring` add detail only.
@@ -38,10 +38,10 @@ A healthy run gives:
 
 | | passed | skipped | xfailed |
 |---|---|---|---|
-| this folder, no dataset | 82 | 11 | 12 |
-| this folder, with dataset | 92 | 1 | 12 |
-| whole suite, no dataset | 1186 | 21 | 12 |
-| whole suite, with dataset | 1201 | 6 | 12 |
+| this folder, no dataset | 85 | 11 | 9 |
+| this folder, with dataset | 95 | 1 | 9 |
+| whole suite, no dataset | 1210 | 21 | 9 |
+| whole suite, with dataset | 1225 | 6 | 9 |
 
 All four rows come from runs of this version.
 

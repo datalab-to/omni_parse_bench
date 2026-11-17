@@ -46,7 +46,7 @@ _SQUOTE = re.compile("[‘’‚‛ʼ`´′ꞌꞋˈ]")
 _DQUOTE = re.compile("[“”„‟«»]")
 # Note: TeX writes a double quote as two single quotes (`` and ''), and a page may mix the family's members
 # ('’); so the pair is read after the family is one character, and a fold never leaves two in a row.
-_TEX_QUOTE = "''"
+_TEX_QUOTE = "''"   # a run of three single quotes reads its first two as the double quote
 # A spacing accent typed after its letter, as a text layer copies it from TeX ("Cuo´"), which NFKC would split
 # into a space and a loose accent.
 # Note: ´ between two letters is an apostrophe typed as an accent ("it´s"), not one.

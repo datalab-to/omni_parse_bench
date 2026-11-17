@@ -125,6 +125,15 @@ def test_order_repeat_and_table_cell_read_a_broken_compound_either_way(t, page):
     assert runs(t, page)
 
 
+def test_the_hyphen_fallback_never_fails_headings_the_plain_reading_matches():
+    # A cell that takes several headings through a broken hyphen must not leave one to a later cell that the
+    # plain reading would have matched: the plain reading is tried first.
+    t = R.TableCell("x", {}, 0, headings=("self-", "aware", "Total"))
+    page = ("<table><tr><th>self-<br>self-aware</th></tr><tr><th>aware Total</th></tr>"
+            "<tr><td>x</td></tr></table>")
+    assert runs(t, page)
+
+
 @pytest.mark.parametrize("t, page", [
     (R.Order("tail", "self-aware", 0), "<p>self- aware</p><p>tail</p>"),       # still in order only
     (R.Order("self-aware", "tail", 0), "<p>self-awre</p><p>tail</p>"),         # no edits to spend
