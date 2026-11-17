@@ -161,8 +161,10 @@ def test_a_pages_line_holds_its_counts_and_its_details_every_verdict():
     s = scorer.UnitTests().score({"html": "<p>alpha beta</p>"}, TESTS)
     ids = s.result.pop("ids")       # a digest of the page's test ids, and of each key's, as an int
     assert isinstance(ids, int) and 0 <= ids < 2 ** 64
-    assert all(isinstance(c.pop("ids"), int) for k in s.result.values() if isinstance(k, dict)
-               for c in k.values())
+    for kind in ("per_tag", "per_arg_kind"):       # only the slices that can have twins carry a digest
+        assert all(isinstance(c.pop("ids"), int) for c in s.result[kind].values())
+    assert not any("ids" in c for kind in ("per_family", "per_test_type", "per_derivation")
+                   for c in s.result[kind].values())
     assert s.result == {"tests": 5, "passed": 2, "per_family": {"text": {"tests": 5, "passed": 2}},
                         "per_tag": {"eng": {"tests": 3, "passed": 2}, "table": {"tests": 1, "passed": 0},
                                     "form": {"tests": 1, "passed": 0}, "math": {"tests": 1, "passed": 0}},

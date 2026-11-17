@@ -150,11 +150,13 @@ from, a raw count) and `effective_documents` (what those documents are worth: sc
 document with many tests weighs more, and this is the number of equal-sized documents that would carry the same
 information, rounded to 1 decimal). `per_tag`, `per_suite`, `per_test_type`, `per_arg_kind` and `per_derivation` give
 the same four numbers for each slice; they are not part of the headline, a test with several tags counts under each,
-and an empty slice is left out. When two or more keys of one slice select exactly the same tests, each of those
-entries also has `same_tests_as`, the other keys, sorted, so a report can show the group once; nothing is merged or
-dropped, and an entry with no twin has no such key. Twins are found from a digest of each key's test ids (`ids`) that
-a page's line in `scores.jsonl` carries, so a run graded before it has none and makes no twins (a key is compared only
-when every page that holds it has the digest); grade it again to add them.
+and an empty slice is left out. When two or more tags, or two arg kinds, have the same tests (by a 64-bit digest of their test ids: a collision is not
+impossible, only negligible), each of those entries also has `same_tests_as`, the other keys, sorted, so a report can
+show the group once; nothing is merged or dropped, and an entry with no twin has no such key. Suites, test types and
+derivations cannot have twins, since each test has exactly one of each. A tag pair that differs only by layout tests is
+not marked as twins when `per_tag` counts those tests: it counts them, so the pair differs. The digests are in a
+page's line in `scores.jsonl` (`ids`), so a run graded before them has none and makes no twins (a key is compared
+only when every page's line has `ids` and every page that holds the key has its digest); grade it again to add them.
 `per_arg_kind` slices by how a test's content is compared (`text`, `number` or `latex`): a test counts under each
 kind its args use, and a `layout_kind` test under none, since its text only labels a place. Run results kept
 before the slice existed have no `per_arg_kind` until they are graded again.
