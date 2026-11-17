@@ -189,7 +189,43 @@ def test_order_reads_folded_text():
 
 def test_repeat_does_not_count_a_longer_word():
     v = html("<p>Passive Income and Loss</p><p>Nonpassive Income and Loss</p><p>Passive Income and Loss</p>")
-    assert R.repeat(R.Repeat("Passive Income and Loss", 2), v)[0]
+    assert R.repeat(R.Repeat(R.Text("Passive Income and Loss", 0), 2), v)[0]
+
+
+# Cases: other separators, a longer number, a sign, parentheses, a currency or percent sign, an image
+# description; and, strict, a comma, a trailing zero or a moved decimal point make another number.
+@pytest.mark.parametrize("gold, count, text, passes", [
+    ("1,240", 2, "<p>1,240</p><p>1,240</p>", True),
+    ("1,240", 2, "<p>1,240</p>", False),
+    ("1,240", 2, "<p>1,240</p><p>1,240</p><p>1,240</p>", False),
+    ("1,240", 1, "<p>1,240 and 1240 and 1.240 and 1 240</p>", True),
+    ("1,240", 1, "<p>11,240 and 1,2405 and 1,240</p>", True),
+    ("1,240", 2, "<p>11,240 and 1,2405 and 1,240</p>", False),
+    ("12.5", 2, "<p>12.5, then 12.5. Next, 12.5.7 and 12.5,77</p>", True),
+    ("12.5", 1, "<p>(12.5) and $12.5 and 12.5%</p>", False),
+    ("12.5", 3, "<p>(12.5) and $12.5 and 12.5%</p>", True),
+    ("-4.8%", 1, "<p>-4.8% and 4.8% and \u20134.8 %</p>", False),
+    ("-4.8%", 2, "<p>-4.8% and 4.8% and \u20134.8 %</p>", True),
+    ("4.8", 1, "<p>-4.8 and 4.8</p>", True),
+    ("1,240", 1, "<table><tr><td>1,240</td><td><img alt='1,240'></td></tr></table>", True),
+    ("1,000", 1, "<p>1000</p>", False),
+    ("1000", 1, "<p>1,000</p>", False),
+    ("1,000", 1, "<p>1.000</p>", False),
+    ("8.455", 1, "<p>8.4550</p>", False),
+    ("8.4550", 1, "<p>8.455</p>", False),
+    ("0.50", 1, "<p>0.5</p>", False),
+    ("12.50", 1, "<p>1.250</p>", False),
+])
+def test_repeat_counts_a_number_as_present_finds_it(gold, count, text, passes):
+    t = R.Repeat(R.Number(gold), count)
+    assert R.VALID["repeat"][0](t)
+    ok, why = R.repeat(t, html(text))
+    assert ok is passes, why
+
+
+def test_repeat_of_a_number_says_how_many_copies_it_found():
+    ok, why = R.repeat(R.Repeat(R.Number("1,240"), 3), html("<p>1,240</p><p>1,240</p>"))
+    assert not ok and why == "'1,240' appears 2x, not 3x"
 
 
 def test_table_cell_checks_neighbours_and_headings():

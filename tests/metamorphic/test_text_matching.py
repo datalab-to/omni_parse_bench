@@ -266,7 +266,7 @@ def test_repeat_needs_exactly_its_count(text, n, rnd):
     """A repeat test of n passes on a page with its text on n lines, and fails with n + 1 or n - 1. [M5]
     Why it matters for a score: repeat is the one test that catches a duplicated or a dropped line."""
     # Given a repeat test of n; When the page holds its text on n lines, among filler lines; Then it passes
-    r = runners.Repeat(text, n)
+    r = runners.Repeat(runners.Text(text, 0), n)
     assert passes(r, page_with_lines(text, n, rnd))
     # When on n + 1 or n - 1 lines; Then it fails
     assert not passes(r, page_with_lines(text, n + 1, rnd))
@@ -281,9 +281,9 @@ def test_repeat_needs_exactly_its_count_on_loaded_tests(t, rnd):
     # Given a loaded repeat test; When its text is on exactly its count of lines, or one more or fewer
     # Then it passes, then fails twice
     p = t.params
-    assert passes(p, page_with_lines(p.text, p.expected_count, rnd))
-    assert not passes(p, page_with_lines(p.text, p.expected_count + 1, rnd))
-    assert not passes(p, page_with_lines(p.text, p.expected_count - 1, rnd))
+    assert passes(p, page_with_lines(p.content.text, p.expected_count, rnd))
+    assert not passes(p, page_with_lines(p.content.text, p.expected_count + 1, rnd))
+    assert not passes(p, page_with_lines(p.content.text, p.expected_count - 1, rnd))
 
 # ------------------------------------------------------------------------- a word broken at a hyphen
 
@@ -299,7 +299,7 @@ def broken_word_check(kind: str, left: str, right: str, glue: str, in_gold: bool
         word, broken = f"{left}- {right}" if glue else word, word
     return {"present": (runners.Present(runners.Text(word, 0)), f"<p>{broken}</p>"),
             "order": (runners.Order(word, "tail", 0), f"<p>{broken}</p><p>tail</p>"),
-            "repeat": (runners.Repeat(word, 1), f"<p>{broken}</p>"),
+            "repeat": (runners.Repeat(runners.Text(word, 0), 1), f"<p>{broken}</p>"),
             "table_cell": (runners.TableCell(word, {}, 0), f"<table><tr><td>{broken}</td></tr></table>"),
             }[kind]
 
@@ -351,14 +351,15 @@ def glued_pages(p, d: str) -> list[str]:
     if isinstance(p, runners.Order):
         return [*(f"<p>{escaped(g)}</p><p>{escaped(p.after)}</p>" for g in digit_glued(p.before, d)),
                 *(f"<p>{escaped(p.before)}</p><p>{escaped(g)}</p>" for g in digit_glued(p.after, d))]
-    return ["".join(f"<p>{escaped(g)}</p>" for _ in range(p.expected_count)) for g in digit_glued(p.text, d)]
+    return ["".join(f"<p>{escaped(g)}</p>" for _ in range(p.expected_count))
+            for g in digit_glued(p.content.text, d)]
 
 
 def digit_edged(tests):
     """The tests with an ASCII string that starts or ends with a digit."""
     def edged(p):
         strings = [p.content.text] if isinstance(p, runners.Present) else \
-            [p.before, p.after] if isinstance(p, runners.Order) else [p.text]
+            [p.before, p.after] if isinstance(p, runners.Order) else [p.content.text]
         return any((x := s.strip()) and x.isascii() and (x[0].isdigit() or x[-1].isdigit()) for s in strings)
     return [t for t in tests if edged(t.params)]
 
@@ -389,9 +390,10 @@ def test_a_digit_glued_to_a_line_that_ends_in_a_digit_fails_repeat(n, count, fro
     # Given a repeat test of '{n} alpha' or 'alpha {n}': it passes on its lines
     text = f"{n} alpha" if front else f"alpha {n}"
     glued = d + text if front else text + d
-    assert passes(runners.Repeat(text, count), "".join(f"<p>{text}</p>" for _ in range(count)))
+    r = runners.Repeat(runners.Text(text, 0), count)
+    assert passes(r, "".join(f"<p>{text}</p>" for _ in range(count)))
     # When a digit is glued to each line's number; Then it fails
-    assert not passes(runners.Repeat(text, count), "".join(f"<p>{glued}</p>" for _ in range(count)))
+    assert not passes(r, "".join(f"<p>{glued}</p>" for _ in range(count)))
 
 
 @more_evidence(pool="digit-edged text, repeat",

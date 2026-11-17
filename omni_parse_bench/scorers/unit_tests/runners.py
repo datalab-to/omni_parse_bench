@@ -167,24 +167,48 @@ def _order_hyphenated(t: Order, v: views.Html) -> bool:
 
 
 class Repeat(NamedTuple):
-    text: str
+    content: Text | Number      # a `Text` is counted as whole words, a `Number` as `present` finds one
     expected_count: int
 
 
 def repeat(t: Repeat, v: views.Html) -> Mark:
-    """The line appears exactly N times, as a whole run of words: a longer word doesn't count. When the count
-    is not N, it is counted again with each hyphen a line broke after, on the page or in the line, read kept
-    or dropped (`_hyphenated_count`), and N copies there pass too."""
-    chars = [c for c in normalize.fold(t.text) if not c.isspace()]
-    pattern = r"(?<![^\W_])" + r"\s*".join(re.escape(c) for c in chars) + r"(?![^\W_])"
-    n = len(re.findall(pattern, normalize.fold(v.seen)))
+    """The content appears exactly N times. A `Text` is counted as a whole run of words: a longer word doesn't
+    count. When the count is not N, it is counted again with each hyphen a line broke after, on the page or in
+    the line, read kept or dropped (`_hyphenated_count`), and N copies there pass too. A `Number` is counted
+    as `present` finds one, digit for digit (`_number_copies`); the hyphen reading does not apply to it.
+    Both read the page text without image descriptions (`v.seen`)."""
+    if isinstance(t.content, Number):
+        n = _number_copies(t.content.number, v.seen)
+        return _mark(n == t.expected_count, f"{t.content.number!r} appears {n}x, not {t.expected_count}x")
+    text = t.content.text
+    n = _text_copies(text, v.seen)
     if n == t.expected_count:
         return True, ""
-    h = _hyphenated_count(t.text, v.seen)
+    h = _hyphenated_count(text, v.seen)
     if h == t.expected_count:
         return True, ""
     how = "" if h is None else " (reading line-end hyphens kept or dropped)"
-    return False, f"{t.text[:50]!r} appears {n if h is None else h}x{how}, not {t.expected_count}x"
+    return False, f"{text[:50]!r} appears {n if h is None else h}x{how}, not {t.expected_count}x"
+
+
+def _text_copies(text: str, page: str) -> int:
+    """How many whole-word copies of `text` the page holds, after `normalize.fold` on both. Planned: a
+    case-sensitive count (`exact_case`, as `present` will have it) swaps `fold` for its case-keeping form
+    here."""
+    chars = [c for c in normalize.fold(text) if not c.isspace()]
+    pattern = r"(?<![^\W_])" + r"\s*".join(re.escape(c) for c in chars) + r"(?![^\W_])"
+    return len(re.findall(pattern, normalize.fold(page)))
+
+
+def _number_copies(text: str, page: str) -> int:
+    """How many copies of the number `text` the page holds: the places `_number_found` accepts, each counted
+    once (a copy is a match of `_number_pattern` with the gold's sign and, if the gold has one, its percent
+    sign). Matches never overlap and are bounded by non-digits, so 12.5 is not a copy inside 12.5.7."""
+    n = number(text)
+    assert n is not None, text
+    written = _NUMBER.match(text.strip())["body"]
+    return sum(1 for m in _number_pattern(written).finditer(normalize.fold(page).translate(_NUM_CLEAN))
+               if ((m["pre"] or "").strip() == "-") == n.negative and (m["pct"] or not n.percent))
 
 
 _WORD_CHAR = re.compile(r"[^\W_]")
@@ -367,7 +391,10 @@ TYPES: dict[str, tuple[type, Runner]] = {
 VALID: dict[str, tuple[Callable[[Any], bool], str]] = {
     "present": (lambda t: not isinstance(t.content, Number) or number(t.content.number) is not None,
                 "a number must read as one number, e.g. 1,240.00 or -4.8%"),
-    "repeat": (lambda t: t.expected_count > 0, "expected_count must be a positive whole number"),
+    "repeat": (lambda t: t.expected_count > 0
+               and (not isinstance(t.content, Number) or number(t.content.number) is not None),
+               "expected_count must be a positive whole number, and a number must read as one number, "
+               "e.g. 1,240.00 or -4.8%"),
     "page_near_empty": (lambda t: t.max_chars >= 0, "max_chars must be a whole number, 0 or more"),
     "layout_kind": (lambda t: bool(t.content.place) and t.kind in views.LABELS,
                     f"its content needs a place, and its kind must be one of {views.LABELS}"),

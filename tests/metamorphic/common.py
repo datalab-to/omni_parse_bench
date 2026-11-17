@@ -89,7 +89,9 @@ def of(*kinds):
 
 TEXT = [t for t in of(runners.Present) if isinstance(t.params.content, runners.Text)]
 NUMBER = [t for t in of(runners.Present) if isinstance(t.params.content, runners.Number)]
-ORDER, REPEAT = of(runners.Order), of(runners.Repeat)
+ORDER = of(runners.Order)
+REPEAT = [t for t in of(runners.Repeat) if isinstance(t.params.content, runners.Text)]
+REPEAT_NUMBER = [t for t in of(runners.Repeat) if isinstance(t.params.content, runners.Number)]
 CELL, LAYOUT = of(runners.TableCell), of(runners.LayoutKind)
 for _name, _tests in [("text", TEXT), ("number", NUMBER), ("order", ORDER), ("repeat", REPEAT),
                       ("table_cell", CELL), ("layout_kind", LAYOUT)]:
@@ -105,7 +107,7 @@ def text_strings(p) -> list[str]:
     if isinstance(p, runners.Order):
         return [p.before, p.after]
     if isinstance(p, runners.Repeat):
-        return [p.text]
+        return [p.content.text] if isinstance(p.content, runners.Text) else []
     if isinstance(p, runners.TableCell):
         section = [p.section] if p.section else []
         return [p.cell, *p.headings, *section, *p.row_groups, *p.relations.values()]
@@ -122,14 +124,15 @@ MANIFEST_SHA256 = "5cc5611ad6e1d32e0e39c91ce23da913e63ba775e414a7734c7d9c1768139
 # test_certificate.py, the fixtures always and the dataset when OPB_DATASET is set).
 POOLS = {
     "text, order, table_cell": ("text, order and table_cell tests", 8, 10_259),
-    "repeat": ("repeat tests", 1, 35),
+    "repeat": ("repeat tests with text", 1, 35),
+    "repeat number": ("repeat tests with a number", 6, 0),
     "text, number": ("text and number tests", 5, 4_007),
     "layout": ("layout_kind tests", 3, 2_403),
     "number": ("number tests", 2, 323),
     "digit-edged text, repeat": ("text and repeat tests with a digit at an end", 2, 431),
     "exact text": ("text tests with max_diffs 0", 2, 2_314),
     "text, order, repeat, table_cell": ("text, order, repeat and table_cell tests", 9, 10_294),
-    "batch": ("text, number, order, repeat and table_cell tests", 11, 10_617),
+    "batch": ("text, number, order, repeat and table_cell tests", 17, 10_617),
 }
 
 # The Hypothesis tests whose input space runs out in CI before the profile's max_examples, and how many

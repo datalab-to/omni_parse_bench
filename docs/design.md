@@ -59,6 +59,12 @@ is found in an output (`runners.found`):
 
 A `layout_kind` test's text only labels its place; it is never compared.
 
+A `repeat` test counts a text or a number: its content is the same kind of arg, read as `present` reads it
+(text as whole words after folding; a number digit for digit, `runners._number_copies`), and `expected_count`
+says how many copies the page holds. The count, not the kind, is what a `repeat` test adds. A case-sensitive
+count (`exact_case` on a text arg, planned with its `present` counterpart) would change only how `_text_copies`
+folds; an arg's kind never decides the comparison on its own.
+
 Text presence also accepts an exact match through an ambiguous wrapping hyphen:
 `মানু- হৰ` can match `মানুহৰ`. The hyphen must follow a letter or its combining marks,
 have whitespace after it, and precede a letter that is neither uppercase nor titlecase (or, in a heading in
@@ -76,7 +82,7 @@ existing rules.
 |---|---|---|---|---|---:|
 | `present` | `html` | this content appears | `content` | text | 7,275 |
 | `order` | `html` | A comes before B | `before`, `after` (text) | text | 1,189 |
-| `repeat` | `html` | this line appears exactly N times | `content` (text); `expected_count` | text | 35 |
+| `repeat` | `html` | this line, or this number, appears exactly N times | `content` (text or number); `expected_count` | text | 35 |
 | `page_near_empty` | `html` | a blank page yields at most N non-space characters (not invisible format characters, nor the marks the text view writes for an element that holds nothing) | no args; `max_chars` | text | 0 |
 | `table_cell` | `html` | this cell exists with these neighbors, under these headings, in this section and in these row groups; the cell may be one line of a multi-line cell | `cell`, `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `headings`, `section`, `row_groups` (text) | tables | 5,386 |
 | `layout_kind` | `blocks` | the smallest block covering half of this line's place has this kind | `content` (text with a `place`); `kind` | layout | 2,403 |

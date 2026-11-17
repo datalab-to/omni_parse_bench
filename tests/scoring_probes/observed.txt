@@ -219,6 +219,32 @@ rep-typo	fail	'Total' appears 0x, not 1x
 rep-alt-only	fail	'Total' appears 0x, not 1x
 rep-overlap	fail	'aa' appears 0x, not 1x
 rep-compound	pass
+## repeat-number-rules
+repn-pass	pass
+repn-cell	pass
+repn-space	pass
+repn-currency	pass
+repn-parens	pass
+repn-stop	pass
+repn-minus	pass
+repn-alt-ignored	pass
+repn-percent-extra	pass
+repn-context	pass
+repn-missing	fail	'1,240' appears 1x, not 2x
+repn-extra	fail	'1,240' appears 3x, not 2x
+repn-separator	fail	'1,240' appears 0x, not 1x
+repn-comma-dropped	fail	'1,000' appears 0x, not 1x
+repn-comma-added	fail	'1000' appears 0x, not 1x
+repn-point-for-comma	fail	'1,000' appears 0x, not 1x
+repn-zero-added	fail	'8.455' appears 0x, not 1x
+repn-zero-dropped	fail	'0.50' appears 0x, not 1x
+repn-digit-glued	fail	'1,240' appears 0x, not 1x
+repn-digit-changed	fail	'1,240' appears 0x, not 1x
+repn-longer-decimal	fail	'12.5' appears 0x, not 1x
+repn-sign-lost	fail	'-4.8%' appears 0x, not 1x
+repn-sign-added	fail	'4.8' appears 0x, not 1x
+repn-percent-lost	fail	'4.8%' appears 0x, not 1x
+repn-alt-only	fail	'1,240' appears 0x, not 1x
 ## near-empty-rules
 ne-blank	pass
 ne-spaces	pass
