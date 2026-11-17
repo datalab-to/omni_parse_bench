@@ -153,3 +153,15 @@ def test_latex_must_render_to_something(latex, why):
     with pytest.raises(ValueError, match=why) as e:
         gold.test("p", with_args({"content": {"latex": latex}}))
     assert "test 't'" in str(e.value) and repr(latex)[:20] in str(e.value)
+
+
+@pytest.mark.parametrize("budget", [1, 2])
+def test_exact_case_and_an_edit_budget_exclude_each_other(budget):
+    """exact_case with max_diffs above 0 is refused at load, and the message names both and the way out."""
+    t = with_args({"content": {"text": "abcdef", "max_diffs": budget, "exact_case": True}})
+    with pytest.raises(ValueError,
+                       match=r"exact_case and max_diffs \d exclude each other.*Set max_diffs to 0"):
+        gold.test("p", t)
+    # and either alone is fine
+    gold.test("p", with_args({"content": {"text": "abcdef", "max_diffs": budget}}))
+    gold.test("p", with_args({"content": {"text": "abcdef", "max_diffs": 0, "exact_case": True}}))

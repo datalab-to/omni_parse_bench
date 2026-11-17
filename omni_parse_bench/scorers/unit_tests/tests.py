@@ -256,8 +256,10 @@ def _arg(where: str, role: str, a: Any) -> runners.Arg:
                                  f"and {a['text']!r:.80} has none")
             if exact and a["max_diffs"] != 0:
                 # Note: a case flip costs one edit, so any budget would let the wrong case pass.
-                raise ValueError(f"{where}: {role}'s exact_case needs max_diffs 0, not {a['max_diffs']!r}: "
-                                 f"an edit budget would spend itself on a changed case")
+                raise ValueError(
+                    f"{where}: {role}'s exact_case and max_diffs {a['max_diffs']!r} exclude each other: "
+                    f"a changed letter case costs one edit, so a budget would let the wrong case pass. "
+                    f"Set max_diffs to 0, or drop exact_case")
             return runners.Text(a["text"], a["max_diffs"], _place(where, role, a.get("place", [])), exact)
         case "number": return runners.Number(a["number"])
         case _: return runners.Latex(a["latex"])

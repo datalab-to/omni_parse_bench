@@ -63,8 +63,7 @@ Case is folded by default: it isn't what most parses are paid for. A text arg of
 `exact_case: true` (false when omitted), for content whose case is the point (`iPhone`, `NASA`, `Co` and `CO`, a German noun). The
 arg then passes only when its text is found with its case kept: `normalize.fold_cased` applies every other fold
 (glyphs, spacing, quotes, dashes, hyphens) and leaves case alone, on both sides, in every path of `found`
-(footnote markers, hyphen wrapping, squeezed text). `max_diffs` then counts a
-changed letter's case as an edit, so such a test must say 0 (the loader refuses a larger budget). Numbers and equations have no case, and the other test types do not read it yet, so the field is refused
+(footnote markers, hyphen wrapping, squeezed text). `exact_case` and a `max_diffs` above 0 exclude each other: a changed letter's case costs one edit, so a budget would let the wrong case pass, and the loader refuses the pair (use `max_diffs: 0`, or drop `exact_case`). Numbers and equations have no case, and the other test types do not read it yet, so the field is refused
 there when the test loads. The text must also have a cased letter (`123` has no case to keep), or the field is refused.
 
 `exact_case` keeps the case of letters only, and it compares the page's text, not how it looks. Limits:

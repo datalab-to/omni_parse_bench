@@ -13,7 +13,7 @@ Case is folded, unless the arg sets `exact_case`: then the same search, squeeze 
 strings that keep their case (every other fold still applies), so `iPhone` does not pass for `iphone`
 (cases `text-exact-case`, `text-exact-case-line-hyphen-wrong`) and does pass in its case through every other
 difference (cases `text-exact-case-kept`, `text-exact-case-folds`, `text-exact-case-line-hyphen`). With edits
-to spend, a changed letter's case costs one, so an exact-case test says 0.
+to spend, a changed letter's case costs one, so `exact_case` and a `max_diffs` above 0 exclude each other and the loader refuses the pair.
 
 ## Rules
 
