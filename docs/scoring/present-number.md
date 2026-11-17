@@ -57,6 +57,10 @@ What it does not look at, so a wrong output passes:
 | B | a percent sign the gold lacks | `4.8` | `4.8%` | pass | `num-percent-extra` |
 <!-- /cases -->
 
+A space groups digits, and the test does not tie a number to its line: `500` is found in `12 500`, and `12 500`
+is found where `12` ends one table cell and `500` starts the next. A `repeat` test with a number counts line by
+line and refuses both ([repeat.md](repeat.md)); `present` is unchanged.
+
 What it penalizes:
 
 <!-- cases:number-penalized -->

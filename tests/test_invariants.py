@@ -46,7 +46,8 @@ def answer(t: gold.Test) -> dict[str, Any]:
         case runners.Present(content=runners.Number(number=x)): html = f"<p>{e(x)}</p>"
         case runners.Present(content=runners.Latex(latex=x)): html = f"<p>$${e(x)}$$</p>"
         case runners.Order(): html = f"<p>{e(p.before)}</p><p>{e(p.after)}</p>"
-        case runners.Repeat(): html = "".join(f"<p>{e(p.text)}</p>" for _ in range(p.expected_count))
+        case runners.Repeat(content=runners.Text(text=x) | runners.Number(number=x)):
+            html = "".join(f"<p>{e(x)}</p>" for _ in range(p.expected_count))
         case runners.TableCell(): html = table(p)
         case runners.LayoutKind():
             xs = p.content.place

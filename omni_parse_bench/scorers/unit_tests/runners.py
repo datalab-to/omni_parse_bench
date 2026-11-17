@@ -8,6 +8,7 @@ constants (a threshold, a fill ratio) are module constants here, never parameter
 """
 from __future__ import annotations
 
+import functools
 import re
 import unicodedata
 from collections.abc import Callable, Sequence
@@ -167,24 +168,74 @@ def _order_hyphenated(t: Order, v: views.Html) -> bool:
 
 
 class Repeat(NamedTuple):
-    text: str
+    content: Text | Number      # a `Text` is counted as whole words, a `Number` as `present` finds one
     expected_count: int
 
 
 def repeat(t: Repeat, v: views.Html) -> Mark:
-    """The line appears exactly N times, as a whole run of words: a longer word doesn't count. When the count
-    is not N, it is counted again with each hyphen a line broke after, on the page or in the line, read kept
-    or dropped (`_hyphenated_count`), and N copies there pass too."""
-    chars = [c for c in normalize.fold(t.text) if not c.isspace()]
-    pattern = r"(?<![^\W_])" + r"\s*".join(re.escape(c) for c in chars) + r"(?![^\W_])"
-    n = len(re.findall(pattern, normalize.fold(v.seen)))
+    """The content appears exactly N times. A `Text` is counted as a whole run of words: a longer word doesn't
+    count. When the count is not N, it is counted again with each hyphen a line broke after, on the page or in
+    the line, read kept or dropped (`_hyphenated_count`), and N copies there pass too. A `Number` is counted
+    as `present` finds one, digit for digit, line by line (`_number_copies`); the hyphen reading does not
+    apply to it. Neither counts image descriptions."""
+    if isinstance(t.content, Number):
+        n = _number_copies(t.content.number, v)
+        return _mark(n == t.expected_count, f"{t.content.number!r} appears {n}x, not {t.expected_count}x")
+    text = t.content.text
+    n = _text_copies(text, v.seen)
     if n == t.expected_count:
         return True, ""
-    h = _hyphenated_count(t.text, v.seen)
+    h = _hyphenated_count(text, v.seen)
     if h == t.expected_count:
         return True, ""
     how = "" if h is None else " (reading line-end hyphens kept or dropped)"
-    return False, f"{t.text[:50]!r} appears {n if h is None else h}x{how}, not {t.expected_count}x"
+    return False, f"{text[:50]!r} appears {n if h is None else h}x{how}, not {t.expected_count}x"
+
+
+def _text_copies(text: str, page: str) -> int:
+    """How many whole-word copies of `text` the page holds, after `normalize.fold` on both. """
+    chars = [c for c in normalize.fold(text) if not c.isspace()]
+    pattern = r"(?<![^\W_])" + r"\s*".join(re.escape(c) for c in chars) + r"(?![^\W_])"
+    return len(re.findall(pattern, normalize.fold(page)))
+
+
+@functools.lru_cache(maxsize=64)
+def _number_lines(html: str) -> tuple[str, ...]:
+    """The lines a page shows without alt text, for counting numbers: its text view with each block and each
+    <br> a line of its own, a footnote marker (`<sup>2</sup>`, `[2]`) and a list's numbers left out, each line
+    folded. A line is the unit because a space groups digits ("12 500") and a block break is a space to
+    fold."""
+    page = re.sub(r"<br\s*/?>", views.BREAK, re.sub(r"<(/?)ol\b", r"<\1ul", html, flags=re.I), flags=re.I)
+    q = views.reading(views.Seq(page), alt=False, marks=False)
+    return tuple(normalize.unmarked(line) for line in q.s.split(views.BREAK))
+
+
+def _number_copies(text: str, v: views.Html) -> int:
+    """How many copies of the number `text` the page holds: the places `_number_found` accepts, each counted
+    once (a copy is a match of `_number_pattern` with the gold's sign and, if the gold has one, its percent
+    sign), counted line by line (`_number_lines`). Matches never overlap and are bounded by non-digits, so
+    12.5 is not a copy inside 12.5.7. A gold of plain or space-grouped digits ("500", "12 500") is also no
+    copy where a group of digits continues across a space: 500 is not a copy in "12 500" and neither is 12 (a
+    gold of three digits is not preceded by a number of up to three digits and a space, a gold is not followed
+    by a space and three digits). `present` is more lenient on both counts."""
+    n = number(text)
+    assert n is not None, text
+    written = _NUMBER.match(text.strip())["body"]
+    pattern, plain = _number_pattern(written), re.sub(r"\s", " ", written)
+    # digits that a further group could continue, and ones that are themselves a group to continue
+    grouped = bool(re.fullmatch(r"\d{1,3}(?: \d{3})*", plain))
+    starts_group = grouped and bool(re.match(r"\d{3}(?: |$)", plain))
+    copies = 0
+    for line in _number_lines(v.html):
+        line = line.translate(_NUM_CLEAN)
+        for m in pattern.finditer(line):
+            if ((m["pre"] or "").strip() == "-") != n.negative or not (m["pct"] or not n.percent):
+                continue
+            if (starts_group and re.search(r"(?<![\w.,])\d{1,3}(?: \d{3})* $", line[:m.start()])
+                    or grouped and re.match(r" \d{3}(?!\w)", line[m.end():])):
+                continue
+            copies += 1
+    return copies
 
 
 _WORD_CHAR = re.compile(r"[^\W_]")

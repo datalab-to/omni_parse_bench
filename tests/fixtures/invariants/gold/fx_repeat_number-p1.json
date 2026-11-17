@@ -1,0 +1,14 @@
+{"tests": [
+  {"id": "fx_repeat_number_total", "test_type": "repeat", "output_type": "html", "derivation": "authored",
+   "tags": ["table"], "args": {"content": {"number": "1,240.00"}}, "settings": {"expected_count": 3}},
+  {"id": "fx_repeat_number_negative", "test_type": "repeat", "output_type": "html", "derivation": "authored",
+   "tags": ["table"], "args": {"content": {"number": "-4.8%"}}, "settings": {"expected_count": 2}},
+  {"id": "fx_repeat_number_decimal", "test_type": "repeat", "output_type": "html", "derivation": "authored",
+   "tags": ["table"], "args": {"content": {"number": "0.0472"}}, "settings": {"expected_count": 4}},
+  {"id": "fx_repeat_number_thousands", "test_type": "repeat", "output_type": "html", "derivation": "authored",
+   "tags": [], "args": {"content": {"number": "7,300"}}, "settings": {"expected_count": 2}},
+  {"id": "fx_repeat_number_spaced", "test_type": "repeat", "output_type": "html", "derivation": "authored",
+   "tags": [], "args": {"content": {"number": "12 500"}}, "settings": {"expected_count": 2}},
+  {"id": "fx_repeat_number_plain", "test_type": "repeat", "output_type": "html", "derivation": "authored",
+   "tags": [], "args": {"content": {"number": "20240117"}}, "settings": {"expected_count": 1}}
+]}
