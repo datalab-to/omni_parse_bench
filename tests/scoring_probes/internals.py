@@ -118,6 +118,7 @@ TABLES = [
         folds("fold-leader-sign", "a dash run before a spaced digit keeps its sign", "Revenue ....... -4.8", "revenue -4.8"),
         folds("fold-blank", "two underscores are not a leader", "Name: __", "name: __"),
         folds("fold-typography", "dash, quote, space and arrow families", "a–b a−b it’s «hi» a b ⇒", "a-b a-b it's \"hi\" a b →", show="`a–b a−b it’s «hi» a`(nbsp)`b ⇒`"),
+        folds("fold-tex-quote", "then two single quotes of any mix are a double quote, as TeX writes one", "``Yes'' '’No’'", "\"yes\" \"no\""),
         folds("fold-cjk", "full-width punctuation becomes ASCII", "日本語。３％", "日本語.3%"),
         folds("fold-middot", "a middle dot between digits is a decimal point; `⋅` is not", "2·3 2⋅3", "2.3 2⋅3"),
         folds("fold-case", "case is folded, but no letter is changed into others", "STRASSE straße Α", "strasse straße α"),

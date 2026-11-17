@@ -67,14 +67,14 @@ def test_folding_twice_is_folding_once_with_brackets_and_dots(s):
     assert fold(fold(s)) == fold(s)
 
 
-@relation(LIMITATION)
-@deviation("M1d")
+@relation(HOLDS)
 @example("'\u2019")
 @given(st.text("a '\u2019\u2018`\""))
 def test_folding_twice_is_folding_once_with_quotes(s):
     """Folding a string of single quotes (`'`, `\u2018`, `\u2019`, a backtick), double quotes, `a` and spaces
     twice gives the same text as folding it once. [M1d]
-    Why it matters for a score: as for M1a, where TeX's doubled quotes ('' for ") meet the quote family."""
+    Why it matters for a score: TeX writes a double quote as two single quotes, and a page may mix their
+    forms: a gold written '' must match a page that writes '\u2019."""
     # Given a string s of quotes; When it is folded once and twice; Then both give the same text
     assert fold(fold(s)) == fold(s)
 

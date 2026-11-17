@@ -64,7 +64,8 @@ this order: math spans read as text; a line-end hyphen before a lowercase letter
 a digit set apart; compatibility forms unified (NFKC) and invisible characters removed; checkboxes unified;
 footnote brackets and line-start bullets removed; leaders removed (runs of 3 or more dots, ideographic full stops
 `。` among them, even though full-width punctuation is made ASCII only later); dash, quote, space and arrow
-families unified; full-width punctuation made ASCII; a decimal middle dot made a point; spacing collapsed;
+families unified, then two single quotes in a row read as a double quote (TeX's ``` `` ``` and `''`, or a mixed
+pair `'’`); full-width punctuation made ASCII; a decimal middle dot made a point; spacing collapsed;
 lowercase.
 
 White space may sit inside a leader run, and a `<br>` or a newline is white space. A block break (the end of a
@@ -91,6 +92,7 @@ a lowercase letter is then read joined (`well-` before `known` reads `wellknown`
 | a dash run before a spaced digit keeps its sign | `Revenue ....... -4.8` | `revenue -4.8` | `fold-leader-sign` |
 | two underscores are not a leader | `Name: __` | `name: __` | `fold-blank` |
 | dash, quote, space and arrow families | `a–b a−b it’s «hi» a`(nbsp)`b ⇒` | `a-b a-b it's "hi" a b →` | `fold-typography` |
+| then two single quotes of any mix are a double quote, as TeX writes one | `` ``Yes'' '’No’' `` | `"yes" "no"` | `fold-tex-quote` |
 | full-width punctuation becomes ASCII | `日本語。３％` | `日本語.3%` | `fold-cjk` |
 | a middle dot between digits is a decimal point; `⋅` is not | `2·3 2⋅3` | `2.3 2⋅3` | `fold-middot` |
 | case is folded, but no letter is changed into others | `STRASSE straße Α` | `strasse straße α` | `fold-case` |

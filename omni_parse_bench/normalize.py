@@ -44,9 +44,11 @@ _DASH = re.compile("[‐-―−]")
 # Note: ꞌ (saltillo, a glottal stop in Amarasi) and ˈ (IPA primary stress) are typed as an ASCII apostrophe.
 _SQUOTE = re.compile("[‘’‚‛ʼ`´′ꞌꞋˈ]")
 _DQUOTE = re.compile("[“”„‟«»]")
-# TeX's quotes, written as doubled single quotes; and a spacing accent typed after its letter, as a
-# text layer copies it from TeX ("Cuo´"), which NFKC would split into a space and a loose accent.
-_TEX_QUOTE = re.compile("‘‘|’’|``|''")
+# Note: TeX writes a double quote as two single quotes (`` and ''), and a page may mix the family's members
+# ('’); so the pair is read after the family is one character, and a fold never leaves two in a row.
+_TEX_QUOTE = "''"
+# A spacing accent typed after its letter, as a text layer copies it from TeX ("Cuo´"), which NFKC would split
+# into a space and a loose accent.
 # Note: ´ between two letters is an apostrophe typed as an accent ("it´s"), not one.
 _ACUTE_APOSTROPHE = re.compile("(?<=[^\\W\\d_])´(?=[^\\W\\d_])")
 _SPACING_ACCENT = re.compile("(?<=[^\\W\\d_])([´¨˜ˆ˚¸˘ˇ˙˝])")
@@ -127,8 +129,8 @@ def fold(s: str) -> str:
                          -> "developers"), when a lowercase letter follows; a block break is a line end
         superscripts     superscript digits after a digit set apart ("1,240¹" -> "1,240 1"), as views.text
                          sets apart a <sup>, so a footnote marker never joins the number it follows
-        NFKC             compatibility forms -> canonical ("ﬁ" -> "fi"); just before it, ″ ‴ and TeX quotes
-                         -> ", 〜 ∗ -> ~ *, CJK middle dots (not between digits) -> "·", spacing accents
+        NFKC             compatibility forms -> canonical ("ﬁ" -> "fi"); just before it, ″ ‴ -> ",
+                         〜 ∗ -> ~ *, CJK middle dots (not between digits) -> "·", spacing accents
                          after a letter -> combining ones
         invisibles       private-use characters and format characters (Unicode category Cf: zero-width,
                          bidi controls, soft hyphen, word joiner, ...) removed, except the visible
@@ -138,9 +140,9 @@ def fold(s: str) -> str:
         markers          a footnote marker [1] or [^1] -> " 1"; a bullet glyph starting a line -> a space
         leaders          runs of 3+ dots (ideographic full stops too), dashes or underscores -> a space;
                          white space may sit inside a run, but not a block break
-        typography       dash, quote (with primes, ꞌ, ˈ), space and arrow families unified; the fraction slash
-                         -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII;
-                         ş ţ -> ș ț; ״ -> "
+        typography       dash, quote (with primes, ꞌ, ˈ), space and arrow families unified, then two single
+                         quotes in a row (TeX's `` and '', or a mixed pair '’) -> "; the fraction slash
+                         -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII; ş ţ -> ș ț; ״ -> "
         symbols          decimal middle dots -> "."; ♢ -> ◊; ≦ -> ≤
         case, spacing    lowercased; whitespace collapsed and trimmed
 
@@ -200,8 +202,8 @@ def boxes(s: str) -> str:
 
 def _primes(s: str) -> str:
     """The folds that must run before NFKC, which would split ″ ‴ and a spacing accent, turn ㆍ into a
-    jamo and ･ into ・, and leave 〜 ∗ alone: ″ ‴ and TeX quotes as ", 〜 ∗ as ~ *, CJK middle dots as "·"."""
-    s = _TEX_QUOTE.sub('"', s.replace("″", '"').replace("‴", '"')).translate(_PRE_NFKC)
+    jamo and ･ into ・, and leave 〜 ∗ alone: ″ ‴ as ", 〜 ∗ as ~ *, CJK middle dots as "·"."""
+    s = s.replace("″", '"').replace("‴", '"').translate(_PRE_NFKC)
     s = _MIDDLE_DOT.sub(_fold_middle_dot, s)
     return _SPACING_ACCENT.sub(lambda m: _COMBINING[m[1]], _ACUTE_APOSTROPHE.sub("'", s))
 
@@ -213,7 +215,7 @@ def typography(s: str, *, preserve_dashes: bool = False) -> str:
     if not preserve_dashes:
         s = _DASH.sub("-", s)
     s = s.translate(_POST_NFKC)
-    s = _SQUOTE.sub("'", s)
+    s = _SQUOTE.sub("'", s).replace(_TEX_QUOTE, '"')
     s = _DQUOTE.sub('"', s)
     s = _SPACE.sub(" ", s)
     for pattern, arrow in _ARROWS:

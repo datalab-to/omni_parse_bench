@@ -67,19 +67,6 @@
     ],
     "promised": false
   },
-  "M1d": {
-    "status": "known limitation",
-    "description": "Fold reads TeX's doubled quotes ('' and ’’) as a double quote before it unifies the quote family. So a mixed pair ('’) folds to two single quotes, and a second fold reads those as a double quote.",
-    "counterexample": "fold(\"'’\") = \"''\", but fold(\"''\") = '\"'. So a text test for '' fails on a page that writes '’",
-    "why_this_status": "No doc promises that folding twice changes nothing. The outcome follows from the order of fold's documented steps but is not itself documented. The steps: the fold docstring in omni_parse_bench/normalize.py turns 'TeX quotes' into '\"' just before NFKC, and unifies the quote family later, under 'typography'.",
-    "effect_on_scores": "unknown",
-    "effect_basis": "not measured: it was not re-scored on cached leaderboard re-runs, and this package holds no system outputs to measure it with. No real text string folds differently twice this way, so only a page that writes another spelling of a gold's two quotes is affected",
-    "how_common": "0 real strings; pages not measured",
-    "who_is_affected": "a text test whose gold writes two single quotes ('') against a page that writes a mixed pair ('’), or the reverse",
-    "enumerated_over_real_tests": true,
-    "found_by": "test_every_real_text_string_folds_to_the_same_text_twice",
-    "real_ids": []
-  },
   "M1e": {
     "status": "known limitation",
     "description": "Fold removes a bullet only where it starts a line, so in '• •' it removes the first and keeps the second. The second then starts the text, and a second fold removes it too.",

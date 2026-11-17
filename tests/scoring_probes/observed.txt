@@ -331,6 +331,7 @@ fold-leader-cjk	目次 5 第一章 8
 fold-leader-sign	revenue -4.8
 fold-blank	name: __
 fold-typography	a-b a-b it's "hi" a b →
+fold-tex-quote	"yes" "no"
 fold-cjk	日本語.3%
 fold-middot	2.3 2⋅3
 fold-case	strasse straße α

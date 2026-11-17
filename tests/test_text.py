@@ -196,6 +196,15 @@ def test_fold_keeps_other_modifier_letters():
         assert normalize.fold(f"a{kept}b") == f"a{kept}b"
 
 
+@pytest.mark.parametrize("pair", ["'’", "’'", "`'", "‘’", "‘'", "'′", "``", "''"])
+def test_two_single_quotes_of_any_mix_are_a_double_quote(pair):
+    # The quote family is one character before TeX's doubled quote is read, so a gold written '' matches
+    # a page that writes '’, and folding the result again changes nothing.
+    assert normalize.fold(f"{pair}x{pair}") == normalize.fold("''x''") == '"x"'
+    assert normalize.fold(normalize.fold(pair)) == normalize.fold(pair) == '"'
+    assert normalize.fold("it’s") == "it's"
+
+
 def test_fold_leaves_money_alone():
     assert "$1,000.01" in normalize.fold("b $1,000.01 to $2,000.00")
     # prose between two "$" with one LaTeX-like character in it isn't math

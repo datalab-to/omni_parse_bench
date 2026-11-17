@@ -7,10 +7,9 @@ Each promise is a *relation*: change a page, or a test, in a way that should not
 known way), and the verdict should follow. Example: putting a passing answer in bold must not make its test
 fail.
 
-- The certificate lists the 68 relations its authors selected: 56 hold and 12 deviate. It is not every
-  relation of the scorer (see [Not covered](#not-covered)). Four of the 12 (M1a to M1c and M1e) are about
-  folding a string twice, which the scorer never does and no document promises, so they change no score; M1d is a
-  spelling equivalence on one fold, with an effect that was not measured.
+- The certificate lists the 68 relations its authors selected: 57 hold and 11 deviate. It is not every
+  relation of the scorer (see [Not covered](#not-covered)). Four of the 11 (M1a to M1c and M1e) are about
+  folding a string twice, which the scorer never does and no document promises, so they change no score.
 - It is generated from the tests. CI fails if it is out of date, or if a status disagrees with its test.
 - This page is enough to read it. Links to `docs/scoring` add detail only.
 
@@ -39,10 +38,10 @@ A healthy run gives:
 
 | | passed | skipped | xfailed |
 |---|---|---|---|
-| this folder, no dataset | 80 | 11 | 14 |
-| this folder, with dataset | 90 | 1 | 14 |
-| whole suite, no dataset | 1163 | 21 | 14 |
-| whole suite, with dataset | 1178 | 6 | 14 |
+| this folder, no dataset | 81 | 11 | 13 |
+| this folder, with dataset | 91 | 1 | 13 |
+| whole suite, no dataset | 1172 | 21 | 13 |
+| whole suite, with dataset | 1187 | 6 | 13 |
 
 All four rows come from runs of this version.
 
@@ -244,7 +243,8 @@ Reference only; the sections above do not need it until a term is unfamiliar.
   7. bullets starting a line are removed;
   8. runs of 3 or more dots (ideographic full stops `。` too, M2g), dashes of any kind (M2f), `_`, `=` or `*`
      (*leaders*) are made a space; white space may sit inside a run, but not a paragraph break (M22a);
-  9. dash, quote, space and arrow families are each made one character;
+  9. dash, quote, space and arrow families are each made one character, then two single quotes in a row (TeX's
+     ` `` ` and `''`, or a mixed pair `'’`) are read as a double quote;
   10. text is lowercased and white space collapsed (not removed).
 - **squeeze**: fold with every space removed. Present and order retry with it when fold fails; table_cell
   also compares cells with their spaces removed.
@@ -310,4 +310,4 @@ Reference only; the sections above do not need it until a term is unfamiliar.
   - CI tries at most 300 examples per test, the same ones every run.
   - `HYPOTHESIS_PROFILE=deep` tries 5,000 new ones. CI never runs it.
 - **strict xfail**: a test marked as expected to fail. If it passes, pytest reports a failure.
-  The 12 deviations give 14 expected failures, because M11b runs as three cases (order, repeat, table_cell).
+  The 11 deviations give 13 expected failures, because M11b runs as three cases (order, repeat, table_cell).

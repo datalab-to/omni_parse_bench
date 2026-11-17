@@ -78,8 +78,8 @@ def deviation(label: str):
 
 
 def known_ids(label: str) -> set[str]:
-    """The real ids listed as deviating for one relation in known_deviations.json."""
-    return set(DEVIATIONS[label].get("real_ids", []))
+    """The real ids listed as deviating for one relation in known_deviations.json (none when it holds)."""
+    return set(DEVIATIONS.get(label, {}).get("real_ids", []))
 
 # ---------------------------------------------------------------------------------------- the tests
 
