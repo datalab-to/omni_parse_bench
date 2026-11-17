@@ -324,7 +324,7 @@ def with_strings_changed(p, f):
     if isinstance(p, runners.Order):
         return p._replace(before=f(p.before), after=f(p.after))
     if isinstance(p, runners.Repeat):
-        return p._replace(text=f(p.text))
+        return p._replace(content=p.content._replace(text=f(p.content.text)))
     return p._replace(cell=f(p.cell), headings=tuple(map(f, p.headings)),
                       section=f(p.section) if p.section else None, row_groups=tuple(map(f, p.row_groups)),
                       relations={k: f(x) for k, x in p.relations.items()})

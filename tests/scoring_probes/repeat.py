@@ -1,6 +1,6 @@
 # ruff: noqa: E501
 """Cases for docs/scoring/repeat.md."""
-from cases import repeat, table
+from cases import repeat, repeat_number, table
 
 TABLES = [
     table(
@@ -22,5 +22,40 @@ TABLES = [
         repeat("rep-alt-only", "P", "only in an image description", "Total", 1, "<img alt='Total'>"),
         repeat("rep-overlap", "P", "copies that overlap", "aa", 1, "aaaa"),
         repeat("rep-compound", "I", "hyphenated compound broken at a line end", "self-aware", 1, "self- aware"),
+    ),
+    table(
+        "repeat-number-rules",
+        repeat_number("repn-pass", "I", "two copies, two expected", "1,240", 2, "<p>1,240</p><p>1,240</p>"),
+        repeat_number("repn-cell", "I", "a copy in a table cell", "1,240", 1, "<table><tr><td>1,240</td></tr></table>"),
+        repeat_number("repn-space", "I", "a no-break space for the gold's space", "12 500", 1, "12&nbsp;500"),
+        repeat_number("repn-currency", "I", "a currency sign", "1,240.00", 1, "$1,240.00"),
+        repeat_number("repn-parens", "I", "parentheses around a copy", "4.8", 1, "(4.8)"),
+        repeat_number("repn-stop", "I", "a full stop after a copy", "5", 1, "5."),
+        repeat_number("repn-minus", "I", "an en dash for the minus sign", "-4.8%", 1, "\u20134.8%"),
+        repeat_number("repn-alt-ignored", "I", "an image description is not a copy", "1,240", 1, "<p>1,240</p><img alt='1,240'>"),
+        repeat_number("repn-percent-extra", "B", "a percent sign the gold lacks", "4.8", 1, "4.8%"),
+        repeat_number("repn-context", "B", "any place on the page, a page number too", "42", 1, "Page 42 of 100"),
+        repeat_number("repn-lines", "I", "two copies in two cells", "1,240", 2, "<table><tr><td>1,240</td><td>1,240</td></tr></table>"),
+        repeat_number("repn-same-line", "I", "two copies on one line", "1,240", 2, "<p>1,240 1,240</p>"),
+        repeat_number("repn-footnote-mark", "I", "a footnote mark is not a copy", "2", 1, "<p>Revenue<sup>2</sup> was 2</p>"),
+        repeat_number("repn-list-numbers", "I", "a list's numbers are not copies", "2", 1, "<ol><li>a</li><li>b 2</li></ol>"),
+        repeat_number("repn-cells-glue", "P", "a space-grouped number in two cells", "12 500", 1, "<table><tr><td>12</td><td>500</td></tr></table>"),
+        repeat_number("repn-group-continued", "P", "three digits that continue a group", "500", 1, "Total 12 500"),
+        repeat_number("repn-group-before", "P", "digits followed by another group", "12", 1, "12 500"),
+        repeat_number("repn-missing", "P", "a missing copy", "1,240", 2, "1,240", why=True),
+        repeat_number("repn-extra", "P", "an extra copy", "1,240", 2, "<p>1,240</p><p>1,240</p><p>1,240</p>", why=True),
+        repeat_number("repn-separator", "P", "another separator", "1,240", 1, "1240"),
+        repeat_number("repn-comma-dropped", "P", "a thousands comma dropped", "1,000", 1, "1000"),
+        repeat_number("repn-comma-added", "P", "a thousands comma added", "1000", 1, "1,000"),
+        repeat_number("repn-point-for-comma", "P", "a point for the comma", "1,000", 1, "1.000"),
+        repeat_number("repn-zero-added", "P", "a trailing zero added", "8.455", 1, "8.4550"),
+        repeat_number("repn-zero-dropped", "P", "a trailing zero dropped", "0.50", 1, "0.5"),
+        repeat_number("repn-digit-glued", "P", "a digit glued on", "1,240", 1, "11,240"),
+        repeat_number("repn-digit-changed", "P", "a changed digit", "1,240", 1, "1,241"),
+        repeat_number("repn-longer-decimal", "P", "cut out of a longer decimal", "12.5", 1, "12.5.7"),
+        repeat_number("repn-sign-lost", "P", "the sign lost", "-4.8%", 1, "4.8%"),
+        repeat_number("repn-sign-added", "P", "a sign the gold lacks", "4.8", 1, "-4.8"),
+        repeat_number("repn-percent-lost", "P", "the percent sign lost", "4.8%", 1, "4.8"),
+        repeat_number("repn-alt-only", "P", "only in an image description", "1,240", 1, "<img alt='1,240'>"),
     ),
 ]

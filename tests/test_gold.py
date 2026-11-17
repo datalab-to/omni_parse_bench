@@ -39,12 +39,29 @@ def with_args(args: dict, test_type: str = "present", settings: dict | None = No
     with_args({"content": {"text": "abc", "max_diffs": 0}}, "repeat", {"expected_count": 0}),
     with_args({"content": {"text": "abc", "max_diffs": 0}}, "repeat", {"expected_count": -1}),
     with_args({"content": {"text": "abc", "max_diffs": 0}}, "repeat", {"expected_count": True}),
+    # ambiguous, as in present
+    with_args({"content": {"number": "12,5"}}, "repeat", {"expected_count": 2}),
+    with_args({"content": {"number": "1,240"}}, "repeat", {"expected_count": 0}),
+    with_args({"content": {"number": "1,240"}}, "repeat", {"expected_count": True}),
+    with_args({"content": {"number": "1,240"}}, "repeat", {}),
+    with_args({"content": {"number": "1,240"}}, "repeat", {"expected_count": 2, "max_diffs": 0}),
+    with_args({"content": {"number": 1240}}, "repeat", {"expected_count": 2}),
+    with_args({"content": {"latex": "x^2"}}, "repeat", {"expected_count": 2}),
+    with_args({"content": {"number": "1,240", "max_diffs": 0}}, "repeat", {"expected_count": 2}),
+    with_args({"content": {"text": "abc", "max_diffs": 1}}, "repeat", {"expected_count": 2}),
     with_args({"content": {"text": "abc", "max_diffs": 0}}, id=7),
     with_args({"content": {"text": "abc", "max_diffs": 0}}, id=" "),
 ])
 def test_a_bad_arg_or_setting_is_refused(t):
     with pytest.raises(ValueError):
         gold.test("p", t)
+
+
+@pytest.mark.parametrize("number", ["1,240", "-4.8%", "12.5", "0.0472", "1,240.00", "8.455"])
+def test_repeat_takes_a_number_and_a_count(number):
+    t = gold.test("p", with_args({"content": {"number": number}}, "repeat", {"expected_count": 3}))
+    assert t.params.content.number == number and t.params.expected_count == 3
+    assert gold.arg_kinds(t.test_type, t.args) == ("number",)
 
 
 @pytest.mark.parametrize("limit", [0, 1, 20])

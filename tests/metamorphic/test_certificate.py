@@ -9,7 +9,8 @@ import sys
 import pytest
 
 from metamorphic.common import CELL, CHECKS, DEVIATION_STATUS, DEVIATIONS, HOLDS, LAYOUT, LIVE, NUMBER, ORDER
-from metamorphic.common import (DATASET_REVISION, MANIFEST_SHA256, POOLS, REAL, RELATIONS, REPEAT, RUN_IN_CI,
+from metamorphic.common import (DATASET_REVISION, MANIFEST_SHA256, POOLS, REAL, RELATIONS, REPEAT,
+                                REPEAT_NUMBER, RUN_IN_CI,
                                TEXT, manifest_sha256, text_strings)
 from metamorphic.render_certificate import (COMMAND, HERE, MODULES, ROOT, compare, examples_drawn,
                                            load_every_test_file, render)
@@ -129,10 +130,11 @@ def test_the_certificate_pools_are_the_loaded_tests():
     from metamorphic.test_fold_and_case import EXACT
     from metamorphic.test_text_matching import DIGIT_EDGED
     sizes = {"text, order, table_cell": len(TEXT + ORDER + CELL), "repeat": len(REPEAT),
+             "repeat number": len(REPEAT_NUMBER),
              "text, number": len(TEXT + NUMBER), "layout": len(LAYOUT), "number": len(NUMBER),
              "digit-edged text, repeat": len(DIGIT_EDGED["present"]) + len(DIGIT_EDGED["repeat"]),
              "exact text": len(EXACT), "text, order, repeat, table_cell": len(TEXT + ORDER + REPEAT + CELL),
-             "batch": len(TEXT + NUMBER + ORDER + REPEAT + CELL)}
+             "batch": len(TEXT + NUMBER + ORDER + REPEAT + REPEAT_NUMBER + CELL)}
     assert sizes == {k: v[2 if LIVE else 1] for k, v in POOLS.items()}, "update POOLS in common.py"
 
 

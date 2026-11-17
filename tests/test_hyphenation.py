@@ -98,7 +98,7 @@ def test_order_and_repeat_keep_their_existing_rules():
     t = R.Order("ab", "cd", 0)
     assert not R.order(t, views.html("cd ab c d"))[0]
     assert not R.order(t, views.html("cd ab c d X- য"))[0]
-    assert R.repeat(R.Repeat("মানুহৰ", 0), views.html("অঁমানু- হৰ"))[0]
+    assert R.repeat(R.Repeat(R.Text("মানুহৰ", 0), 0), views.html("অঁমানু- হৰ"))[0]
 
 
 def runs(t, page):
@@ -110,8 +110,8 @@ def runs(t, page):
     (R.Order("self- aware", "tail", 0), "<p>self-aware</p><p>tail</p>"),
     (R.Order("head", "self-aware", 0), "<p>head</p><p>self-<br>aware</p>"),
     (R.Order("মানুহৰ", "শেষ", 0), "মানু- হৰ শেষ"),
-    (R.Repeat("self-aware", 1), "<p>self- aware</p>"),
-    (R.Repeat("self- aware", 1), "<p>self-aware</p>"),
+    (R.Repeat(R.Text("self-aware", 0), 1), "<p>self- aware</p>"),
+    (R.Repeat(R.Text("self- aware", 0), 1), "<p>self-aware</p>"),
     (R.TableCell("self-aware", {}, 0), "<table><tr><td>self- aware</td></tr></table>"),
     (R.TableCell("self- aware", {}, 0), "<table><tr><td>self-aware</td></tr></table>"),
     (R.TableCell("x", {"right": "self-aware"}, 0), "<table><tr><td>x</td><td>self- aware</td></tr></table>"),
@@ -126,9 +126,9 @@ def test_order_repeat_and_table_cell_read_a_broken_compound_either_way(t, page):
 
 
 def test_a_repeat_that_fails_reports_the_count_the_fallback_read():
-    ok, why = R.repeat(R.Repeat("self-aware", 2), views.html("<p>self- aware</p>"))
+    ok, why = R.repeat(R.Repeat(R.Text("self-aware", 0), 2), views.html("<p>self- aware</p>"))
     assert not ok and "appears 1x (reading line-end hyphens kept or dropped), not 2x" in why
-    ok, why = R.repeat(R.Repeat("total", 2), views.html("<p>total</p>"))
+    ok, why = R.repeat(R.Repeat(R.Text("total", 0), 2), views.html("<p>total</p>"))
     assert not ok and why.endswith("appears 1x, not 2x")
 
 
@@ -144,7 +144,7 @@ def test_the_hyphen_fallback_never_fails_headings_the_plain_reading_matches():
 @pytest.mark.parametrize("t, page", [
     (R.Order("tail", "self-aware", 0), "<p>self- aware</p><p>tail</p>"),       # still in order only
     (R.Order("self-aware", "tail", 0), "<p>self-awre</p><p>tail</p>"),         # no edits to spend
-    (R.Repeat("self-aware", 1), "<p>xself- aware</p>"),                        # still whole words
+    (R.Repeat(R.Text("self-aware", 0), 1), "<p>xself- aware</p>"),                        # still whole words
     (R.TableCell("self-aware", {}, 0), "<table><tr><td>self- aware x</td></tr></table>"),   # the whole cell
     (R.TableCell("self-aware", {}, 0), "<table><tr><td>selfaware</td></tr></table>"),       # unspaced
 ])
@@ -157,9 +157,9 @@ def test_repeat_counts_a_word_written_whole_and_broken_as_two_copies(count, pass
     # The main count sees the whole copy (1); the fallback reads both, each once (2), never more. With 1 the
     # main count passes, as it did: the fallback only adds a way to pass.
     page = "<p>self-aware</p><p>self- aware</p>"
-    assert runs(R.Repeat("self-aware", count), page) is passes
-    assert runs(R.Repeat("self-aware", 2), "<p>self- aware</p><p>self- aware</p>")
-    assert not runs(R.Repeat("self-aware", 2), "<p>self- aware</p>")
+    assert runs(R.Repeat(R.Text("self-aware", 0), count), page) is passes
+    assert runs(R.Repeat(R.Text("self-aware", 0), 2), "<p>self- aware</p><p>self- aware</p>")
+    assert not runs(R.Repeat(R.Text("self-aware", 0), 2), "<p>self- aware</p>")
 
 
 def test_fallback_requires_a_continuation_inside_the_match():
