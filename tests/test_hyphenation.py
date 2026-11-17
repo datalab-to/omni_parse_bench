@@ -57,6 +57,16 @@ def test_latin_mixed_hyphen_interpretations_in_one_match():
     assert present(wrapped, gold)
 
 
+def test_a_compound_in_capitals_keeps_both_readings():
+    # Fold joins a line-end hyphen between two words in capitals, as in lower case; so the hyphen stays
+    # optional there, as in lower case, and a heading in capitals still matches the compound.
+    for wrapped in ("SELF- AWARE", "self- aware"):
+        assert present("self-aware", wrapped) and present("selfaware", wrapped)
+        assert present(wrapped, "self-aware") and present(wrapped, "selfaware")
+    # A capital after a word in mixed case keeps the hyphen: the compound, not the joined word.
+    assert present("self-aware", "Self- Aware") and not present("selfaware", "Self- Aware")
+
+
 def test_published_korean_compound_regression():
     gold = "있다. T점수가 40점 이하를 낮은 점수라고 본다. 나는 남성성-여성성인 척도 5번이"
     assert present(gold, gold.replace("성-여", "성-\n여"))

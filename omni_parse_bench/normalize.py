@@ -126,7 +126,10 @@ def fold(s: str) -> str:
                          the spaces math mode doesn't render ("$c_{\text{MC}}$" -> "cMC", "$U$" -> "U",
                          "$$2 . 5 5$$" -> "2.55")
         line-end hyphens a word broken by a hyphen at a line end -> joined ("develop-\ners" and "develop- ers"
-                         -> "developers"), when a lowercase letter follows; a block break is a line end
+                         -> "developers"), when a lowercase letter follows, or when the letters before the
+                         hyphen and the letters after the break are all capitals ("DEVELOP- ERS"); a capital
+                         after a word in lower or mixed case keeps it ("Anglo- Saxon"); a block break is a
+                         line end
         superscripts     superscript digits after a digit set apart ("1,240¹" -> "1,240 1"), as views.text
                          sets apart a <sup>, so a footnote marker never joins the number it follows
         NFKC             compatibility forms -> canonical ("ﬁ" -> "fi"); just before it, ″ ‴ -> ",
@@ -177,9 +180,10 @@ def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool
     # Note: the block breaks `views.text` leaves stay until the leaders are folded, so a leader run never
     # joins two paragraphs; then they are the spaces they were. A line-end hyphen joins across one.
     s = unicodedata.normalize("NFC", _math_to_text(s))
-    # Note: only before a lowercase letter, so a line ending "-" before a capital or a digit stays.
+    # Note: only before a lowercase letter, or between two words in capitals, so a line ending "-" before a
+    # capital after a word in lower or mixed case ("Anglo- Saxon"), or before a digit, stays.
     if not preserve_line_hyphens:
-        s = _LINE_HYPHEN.sub(lambda m: m[1] if m[1].islower() else m[0], s)
+        s = _LINE_HYPHEN.sub(lambda m: m[1] if _joins(m.string, m.start(), m.start(1)) else m[0], s)
     s = _SUPERSCRIPT_DIGITS.sub(r" \1", s)
     s = _INVISIBLE.sub("", unicodedata.normalize("NFKC", _primes(s)))
     s = boxes(s)
@@ -192,6 +196,21 @@ def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool
     s = s.replace("…", "...").translate(_CJK_PUNCT)
     s = _DECIMAL_MIDDOT.sub(".", s).replace("♢", "◊").replace("≦", "≤")
     return _WHITESPACE.sub(" ", s).strip()
+
+
+def _joins(s: str, i: int, j: int) -> bool:
+    """Whether a line-end hyphen at `s[i]`, its line broken before the letter at `s[j]`, joins the word: when
+    that letter is lowercase, or when the letters before the hyphen and those from `j` are each all capitals
+    (a heading in capitals broken across a line, "DEVELOP- ERS"), so a word folds the same in upper case as in
+    lower case. A capital after a word in lower or mixed case keeps the hyphen ("Anglo- Saxon")."""
+    if s[j].islower():
+        return True
+    start, end = i, j
+    while start > 0 and s[start - 1].isalpha():
+        start -= 1
+    while end < len(s) and s[end].isalpha():
+        end += 1
+    return s[start:i].isupper() and s[j:end].isupper()
 
 
 def boxes(s: str) -> str:
@@ -247,8 +266,9 @@ def continuations(s: str, spaced: bool = False) -> tuple[str, frozenset[int]]:
         j = i + 1
         while j < len(cased) and cased[j].isspace():
             j += 1
+        # Note: optional where fold would join the word (`_joins`), and before an uncased letter too.
         if (j < len(cased) and unicodedata.category(cased[j]).startswith("L")
-                and not cased[j].isupper() and not cased[j].istitle()):
+                and (not cased[j].isupper() and not cased[j].istitle() or _joins(cased, i, j))):
             # Lowercasing can expand characters. Count intervening segments, not every
             # character in Python or the whole prefix again for each wrapping hyphen.
             offset += len(_WHITESPACE.sub("", cased[previous:i].lower()))

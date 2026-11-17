@@ -104,7 +104,8 @@ TABLES = [
     table(
         "internals-fold",
         folds("fold-math", "math is read as text", "$c_{\\text{MC}}$ and $$2 . 5 5$$", "cmc and 2.55"),
-        folds("fold-hyphen", "a line-end hyphen before a lowercase letter joins", "develop- ers, R- M", "developers, r- m"),
+        folds("fold-hyphen", "a line-end hyphen before a lowercase letter joins; a capital after a word in mixed case keeps it", "develop- ers, Anglo- Saxon", "developers, anglo- saxon"),
+        folds("fold-hyphen-caps", "so does one between two words in capitals", "DEVELOP- ERS, RE- M", "developers, rem"),
         folds("fold-hyphen-block", "a block break is a line break for a hyphen: it joins, as a `<br>` does", "<p>Head-</p><p>quarters</p><p>develop-<br>ers</p>", "headquarters developers"),
         folds("fold-superscript", "a superscript digit after a digit is set apart", "1,240¹", "1,240 1"),
         folds("fold-nfkc", "compatibility forms (ligatures, full width, sub- and superscripts)", "ﬁnal １２ m² H₂O ½ №", "final 12 m2 h2o 1/2 no"),

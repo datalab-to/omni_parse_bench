@@ -1,9 +1,9 @@
 {
   "M1a": {
     "status": "known limitation",
-    "description": "Fold keeps a line-end hyphen before a capital, then lowercases, so a second fold joins the word.",
-    "counterexample": "fold('R- M') = 'r- m', but fold('r- m') = 'rm'",
-    "why_this_status": "No doc promises that folding twice changes nothing, and the scorer folds each string once, so no verdict can change. The second-fold outcome follows from a documented rule but is not itself documented. The rule: the fold docstring in omni_parse_bench/normalize.py, 'a word broken by a hyphen at a line end -> joined ... when a lowercase letter follows', and the code comment above it, 'only before a lowercase letter, so a line ending \"-\" before a capital or a digit stays'.",
+    "description": "Fold keeps a line-end hyphen before a capital that follows a word in lower or mixed case, then lowercases, so a second fold joins the word.",
+    "counterexample": "fold('a- B') = 'a- b', but fold('a- b') = 'ab'",
+    "why_this_status": "No doc promises that folding twice changes nothing, and the scorer folds each string once, so no verdict can change. The second-fold outcome follows from a documented rule but is not itself documented. The rule: the fold docstring in omni_parse_bench/normalize.py, 'a word broken by a hyphen at a line end -> joined ... when a lowercase letter follows', and the code comment above it, 'only before a lowercase letter, or between two words in capitals, so a line ending \"-\" before a capital after a word in lower or mixed case ... stays'.",
     "effect_on_scores": "none seen",
     "effect_basis": "The scorer folds each string once. Measured on cached leaderboard re-runs (not included here): over the cached re-runs, no already-folded string was folded again, and making fold skip such strings changed no verdict",
     "how_common": "13 real strings",
@@ -81,38 +81,6 @@
     "real_ids": [],
     "promised": false
   },
-  "M2e": {
-    "status": "intended and documented",
-    "description": "Fold reads the case of the letter after a line-end hyphen, so the upper and lower case of the same words can fold differently.",
-    "counterexample": "fold('RE- M') = 're- m', but fold('re- m') = 'rem'",
-    "why_this_status": "The fold docstring in omni_parse_bench/normalize.py joins a line-end hyphen only 'when a lowercase letter follows'; docs/scoring/order.md (case ord-case-hyphen) shows 'R- M' not found in 'r- m'.",
-    "effect_on_scores": "unknown",
-    "effect_basis": "not measured: it was not re-scored on cached leaderboard re-runs, and this package holds no system outputs to measure it with. The 18 real tests it touches are listed, so it can change their verdicts",
-    "how_common": "18 real tests: those with a line-end hyphen that fail on their answer in another case",
-    "who_is_affected": "a page that writes such a line in another case than the gold (for example a heading in capitals) fails the test",
-    "enumerated_over_real_tests": true,
-    "found_by": "test_every_real_text_test_passes_on_its_answer_in_another_case",
-    "real_ids": [
-      "23_189451",
-      "p5_PMC12399732.1_t0_head_12_1",
-      "p5_PMC1838420.1_t2_head_10_5",
-      "p5_PMC1838420.1_t2_head_10_8",
-      "p5_PMC1838420.1_t2_head_12_5",
-      "p5_PMC1838420.1_t2_head_12_6",
-      "p5_PMC1838420.1_t2_head_12_7",
-      "p5_PMC1838420.1_t2_head_12_8",
-      "p5_PMC1838420.1_t2_head_14_5",
-      "p5_PMC1838420.1_t2_head_14_6",
-      "p5_PMC1838420.1_t2_head_14_7",
-      "p5_PMC1838420.1_t2_head_14_8",
-      "p5_PMC1838420.1_t2_head_4_8",
-      "p5_PMC1838420.1_t2_head_6_8",
-      "p8_PMC10627888.1_t2_head_11_11",
-      "p8_PMC10627888.1_t2_head_5_11",
-      "p8_PMC10627888.1_t2_head_7_11",
-      "p8_PMC10627888.1_t2_head_9_11"
-    ]
-  },
   "M11b": {
     "status": "intended and documented",
     "description": "Only present accepts a hyphenated word broken after its hyphen. Order, repeat and table_cell fold 'aa- bb' to 'aabb', whether the page or the gold holds the break.",
@@ -120,7 +88,7 @@
     "why_this_status": "The label covers the direction this relation tests: a page that breaks the word. The docstring of omni_parse_bench/scorers/unit_tests/hyphenation.py says 'Only text presence uses this fallback', and docs/scoring/internals.md (The hyphen rule, cases hyph-order, hyph-repeat, hyph-cell) shows those three tests failing. The reverse direction, a gold that holds the broken word ('self- aware') against a page that writes 'self-aware', also passes present and fails the other three. It follows from fold joining a line-end hyphen in every string, the gold's included (docs/scoring/internals.md, The hyphen rule). It is an artefact in the gold, not a verdict the docs promise.",
     "effect_on_scores": "small",
     "effect_basis": "Measured on cached leaderboard re-runs (not included here): extending the hyphen fallback to order, repeat and table_cell would change the verdict of a handful of tests, all from fail to pass. Both directions occur. In most the gold holds the broken word: a correct page failed because of an artefact in the gold",
-    "how_common": "Measured on cached leaderboard re-runs (not included here): a handful of tests",
+    "how_common": "Measured on cached leaderboard re-runs (not included here): a handful of tests; and 14 real order and table_cell tests whose gold writes a line-end hyphen in mixed case ('Primary- Revision') fail on their answer in another case, which reads the hyphen the other way (M15a's check over every real test)",
     "who_is_affected": "a page that breaks a hyphenated word after its hyphen fails order, repeat and table_cell tests of that word (present accepts it); and a correct page fails those tests when the gold holds the broken word",
     "enumerated_over_real_tests": false
   },

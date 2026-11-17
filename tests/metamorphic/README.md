@@ -7,8 +7,8 @@ Each promise is a *relation*: change a page, or a test, in a way that should not
 known way), and the verdict should follow. Example: putting a passing answer in bold must not make its test
 fail.
 
-- The certificate lists the 68 relations its authors selected: 57 hold and 11 deviate. It is not every
-  relation of the scorer (see [Not covered](#not-covered)). Four of the 11 (M1a to M1c and M1e) are about
+- The certificate lists the 68 relations its authors selected: 58 hold and 10 deviate. It is not every
+  relation of the scorer (see [Not covered](#not-covered)). Four of the 10 (M1a to M1c and M1e) are about
   folding a string twice, which the scorer never does and no document promises, so they change no score.
 - It is generated from the tests. CI fails if it is out of date, or if a status disagrees with its test.
 - This page is enough to read it. Links to `docs/scoring` add detail only.
@@ -38,10 +38,10 @@ A healthy run gives:
 
 | | passed | skipped | xfailed |
 |---|---|---|---|
-| this folder, no dataset | 81 | 11 | 13 |
-| this folder, with dataset | 91 | 1 | 13 |
-| whole suite, no dataset | 1172 | 21 | 13 |
-| whole suite, with dataset | 1187 | 6 | 13 |
+| this folder, no dataset | 82 | 11 | 12 |
+| this folder, with dataset | 92 | 1 | 12 |
+| whole suite, no dataset | 1186 | 21 | 12 |
+| whole suite, with dataset | 1201 | 6 | 12 |
 
 All four rows come from runs of this version.
 
@@ -232,8 +232,9 @@ Reference only; the sections above do not need it until a term is unfamiliar.
 
 - **fold**: the plain form in which gold and page text are compared. Steps, in this order:
   1. math spans (`$..$`, `\(..\)`, `<math>`) are read as text;
-  2. a word broken by a hyphen at a line end (`develop- ers`) is joined, when a lowercase letter follows, even
-     across a paragraph break (M22b);
+  2. a word broken by a hyphen at a line end (`develop- ers`) is joined, when a lowercase letter follows or the
+     letters on both sides are all capitals (`DEVELOP- ERS`), even across a paragraph break (M22b); a capital
+     after a word in lower or mixed case keeps the hyphen (`Anglo- Saxon`);
   3. compatibility forms are unified (ligatures, full width);
   4. invisible and private-use characters are removed;
   5. checkboxes are made ☒ or ☐;
@@ -263,7 +264,8 @@ Reference only; the sections above do not need it until a term is unfamiliar.
     starts or ends the page text gets about 1.5 times its budget for substituted letters (M23a);
   - table_cell: a substituted character is one edit (M3); an inserted or deleted one costs about half (M23b).
 - **line-end hyphen**: a letter, a hyphen, then white space (`develop- ers`). Fold joins it when a lowercase
-  letter follows.
+  letter follows, or when the letters before the hyphen and after the white space are all capitals (a heading
+  in capitals, `DEVELOP- ERS`), so a word folds the same in upper case as in lower case (M2e).
 - **text view**: a page's HTML as plain text.
   - Tags are dropped, namespaced ones (`<o:p>`) too; a `>` inside a quoted attribute does not end a tag (M24c,
     M24d).
@@ -310,4 +312,4 @@ Reference only; the sections above do not need it until a term is unfamiliar.
   - CI tries at most 300 examples per test, the same ones every run.
   - `HYPOTHESIS_PROFILE=deep` tries 5,000 new ones. CI never runs it.
 - **strict xfail**: a test marked as expected to fail. If it passes, pytest reports a failure.
-  The 11 deviations give 13 expected failures, because M11b runs as three cases (order, repeat, table_cell).
+  The 10 deviations give 12 expected failures, because M11b runs as three cases (order, repeat, table_cell).

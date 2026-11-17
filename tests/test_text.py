@@ -229,6 +229,23 @@ def test_a_line_end_hyphen_before_a_capital_stays():
     assert normalize.fold("well-\nKnown") != normalize.fold("wellKnown")
 
 
+@pytest.mark.parametrize("upper, lower", [
+    ("RE- M", "re- m"), ("R- M", "r- m"), ("DEVELOP-\nERS", "develop-\ners"),
+    ("ANGLO- SAXON", "anglo- saxon"), ("CAFÉ- ALI", "café- ali"),
+    ("<p>HEAD-</p><p>QUARTERS</p>", "<p>head-</p><p>quarters</p>"),
+])
+def test_a_line_end_hyphen_in_capitals_folds_as_in_lower_case(upper, lower):
+    # A heading in capitals broken across a line: both sides all capitals, so the word joins.
+    assert normalize.fold(views.text(upper)) == normalize.fold(views.text(lower))
+    assert "-" not in normalize.fold(views.text(upper))
+
+
+@pytest.mark.parametrize("s", ["Anglo- Saxon", "aB- C", "a- B", "RE- Mx", "AB- 1", "AB- \u4e2d"])
+def test_a_capital_after_a_word_in_lower_or_mixed_case_keeps_the_hyphen(s):
+    # Only a lowercase letter, or capitals on both sides, joins: the rest keep the hyphen.
+    assert "- " in normalize.fold(s)
+
+
 def test_a_line_end_hyphen_after_a_decomposed_letter_is_joined_as_after_a_composed_one():
     assert normalize.fold("caf\u0065\u0301- ali") == normalize.fold("caf\u00e9- ali") == "caféali"
 

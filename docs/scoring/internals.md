@@ -60,7 +60,8 @@ A table cell is read the same way, on the cell alone, and uses its `alt` text on
 ## Fold
 
 `normalize.fold` puts both the gold and the page text in one form before any text comparison. The steps run in
-this order: math spans read as text; a line-end hyphen before a lowercase letter joined; a superscript digit after
+this order: math spans read as text; a line-end hyphen joined before a lowercase letter or between two words in
+capitals; a superscript digit after
 a digit set apart; compatibility forms unified (NFKC) and invisible characters removed; checkboxes unified;
 footnote brackets and line-start bullets removed; leaders removed (runs of 3 or more dots, ideographic full stops
 `。` among them, even though full-width punctuation is made ASCII only later); dash, quote, space and arrow
@@ -78,7 +79,8 @@ a lowercase letter is then read joined (`well-` before `known` reads `wellknown`
 | rule | input | reads as | case |
 |---|---|---|---|
 | math is read as text | `$c_{\text{MC}}$ and $$2 . 5 5$$` | `cmc and 2.55` | `fold-math` |
-| a line-end hyphen before a lowercase letter joins | `develop- ers, R- M` | `developers, r- m` | `fold-hyphen` |
+| a line-end hyphen before a lowercase letter joins; a capital after a word in mixed case keeps it | `develop- ers, Anglo- Saxon` | `developers, anglo- saxon` | `fold-hyphen` |
+| so does one between two words in capitals | `DEVELOP- ERS, RE- M` | `developers, rem` | `fold-hyphen-caps` |
 | a block break is a line break for a hyphen: it joins, as a `<br>` does | `<p>Head-</p><p>quarters</p><p>develop-<br>ers</p>` | `headquarters developers` | `fold-hyphen-block` |
 | a superscript digit after a digit is set apart | `1,240¹` | `1,240 1` | `fold-superscript` |
 | compatibility forms (ligatures, full width, sub- and superscripts) | `ﬁnal １２ m² H₂O ½ №` | `final 12 m2 h2o 1/2 no` | `fold-nfkc` |
@@ -166,6 +168,9 @@ Measured on random strings (the figures come from the installed rapidfuzz and fu
 ## The hyphen rule
 
 A word broken at a line end (`develop- ers`) is joined by fold when a lowercase letter follows, in every test.
+It is joined too when the letters before the hyphen and the letters after the break are all capitals (a heading
+in capitals, `DEVELOP- ERS`), so the same words fold the same in upper case and in lower case. A capital after a
+word in lower or mixed case keeps the hyphen (`Anglo- Saxon`), and so does a digit after it.
 `present` alone also accepts a hyphenated compound broken the same way (`self- aware` for `self-aware`): when its
 other comparisons fail, it tries the match with each such hyphen kept or dropped, without spending edits.
 

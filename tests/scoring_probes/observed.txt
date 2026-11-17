@@ -198,7 +198,7 @@ ord-more-edits	pass
 ord-digit-edge	fail	'before' text 'Total: 40' found only inside a longer number
 ord-footnote	fail	'before' text 'Smith and Jones' not found
 ord-compound	fail	'before' text 'self-aware' not found
-ord-case-hyphen	fail	'before' text 'R- M' not found
+ord-case-hyphen	pass
 ## repeat-rules
 rep-pass	pass
 rep-case	pass
@@ -317,7 +317,8 @@ view-alt	see chart
 view-seen	see
 ## internals-fold
 fold-math	cmc and 2.55
-fold-hyphen	developers, r- m
+fold-hyphen	developers, anglo- saxon
+fold-hyphen-caps	developers, rem
 fold-hyphen-block	headquarters developers
 fold-superscript	1,240 1
 fold-nfkc	final 12 m2 h2o 1/2 no

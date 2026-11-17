@@ -32,7 +32,7 @@ order: a table reads row by row, and a two-column page is only as ordered as the
 | P | a digit continues a number | `Total: 40` before `ZZZ` | `<p>Total: 400</p><p>ZZZ</p>` | fail: `'before' text 'Total: 40' found only inside a longer number` | `ord-digit-edge` |
 | P | a footnote marker inside the phrase | `Smith and Jones` before `ZZZ` | `<p>Smith[1] and Jones</p><p>ZZZ</p>` | fail | `ord-footnote` |
 | P | hyphenated compound broken at a line end | `self-aware` before `ZZZ` | `<p>self- aware</p><p>ZZZ</p>` | fail | `ord-compound` |
-| P | a capital before a line-end hyphen | `R- M` before `ZZZ` | `<p>r- m</p><p>ZZZ</p>` | fail | `ord-case-hyphen` |
+| I | a line-end hyphen in capitals reads as in lower case | `RE- M` before `ZZZ` | `<p>re- m</p><p>ZZZ</p>` | pass | `ord-case-hyphen` |
 <!-- /cases -->
 
 ## How it differs from `present`
@@ -43,8 +43,6 @@ order: a table reads row by row, and a two-column page is only as ordered as the
   here the marker stays, so `Smith and Jones` is not found in `Smith[1] and Jones` (case ord-footnote).
 - **No hyphen fallback.** A hyphenated compound broken at a line end fails here and passes `present` (case
   ord-compound). A plain word broken at a line end passes both (case ord-line-hyphen).
-- **A capital before a line-end hyphen** keeps the hyphen, and case then matters: `R- M` is not found in `r- m`
-  (case ord-case-hyphen).
 - Like `present`, it has a digit edge on each string and no word edge (cases ord-digit-edge, ord-glued).
 
 ## Blind spots

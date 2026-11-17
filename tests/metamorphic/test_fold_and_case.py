@@ -30,7 +30,7 @@ PROSE = st.lists(st.one_of(WORD, st.sampled_from(["AT&T", "R&D", "Q&A", "&", "a&
 
 @relation(LIMITATION)
 @deviation("M1a")
-@example("R- M")
+@example("a- B")
 @given(st.text(string.ascii_letters + " -"))
 def test_folding_twice_is_folding_once_with_hyphens(s):
     """Folding a string of letters, spaces and hyphens twice gives the same text as folding it once. [M1a]
@@ -128,23 +128,24 @@ def test_fold_ignores_case(s):
     """Fold gives the same text in upper, lower or swapped case for text made of words (ASCII letters, digits
     and éüñàçöå), '&' words (AT&T) and the marks . , - (x) 50% 1,000; no line-end hyphen. [M2a]
     Why it matters for a score: a page that prints a heading in capitals passes the test of the same words."""
-    # Given ordinary text with no line-end hyphen (that is M2e)
+    # Given ordinary text with no line-end hyphen (whose reading depends on case in mixed case: M2e)
     assume(not LINE_END_HYPHEN.search(s))
     # When it is folded in upper case, as written, in lower case and swapped; Then all four are the same
     assert fold(s.upper()) == fold(s) == fold(s.lower()) == fold(s.swapcase())
 
 
-@relation(INTENDED)
-@deviation("M2e")
-@example(s="R- M")
+@relation(HOLDS)
+@example(s="RE- M")
+@example(s="Anglo- Saxon")
 @given(st.lists(st.one_of(WORD, st.sampled_from(["a-", "Re-", "ab-", "-"])), min_size=2, max_size=6)
        .map(" ".join))
 def test_fold_ignores_case_at_a_line_end_hyphen(s):
-    """Fold gives the same text for words ending in a hyphen in upper case or lower case. [M2e]
-    Why it matters for a score: as for M2a, at a word broken at the end of a line."""
-    # Given words, some ending in a hyphen; When folded in upper case, as written and in lower case
-    # Then all three are the same
-    assert fold(s.upper()) == fold(s) == fold(s.lower())
+    """Fold gives the same text for words ending in a hyphen in upper case and in lower case. [M2e]
+    Why it matters for a score: as for M2a, at a word broken at the end of a line: a heading in capitals
+    broken across a line reads as the same words in lower case."""
+    # Given words, some ending in a hyphen; When folded in upper case and in lower case
+    # Then both are the same (in mixed case a capital after the hyphen keeps it, by the documented rule)
+    assert fold(s.upper()) == fold(s.lower())
 
 
 @relation(HOLDS)
@@ -307,10 +308,10 @@ def with_strings_changed(p, f):
 @given(st.sampled_from([*TEXT, *ORDER, *REPEAT, *CELL]), st.sampled_from([str.upper, str.swapcase]))
 def test_a_page_in_another_case_passes_every_text_test(t, change_case):
     """An ASCII text, order, repeat or table_cell test passes on its answer in upper or swapped case, unless a
-    string of it has a line-end hyphen (a letter, a hyphen, white space) before a letter: that is M2e. M15b's
-    real tests are not ASCII, so outside this promise. [M15a]
+    string of it has a line-end hyphen (a letter, a hyphen, white space) before a letter, which fold reads by
+    case (M2e). M15b's real tests are not ASCII, so outside this promise. [M15a]
     Why it matters for a score: case is folded by every test type, not only by present."""
-    # Given an ASCII test with no line-end hyphen before a capital (that is M2e)
+    # Given an ASCII test with no line-end hyphen (fold reads one by case: M2e)
     strings = text_strings(t.params)
     assume(all(x.isascii() for x in strings))
     assume(not any(LINE_END_HYPHEN_ANY.search(x) for x in strings))
@@ -342,22 +343,38 @@ def test_a_word_in_upper_case_passes_even_when_upper_case_changes_its_letters(wo
     assert passes(runners.Present(runners.Text(word, 0)), f"<p>{word.upper()}</p>")
 
 
-DEVIATING_CASE = known_ids("M2e") | known_ids("M15b")    # the real tests listed under M2e and M15b
+# The real order and table_cell tests whose gold writes a line-end hyphen in mixed case ('Primary- Revision',
+# 'R- Matrix', 'Head- quarters'): fold keeps or joins it by the case each side writes, so the page in another
+# case reads it the other way. Present accepts either reading (M11a); order and table_cell do not (M11b).
+HYPHEN_BY_CASE = {"23_189451", "p5_PMC12399732.1_t0_head_12_1", *(
+    f"p5_PMC1838420.1_t2_head_{x}" for x in ("10_5", "10_8", "12_5", "12_6", "12_7", "12_8", "14_5", "14_6",
+                                             "14_7", "14_8", "4_8", "6_8"))}
 
 
-@every_real_test("text tests", note=f"all except the {len(DEVIATING_CASE)} listed under M2e and M15b")
+CASE_NOTE = (f"all except the {len(known_ids('M15b'))} listed under M15b and the {len(HYPHEN_BY_CASE)} "
+             "order and table_cell tests whose gold writes a line-end hyphen in mixed case (M11b); upper and "
+             "lower case give the same verdict on every real test but those listed under M15b")
+
+
+@every_real_test("text tests", note=CASE_NOTE)
 def test_every_real_text_test_passes_on_its_answer_in_another_case():
-    """Every real text test passes on its answer in another case, except the ones listed. [M15a, M2e, M15b]
-    Why it matters for a score: it counts the real tests that M2e and M15b touch."""
-    # Given every real text test; When its answer is upper-cased or case-swapped
-    failing = {t.id for f in (str.upper, str.swapcase) for t in [*TEXT, *ORDER, *REPEAT, *CELL]
-               if not passes(t.params, answer_page(with_strings_changed(t.params, f)))}
-    # Then those with a line-end hyphen (M2e), and those with a letter whose upper case lowers to other
-    # letters (M15b), are exactly the ones known_deviations.json lists for each; none is left over
-    strings = {t.id: text_strings(t.params) for t in [*TEXT, *ORDER, *REPEAT, *CELL]}
-    m2e = {i for i in failing if any(LINE_END_HYPHEN_ANY.search(x) for x in strings[i])}
-    m15b = {i for i in failing - m2e if any(c.upper().lower() != c.lower() for x in strings[i] for c in x)}
-    for label, found in (("M2e", m2e), ("M15b", m15b)):
-        known = known_ids(label)
-        assert found == known, (label, {"new": sorted(found - known), "gone": sorted(known - found)})
-    assert failing == m2e | m15b, sorted(failing - m2e - m15b)
+    """Every real text test passes on its answer in another case, and gets the same verdict on it in upper
+    case as in lower case, except the ones listed. [M15a, M2e, M15b]
+    Why it matters for a score: it counts the real tests that M15b touches, and checks M2e over every real
+    test."""
+    # Given every real text test; When its answer is upper-cased, case-swapped or lower-cased
+    tests = [*TEXT, *ORDER, *REPEAT, *CELL]
+    upper, swapped, lower = ({t.id for t in tests
+                              if passes(t.params, answer_page(with_strings_changed(t.params, f)))}
+                             for f in (str.upper, str.swapcase, str.lower))
+    # Then upper and lower case give the same verdict (M2e), but on those listed under M15b
+    assert not (upper ^ lower) - known_ids("M15b"), sorted((upper ^ lower) - known_ids("M15b"))
+    # And those failing in another case are those with a line-end hyphen in mixed case (M11b) and those with a
+    # letter whose upper case lowers to other letters (M15b), as known_deviations.json lists them
+    failing = {t.id for t in tests} - (upper & swapped)
+    strings = {t.id: text_strings(t.params) for t in tests}
+    hyphen = {i for i in failing if any(LINE_END_HYPHEN_ANY.search(x) for x in strings[i])}
+    assert hyphen == HYPHEN_BY_CASE, {"new": sorted(hyphen - HYPHEN_BY_CASE),
+                                      "gone": sorted(HYPHEN_BY_CASE - hyphen)}
+    found, known = failing - hyphen, known_ids("M15b")
+    assert found == known, ("M15b", {"new": sorted(found - known), "gone": sorted(known - found)})
