@@ -20,7 +20,8 @@ F = frozenset
     ("font: inherit", set(), set(), set()),                                  # no change
     ("font: var(--font)", set(), set(), set()),
     ("font-weight: inherit", set(), set(), set()),
-    ("font-weight: bold; font-weight: inherit", set(), set(), set()),        # a keyword takes the earlier one back
+    # a keyword takes the earlier one back
+    ("font-weight: bold; font-weight: inherit", set(), set(), set()),
     ("font-weight: bold; font-weight: unset", set(), set(), set()),
     ("font-weight: bold; font-weight: initial", set(), {"bold"}, set()),     # initial is plain
     ("font-style: italic; font-style: initial", set(), {"italic"}, set()),
@@ -35,6 +36,10 @@ F = frozenset
     ("font-weight: bold !important; font-weight: normal !important", set(), {"bold"}, set()),
     ("font: 12px serif !important; font-weight: bold", set(), {"bold", "italic"}, set()),
     ("text-decoration: underline !important; text-decoration: none", {"underline"}, set(), set()),
+    ("font-weight: bold ! important; font-weight: normal", {"bold"}, set(), set()),   # a space after `!`
+    # each half alone
+    ("font-weight: bold !important; font: italic 12px serif", {"bold", "italic"}, set(), set()),
+    ("font-style: italic !important; font: bold 12px serif", {"bold", "italic"}, set(), set()),
     ("text-decoration: underline", {"underline"}, set(), set()),
     ("text-decoration: underline; text-decoration: none", set(), set(), {"underline", "strike"}),
     ("text-decoration: line-through underline", {"underline", "strike"}, set(), set()),

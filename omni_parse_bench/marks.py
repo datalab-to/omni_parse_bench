@@ -62,6 +62,7 @@ INERT = frozenset({"math"})
 VOID = frozenset(
     {"br", "hr", "img", "input", "meta", "link", "col", "wbr", "area", "base", "embed", "source", "track"}
 )
+_IMPORTANT = re.compile(r"!\s*important")   # CSS allows white space after the `!`
 _NUMBER = re.compile(r"\d+")
 _NOT_A_TAG = re.compile(rf"<(?!{views._TAG[1:]})")
 
@@ -106,7 +107,8 @@ def style_marks(style: str) -> tuple[frozenset[str], frozenset[str], frozenset[s
     italic: bool | None = None
     deco: list[str] | None = None
     vertical: str | None = None
-    important: set[str] = set()   # the properties an `!important` declaration has set: a later plain one loses
+    # the properties an `!important` declaration has set: a later plain one loses
+    important: set[str] = set()
 
     def wins(prop: str, imp: bool) -> bool:
         if prop in important and not imp:
@@ -118,8 +120,8 @@ def style_marks(style: str) -> tuple[frozenset[str], frozenset[str], frozenset[s
     for decl in style.lower().split(";"):
         name, _, value = decl.partition(":")
         name = name.strip()
-        imp = "!important" in value
-        words = value.replace("!important", "").split()
+        imp = _IMPORTANT.search(value) is not None
+        words = _IMPORTANT.sub("", value).split()
         if not words or "var(" in value:
             continue
         # Note: a CSS-wide keyword replaces an earlier declaration: `initial` is the property's plain value,
@@ -127,15 +129,21 @@ def style_marks(style: str) -> tuple[frozenset[str], frozenset[str], frozenset[s
         keyword = words[0] if words[0] in ("inherit", "initial", "unset", "revert", "revert-layer") else None
         plain = keyword == "initial"
         if name == "font-weight" and wins("weight", imp):
-            bold = False if plain else None if keyword else _bold(words[0]) if _bold(words[0]) is not None else bold
+            weight = _bold(words[0])
+            bold = False if plain else None if keyword else weight if weight is not None else bold
         elif name == "font-style" and wins("style", imp):
             if keyword:
                 italic = False if plain else None
             elif words[0] in ("italic", "oblique", "normal"):
                 italic = words[0] != "normal"
-        elif name == "font" and wins("weight", imp) and wins("style", imp):
+        elif name == "font":
+            # Note: each half of the shorthand loses alone to an earlier `!important` on that half
+            set_weight, set_style = wins("weight", imp), wins("style", imp)
             if keyword:
-                bold, italic = (False, False) if plain else (None, None)
+                if set_weight:
+                    bold = False if plain else None
+                if set_style:
+                    italic = False if plain else None
                 continue
             # Note: the shorthand sets the weight and the style, plain unless it names them; they come
             # before the size, which ends them
@@ -147,7 +155,10 @@ def style_marks(style: str) -> tuple[frozenset[str], frozenset[str], frozenset[s
                     named.add("italic")
                 elif _bold(w):
                     named.add("bold")
-            bold, italic = "bold" in named, "italic" in named
+            if set_weight:
+                bold = "bold" in named
+            if set_style:
+                italic = "italic" in named
         elif name in ("text-decoration", "text-decoration-line") and wins("deco", imp):
             deco = ["none"] if keyword in ("initial", "unset") else None if keyword else words
         elif name == "vertical-align" and wins("vertical", imp):
