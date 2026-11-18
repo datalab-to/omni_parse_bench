@@ -323,6 +323,7 @@ fm-sup-style-sub	fail	the span lacks ['sup']
 fm-neg-empty-element	fail	the output has no marks at all, so it cannot show that a mark is absent
 fm-own-none	pass
 fm-font-resets	pass
+fm-closed-head	fail	the span lacks ['bold']
 fm-head-bare-text	pass
 fm-markdown-html	pass
 fm-neg-marked	fail	the span carries ['bold']

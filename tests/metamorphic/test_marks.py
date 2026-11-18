@@ -13,7 +13,7 @@ from test_properties import MARK, TESTS, WORD
 
 from metamorphic.common import (HOLDS, LIMITATION, deviation, escaped, every_real_test, is_exact, passes, relation,
                                 text_strings)
-from omni_parse_bench import markdown, marks
+from omni_parse_bench import markdown, marks, views
 from omni_parse_bench.scorers.unit_tests import runners
 
 KINDS = marks.KINDS
@@ -475,8 +475,8 @@ def test_the_contexts_own_place_decides_which_copy_of_the_span_is_read(word, oth
 @given(PHRASE, KIND, st.sampled_from(["<html><head>", "<html><head><title>t", "<title>t<body>", "<head>intro ",
                                       "<head><meta><div>", "<head><noscript>n</noscript> "]))
 def test_an_unclosed_head_or_title_does_not_hide_the_page_from_the_format_reader(phrase, kind, start):
-    """A page whose `<head>` or `<title>` is never closed is read as the text test reads it: its content starts at
-    the first content tag, and its marks are there. [M70]
+    """A page whose `<head>` or `<title>` is never closed is read as the text test reads it: nothing is hidden,
+    so its text is read and its marks are there. [M70]
     Why it matters for a score: one odd page must not turn every format test on it into a failure while the other
     tests of the page pass."""
     # Given the answer after an unclosed head; When the positive format test and a text test run
@@ -545,3 +545,35 @@ def test_an_elements_own_style_takes_off_its_own_default_mark_but_not_an_ancesto
         assert not passes(fmt(*phrase, kind=kind), inside)
     else:
         assert passes(fmt(*phrase, kind=kind), inside), inside
+
+
+PIECES = ["<p>{w}</p>", "<b>{w}</b>", "<head>{w}</head>", "<head>{w}", "<title>{w}</title>", "<title>{w}",
+          "<script>{w}</script>", "<style>{w}</style>", "<!--{w}-->", "<!DOCTYPE html>{w}",
+          "<head><title>{w} <b>{w}</b></title></head>", "<i>{w}", "<script>{w}"]
+
+
+@relation(HOLDS, domain="pages of up to 6 pieces from 13: closed and unclosed head, title, script, style, comments")
+@given(st.lists(st.tuples(st.sampled_from(PIECES), LETTERS), min_size=1, max_size=6))
+def test_the_format_reader_hides_what_the_text_view_hides_and_reads_what_it_reads(pieces):
+    """On a page of paragraphs, marks, comments, a doctype and head, title, script and style elements, closed or
+    not, the text the format reader finds is the text `views.html` shows, once folded: an element hidden when an end
+    tag closes it, and read as text when none does. [M74]
+    Why it matters for a score: the format and the text tests see the same page, so a test cannot fail on text the
+    other tests never saw, or pass on text they ignore."""
+    # Given a page built from the pieces; When both readers read it; Then they find the same text
+    html = "".join(piece.format(w=w) for piece, w in pieces)
+    assert marks.read(html).text == marks.fold(views.html(html).text), html
+
+
+@relation(HOLDS, domain="3 pages: marks only inside a closed head and title, a closed script, and punctuation")
+@given(PHRASE, KIND)
+def test_marks_on_hidden_text_or_on_no_letter_do_not_make_a_page_have_marks(phrase, kind):
+    """A page whose only marks are inside a closed `<head>`, `<title>` or `<script>`, or are on punctuation alone,
+    has no marks: a negative test fails on it. [M75]
+    Why it matters for a score: a negative test needs a mark somewhere on the text the page shows."""
+    # Given the plain answer with a mark only where it does not count
+    plain = page(*phrase)
+    hidden = f"<head><title>The <b>Report</b></title></head>{plain}<script><b>x</b></script>"
+    # When a negative test runs; Then it fails on each
+    assert not passes(fmt(*phrase, absent=kind), hidden)
+    assert not passes(fmt(*phrase, absent=kind), plain + "<b>.</b><i> — </i>")

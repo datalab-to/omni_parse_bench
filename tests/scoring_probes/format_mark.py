@@ -50,6 +50,7 @@ TABLES = [
         fmt("fm-neg-empty-element", "P", "a negative test where the only marks are on no text: empty elements do not count", T, B_, A, ["bold"], "<p>the total due</p><b></b><i class=fa></i>", absent=True, why=True),
         fmt("fm-own-none", "I", "`text-decoration: none` takes off the element's own underline", T, B_, A, ["underline"], '<p>the <u style="text-decoration: none">total</u> due</p><p><b>x</b></p>', absent=True),
         fmt("fm-font-resets", "I", "a `font` shorthand that names no weight draws the text plain", T, B_, A, ["bold"], '<p>the <b style="font: 12px serif">total</b> due</p><p><i>x</i></p>', absent=True),
+        fmt("fm-closed-head", "P", "a mark inside a head and title that an end tag closes is hidden, as the text view hides them", T, B_, A, ["bold"], "<head><title>the <b>total</b> due</title></head><p>the total due</p>", why=True),
         fmt("fm-head-bare-text", "I", "an unclosed head ends at the first text that is not its own", T, B_, A, ["bold"], "<head>intro the <b>total</b> due"),
         fmt("fm-markdown-html", "I", "an html tag inside markdown is read as html", "H", "2", "O", ["sub"], "H<sub>2</sub>O", from_markdown=True),
         fmt("fm-neg-marked", "P", "a negative test, the span marked", T, B_, A, ["bold"], "the <b>total</b> due", absent=True, why=True),

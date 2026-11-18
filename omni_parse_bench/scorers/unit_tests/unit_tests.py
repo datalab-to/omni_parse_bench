@@ -110,7 +110,9 @@ def gold(page: data.Page) -> tuple[_tests.Test, ...]:
 
 def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
     """Every test of `pages`, each page's checked (`gold`), and what no single page can show: a test id used
-    twice. It is what publishing a dataset checks; grading needs none of it.
+    twice, and a suite that mixes `format` tests with tests of the headline families (a suite's score pools
+    all its tests, so the two would be one number). It is what publishing a dataset checks; grading needs
+    none of it.
 
     Note: a gold file no manifest names isn't refused, since a dataset may hold several manifests, each naming
     some of the gold files."""
@@ -119,6 +121,13 @@ def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
         raise ValueError(f"test ids used more than once, across the dataset: "
                          f"{errors.counted(len(twice), 'id')}, e.g. {twice[:3]}; each test's id is "
                          "unique in its dataset")
+    suite = {p.page_id: p.suite for p in pages}
+    families: dict[str, set[str]] = collections.defaultdict(set)
+    for t in every:
+        families[suite[t.page_id]].add(vocab.FAMILIES[t.test_type] in vocab.HEADLINE_FAMILIES)
+    if mixed := sorted(s for s, kinds in families.items() if len(kinds) > 1):
+        raise ValueError(f"suites with both format tests and headline tests: {mixed[:3]}; a suite's score "
+                         "pools its tests, so give the format tests a suite of their own")
     if empty := sorted({p.page_id for p in pages} - {t.page_id for t in every}):
         raise ValueError(f"pages with no tests: {errors.counted(len(empty), 'page')}, e.g. "
                          f"{empty[:3]}; remove them or give them tests")

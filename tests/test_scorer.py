@@ -325,3 +325,28 @@ def test_the_arg_kind_slice_counts_a_test_under_each_kind_and_leaves_layout_out(
     assert s["per_arg_kind"]["text"]["tests"] == 2       # the present text test and the table cell
     assert s["per_arg_kind"]["number"]["tests"] == 1     # the present number test
     assert "latex" not in s["per_arg_kind"] and sum(e["tests"] for e in s["per_arg_kind"].values()) == 3
+
+
+def test_a_suite_may_not_mix_format_tests_with_headline_tests(tmp_path):
+    """A suite's score pools all its tests, so format and text tests would be one number: `check` refuses the
+    suite that holds both, and takes each in a suite of its own."""
+    import json
+
+    from omni_parse_bench.scorers.unit_tests import check
+
+    def test(i, kind):
+        t = {"id": i, "test_type": kind, "output_type": "html", "derivation": "authored", "tags": [],
+             "settings": {}}
+        if kind == "format":
+            return t | {"args": {"span": {"text": "total", "max_diffs": 0}},
+                        "settings": {"marks": ["bold"]}}
+        return t | {"args": {"content": {"text": "total", "max_diffs": 0}}}
+
+    def page(i, suite, kind):
+        gold = tmp_path / f"{i}.json"
+        gold.write_text(json.dumps({"tests": [test(f"t-{i}", kind)]}))
+        return data.Page(i, i, suite, tmp_path / f"{i}.png", gold, ("html",))
+
+    assert len(check([page("a", "text", "present"), page("b", "marks", "format")])) == 2
+    with pytest.raises(ValueError, match="both format tests and headline tests"):
+        check([page("a", "same", "present"), page("b", "same", "format")])

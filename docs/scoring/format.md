@@ -48,8 +48,9 @@ that names neither) takes bold or italic off (cases fm-style-cancelled, fm-font-
 `text-decoration: none` takes off its underline or strikethrough and `vertical-align: baseline` its script
 (case fm-own-none), but neither takes off a mark an ancestor makes, as in a browser (cases fm-underline-none,
 fm-baseline). An
-end tag that crosses another mark leaves it on after it (cases fm-crossed, fm-crossed-goes-on), and an unclosed head ends at the first tag or text a
-head does not hold, an unclosed title at the first tag (cases fm-unclosed-head, fm-head-bare-text). Markdown is a vendor's output, and the harness turns it into html before any test
+end tag that crosses another mark leaves it on after it (cases fm-crossed, fm-crossed-goes-on), and what `views.html` hides is hidden here too: a comment, a doctype, and a script, style, head or title that an end tag closes, with everything
+in it; one that is never closed hides nothing, so its text is read like any other (cases fm-closed-head, fm-unclosed-head,
+fm-head-bare-text). Markdown is a vendor's output, and the harness turns it into html before any test
 reads it, so `**x**` and `<strong>x</strong>` are the same marks (case fm-markdown); markdown markers written into an html
 output are text, not marks (case fm-raw-markdown), and an html tag inside the markdown is read as html (case
 fm-markdown-html). Markdown has no superscript or subscript and no single-tilde
@@ -107,6 +108,7 @@ other text (case fm-in-code).
 | P | a negative test where the only marks are on no text: empty elements do not count | not bold on `total`, context `the total due` | `<p>the total due</p><b></b><i class=fa></i>` | fail: `the output has no marks at all, so it cannot show that a mark is absent` | `fm-neg-empty-element` |
 | I | `text-decoration: none` takes off the element's own underline | not underline on `total`, context `the total due` | `<p>the <u style="text-decoration: none">total</u> due</p><p><b>x</b></p>` | pass | `fm-own-none` |
 | I | a `font` shorthand that names no weight draws the text plain | not bold on `total`, context `the total due` | `<p>the <b style="font: 12px serif">total</b> due</p><p><i>x</i></p>` | pass | `fm-font-resets` |
+| P | a mark inside a head and title that an end tag closes is hidden, as the text view hides them | bold on `total`, context `the total due` | `<head><title>the <b>total</b> due</title></head><p>the total due</p>` | fail: `the span lacks ['bold']` | `fm-closed-head` |
 | I | an unclosed head ends at the first text that is not its own | bold on `total`, context `the total due` | `<head>intro the <b>total</b> due` | pass | `fm-head-bare-text` |
 | I | an html tag inside markdown is read as html | sub on `2`, context `H2O` | `H<sub>2</sub>O` | pass | `fm-markdown-html` |
 | P | a negative test, the span marked | not bold on `total`, context `the total due` | `the <b>total</b> due` | fail: `the span carries ['bold']` | `fm-neg-marked` |

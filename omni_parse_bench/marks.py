@@ -28,9 +28,9 @@ it, so `**x**` and `<strong>x</strong>` are the same marks by construction, and 
 markdown (`H<sub>2</sub>O`) is read as HTML. Markdown has no superscript or subscript and no single-tilde
 strikethrough, so a markdown-only output cannot carry them. Not a mark: a heading or `<th>` (drawn bold, not
 marked), `<mark>`, `<a>`, `<kbd>`, Unicode superscript characters, and LaTeX. Text inside `<math>` carries
-no mark, and nothing in `<script>`, `<style>`, `<head>`, `<title>`, a comment or a doctype is read at all
-(the same elements `views.html` hides). An unclosed `<head>` ends at the first tag or text a head does not
-hold, and an unclosed `<title>` at the first tag.
+no mark, and what `views.html` hides is not read: a comment, a doctype, and a `<script>`, `<style>`, `<head>`
+or `<title>` that an end tag closes, with everything in it. One that is never closed hides nothing, as in
+`views.html`, so its text is read like any other.
 
 The text is compared as the fold of the character forms (`normalize.typography`: dashes, quotes, spaces,
 compatibility forms), case-folded, NFC, with no whitespace: the fold `format` uses is that and no more (no
@@ -47,7 +47,7 @@ import unicodedata
 from html.parser import HTMLParser
 from typing import NamedTuple
 
-from omni_parse_bench import normalize
+from omni_parse_bench import normalize, views
 
 KINDS = ("bold", "italic", "underline", "strike", "sup", "sub")
 # Note: the most mark elements an end tag that crosses them puts back on: a page of 20,000 is not read twice
@@ -56,16 +56,12 @@ REOPEN = 16
 # element -> the mark it makes
 TAGS = {"b": "bold", "strong": "bold", "i": "italic", "em": "italic", "u": "underline", "ins": "underline",
         "s": "strike", "strike": "strike", "del": "strike", "sup": "sup", "sub": "sub"}
-# elements whose content is not text the page shows: the ones `views.html` hides too
-HIDDEN = frozenset({"script", "style", "head", "title"})
 # elements whose text is read but carries no mark
 INERT = frozenset({"math"})
 # a void element has no end tag, so it must not be pushed
 VOID = frozenset(
     {"br", "hr", "img", "input", "meta", "link", "col", "wbr", "area", "base", "embed", "source", "track"}
 )
-# the elements a head may hold: a start tag of any other ends an unclosed head
-HEAD = frozenset({"head", "title", "meta", "link", "style", "script", "base", "noscript", "template"})
 _NUMBER = re.compile(r"\d+")
 
 
@@ -73,7 +69,7 @@ class Marked(NamedTuple):
     """An output's text as `fold` leaves it, and the marks on each of its characters."""
     text: str
     marks: tuple[frozenset[str], ...]
-    emitted: bool   # whether some character of the text carries a mark
+    emitted: bool   # whether some letter or digit of the text carries a mark
 
 
 def fold(s: str) -> str:
@@ -101,20 +97,24 @@ def style_marks(style: str) -> tuple[frozenset[str], frozenset[str], frozenset[s
     (`font-weight: normal` inside a `<b>`, and a `font` shorthand that names no weight or style); an
     underline, a strikethrough or a script only off the element that makes it
     (`<u style="text-decoration: none">`), since a browser draws one an ancestor makes whatever the style
-    says. `vertical-align` replaces the other script: a `<sup style="vertical-align: sub">` is a subscript."""
-    add: set[str] = set()
-    drop: set[str] = set()
-    own: set[str] = set()
+    says. `vertical-align` replaces the other script: a `<sup style="vertical-align: sub">` is a subscript.
+    A later declaration replaces an earlier one; an inherited value or a variable changes nothing."""
+    bold: bool | None = None
+    italic: bool | None = None
+    deco: list[str] | None = None
+    vertical: str | None = None
     for decl in style.lower().split(";"):
         name, _, value = decl.partition(":")
         name, value = name.strip(), value.replace("!important", "").strip()
         words = value.split()
-        if name == "font-weight" and words:
-            (add if _bold(words[0]) else drop if _bold(words[0]) is False else set()).add("bold")
-        elif name == "font-style" and words:
-            slant = words[0] in ("italic", "oblique")
-            (add if slant else drop if words[0] == "normal" else set()).add("italic")
-        elif name == "font" and words:
+        if not words or "var(" in value or words[0] in ("inherit", "unset", "revert", "initial"):
+            continue
+        if name == "font-weight":
+            bold = _bold(words[0]) if _bold(words[0]) is not None else bold
+        elif name == "font-style":
+            if words[0] in ("italic", "oblique", "normal"):
+                italic = words[0] != "normal"
+        elif name == "font":
             # Note: the shorthand sets the weight and the style, plain unless it names them; they come
             # before the size, which ends them
             named: set[str] = set()
@@ -125,24 +125,30 @@ def style_marks(style: str) -> tuple[frozenset[str], frozenset[str], frozenset[s
                     named.add("italic")
                 elif _bold(w):
                     named.add("bold")
-            add |= named
-            drop |= {"bold", "italic"} - named
+            bold, italic = "bold" in named, "italic" in named
         elif name in ("text-decoration", "text-decoration-line"):
-            if "underline" in words:
-                add.add("underline")
-            if "line-through" in words:
-                add.add("strike")
-            if "none" in words:
-                own |= {"underline", "strike"}
-        elif name == "vertical-align" and words:
-            if words[0] in ("super", "sup"):
-                add.add("sup")
-                drop.add("sub")
-            elif words[0] == "sub":
-                add.add("sub")
-                drop.add("sup")
-            elif words[0] == "baseline":
-                own |= {"sup", "sub"}
+            deco = words
+        elif name == "vertical-align":
+            vertical = words[0]
+    add: set[str] = set()
+    drop: set[str] = set()
+    own: set[str] = set()
+    if bold is not None:
+        (add if bold else drop).add("bold")
+    if italic is not None:
+        (add if italic else drop).add("italic")
+    if deco is not None:
+        add |= {m for w, m in (("underline", "underline"), ("line-through", "strike")) if w in deco}
+        if "none" in deco:
+            own |= {"underline", "strike"}
+    if vertical in ("super", "sup"):
+        add.add("sup")
+        drop.add("sub")
+    elif vertical == "sub":
+        add.add("sub")
+        drop.add("sup")
+    elif vertical == "baseline":
+        own |= {"sup", "sub"}
     return frozenset(add), frozenset(drop - add), frozenset(own - add)
 
 
@@ -156,46 +162,31 @@ class _Reader(HTMLParser):
         # is linear
         self.stack: list[tuple[str, frozenset[str], frozenset[str], frozenset[str], bool]] = []
         self.open: collections.Counter[str] = collections.Counter()   # how many of each tag are open
-        self.hidden = 0
         self.inert = 0
 
     def _push(self, tag: str, add: frozenset[str], drop: frozenset[str]) -> None:
         above = self.stack[-1][3] if self.stack else frozenset()
-        here = (above | add) - drop
-        if tag in HIDDEN:
-            self.hidden += 1
         inert = tag in INERT
         self.inert += inert
         self.open[tag] += 1
-        self.stack.append((tag, add, drop, frozenset() if self.inert else here, inert))
+        self.stack.append((tag, add, drop, frozenset() if self.inert else (above | add) - drop, inert))
 
     def _pop(self) -> tuple[str, frozenset[str], frozenset[str]]:
         tag, add, drop, _, inert = self.stack.pop()
-        self.hidden -= tag in HIDDEN
         self.inert -= inert
         self.open[tag] -= 1
         return tag, add, drop
 
-    def _close(self, tag: str) -> None:
-        """Pops open elements down to and including the innermost `tag`."""
-        while self.open[tag]:
-            self._pop()
-
     def set_cdata_mode(self, elem: str, *args, **kwargs) -> None:
-        # Note: only a script and a style hold text the parser must not read as markup. Python 3.13 also reads
-        # a title, a textarea and a few more that way, which would hide an unclosed title's whole page;
-        # reading them as elements keeps the same page the same on every version
-        if elem.lower() in ("script", "style"):
-            super().set_cdata_mode(elem, *args, **kwargs)
+        # Note: no element holds text the parser must not read as markup. A script or a style an end tag
+        # closes is gone before the parser sees the page (`read`), and one never closed is read like the text
+        # view reads it, its tags as tags; Python 3.13 also reads a title and a textarea as text, and the
+        # versions before it do not, so this keeps the same page the same on every version
+        return
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag in VOID:
             return
-        # Note: a title holds no tags, and a head only those it may: any other ends it, as the page begins
-        if self.open["title"]:
-            self._close("title")
-        if self.open["head"] and tag not in HEAD:
-            self._close("head")
         add, drop, own = style_marks(dict(attrs).get("style") or "")
         default = frozenset({TAGS[tag]} if tag in TAGS else ()) - own
         self._push(tag, default | add, drop)
@@ -217,10 +208,7 @@ class _Reader(HTMLParser):
             self._push(t, add, drop)
 
     def handle_data(self, data: str) -> None:
-        # Note: text in a head that is not a title, a script or a style begins the page
-        if self.open["head"] and data.strip() and not self.hidden - self.open["head"]:
-            self._close("head")
-        if self.hidden or not data:
+        if not data:
             return
         marks = self.stack[-1][3] if self.stack else frozenset()
         if self.runs and self.runs[-1][1] == marks:
@@ -234,6 +222,9 @@ def read(html: str) -> Marked:
     """The output's folded text, and the marks of each of its characters. Block boundaries and whitespace fold
     away, so a mark runs across a space, a line break or a paragraph break when both sides carry it, and
     carries nothing else."""
+    # Note: what `views.html` hides is hidden here, by its own patterns, so the two readers see the same text
+    html = views._COMMENT.sub("", html)
+    html = views._SCRIPT.sub(" ", views._DOCTYPE.sub(" ", html))
     r = _Reader()
     r.feed(html)
     r.close()
@@ -243,7 +234,8 @@ def read(html: str) -> Marked:
         f = fold("".join(parts))
         text.append(f)
         marks.extend([m] * len(f))
-    return Marked("".join(text), tuple(marks), any(marks))
+    flat = "".join(text)
+    return Marked(flat, tuple(marks), any(m and c.isalnum() for c, m in zip(flat, marks, strict=True)))
 
 
 def check(out: Marked, before: str, span: str, after: str, wanted: tuple[str, ...],
