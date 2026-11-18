@@ -8,7 +8,7 @@ from __future__ import annotations
 import random
 
 import pytest
-from hypothesis import assume, given
+from hypothesis import assume, example, given
 from hypothesis import strategies as st
 from metamorphic.test_numbers import one_digit_glued, one_separator_changed
 
@@ -192,6 +192,8 @@ NUMBER_TOKENS = ["1,240", "12", "500", "12 500", "$1,240", "(4.8)", "-4.8", "4.8
 
 
 @relation(HOLDS)
+# Note: a marker dropped between the groups of "12 500" joined them, and repeat counted what present did not
+@example(gold="12 500", tokens=["12", "<sup>2</sup>", "500"])
 @given(st.sampled_from(["1,240", "12", "500", "12 500", "4.8", "-4.8", "1 000", "10", "1240"]),
        st.lists(st.sampled_from(NUMBER_TOKENS), max_size=10))
 def test_a_number_repeat_copy_is_one_present_finds(gold, tokens):

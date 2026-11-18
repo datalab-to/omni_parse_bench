@@ -17,7 +17,9 @@ as in that page, and it takes the same gold (a number that reads as two numbers,
 test loads). It differs from `present` in what it reads: **line by line** (a block, a table cell and a `<br>`
 each end a line, so a space-grouped number is never counted across two cells), **without image descriptions**
 (`present` reads them), and without the digits a footnote mark (`<sup>2</sup>`, `[2]`) or the numbers a browser
-draws for an ordered list would add. A gold of plain or space-grouped digits is no copy where it continues a
+draws for an ordered list would add (but a footnote mark between the groups of a number written with spaces is
+kept, so `12 500` is no copy in `12<sup>2</sup> 500`, which `present` reads as two numbers too: case
+repn-footnote-between-groups). A gold of plain or space-grouped digits is no copy where it continues a
 group of digits across a space (`500` in `12 500`, `12` in `12 500`); `present` finds a number there. Each
 match counts once and matches never overlap; the hyphen reading below does not apply to it. `1,240` and `1240`
 are two numbers, so a page that writes a figure both ways holds one copy of each. A copy that `repeat` counts
@@ -65,6 +67,7 @@ is always one `present` finds.
 | I | two copies in two cells | `1,240` ×2 | `<table><tr><td>1,240</td><td>1,240</td></tr></table>` | pass | `repn-lines` |
 | I | two copies on one line | `1,240` ×2 | `<p>1,240 1,240</p>` | pass | `repn-same-line` |
 | I | a footnote mark is not a copy | `2` ×1 | `<p>Revenue<sup>2</sup> was 2</p>` | pass | `repn-footnote-mark` |
+| P | a footnote mark between the groups of a number written with spaces is not dropped: the two groups are two numbers, as `present` reads them | `12 500` ×1 | `<p>12<sup>2</sup> 500</p>` | fail | `repn-footnote-between-groups` |
 | I | a list's numbers are not copies | `2` ×1 | `<ol><li>a</li><li>b 2</li></ol>` | pass | `repn-list-numbers` |
 | P | a space-grouped number in two cells | `12 500` ×1 | `<table><tr><td>12</td><td>500</td></tr></table>` | fail | `repn-cells-glue` |
 | P | three digits that continue a group | `500` ×1 | `Total 12 500` | fail | `repn-group-continued` |

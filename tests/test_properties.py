@@ -38,10 +38,20 @@ assert HTML_TESTS and INLINE_TESTS, "no html tests found: check tests/fixtures/i
 # Filler no test asks for, and the marks a page prints around its text. Note: no bare "$": two of them
 # around LaTeX-like text ("$ _ P < 0.05 $") read as math, as an OCR model's spaced "$ x_1 $" must.
 WORD = st.sampled_from(["lorem", "ipsum", "dolor", "amet", "sed", "ut", "Vel", "QUIS", "A7", "x9"])
-MARK = st.sampled_from(["$5.00", "$1,000", "US$5", "%", "____", "_", "x_1", "[1]", "...", "•", "—", "-",
-                        "(", ")", "e.g.", "1,000", "12", "0.5", "&", "<", "¹", "ﬁ", " "])
+MARKS = ["$5.00", "$1,000", "US$5", "%", "____", "_", "x_1", "[1]", "...", "•", "—", "-",
+         "(", ")", "e.g.", "1,000", "12", "0.5", "&", "<", "¹", "ﬁ", " "]
+MARK = st.sampled_from(MARKS)
 TOKENS = st.lists(st.one_of(WORD, MARK), max_size=12)
 PARAGRAPH = TOKENS.map(" ".join)
+# Note: text in the same block as an answer is read with it, and three of the fold's documented rules read
+# what is joined differently: a run of leader characters ("...", "____", "-", a full stop and spaces) is
+# dropped, two dollars around text read as maths, and a dash that ends a line joins the next word. A filler
+# with none of those marks cannot change how the answer is read (a block break stops each of them, and
+# `test_a_block_break_stops_a_leader_run` and the dollar tests say so), so the property that puts the
+# filler in the answer's own block draws from it.
+JOINING = {"$5.00", "$1,000", "US$5", "____", "_", "...", "—", "-", "e.g."}
+APART = st.lists(st.one_of(WORD, st.sampled_from([m for m in MARKS if m not in JOINING])),
+                 max_size=12).map(" ".join)
 
 
 def paragraphs(xs: list[str]) -> str:
@@ -54,7 +64,7 @@ def test_an_answer_passes_with_paragraphs_around_it(t, before, after):
     assert v.result == "pass", v.why
 
 
-@given(st.sampled_from(INLINE_TESTS), PARAGRAPH, PARAGRAPH)
+@given(st.sampled_from(INLINE_TESTS), APART, APART)
 def test_an_answer_passes_with_text_around_it_in_its_paragraph(t, before, after):
     h = answer(t)["html"]
     head, tail = h[:-len("</p>")].replace("<p>", f"<p>{_html.escape(before, quote=False)} ", 1), "</p>"

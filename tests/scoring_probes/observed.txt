@@ -245,6 +245,7 @@ repn-context	pass
 repn-lines	pass
 repn-same-line	pass
 repn-footnote-mark	pass
+repn-footnote-between-groups	fail	'12 500' appears 0x, not 1x
 repn-list-numbers	pass
 repn-cells-glue	fail	'12 500' appears 0x, not 1x
 repn-group-continued	fail	'500' appears 0x, not 1x
