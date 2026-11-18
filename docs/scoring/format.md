@@ -109,7 +109,9 @@ other text (case fm-in-code).
 | I | `text-decoration: none` takes off the element's own underline | not underline on `total`, context `the total due` | `<p>the <u style="text-decoration: none">total</u> due</p><p><b>x</b></p>` | pass | `fm-own-none` |
 | I | a `font` shorthand that names no weight draws the text plain | not bold on `total`, context `the total due` | `<p>the <b style="font: 12px serif">total</b> due</p><p><i>x</i></p>` | pass | `fm-font-resets` |
 | P | a mark inside a head and title that an end tag closes is hidden, as the text view hides them | bold on `total`, context `the total due` | `<head><title>the <b>total</b> due</title></head><p>the total due</p>` | fail: `the span lacks ['bold']` | `fm-closed-head` |
-| I | an unclosed head ends at the first text that is not its own | bold on `total`, context `the total due` | `<head>intro the <b>total</b> due` | pass | `fm-head-bare-text` |
+| I | an unclosed head hides nothing: its text and marks are read, as the text view reads them | bold on `total`, context `the total due` | `<head>intro the <b>total</b> due` | pass | `fm-head-bare-text` |
+| I | an unclosed comment hides nothing, as in the text view: what follows it is read | bold on `total`, context `the total due` | `<p>Intro</p><!-- figure placeholder <p>the <b>total</b> due</p>` | pass | `fm-unclosed-comment` |
+| I | markup that is no tag is text: CDATA, a processing instruction and a stray < hide nothing | bold on `total`, context `the total due` | `<![CDATA[x]]><?xml v?><p>a<b the <b>total</b> due</p>` | pass | `fm-cdata` |
 | I | an html tag inside markdown is read as html | sub on `2`, context `H2O` | `H<sub>2</sub>O` | pass | `fm-markdown-html` |
 | P | a negative test, the span marked | not bold on `total`, context `the total due` | `the <b>total</b> due` | fail: `the span carries ['bold']` | `fm-neg-marked` |
 | P | a negative test, the words not on a page that has marks | not bold on `total`, context `the total due` | `<p>nothing <b>here</b></p>` | fail: `the context is not in the output` | `fm-neg-missing` |

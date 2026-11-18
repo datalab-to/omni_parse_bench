@@ -63,6 +63,7 @@ VOID = frozenset(
     {"br", "hr", "img", "input", "meta", "link", "col", "wbr", "area", "base", "embed", "source", "track"}
 )
 _NUMBER = re.compile(r"\d+")
+_NOT_A_TAG = re.compile(rf"<(?!{views._TAG[1:]})")
 
 
 class Marked(NamedTuple):
@@ -98,23 +99,44 @@ def style_marks(style: str) -> tuple[frozenset[str], frozenset[str], frozenset[s
     underline, a strikethrough or a script only off the element that makes it
     (`<u style="text-decoration: none">`), since a browser draws one an ancestor makes whatever the style
     says. `vertical-align` replaces the other script: a `<sup style="vertical-align: sub">` is a subscript.
-    A later declaration replaces an earlier one; an inherited value or a variable changes nothing."""
+    A later declaration replaces an earlier one, unless the earlier is `!important` and it is not; a CSS-wide
+    keyword (`inherit`, `unset`, `revert`) takes an earlier declaration back and `initial` is the plain
+    value; a variable changes nothing."""
     bold: bool | None = None
     italic: bool | None = None
     deco: list[str] | None = None
     vertical: str | None = None
+    important: set[str] = set()   # the properties an `!important` declaration has set: a later plain one loses
+
+    def wins(prop: str, imp: bool) -> bool:
+        if prop in important and not imp:
+            return False
+        if imp:
+            important.add(prop)
+        return True
+
     for decl in style.lower().split(";"):
         name, _, value = decl.partition(":")
-        name, value = name.strip(), value.replace("!important", "").strip()
-        words = value.split()
-        if not words or "var(" in value or words[0] in ("inherit", "unset", "revert", "initial"):
+        name = name.strip()
+        imp = "!important" in value
+        words = value.replace("!important", "").split()
+        if not words or "var(" in value:
             continue
-        if name == "font-weight":
-            bold = _bold(words[0]) if _bold(words[0]) is not None else bold
-        elif name == "font-style":
-            if words[0] in ("italic", "oblique", "normal"):
+        # Note: a CSS-wide keyword replaces an earlier declaration: `initial` is the property's plain value,
+        # the others leave it to the parent's (all four properties here are inherited or drawn through)
+        keyword = words[0] if words[0] in ("inherit", "initial", "unset", "revert", "revert-layer") else None
+        plain = keyword == "initial"
+        if name == "font-weight" and wins("weight", imp):
+            bold = False if plain else None if keyword else _bold(words[0]) if _bold(words[0]) is not None else bold
+        elif name == "font-style" and wins("style", imp):
+            if keyword:
+                italic = False if plain else None
+            elif words[0] in ("italic", "oblique", "normal"):
                 italic = words[0] != "normal"
-        elif name == "font":
+        elif name == "font" and wins("weight", imp) and wins("style", imp):
+            if keyword:
+                bold, italic = (False, False) if plain else (None, None)
+                continue
             # Note: the shorthand sets the weight and the style, plain unless it names them; they come
             # before the size, which ends them
             named: set[str] = set()
@@ -126,10 +148,10 @@ def style_marks(style: str) -> tuple[frozenset[str], frozenset[str], frozenset[s
                 elif _bold(w):
                     named.add("bold")
             bold, italic = "bold" in named, "italic" in named
-        elif name in ("text-decoration", "text-decoration-line"):
-            deco = words
-        elif name == "vertical-align":
-            vertical = words[0]
+        elif name in ("text-decoration", "text-decoration-line") and wins("deco", imp):
+            deco = ["none"] if keyword in ("initial", "unset") else None if keyword else words
+        elif name == "vertical-align" and wins("vertical", imp):
+            vertical = "baseline" if keyword in ("initial", "unset") else None if keyword else words[0]
     add: set[str] = set()
     drop: set[str] = set()
     own: set[str] = set()
@@ -225,6 +247,9 @@ def read(html: str) -> Marked:
     # Note: what `views.html` hides is hidden here, by its own patterns, so the two readers see the same text
     html = views._COMMENT.sub("", html)
     html = views._SCRIPT.sub(" ", views._DOCTYPE.sub(" ", html))
+    # Note: a "<" that starts no tag is text, as in the text view: an unclosed comment, "<![CDATA[", "<?xml",
+    # "</ 3" and a tag left open at the end must not hide what follows from this reader alone
+    html = _NOT_A_TAG.sub("&lt;", html)
     r = _Reader()
     r.feed(html)
     r.close()

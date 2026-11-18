@@ -550,17 +550,22 @@ def test_an_elements_own_style_takes_off_its_own_default_mark_but_not_an_ancesto
 
 PIECES = ["<p>{w}</p>", "<b>{w}</b>", "<head>{w}</head>", "<head>{w}", "<title>{w}</title>", "<title>{w}",
           "<script>{w}</script>", "<style>{w}</style>", "<!--{w}-->", "<!DOCTYPE html>{w}",
-          "<head><title>{w} <b>{w}</b></title></head>", "<i>{w}", "<script>{w}"]
+          "<head><title>{w} <b>{w}</b></title></head>", "<i>{w}", "<script>{w}",
+          "<!--{w}", "<!-- a -- {w} -->", "<![CDATA[{w}]]>", "<?xml {w}?>", "<!x {w}>", "</ 3 {w}", "<![if !IE]>{w}",
+          "{w} a<b", "<p title='a<b'>{w}</p>", '<p title="a>b">{w}</p>', "<P>{w}</P><B>{w}</B>", "{w} a<b c&d &amp; e",
+          "<p {w}", "<!>{w}", "<i><!--{w}</i>"]
 
 
-@relation(HOLDS, domain="pages of up to 6 pieces from 13: closed and unclosed head, title, script, style, comments")
+@relation(HOLDS, domain="pages of up to 6 pieces from 28: closed and unclosed head, title, script, style, comments (closed, with --, or open), CDATA, conditional comments, processing instructions, stray < and &, uppercase tags, > in a quoted attribute")
 @given(st.lists(st.tuples(st.sampled_from(PIECES), LETTERS), min_size=1, max_size=6))
 def test_the_format_reader_hides_what_the_text_view_hides_and_reads_what_it_reads(pieces):
     """On a page of paragraphs, marks, comments, a doctype and head, title, script and style elements, closed or
     not, the text the format reader finds is the text `views.html` shows, once folded: an element hidden when an end
     tag closes it, and read as text when none does. [M74]
     Why it matters for a score: the format and the text tests see the same page, so a test cannot fail on text the
-    other tests never saw, or pass on text they ignore."""
+    other tests never saw, or pass on text they ignore.
+    Not in the domain, because the text view shows them and this reader does not: an image's alt text, `<ol>`
+    numbering and a checkbox's mark."""
     # Given a page built from the pieces; When both readers read it; Then they find the same text
     html = "".join(piece.format(w=w) for piece, w in pieces)
     assert marks.read(html).text == marks.fold(views.html(html).text), html

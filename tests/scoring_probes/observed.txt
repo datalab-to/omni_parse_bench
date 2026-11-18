@@ -326,6 +326,8 @@ fm-own-none	pass
 fm-font-resets	pass
 fm-closed-head	fail	the span lacks ['bold']
 fm-head-bare-text	pass
+fm-unclosed-comment	pass
+fm-cdata	pass
 fm-markdown-html	pass
 fm-neg-marked	fail	the span carries ['bold']
 fm-neg-missing	fail	the context is not in the output
