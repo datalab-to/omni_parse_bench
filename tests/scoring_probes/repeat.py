@@ -38,6 +38,7 @@ TABLES = [
         repeat_number("repn-lines", "I", "two copies in two cells", "1,240", 2, "<table><tr><td>1,240</td><td>1,240</td></tr></table>"),
         repeat_number("repn-same-line", "I", "two copies on one line", "1,240", 2, "<p>1,240 1,240</p>"),
         repeat_number("repn-footnote-mark", "I", "a footnote mark is not a copy", "2", 1, "<p>Revenue<sup>2</sup> was 2</p>"),
+        repeat_number("repn-footnote-between-groups", "P", "a footnote mark between the groups of a number written with spaces is not dropped: the two groups are two numbers, as `present` reads them", "12 500", 1, "<p>12<sup>2</sup> 500</p>"),
         repeat_number("repn-list-numbers", "I", "a list's numbers are not copies", "2", 1, "<ol><li>a</li><li>b 2</li></ol>"),
         repeat_number("repn-cells-glue", "P", "a space-grouped number in two cells", "12 500", 1, "<table><tr><td>12</td><td>500</td></tr></table>"),
         repeat_number("repn-group-continued", "P", "three digits that continue a group", "500", 1, "Total 12 500"),

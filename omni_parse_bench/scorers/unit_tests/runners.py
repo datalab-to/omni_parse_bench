@@ -204,14 +204,14 @@ def _text_copies(text: str, page: str) -> int:
 
 
 @functools.lru_cache(maxsize=64)
-def _number_lines(html: str) -> tuple[str, ...]:
+def _number_lines(html: str, marks: bool = False) -> tuple[str, ...]:
     """The lines a page shows without alt text, for counting numbers: its text view with each block and each
     <br> a line of its own, a footnote marker (`<sup>2</sup>`, `[2]`) and a list's numbers left out, each line
     folded. A line is the unit because a space groups digits ("12 500") and a block break is a space to
-    fold."""
+    fold. With `marks`, a footnote marker is kept, as `present` reads it (a spaced number)."""
     page = re.sub(r"<br\s*/?>", views.BREAK, re.sub(r"<(/?)ol\b", r"<\1ul", html, flags=re.I), flags=re.I)
-    q = views.reading(views.Seq(page), alt=False, marks=False)
-    return tuple(normalize.unmarked(line) for line in q.s.split(views.BREAK))
+    q = views.reading(views.Seq(page), alt=False, marks=marks)
+    return tuple(line if marks else normalize.unmarked(line) for line in q.s.split(views.BREAK))
 
 
 def _number_copies(text: str, v: views.Html) -> int:
@@ -230,7 +230,10 @@ def _number_copies(text: str, v: views.Html) -> int:
     grouped = bool(re.fullmatch(r"\d{1,3}(?: \d{3})*", plain))
     starts_group = grouped and bool(re.match(r"\d{3}(?: |$)", plain))
     copies = 0
-    for line in _number_lines(v.html):
+    # Note: a gold written with spaces ("12 500") has a place between its groups where a footnote marker could
+    # be dropped and join two numbers that `present` reads as two ("12<sup>2</sup> 500"), so it is counted on
+    # the lines with their markers kept; a marker after it ("12 500<sup>1</sup>") is still not a group
+    for line in _number_lines(v.html, " " in plain):
         line = line.translate(_NUM_CLEAN)
         for m in pattern.finditer(line):
             if ((m["pre"] or "").strip() == "-") != n.negative or not (m["pct"] or not n.percent):
