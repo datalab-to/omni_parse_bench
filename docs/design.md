@@ -59,6 +59,24 @@ is found in an output (`runners.found`):
 
 A `layout_kind` test's text only labels its place; it is never compared.
 
+Case is folded by default: it isn't what most parses are paid for. A text arg of a `present` test may set
+`exact_case: true` (false when omitted), for content whose case is the point (`iPhone`, `NASA`, `Co` and `CO`, a German noun). The
+arg then passes only when its text is found with its case kept: `normalize.fold_cased` applies every other fold
+(glyphs, spacing, quotes, dashes, hyphens) and leaves case alone, on both sides, in every path of `found`
+(footnote markers, hyphen wrapping, squeezed text). `exact_case` and a `max_diffs` above 0 exclude each other: a changed letter's case costs one edit, so a budget would let the wrong case pass, and the loader refuses the pair (use `max_diffs: 0`, or drop `exact_case`). Numbers and equations have no case, and the other test types do not read it yet, so the field is refused
+there when the test loads. The text must also have a cased letter (`123` has no case to keep), or the field is refused.
+
+`exact_case` keeps the case of letters only, and it compares the page's text, not how it looks. Limits:
+- Two folds that are not case still apply: a checkbox mark (`[x]` and `[X]`, `[checked]` and `[Checked]`,
+  `[unchecked]` and `[UNCHECKED]` are one box each, since the checkbox patterns ignore case) and the glyph
+  unification of NFKC (`µ` micro sign and `μ` Greek mu are one letter).
+- Styling that changes how text looks, not what it is, is not read: `text-transform: uppercase` or small caps
+  on lowercase text leaves the text lowercase, so an uppercase gold fails on a page that only looks uppercase,
+  and a lowercase gold passes on it (cases `text-exact-case-css-upper`, `text-exact-case-small-caps`,
+  `text-exact-case-css-lower`).
+- Image descriptions (`alt`) are part of the text, so a string there counts, in its case
+  (`text-exact-case-alt`).
+
 A `repeat` test counts a text or a number: its content is the same kind of arg, and `expected_count` says how
 many copies the page holds. A text is counted as whole words after folding; a number is counted as `present`
 finds it (digit for digit, `runners._number_copies`), line by line and without the digits a footnote mark or a

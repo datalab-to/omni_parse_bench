@@ -53,7 +53,7 @@ What this means for a reader of scores:
 ## Two words used everywhere
 
 - **fold**: before any text comparison, the gold string and the output text are both put in one plain form:
-  lowercase, spacing collapsed, look-alike characters (dashes, quotes, ligatures, full-width digits) made one,
+  lowercase (case kept for an arg with `exact_case`), spacing collapsed, look-alike characters (dashes, quotes, ligatures, full-width digits) made one,
   math read as text, leaders and footnote brackets removed. Diacritics, punctuation and digits are kept. The full
   list is in [internals.md](internals.md#fold).
 - **squeeze**: fold, then remove every space. A text test that fails tries once more on the squeezed strings, so

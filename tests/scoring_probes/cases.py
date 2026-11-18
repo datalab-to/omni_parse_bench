@@ -78,10 +78,11 @@ def verdict(label: str, mark: str, rule: str, gold: str, output: str, run: Run, 
 # ----------------------------------------------------------------------------------------------- test types
 
 
-def text(label, mark, rule, gold, out, md=0, **kw) -> Case:
-    """`present` with a text arg."""
-    return verdict(label, mark, rule, _md(gold, md), out,
-                   lambda: _v(R.found(R.Text(gold, md), views.html(html(out)))), **kw)
+def text(label, mark, rule, gold, out, md=0, exact=False, **kw) -> Case:
+    """`present` with a text arg; `exact` sets the arg's `exact_case`."""
+    shown = _md(gold, md) + (" (exact case)" if exact else "")
+    return verdict(label, mark, rule, shown, out,
+                   lambda: _v(R.found(R.Text(gold, md, (), exact), views.html(html(out)))), **kw)
 
 
 def number(label, mark, rule, gold, out, **kw) -> Case:

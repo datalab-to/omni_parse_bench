@@ -266,6 +266,14 @@ test's `id` is unique across its dataset, and every page has at least one test. 
  "settings": {"kind": "table"}}
 ```
 
+Case is folded by default. A `present` test's text arg may also set `exact_case`, to be found only in the case it
+was printed (every other fold still applies; `max_diffs` must be 0, and the text needs a cased letter):
+
+```json
+{"id": "t6", "test_type": "present", "output_type": "html", "derivation": "authored", "tags": ["Latn"],
+ "args": {"content": {"text": "eLife", "max_diffs": 0, "exact_case": true}}, "settings": {}}
+```
+
 ```python
 data.read_manifest(dataset, manifest="manifest.parquet")  # (folder, pages): every page, with full local paths
 unit_tests.gold(page)                                    # one page's tests, checked

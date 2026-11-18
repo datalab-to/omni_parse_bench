@@ -11,10 +11,11 @@ from hypothesis import strategies as st
 from test_properties import TESTS
 
 from metamorphic.common import (CELL, HOLDS, INTENDED, LIMITATION, ORDER, REPEAT, TEXT, answer_page,
-                                deviation, escaped, every_real_test, known_ids, more_evidence, passes,
+                                deviation, escaped, every_real_test, exact_case_tests, known_ids,
+                                more_evidence, passes,
                                 relation, text_strings)
 from omni_parse_bench import views
-from omni_parse_bench.normalize import fold
+from omni_parse_bench.normalize import fold, fold_cased
 from omni_parse_bench.scorers.unit_tests import runners
 
 LINE_END_HYPHEN = re.compile(r"[^\W\d_]-\s")    # a letter, a hyphen, a space: what fold may join
@@ -395,3 +396,185 @@ def test_every_real_text_test_passes_on_its_answer_in_another_case():
     failing = {t.id for t in tests} - (upper & swapped)
     assert failing == known_ids("M15b"), {"new": sorted(failing - known_ids("M15b")),
                                           "gone": sorted(known_ids("M15b") - failing)}
+
+
+# ------------------------------------------------------------------------ exact_case: the case kept
+
+
+def exact(text: str, edits: int = 0) -> runners.Present:
+    """A present test of `text` whose arg sets `exact_case`."""
+    return runners.Present(runners.Text(text, edits, (), True))
+
+
+def flipped(s: str, i: int) -> str:
+    """`s` with the case of its letter number `i` (counting only cased single-character letters) swapped."""
+    spots = [k for k, c in enumerate(s) if c.swapcase() != c and len(c.swapcase()) == 1
+             and c.swapcase().swapcase() == c]
+    k = spots[i % len(spots)]
+    return s[:k] + s[k].swapcase() + s[k + 1:]
+
+
+def has_cased_letter(s: str) -> bool:
+    return any(c.swapcase() != c and len(c.swapcase()) == 1 and c.swapcase().swapcase() == c for c in s)
+
+
+@relation(HOLDS, domain="words (ASCII letters, digits and éüñàçöå), '&' words and the marks . , - (x) 50% "
+                        "1,000, in the case written; the loaded exact_case tests")
+@given(PROSE)
+def test_a_text_passes_on_its_own_case_with_exact_case(s):
+    """A text test whose arg sets exact_case passes on a page that writes its text in the case it has, for
+    words, '&' words and the marks . , - (x) 50% 1,000, and for every loaded test that sets exact_case. [M29]
+    Why it matters for a score: exact_case must keep every correct page, in any case the gold has (`iPhone`,
+    `NASA`, a German noun), or it would punish what it is meant to protect."""
+    # Given a text a gold file may hold (something is left of it after folding), with no line-end hyphen
+    # (whose reading depends on case: M2e)
+    assume(fold(s) and not LINE_END_HYPHEN.search(s))
+    # When a page writes it as it is and a test of it sets exact_case; Then the test passes
+    assert passes(exact(s), f"<p>{escaped(s)}</p>", exact=True)
+    # And so does every loaded test that sets exact_case, on its own answer
+    for t in exact_case_tests():
+        assert passes(t.params, answer_page(t.params), exact=True), t.id
+
+
+@relation(HOLDS, domain="words (ASCII letters, digits and éüñàçöå), '&' words and the marks . , - (x) 50% "
+                        "1,000, with one letter's case swapped")
+@given(PROSE, st.integers(0, 500))
+def test_swapping_the_case_of_one_letter_fails_exact_case_and_passes_without_it(s, i):
+    """A text test passes on a page that writes its text with the case of one letter swapped when the arg does
+    not set exact_case (M2a, M15a), and fails on it when the arg sets exact_case, for text with a cased letter
+    and no line-end hyphen. [M30]
+    Why it matters for a score: `NASA` for `Nasa`, `Co` for `CO` or `iPhone` for `iphone` is the error
+    exact_case is for; the setting must not be a no-op."""
+    # Given a text with a cased letter and no line-end hyphen (whose reading depends on case: M2e)
+    assume(has_cased_letter(s) and fold(s) and not LINE_END_HYPHEN.search(s))
+    # When a page writes it with the case of one letter swapped
+    page = f"<p>{escaped(flipped(s, i))}</p>"
+    # Then a test without exact_case passes, and the same test with exact_case fails
+    assert passes(runners.Present(runners.Text(s, 0)), page)
+    assert not passes(exact(s), page, exact=True)
+
+
+CASE_FLIP_NOTE = ("those with a cased letter (and no checkbox [x]) pass in their own case and fail with "
+                  "their first cased letter swapped, under exact_case")
+
+
+@every_real_test("text strings", note=CASE_FLIP_NOTE)
+def test_every_real_text_string_fails_with_one_letter_case_swapped_under_exact_case():
+    """Every real text string, were it the text of an arg that sets exact_case, fails with its first cased
+    letter swapped, and passes in its own case, but those with a checkbox ([x]: fold reads [x] and [X] as one
+    checked box). [M30, M29]
+    Why it matters for a score: it checks the setting on real strings: a hyphen, a footnote or a squeeze path
+    that lowercased would let a wrong-case page through on some of them."""
+    # Given every text string of every real test; When it is the text of an arg that sets exact_case
+    bad_flip, bad_own = [], []
+    for t in TESTS:
+        for n, text in enumerate(text_strings(t.params)):
+            # Note: a checkbox "[x]" or "[X]" is one checked box (a mark, not a letter): no case
+            if not has_cased_letter(text) or re.search(r"\[[xX]\]", text):
+                continue
+            e = exact(text)
+            # Then it passes on its answer, and fails with a letter's case swapped
+            if not passes(e, answer_page(e), exact=True):
+                bad_own.append(f"{t.id}#{n}")
+            if passes(e, f"<p>{escaped(flipped(text, 0))}</p>", exact=True):
+                bad_flip.append(f"{t.id}#{n}")
+    assert not bad_own and not bad_flip, {"own": bad_own[:5], "flip": bad_flip[:5]}
+
+
+SPACES = st.lists(st.sampled_from(" \t\n\u00a0\u3000\r"), min_size=1, max_size=4).map("".join)
+
+
+@relation(HOLDS, domain="words (ASCII letters, digits and éüñàçöå), '&' words and the marks . , - (x) 50% "
+                        "1,000: runs of white space, entities, NFD, and the answer in <b> <i> <span> <em> "
+                        "<strong> <u> <small> <a>")
+@given(PROSE, st.data(), st.sampled_from(["b", "i", "span", "em", "strong", "u", "small", "a"]))
+def test_exact_case_still_ignores_spacing_entities_accents_and_markup(s, data, tag):
+    """A text test whose arg sets exact_case passes on its text with each space replaced by a run of white
+    space, with its characters written as entities, with its accents decomposed (NFD), and with a head, a
+    tail or all of it in an inline tag. [M31]
+    Why it matters for a score: exact_case keeps case only; spacing, entities, accents and styling are as
+    ungraded as without it (M2b, M2c, M7a)."""
+    # Given a text a gold file may hold (something is left after folding), with no line-end hyphen (M2e)
+    assume(fold(s) and not LINE_END_HYPHEN.search(s))
+    words = s.split(" ")
+    spaced = words[0] + "".join(data.draw(SPACES) + w for w in words[1:])
+    cut = data.draw(st.integers(0, len(s)))
+    a, b = escaped(s[:cut]), escaped(s[cut:])
+    pages = [f"<p>{escaped(spaced)}</p>",                                                      # spacing
+             f"<p>{''.join(f'&#{ord(c)};' if c != ' ' else c for c in s)}</p>",               # entities
+             f"<p>{escaped(unicodedata.normalize('NFD', s))}</p>",                              # accents
+             f"<p><{tag}>{a}</{tag}>{b}</p>", f"<p>{a}<{tag}>{b}</{tag}></p>",                  # markup
+             f"<p><{tag}>{escaped(s)}</{tag}></p>"]
+    # When each page is scored with an exact_case test of s; Then each passes
+    assert [passes(exact(s), page, exact=True) for page in pages] == [True] * len(pages)
+
+
+@more_evidence()
+def test_exact_case_still_folds_quotes_dashes_glyphs_and_wrapped_lines():
+    """A text test whose arg sets exact_case passes on its text with quotes, dashes, a ligature, full-width
+    letters or a footnote mark written another way, and with a word broken at a line end, in the case the gold
+    has; and fails when one letter of it has another case. [M31]
+    Why it matters for a score: as for M31, for the folds that are not about spacing or markup."""
+    # Given texts, and pages that write them another way but in the same case
+    cases = [("\u201cNASA\u201d said it\u2019s \u2018Okay\u2019", "<p>\"NASA\" said it's 'Okay'</p>"),
+             ("Pre-post Test", "<p>Pre\u2013post Test</p>"), ("Pre-post Test", "<p>Pre\u2212post Test</p>"),
+             ("figure One", "<p>\ufb01gure One</p>"),
+             ("iPhone Pro", "<p>\uff49\uff30hone Pro</p>"),
+             ("Smith and Jones", "<p>Smith<sup>1</sup> and Jones</p>"),
+             ("Smith and Jones", "<p>Smith[1] and Jones</p>"), ("Headquarters", "<p>Head-\nquarters</p>"),
+             ("Headquarters", "<p>Head- quarters</p>"), ("Total due", "<p>Total ........ due</p>")]
+    for text, page in cases:
+        # Then the test passes
+        assert passes(exact(text), page, exact=True), (text, page)
+    # And a page with one letter in another case fails
+    for text, page in [("NASA said", "<p>Nasa said</p>"),
+                       ("Smith and Jones", "<p>smith<sup>1</sup> and Jones</p>"),
+                       ("Headquarters", "<p>head-\nquarters</p>"),
+                       ("Head quarters", "<p>head-\nquarters</p>"),
+                       ("Pre-post Test", "<p>Pre\u2013post test</p>")]:
+        assert not passes(exact(text), page, exact=True), (text, page)
+
+
+@relation(HOLDS, domain="strings of ASCII letters, digits, accents é ü, a few symbols (& . , %), quotes and "
+                        "spaces; no hyphen, dash, bracket or bullet (those are M1a, M1b, M1c, M1e)")
+@example("A'\u2019B")
+@given(st.text(string.ascii_letters + string.digits + "éÉüÜ&.,% '\u2018\u2019`\"\u201c\u201d"))
+def test_folding_with_case_kept_twice_is_folding_it_once(s):
+    """`fold_cased` twice gives the same text as once, for strings of letters in both cases, digits, accents,
+    '& . , %', quotes and spaces. [M32]
+    Why it matters for a score: exact_case compares the gold and the page each folded once; a second fold
+    that changed the text would show the case-kept form is not final (as M1d for `fold`)."""
+    # Given a string s with both cases; When it is folded once and twice, with case kept; Then both agree
+    assert fold_cased(fold_cased(s)) == fold_cased(s)
+    # And fold_cased is fold without lowercasing: lowercasing it gives fold's text
+    assert fold_cased(s).lower() == fold(s)
+
+
+@relation(HOLDS, domain="130 words broken after 2-5 letters (the second part in lower case), the first part "
+                        "in lower, Capitalized or UPPER case; one letter's case swapped")
+@given(st.text(string.ascii_lowercase, min_size=2, max_size=5), st.text(string.ascii_lowercase, min_size=2,
+                                                                         max_size=5),
+       st.sampled_from([str.lower, str.capitalize, str.upper]), st.sampled_from([" ", "\n", "  \n "]),
+       st.integers(0, 500))
+def test_a_word_broken_at_a_line_end_keeps_its_case_under_exact_case(first, rest, style, gap, i):
+    """A text test for a word, whose arg sets exact_case, passes on the page that breaks it after a hyphen at
+    a line end when the page has the word's case, and fails when one letter has another case; without
+    exact_case both pass (the hyphen is read kept or dropped, M11a). The letter swapped is not the first
+    of the second part (a capital there is read as a compound hyphen: M2e). [M33]
+    Why it matters for a score: the hyphen fallback re-reads the page's text; if it lowercased, `Develop- ers`
+    and `develop- ers` would both pass an exact_case test of `Developers`."""
+    word = style(first) + rest
+    broken = f"{style(first)}-{gap}{rest}"
+    # Given a word of the case `style`, and a page that breaks it at a line end with a hyphen
+    assert passes(exact(word), f"<p>{broken}</p>", exact=True)
+    # When one letter of the word, not the first of its second part, has the other case on the page
+    where = i % (len(first) + len(rest) - 1)
+    where = where if where < len(first) else where + 1
+    letters = list(broken)
+    spots = [k for k, c in enumerate(broken) if c.isalpha()]
+    k = spots[where]
+    letters[k] = letters[k].swapcase()
+    page = f"<p>{''.join(letters)}</p>"
+    # Then the exact_case test fails, and the test without exact_case still passes
+    assert not passes(exact(word), page, exact=True), page
+    assert passes(runners.Present(runners.Text(word, 0)), page), page

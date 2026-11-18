@@ -714,3 +714,64 @@ def test_order_that_passes_with_fewer_edits_passes_with_more():
     # folded text, out of order there, which must not stop the squeezed text from passing.
     page = html("<p>b b a ab ab</p>")
     assert [R.order(R.Order("aa", "a ba", k), page)[0] for k in range(2)] == [True, True]
+
+
+@pytest.mark.parametrize("gold, page, exact, passes", [
+    ("iPhone", "<p>Buy an iphone today</p>", False, True),     # case is folded unless the arg asks
+    ("iPhone", "<p>Buy an iphone today</p>", True, False),     # found, but not in its case
+    ("iPhone", "<p>Buy an iPhone today</p>", True, True),
+    ("NASA", "<p>Nasa launched</p>", True, False),
+    ("Co", "<p>CO</p>", True, False),
+    ("Straße", "<p>straße</p>", True, False),
+    ("école", "<p>école</p>", True, True),               # NFC/NFKC and the other folds still apply
+    ("“Hello”", '<p>"Hello"</p>', True, True),                 # quotes still fold
+    ("Total due", "<p>Total   due:\n40</p>", True, True),      # spacing still folds
+    ("Anglo-Saxon law", "<p>Anglo- saxon law</p>", True, False),   # a wrapped hyphen keeps case too
+    ("Anglo-Saxon law", "<p>Anglo- Saxon law</p>", True, True),
+    ("Anglo-Saxon law", "<p>Anglo- saxon law</p>", False, True),
+    ("Xylophonic", "<p>Xylo- phonic</p>", True, True),
+    ("Xylophonic", "<p>xylo- phonic</p>", True, False),
+    ("Probiotic Bacteria", "<p>ProbioticBacteria</p>", True, True),          # the squeeze keeps case too
+    ("Probiotic Bacteria", "<p>Probioticbacteria</p>", True, False),
+    ("Probiotic Bacteria", "<p>Probioticbacteria</p>", False, True),
+    ("Probiotic", "<p>Probiotic1</p>", True, True),
+    ("Probiotic", "<p>probiotic1</p>", True, False),
+    ("Smith and Jones", "<p>Smith[1] and Jones</p>", True, True),            # the bracket-marker retry
+    ("Smith and Jones", "<p>smith[1] and Jones</p>", True, False),
+    ("Smith and Jones", "<p>smith[1] and Jones</p>", False, True),
+    ("Smith and Jones", "<p>smith<sup>1</sup> and Jones</p>", True, False),
+])
+def test_present_exact_case_keeps_case_and_every_other_fold(gold, page, exact, passes):
+    got, why = R.present(R.Present(R.Text(gold, 0, (), exact)), html(page))
+    assert got is passes
+    assert passes or "not found" in why
+
+
+def test_exact_case_is_an_arg_field_of_a_present_text_only():
+    from omni_parse_bench.scorers.unit_tests import tests as T
+
+    def parse(args, settings=None, test_type="present"):
+        return T._params("t", test_type, args, settings or {})
+
+    arg = {"text": "iPhone", "max_diffs": 0}
+    assert parse({"content": arg | {"exact_case": True}}).content.exact_case is True
+    assert parse({"content": arg}).content.exact_case is False
+    for bad in ("yes", 1, None):
+        with pytest.raises(ValueError, match="exact_case"):
+            parse({"content": arg | {"exact_case": bad}})
+    with pytest.raises(ValueError, match="compares text only, not a number"):
+        parse({"content": {"number": "12", "exact_case": True}})
+    with pytest.raises(ValueError, match="present"):
+        parse({"before": arg | {"exact_case": True}, "after": arg}, test_type="order")
+    with pytest.raises(ValueError, match="present"):
+        parse({"content": arg | {"exact_case": True}}, {"expected_count": 1}, "repeat")
+    with pytest.raises(ValueError, match="present"):
+        parse({"cell": arg | {"exact_case": True}}, test_type="table_cell")
+
+
+def test_exact_case_names_a_glued_number_not_a_case_when_both_apply():
+    """Wrong case and a number glued on both fail; the reason says what the test's own fold sees."""
+    got, why = R.present(R.Present(R.Text("Total: 40", 0, (), True)), html("<p>total: 400</p>"))
+    assert not got and "not found" in why
+    got, why = R.present(R.Present(R.Text("Total: 40", 0, (), True)), html("<p>Total: 400</p>"))
+    assert not got and "longer number" in why

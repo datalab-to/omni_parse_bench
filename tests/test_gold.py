@@ -19,7 +19,8 @@ def test_a_tag_is_a_vocabulary_tag_a_language_or_a_script():
 
 
 def with_args(args: dict, test_type: str = "present", settings: dict | None = None, **fields) -> dict:
-    output = {"present": "html", "order": "html", "repeat": "html", "page_near_empty": "html"}[test_type]
+    output = {"present": "html", "order": "html", "repeat": "html", "page_near_empty": "html",
+              "table_cell": "html", "layout_kind": "blocks"}[test_type]
     return {"id": "t", "test_type": test_type, "output_type": output, "derivation": "authored", "tags": [],
             "args": args, "settings": settings or {}} | fields
 
@@ -39,6 +40,23 @@ def with_args(args: dict, test_type: str = "present", settings: dict | None = No
     with_args({"content": {"text": "abc", "max_diffs": 0}}, "repeat", {"expected_count": 0}),
     with_args({"content": {"text": "abc", "max_diffs": 0}}, "repeat", {"expected_count": -1}),
     with_args({"content": {"text": "abc", "max_diffs": 0}}, "repeat", {"expected_count": True}),
+    with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": "yes"}}),
+    with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": 1}}),
+    with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": None}}),
+    with_args({"content": {"text": "abcdef", "max_diffs": 1, "exact_case": True}}),  # budget
+    with_args({"content": {"text": "123 456", "max_diffs": 0, "exact_case": True}}),  # no cased letter
+    with_args({"content": {"number": "12", "exact_case": True}}),
+    with_args({"content": {"latex": "x", "exact_case": True}}),
+    with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": True}},
+              settings={"exact_case": True}),
+    with_args({"content": {"text": "abc", "max_diffs": 0}}, settings={"exact_case": True}),
+    with_args({"before": {"text": "abc", "max_diffs": 0, "exact_case": True},
+               "after": {"text": "xyz", "max_diffs": 0}}, "order"),
+    with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": True}}, "repeat",
+              {"expected_count": 1}),
+    with_args({"cell": {"text": "abc", "max_diffs": 0, "exact_case": True}}, "table_cell"),
+    with_args({"content": {"text": "abc", "max_diffs": 0, "exact_case": True, "place": [[0, 0, 1, 1]]}},
+              "layout_kind", {"kind": "text"}),
     # ambiguous, as in present
     with_args({"content": {"number": "12,5"}}, "repeat", {"expected_count": 2}),
     with_args({"content": {"number": "1,240"}}, "repeat", {"expected_count": 0}),
@@ -55,6 +73,53 @@ def with_args(args: dict, test_type: str = "present", settings: dict | None = No
 def test_a_bad_arg_or_setting_is_refused(t):
     with pytest.raises(ValueError):
         gold.test("p", t)
+
+
+def _roles(exact):
+    """One test of every type that takes a text arg, each text arg saying `exact_case: exact`."""
+    t = lambda **k: {"text": "abc", "max_diffs": 0, "exact_case": exact} | k  # noqa: E731
+    return {
+        "present": with_args({"content": t()}),
+        "order": with_args({"before": t(), "after": t(text="xyz")}, "order"),
+        "repeat": with_args({"content": t()}, "repeat", {"expected_count": 1}),
+        "table_cell": with_args({"cell": t(), "headings": [t(text="head")], "section": t(text="sec"),
+                                 "row_groups": [t(text="grp")], "left": t(text="l")}, "table_cell"),
+        "layout_kind": with_args({"content": t(place=[[0.1, 0.1, 0.5, 0.2]])}, "layout_kind",
+                                 {"kind": "text"}),
+    }
+
+
+@pytest.mark.parametrize("role", ["present", "order", "repeat", "table_cell", "layout_kind"])
+def test_an_explicit_exact_case_false_is_accepted_wherever_a_text_arg_is(role):
+    t = gold.test("p", _roles(False)[role])
+    assert gold.arg_kinds(t.test_type, t.args) in {("text",), ()}    # as without the field
+
+
+@pytest.mark.parametrize("role", ["order", "repeat", "table_cell", "layout_kind"])
+def test_exact_case_true_is_refused_outside_a_present_test(role):
+    with pytest.raises(ValueError, match="present test's text content only for now"):
+        gold.test("p", _roles(True)[role])
+
+
+@pytest.mark.parametrize("role", ["present", "order", "table_cell"])
+def test_exact_case_must_be_a_bool_on_every_role(role):
+    with pytest.raises(ValueError, match="true or false"):
+        gold.test("p", _roles("no")[role])
+
+
+@pytest.mark.parametrize("arg, kind", [({"number": "12"}, "number"), ({"latex": "x"}, "latex")])
+@pytest.mark.parametrize("value", [True, False])
+def test_exact_case_on_a_number_or_latex_arg_names_its_kind(arg, kind, value):
+    with pytest.raises(ValueError, match=f"exact_case compares text only, not a {kind}"):
+        gold.test("p", with_args({"content": arg | {"exact_case": value}}))
+
+
+def test_exact_case_is_a_bool_arg_field_of_a_present_text():
+    t = gold.test("p", with_args({"content": {"text": "iPhone", "max_diffs": 0, "exact_case": True}}))
+    assert t.params.content.exact_case is True
+    assert gold.arg_kinds(t.test_type, t.args) == ("text",)
+    t = gold.test("p", with_args({"content": {"text": "iPhone", "max_diffs": 0, "exact_case": False}}))
+    assert t.params.content.exact_case is False
 
 
 @pytest.mark.parametrize("number", ["1,240", "-4.8%", "12.5", "0.0472", "1,240.00", "8.455"])
@@ -105,3 +170,15 @@ def test_latex_must_render_to_something(latex, why):
     with pytest.raises(ValueError, match=why) as e:
         gold.test("p", with_args({"content": {"latex": latex}}))
     assert "test 't'" in str(e.value) and repr(latex)[:20] in str(e.value)
+
+
+@pytest.mark.parametrize("budget", [1, 2])
+def test_exact_case_and_an_edit_budget_exclude_each_other(budget):
+    """exact_case with max_diffs above 0 is refused at load, and the message names both and the way out."""
+    t = with_args({"content": {"text": "abcdef", "max_diffs": budget, "exact_case": True}})
+    with pytest.raises(ValueError,
+                       match=r"exact_case and max_diffs \d exclude each other.*Set max_diffs to 0"):
+        gold.test("p", t)
+    # and either alone is fine
+    gold.test("p", with_args({"content": {"text": "abcdef", "max_diffs": budget}}))
+    gold.test("p", with_args({"content": {"text": "abcdef", "max_diffs": 0, "exact_case": True}}))

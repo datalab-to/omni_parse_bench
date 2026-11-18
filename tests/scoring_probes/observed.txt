@@ -27,8 +27,15 @@ text-math-letter	pass
 text-math-symbol	pass
 text-middot	pass
 text-glued-dash	pass
+text-exact-case-kept	pass
+text-exact-case-folds	pass
+text-exact-case-line-hyphen	pass
+text-exact-case-checkbox	pass
+text-exact-case-unchecked	pass
 text-transposition	pass
 ## text-blind
+text-exact-case-alt	pass
+text-exact-case-css-lower	pass
 text-strike	pass
 text-loop	pass
 text-longer-word	pass
@@ -58,6 +65,11 @@ text-literal-stars	fail	'Total Due' not found (best 0.778 < 1.000); closest 'ota
 text-caret	fail	'x^2' not found (best 0.800 < 1.000); closest 'x2'
 text-sup-exponent	fail	'10 cells' not found (best 0.857 < 1.000); closest ' cells'
 text-sign-after-leaders	fail	'Revenue 4.8' not found (best 0.909 < 1.000); closest 'revenue -4.'
+text-exact-case	fail	'iPhone' not found (best 0.833 < 1.000); closest 'iphone'
+text-exact-case-acronym	fail	'NASA' not found (best 0.400 < 1.000); closest 'N'
+text-exact-case-line-hyphen-wrong	fail	'Developers' not found (best 0.947 < 1.000); closest 'evelopers'
+text-exact-case-css-upper	fail	'NASA' not found (best 0.000 < 1.000); closest 'nasa'
+text-exact-case-small-caps	fail	'Nasa' not found (best 0.857 < 1.000); closest 'asa'
 text-case-mapping	fail	'straße' not found (best 0.800 < 1.000); closest 'stra'
 ## text-digit-edge
 edge-digit-after	fail	'Total: 40' found only inside a longer number

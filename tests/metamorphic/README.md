@@ -7,7 +7,7 @@ Each promise is a *relation*: change a page, or a test, in a way that should not
 known way), and the verdict should follow. Example: putting a passing answer in bold must not make its test
 fail.
 
-- The certificate lists the 68 relations its authors selected: 60 hold and 8 deviate. It is not every
+- The certificate lists the 81 relations its authors selected: 73 hold and 8 deviate. It is not every
   relation of the scorer (see [Not covered](#not-covered)). Four of the 8 (M1a to M1c and M1e) are about
   folding a string twice, which the scorer never does and no document promises, so they change no score.
 - It is generated from the tests. CI fails if it is out of date, or if a status disagrees with its test.
@@ -245,7 +245,7 @@ Reference only; the sections above do not need it until a term is unfamiliar.
      (*leaders*) are made a space; white space may sit inside a run, but not a paragraph break (M22a);
   9. dash, quote, space and arrow families are each made one character, then two single quotes in a row (TeX's
      ` `` ` and `''`, or a mixed pair `'’`) are read as a double quote;
-  10. text is lowercased and white space collapsed (not removed).
+  10. text is lowercased (case kept for an arg with `exact_case`) and white space collapsed (not removed).
 - **squeeze**: fold with every space removed. Present and order retry with it when fold fails; table_cell
   also compares cells with their spaces removed.
 - **text matching**: a text test looks for its folded string in the folded page.

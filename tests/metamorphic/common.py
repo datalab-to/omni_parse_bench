@@ -83,8 +83,21 @@ def known_ids(label: str) -> set[str]:
 
 # ---------------------------------------------------------------------------------------- the tests
 
+def is_exact(p) -> bool:
+    """Whether a test's params ask for `exact_case` (only a `present` text arg can)."""
+    return isinstance(p, runners.Present) and isinstance(p.content, runners.Text) and p.content.exact_case
+
+
 def of(*kinds):
-    return [t for t in TESTS if isinstance(t.params, kinds)]
+    # Note: the relations that say case does not matter (M2a, M2e, M3, M7, M13a, M14, M15a/b, ...) draw their
+    # tests here, and a test that sets `exact_case` is left out of every one of them (`exact_case_tests`
+    # holds them): `passes` refuses such a test too, so that case-insensitivity cannot be weakened by one.
+    return [t for t in TESTS if isinstance(t.params, kinds) and not is_exact(t.params)]
+
+
+def exact_case_tests():
+    """The loaded tests whose text arg sets `exact_case` (the fixtures hold two; M29 runs them)."""
+    return [t for t in TESTS if is_exact(t.params)]
 
 
 TEXT = [t for t in of(runners.Present) if isinstance(t.params.content, runners.Text)]
@@ -171,8 +184,11 @@ def escaped(s: str) -> str:
     return html.escape(s, quote=False)
 
 
-def passes(params, page: str) -> bool:
-    """Whether the HTML `page` passes a test with these params."""
+def passes(params, page: str, *, exact: bool = False) -> bool:
+    """Whether the HTML `page` passes a test with these params. `exact` says the params set `exact_case`: a
+    relation about the folded comparison (the default) refuses params that set it, and one about
+    `exact_case` refuses params that do not, so neither can run on the other's tests."""
+    assert is_exact(params) == exact, f"exact_case is {is_exact(params)}, the relation expects {exact}"
     kind = next(k for k, (cls, _) in runners.TYPES.items() if isinstance(params, cls))
     return runners.TYPES[kind][1](params, views.html(page))[0]
 

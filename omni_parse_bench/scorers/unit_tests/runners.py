@@ -49,8 +49,9 @@ Mark = tuple[bool, str]                            # passed, and why not
 
 class Text(NamedTuple):
     text: str
-    max_diffs: int      # edits allowed, after `normalize.fold`
+    max_diffs: int      # edits allowed, after `normalize.fold` (`normalize.fold_cased` with exact_case)
     place: tuple[Box, ...] = ()     # where it is printed: a box per line, page fractions; () when not pinned
+    exact_case: bool = False    # compare with case kept (`normalize.fold_cased`); a `present` content only
 
 
 class Number(NamedTuple):
@@ -75,17 +76,20 @@ def found(a: Arg, v: views.Html) -> Mark:
         # -> (True, "")"""
     if isinstance(a, Number): return _number_found(a.number, v)
     if isinstance(a, Latex): return _latex_found(a.latex, v)
-    ok, r, thr, window = _contains(a.text, v.text, a.max_diffs)
+    # Note: `exact_case` runs every path below on the case-kept fold (fold_cased); nothing else changes.
+    fold_one, fold_marks = (normalize.fold_cased, normalize.unmarked_cased) if a.exact_case else (
+        normalize.fold, normalize.unmarked)
+    ok, r, thr, window = _contains(a.text, v.text, a.max_diffs, fold_one, fold_one)
     # Note: fold reads a bracketed footnote marker as a spaced number (so a number test still sees it, and
     # a gold that writes the marker finds it), and the text view a mark set as a superscript the same way,
     # which leaves either free only at the end of the gold: "Smith[1] and Jones" and
     # "Smith<sup>1</sup> and Jones" missed "Smith and Jones". Retry with the page's markers dropped.
     if not ok and ((page := views.unmarked(v.html)) is not None or "[" in v.text) and _contains(
-            a.text, v.text if page is None else page, a.max_diffs, normalize.unmarked)[0]:
+            a.text, v.text if page is None else page, a.max_diffs, fold_marks, fold_one)[0]:
         return True, ""
-    if not ok and hyphenation.matches(a.text, v.text, _cut_before, _cut_after):
+    if not ok and hyphenation.matches(a.text, v.text, _cut_before, _cut_after, cased=a.exact_case):
         return True, ""
-    if not ok and _only_glued(a.text, v.text):
+    if not ok and _only_glued(a.text, v.text, fold_one):
         return False, f"{a.text[:60]!r} found only inside a longer number"
     near = f"; closest {_excerpt(window)!r}" if window else ""
     return _mark(ok, f"{a.text[:60]!r} not found (best {r:.3f} < {thr:.3f}){near}")
@@ -687,10 +691,11 @@ def _why_missing(cut: bool) -> str:
     return "found only inside a longer number" if cut else "not found"
 
 
-def _only_glued(needle: str, text: str) -> bool:
+def _only_glued(needle: str, text: str, fold: Callable[[str], str] = normalize.fold) -> bool:
     """Whether `needle` is in `text` exactly but only cut out of a longer number (`_contains` fails it
-    on its edges): as `_contains` judges it, in the folded text, else in the squeezed."""
-    want, hay = normalize.fold(needle), normalize.fold(text)
+    on its edges): as `_contains` judges it, in the folded text, else in the squeezed. `fold` is the fold
+    the test compares with (`normalize.fold_cased` for an `exact_case` arg)."""
+    want, hay = fold(needle), fold(text)
     if not want: return False
     if want in hay: return not _edges_ok(want, hay)
     squeezed = want.replace(" ", ""), hay.replace(" ", "")
@@ -705,12 +710,12 @@ def _squeezed_ok(want: str, hay: str, folded: str) -> bool:
     return _edges_ok(want, hay, folded, [k for k, c in enumerate(folded) if c != " "])
 
 
-def _contains(needle: str, text: str, max_diffs: int,
-              fold_page: Callable[[str], str] = normalize.fold) -> tuple[bool, float, float, str]:
+def _contains(needle: str, text: str, max_diffs: int, fold_page: Callable[[str], str] = normalize.fold,
+              fold_needle: Callable[[str], str] = normalize.fold) -> tuple[bool, float, float, str]:
     """`contains`, and, when it fails, the best-matching window of the folded text (the squeezed, if that
-    matched better): lowercased, its spacing folded; "" when it passes or `needle` is empty. `fold_page`
-    folds `text` (`normalize.unmarked` drops its footnote markers)."""
-    want, hay = normalize.fold(needle), fold_page(text)
+    matched better): lowercased (case kept under `fold_cased`), its spacing folded; "" when it passes or
+    `needle` is empty. `fold_page` folds `text` (`normalize.unmarked` drops its footnote markers)."""
+    want, hay = fold_needle(needle), fold_page(text)
     ok, r, thr = _ratio(want, hay, max_diffs)
     if ok and want and want in hay and not _edges_ok(want, hay):
         # Note: a copy cut out of a longer number does not count, nor any window of it ("total: 40" spends
