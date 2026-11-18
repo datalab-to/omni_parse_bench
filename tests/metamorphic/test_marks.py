@@ -45,7 +45,8 @@ def fmt(before: str, span: str, after: str, kind: str | None = None, absent: str
 def elsewhere(kind: str) -> str:
     """A paragraph with a mark of another kind: a page that has some mark, which a negative test needs."""
     tag = "b" if kind != "bold" else "i"
-    return f"<p><{tag}>note</{tag}></p>"
+    # Note: digits, which no phrase has, so the text after a context never completes one a character short of it
+    return f"<p><{tag}>9999</{tag}></p>"
 
 
 def page(before: str, span: str, after: str, wrap: str = "{}") -> str:
