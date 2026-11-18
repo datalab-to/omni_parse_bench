@@ -114,6 +114,19 @@ def repeat_number(label, mark, rule, gold, count, out, **kw) -> Case:
                    lambda: _v(R.repeat(R.Repeat(R.Number(gold), count), views.html(html(out)))), **kw)
 
 
+def fmt(label, mark, rule, before, span, after, kinds, out, *, absent=False, md=0,
+        from_markdown=False, **kw) -> Case:
+    """`format`: the span carries `kinds` (or, with `absent`, none of them). `from_markdown`: `out` is
+    markdown, turned to html as the harness does."""
+    from omni_parse_bench import markdown
+    marks_, absent_ = ((), tuple(kinds)) if absent else (tuple(kinds), ())
+    p = R.Format(before or None, span, after or None, md, marks_, absent_)
+    gold = (f"{'not ' if absent else ''}{' + '.join(kinds)} on {code(span)}, "
+            f"context {code(before + span + after)}" + (f" (md {md})" if md else ""))
+    page = markdown.to_html(out) if from_markdown else html(out)
+    return verdict(label, mark, rule, gold, out, lambda: _v(R.format_mark(p, views.html(page))), **kw)
+
+
 def near_empty(label, mark, rule, max_chars, out, **kw) -> Case:
     return verdict(label, mark, rule, f"at most {max_chars}", out,
                    lambda: _v(R.page_near_empty(R.PageNearEmpty(max_chars), views.html(html(out)))), **kw)

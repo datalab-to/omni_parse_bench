@@ -92,6 +92,7 @@ It reads as: "some table in the output has a cell `167.8`, under the column head
 | repeat | `content` | `expected_count` | the arg appears exactly that many times in the html, as whole words |
 | page_near_empty | none | `max_chars` | the html has at most `max_chars` non-space characters outside image alt text |
 | table_cell | `cell`; optional `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `section`; optional lists `headings`, `row_groups` | | some table in the html has the cell, with these neighbors and headings |
+| format | `span`; optional `before`, `after` | exactly one of `marks`, `absent` (lists of `bold`, `italic`, `underline`, `strike`, `sup`, `sub`) | every letter of the span carries every mark in `marks` (and no letter of the words around it does), or no letter of it carries a mark in `absent`; read from the html's markup, see [scoring/format.md](scoring/format.md) |
 | layout_kind | `content`, with its `place` | `kind` | the smallest block covering at least half of the place is labeled `kind` (one of `views.LABELS`); for `text`, a `list` or `form` block (a list item, or a form field or key-value pair) passes too |
 
 `page_near_empty` takes no args and settings exactly `{"max_chars": N}`, where N is a whole number,
@@ -130,6 +131,7 @@ Which kinds each type accepts (`scorers/unit_tests/tests.py`):
 
 - `page_near_empty`: no args;
 - `present`: `text`, `number` or `latex`;
+- `format`: `text` (`span`, `before`, `after`), each with `max_diffs` 0 (the context is found as written, no `place`, no `exact_case`);
 - `order`, `repeat` and `table_cell`: `text`; and
 - `layout_kind`: `text` with a `place`. Its text is shown to a reader and never compared.
 
@@ -182,6 +184,7 @@ The arg's characters come from a source, and `derivation` records which (`vocab.
 | `publisher_markup` | the publisher's JATS XML |
 | `text_layer` | the PDF's own text layer |
 | `authored` | we made the page or filled the form, so we know what is on it |
+| `rendered_source` | we rendered the page from markup we hold (a document written with its marks), so each mark is known |
 | `upstream_olmocr` | olmOCR-bench's own tests |
 | `upstream_frbench` | fr-bench-pdf2md's own tests |
 | `source_transcription` | the archive's own transcription of a manuscript (Library of Congress volunteers, HTR-United datasets) |

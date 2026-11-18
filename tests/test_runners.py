@@ -775,3 +775,23 @@ def test_exact_case_names_a_glued_number_not_a_case_when_both_apply():
     assert not got and "not found" in why
     got, why = R.present(R.Present(R.Text("Total: 40", 0, (), True)), html("<p>Total: 400</p>"))
     assert not got and "longer number" in why
+
+
+def test_format_reads_the_marks_of_the_span_and_the_words_around_it():
+    p = R.Format("the ", "total", " due", 0, ("bold",), ())
+    assert R.format_mark(p, html("<p>the <b>total</b> due</p>")) == (True, "")
+    assert R.format_mark(p, html("<p>the total due</p>")) == (False, "the span lacks ['bold']")
+    assert R.format_mark(p, html("<p><b>the total due</b></p>")) == (
+        False, "['bold'] runs onto the text around the span")
+    assert R.format_mark(p, html("<p>nothing</p>")) == (False, "the context is not in the output")
+    no = p._replace(marks=(), absent=("bold",))
+    assert R.format_mark(no, html("<p>the total due</p><p><b>x</b></p>")) == (True, "")
+    assert R.format_mark(no, html("<p>the total due</p>"))[0] is False     # no mark anywhere: nothing shown
+    assert R.format_mark(no, html("<p>the <b>total</b> due</p>")) == (False, "the span carries ['bold']")
+
+
+def test_format_does_not_change_what_a_text_test_reads():
+    page = html("<p>Total <b>due</b> <sup>1</sup></p>")
+    assert R.found(R.Text("Total due", 0), page) == (True, "")
+    assert R.format_mark(R.Format("Total ", "due", None, 0, ("bold",), ()), page)[0]
+    assert not R.format_mark(R.Format("Total ", "due", None, 0, ("italic",), ()), page)[0]

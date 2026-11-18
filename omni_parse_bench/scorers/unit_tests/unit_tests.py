@@ -36,8 +36,8 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
       digest for each tag and arg kind; its `row` holds the page's `document` and `suite`;
     - its details (`details/<page_id>.jsonl`) hold one test line per test (`lines`); and
     - the summary is `summarize` over every page, a failed one with all its tests failed (`score_failure`):
-      the families in the order text, tables, layout, and their mean as the headline, then the same scores
-      by tag, suite, test type, arg kind and derivation."""
+      the families in the order text, tables, layout, format, and the mean of the first three as the headline
+      (`vocab.HEADLINE_FAMILIES`), then the same scores by tag, suite, test type, arg kind and derivation."""
 
     name: ClassVar[str] = "unit_tests"
     headline: ClassVar[str] = "score"
@@ -110,7 +110,9 @@ def gold(page: data.Page) -> tuple[_tests.Test, ...]:
 
 def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
     """Every test of `pages`, each page's checked (`gold`), and what no single page can show: a test id used
-    twice. It is what publishing a dataset checks; grading needs none of it.
+    twice, and a suite that mixes `format` tests with tests of the headline families (a suite's score pools
+    all its tests, so the two would be one number). It is what publishing a dataset checks; grading needs
+    none of it.
 
     Note: a gold file no manifest names isn't refused, since a dataset may hold several manifests, each naming
     some of the gold files."""
@@ -119,6 +121,13 @@ def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
         raise ValueError(f"test ids used more than once, across the dataset: "
                          f"{errors.counted(len(twice), 'id')}, e.g. {twice[:3]}; each test's id is "
                          "unique in its dataset")
+    suite = {p.page_id: p.suite for p in pages}
+    families: dict[str, set[str]] = collections.defaultdict(set)
+    for t in every:
+        families[suite[t.page_id]].add(vocab.FAMILIES[t.test_type] in vocab.HEADLINE_FAMILIES)
+    if mixed := sorted(s for s, kinds in families.items() if len(kinds) > 1):
+        raise ValueError(f"suites with both format tests and headline tests: {mixed[:3]}; a suite's score "
+                         "pools its tests, so give the format tests a suite of their own")
     if empty := sorted({p.page_id for p in pages} - {t.page_id for t in every}):
         raise ValueError(f"pages with no tests: {errors.counted(len(empty), 'page')}, e.g. "
                          f"{empty[:3]}; remove them or give them tests")
@@ -138,7 +147,8 @@ def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.
 
 
 def summarize(lines: Iterable[Line]) -> dict[str, Any]:
-    """Test lines (from `lines`) as one summary: `score`, the mean of the families' scores, and `families`,
+    """Test lines (from `lines`) as one summary: `score`, the mean of the headline families' scores (text,
+    tables, layout; all the families present when none of them is), and `families`,
     each family's `score` (the share of its tests passed), `tests`, `documents` and `effective_documents`;
     then `per_tag`, `per_suite`, `per_test_type`, `per_arg_kind` and `per_derivation`, each a slice's entries
     shaped as a family's. `score` is None when there are no tests, and a slice with no tests is left out.
@@ -199,16 +209,20 @@ def _count(marks: Iterable[tuple[bool, str, str, Iterable[str], Iterable[str], s
     """One page's counts, each as `{key: {"tests", "passed"}}`: `per_family`, `per_tag`,
     `per_test_type`, `per_arg_kind` and `per_derivation`, from its tests' (passed, test type, derivation,
     tags, arg kinds, test id). A test counts once under each of its tags and of its arg kinds; a blank
-    derivation counts under none. The tag and arg kind counts also hold `ids`, the digest of the key's test
-    ids (`_ids`), the only slices that can have twins; it is left out when a test has no id."""
+    derivation counts under none; a test of a family outside the headline (`format`) counts in none of the
+    tag, arg kind and derivation slices. The tag and arg kind counts also hold `ids`, the digest of the key's
+    test ids (`_ids`), the only slices that can have twins; it is left out when a test has no id."""
     marks = list(marks)
     with_ids = all(m[5] is not None for m in marks)
     out: dict[str, dict[str, dict[str, int]]] = {"per_family": {}, "per_tag": {}, "per_test_type": {},
                                                  "per_arg_kind": {}, "per_derivation": {}}
     for ok, test_type, derivation, tags, arg_kinds, test_id in marks:
-        keys = {"per_family": [vocab.FAMILIES[test_type]], "per_tag": dict.fromkeys(tags),
-                "per_test_type": [test_type], "per_arg_kind": dict.fromkeys(arg_kinds),
-                "per_derivation": [derivation] if derivation else []}
+        # Note: the format family is reported as a family, a suite and a test type, and in none of the slices
+        # a text test's tags, arg kind and derivation pool: those are for what the headline families measure
+        own = vocab.FAMILIES[test_type] not in vocab.HEADLINE_FAMILIES
+        keys = {"per_family": [vocab.FAMILIES[test_type]], "per_tag": {} if own else dict.fromkeys(tags),
+                "per_test_type": [test_type], "per_arg_kind": {} if own else dict.fromkeys(arg_kinds),
+                "per_derivation": [derivation] if derivation and not own else []}
         for slice_, ks in keys.items():
             for k in ks:
                 c = out[slice_].setdefault(k, {"tests": 0, "passed": 0})
@@ -271,7 +285,9 @@ def _summary(pages: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
                 for x in pages for k, c in x.get(name, {}).items())
 
     families = _entries(counted("per_family"), vocab.FAMILY_ORDER)
-    return {"score": float(statistics.fmean(x["score"] for x in families.values())) if families else None,
+    head = ([x["score"] for k, x in families.items() if k in vocab.HEADLINE_FAMILIES]
+            or [x["score"] for x in families.values()])
+    return {"score": float(statistics.fmean(head)) if head else None,
             "families": families,
             "per_tag": _entries(counted("per_tag"), twins=twins),
             "per_suite": _entries((x["row"]["suite"], x["row"]["document"], x["passed"], x["tests"])

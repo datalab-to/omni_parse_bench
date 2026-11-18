@@ -85,7 +85,7 @@ Contents:
 
 ![The benchmark's design: headline, families, tests, args and tags](https://raw.githubusercontent.com/datalab-to/omni_parse_bench/main/docs/assets/design.svg)
 
-A test is a yes/no question about one page. Each test type belongs to one of three families:
+A test is a yes/no question about one page. Each test type belongs to one of four families (the first three make the headline):
 
 | test type | checks | family |
 |---|---|---|
@@ -95,6 +95,7 @@ A test is a yes/no question about one page. Each test type belongs to one of thr
 | `page_near_empty` | a blank page yields at most N non-space characters | text |
 | `table_cell` | this cell sits under these headings and beside these neighbors | tables |
 | `layout_kind` | the block holding this line is a heading, text or table | layout |
+| `format` | this span of text is bold, italic, underlined, struck through, superscript or subscript, and the words around it are not (reported beside the headline) | format |
 
 A family's score is the share of its tests that pass, and the headline is the mean of the three family scores.
 

@@ -280,6 +280,79 @@ ne-hidden-input	pass
 ne-item-number	fail	3 non-space characters (limit 0)
 ne-text	fail	8 non-space characters (limit 0)
 ne-cell	fail	1 non-space characters (limit 0)
+## format-rules
+fm-bold	pass
+fm-strong	pass
+fm-bold-style	pass
+fm-italic	pass
+fm-underline	pass
+fm-strike	pass
+fm-sup	pass
+fm-sub	pass
+fm-markdown	pass
+fm-case	pass
+fm-spacing	pass
+fm-typography	pass
+fm-two-marks	pass
+fm-adjacent	pass
+fm-spaced-runs	pass
+fm-across-paragraphs	pass
+fm-repeat-at-edge	pass
+fm-wrong-letter	fail	the context is not in the output
+fm-other-mark	pass
+fm-elsewhere	pass
+fm-neg-plain	pass
+fm-neg-other-mark	pass
+fm-no-mark	fail	the span lacks ['bold']
+fm-wrong-mark	fail	the span lacks ['bold']
+fm-half	fail	the span lacks ['bold']
+fm-whole-paragraph	fail	['bold'] runs onto the text around the span
+fm-neighbour	fail	['bold'] runs onto the text around the span
+fm-neg-no-marks	fail	the output has no marks at all, so it cannot show that a mark is absent
+fm-ins	pass
+fm-punct-inside	pass
+fm-punct-outside	pass
+fm-far-neighbour	pass
+fm-crossed	pass
+fm-crossed-goes-on	pass
+fm-unclosed-head	pass
+fm-font-shorthand	pass
+fm-weight-650	pass
+fm-underline-none	pass
+fm-baseline	pass
+fm-sup-style-sub	fail	the span lacks ['sup']
+fm-neg-empty-element	fail	the output has no marks at all, so it cannot show that a mark is absent
+fm-own-none	pass
+fm-font-resets	pass
+fm-closed-head	fail	the span lacks ['bold']
+fm-head-bare-text	pass
+fm-unclosed-comment	pass
+fm-cdata	pass
+fm-markdown-html	pass
+fm-neg-marked	fail	the span carries ['bold']
+fm-neg-missing	fail	the context is not in the output
+fm-missing-context	fail	the context is not in the output
+fm-heading	fail	the span lacks ['bold']
+fm-th	fail	the span lacks ['bold']
+fm-mark-element	fail	the span lacks ['bold']
+fm-link	fail	the span lacks ['underline']
+fm-raw-markdown	fail	the context is not in the output
+fm-math-bold-letters	fail	the span lacks ['bold']
+fm-unicode-sup	fail	the span lacks ['sup']
+fm-latex-sup	fail	the context is not in the output
+fm-in-math	fail	the span lacks ['bold']
+fm-in-code	pass
+fm-hidden	fail	the context is not in the output
+fm-style-cancelled	fail	the span lacks ['bold']
+fm-class	fail	the span lacks ['bold']
+fm-hyphen-break	fail	the context is not in the output
+fm-wrong-order	fail	the context is not in the output
+fm-sub-for-sup	fail	the span lacks ['sup']
+fm-word-edge	pass
+fm-a-copy	pass
+fm-spacing-edge	pass
+fm-case-blind	pass
+fm-neg-all-copies	fail	the span carries ['bold']
 ## cell-ignored
 cell-match	pass
 cell-case	pass

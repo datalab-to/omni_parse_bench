@@ -246,3 +246,17 @@ def test_a_95_percent_interval_covers_the_truth_about_that_often():
         got = uncertainty.intervals(pages, resamples=200, seed=sim)["headline"]
         covered += got["low"] <= 0.5 <= got["high"]
     assert 0.90 <= covered / 200 <= 0.98, covered
+
+
+def test_the_format_family_has_an_interval_beside_the_headline_and_is_not_in_it():
+    """The headline is the mean of the text, tables and layout families; `format` is a family of its own."""
+    text = together(40, 5, 0.8, seed=2)
+    fmt = [line(f"f{i}", 4, 4 * (i % 2), family="format") for i in range(30)]
+    got = uncertainty.intervals(text + fmt, resamples=100, seed=1)
+    assert set(got["families"]) == {"text", "format"}
+    assert got["headline"]["score"] == got["families"]["text"]["score"]    # the headline families only
+    assert got["families"]["format"]["score"] == 0.5
+    both = uncertainty.paired(text + fmt, text + fmt, resamples=100, seed=1)
+    assert both["headline_families"] == ["text"]
+    only = uncertainty.intervals(fmt, resamples=100, seed=1)   # no headline family: the mean of its own
+    assert only["headline"]["score"] == 0.5

@@ -25,6 +25,7 @@ from omni_parse_bench.scorers.unit_tests import tests as gold
 FIXTURE = Path(__file__).parent / "fixtures" / "invariants"
 DATASET = Path(os.environ.get("OPB_DATASET", "")).expanduser()
 EMPTY = {"html": "", "blocks": []}
+TAG = {"bold": "b", "italic": "i", "underline": "u", "strike": "s", "sup": "sup", "sub": "sub"}
 
 
 def fixture_tests() -> tuple[gold.Test, ...]:
@@ -50,6 +51,13 @@ def answer(t: gold.Test) -> dict[str, Any]:
             html = "".join(f"<p>{e(x)}</p>" for _ in range(p.expected_count))
         case runners.PageNearEmpty(): html = f"<p>{'x' * p.max_chars}</p>"     # as much as it allows
         case runners.TableCell(): html = table(p)
+        case runners.Format():
+            span = e(p.span)
+            for kind in p.marks:
+                span = f"<{TAG[kind]}>{span}</{TAG[kind]}>"
+            html = f"<p>{e(p.before or '')}{span}{e(p.after or '')}</p>"
+            # Note: a negative test is only scored on an output that has a mark somewhere
+            html += "" if p.marks else "<p><b>note</b></p>"
         case runners.LayoutKind():
             xs = p.content.place
             box = [min(b[0] for b in xs), min(b[1] for b in xs), max(b[2] for b in xs), max(b[3] for b in xs)]

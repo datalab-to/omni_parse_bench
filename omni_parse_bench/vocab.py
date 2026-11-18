@@ -12,7 +12,7 @@ OUTPUT_TYPES = ("html", "blocks", "markdown")
 DERIVATIONS = (
     "text_layer", "upstream_olmocr", "authored", "publisher_markup", "model_panel",
     "extractor_agreement", "human_review", "model_review",
-    "upstream_frbench", "source_transcription", "computed",
+    "upstream_frbench", "source_transcription", "computed", "rendered_source",
 )
 
 # test type -> the output type it grades
@@ -23,6 +23,7 @@ READS = {
     "page_near_empty": "html",
     "table_cell": "html",
     "layout_kind": "blocks",
+    "format": "html",
 }
 
 # test type -> the capability it measures. The headline is the mean of the families' scores (each
@@ -31,9 +32,15 @@ FAMILIES = {
     "present": "text", "order": "text", "repeat": "text", "page_near_empty": "text",
     "table_cell": "tables",
     "layout_kind": "layout",
+    "format": "format",
 }
 # The families in the order a summary lists them, so two runs' summaries read alike.
 FAMILY_ORDER = tuple(dict.fromkeys(FAMILIES.values()))
+# The families whose mean is the headline. `format` is reported beside it, never in it: it asks whether the
+# output keeps a page's bold, italic, underline, strikethrough, superscript and subscript, which most of the
+# other tests are certified not to see (M7a), and adding it would change every published score. A dataset with
+# none of the headline families has the mean of the families it has.
+HEADLINE_FAMILIES = ("text", "tables", "layout")
 
 # The tags: what the content a test checks is. Each definition is
 # the one text the tagger, the docs and test builders share; tag prompts are filled from it.
