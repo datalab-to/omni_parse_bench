@@ -12,7 +12,7 @@ OUTPUT_TYPES = ("html", "blocks", "markdown")
 DERIVATIONS = (
     "text_layer", "upstream_olmocr", "authored", "publisher_markup", "model_panel",
     "extractor_agreement", "human_review", "model_review",
-    "upstream_frbench", "source_transcription",
+    "upstream_frbench", "source_transcription", "computed",
 )
 
 # test type -> the output type it grades
