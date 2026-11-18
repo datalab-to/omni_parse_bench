@@ -232,3 +232,14 @@ def test_the_format_family_is_reported_beside_the_headline_and_never_in_it():
     assert s["score"] == (s["families"]["text"]["score"] + s["families"]["tables"]["score"]) / 2
     only = unit_tests.summarize([xs[2]])
     assert only["score"] == 0.0     # a dataset with no headline family has the mean of the ones it has
+
+
+def test_format_tests_are_in_no_tag_arg_kind_or_derivation_slice():
+    """The tag, arg kind and derivation slices are for what the headline families measure; a format test
+    counts in its family, its test type and its suite, and in none of them."""
+    xs = [line("a", document="d1", tags=["eng"]), line("b", document="d2", tags=["eng"], test_type="format")]
+    s = unit_tests.summarize(xs)
+    assert s["per_tag"]["eng"]["tests"] == 1 and s["per_arg_kind"]["text"]["tests"] == 1
+    assert s["per_derivation"]["authored"]["tests"] == 1
+    assert s["families"]["format"]["tests"] == 1 and s["per_test_type"]["format"]["tests"] == 1
+    assert s["per_suite"]["s"]["tests"] == 2

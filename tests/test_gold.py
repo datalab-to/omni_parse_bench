@@ -204,6 +204,14 @@ def test_a_format_test_loads_with_its_marks_or_its_absent_marks():
     assert t.params == gold.runners.Format(None, "total", " due", 0, (), ("sup",))
 
 
+def one(text: str) -> dict:
+    return {"text": text, "max_diffs": 0}
+
+
+def short(text: str) -> dict:
+    return {"span": one(text)}
+
+
 def fmt_test(settings: dict, args: dict | None = None) -> dict:
     return with_args(fmt_args() if args is None else args, "format", settings)
 
@@ -221,10 +229,14 @@ def fmt_test(settings: dict, args: dict | None = None) -> dict:
     fmt_test({"marks": ["bold"]}, fmt_args(span="ab") | {"before": {"text": "x", "max_diffs": 1}}),
     fmt_test({"marks": ["bold"]}, {"span": {"text": "ab", "max_diffs": 2}}),
     fmt_test({"marks": ["bold"]}, fmt_args() | {"content": {"text": "x", "max_diffs": 0}}),
-    fmt_test({"marks": ["sup", "sub"]}),                                     # both scripts at once
-    fmt_test({"marks": ["bold"]}, {"span": {"text": "ab", "max_diffs": 0}}),      # a short span, no context
-    fmt_test({"marks": ["bold"]},
-             fmt_args(span="abcdefgh") | {"before": {"text": "xx", "max_diffs": 3}}),   # too many edits
+    fmt_test({"marks": ["sup", "sub"]}),
+    fmt_test({"marks": ["bold"]}, {"span": {"text": "ab", "max_diffs": 0}}),
+    fmt_test({"marks": ["bold"]}, short("ab") | {"before": one("...")}),
+    fmt_test({"marks": ["bold"]}, short("...") | {"before": one("the")}),
+    fmt_test({"marks": ["bold"]}, short("\u0301\u0302") | {"before": one("e")}),
+    fmt_test({"marks": ["bold"]}, fmt_args(span="abcdefgh") | {"before": {"text": "xx", "max_diffs": 1}}),
+    fmt_test({"marks": ["bold"]}, {"span": one("total") | {"place": [[0.1, 0.1, 0.2, 0.2]]}}),
+    fmt_test({"marks": ["bold"]}, {"span": {"text": "total", "max_diffs": 0, "exact_case": True}}),
 ])
 def test_a_format_test_that_asks_nothing_or_nonsense_does_not_load(t):
     with pytest.raises(ValueError):

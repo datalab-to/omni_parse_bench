@@ -296,8 +296,8 @@ fm-two-marks	pass
 fm-adjacent	pass
 fm-spaced-runs	pass
 fm-across-paragraphs	pass
-fm-budget	pass
 fm-repeat-at-edge	pass
+fm-wrong-letter	fail	the context is not in the output
 fm-other-mark	pass
 fm-elsewhere	pass
 fm-neg-plain	pass
@@ -320,10 +320,14 @@ fm-weight-650	pass
 fm-underline-none	pass
 fm-baseline	pass
 fm-sup-style-sub	fail	the span lacks ['sup']
+fm-neg-empty-element	fail	the output has no marks at all, so it cannot show that a mark is absent
+fm-own-none	pass
+fm-font-resets	pass
+fm-head-bare-text	pass
+fm-markdown-html	pass
 fm-neg-marked	fail	the span carries ['bold']
-fm-neg-missing	fail	the output has no marks at all, so it cannot show that a mark is absent
+fm-neg-missing	fail	the context is not in the output
 fm-missing-context	fail	the context is not in the output
-fm-budget-over	fail	the context is not in the output
 fm-heading	fail	the span lacks ['bold']
 fm-th	fail	the span lacks ['bold']
 fm-mark-element	fail	the span lacks ['bold']

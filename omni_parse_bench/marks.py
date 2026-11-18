@@ -17,17 +17,20 @@ What a mark is:
     sup, sub    <sup>, <sub>, vertical-align super or sub (the style wins over the element)
 
 An element that is a mark by default is a mark: `<ins>` is underlined and `<del>` struck through whatever
-a page's style sheet says, and the reader does not read one. A style that draws the text plain (`font-
-weight: normal`, `font-style: normal`) takes bold or italic off, as a browser does; `text-decoration:
-none` and `vertical-align: baseline` do not take off an inherited underline, strikethrough or superscript,
-as in a browser.
+a page's style sheet says, and the reader does not read one. A style that draws the text plain
+(`font-weight: normal`, `font-style: normal`, a `font` shorthand without the weight or the style) takes bold
+or italic off, as a browser does. On an element's own mark, `text-decoration: none` takes off its underline
+or strikethrough and `vertical-align: baseline` its script (`<u style="text-decoration: none">` is plain
+text); neither takes off a mark an ancestor makes, as in a browser.
 
 Markdown is a vendor's output: the harness turns it into HTML (`markdown.to_html`) before any test reads
-it, so `**x**` and `<strong>x</strong>` are the same marks by construction. Markdown has no superscript or
-subscript and no single-tilde strikethrough, so a markdown-only output cannot carry them. Not a mark: a
-heading or `<th>` (drawn bold, not marked), `<mark>`, `<a>`, `<kbd>`, Unicode superscript characters, and
-LaTeX. Text inside `<math>` carries no mark, and nothing in `<script>`, `<style>`, `<head>`, a comment or
-a doctype is read at all (an unclosed `<head>` or `<title>` ends where the body's content begins).
+it, so `**x**` and `<strong>x</strong>` are the same marks by construction, and an HTML tag inside the
+markdown (`H<sub>2</sub>O`) is read as HTML. Markdown has no superscript or subscript and no single-tilde
+strikethrough, so a markdown-only output cannot carry them. Not a mark: a heading or `<th>` (drawn bold, not
+marked), `<mark>`, `<a>`, `<kbd>`, Unicode superscript characters, and LaTeX. Text inside `<math>` carries
+no mark, and nothing in `<script>`, `<style>`, `<head>`, `<title>`, a comment or a doctype is read at all
+(the same elements `views.html` hides). An unclosed `<head>` ends at the first tag or text a head does not
+hold, and an unclosed `<title>` at the first tag.
 
 The text is compared as the fold of the character forms (`normalize.typography`: dashes, quotes, spaces,
 compatibility forms), case-folded, NFC, with no whitespace: the fold `format` uses is that and no more (no
@@ -47,26 +50,22 @@ from typing import NamedTuple
 from omni_parse_bench import normalize
 
 KINDS = ("bold", "italic", "underline", "strike", "sup", "sub")
-# Note: the edits a context may be allowed: more is slow and says nothing (an edit needs 5 context characters)
-MAX_DIFFS = 4
+# Note: the most mark elements an end tag that crosses them puts back on: a page of 20,000 is not read twice
+REOPEN = 16
 
 # element -> the mark it makes
 TAGS = {"b": "bold", "strong": "bold", "i": "italic", "em": "italic", "u": "underline", "ins": "underline",
         "s": "strike", "strike": "strike", "del": "strike", "sup": "sup", "sub": "sub"}
-# elements whose content is not text the page shows
-HIDDEN = frozenset({"script", "style", "head", "title", "template", "noscript"})
+# elements whose content is not text the page shows: the ones `views.html` hides too
+HIDDEN = frozenset({"script", "style", "head", "title"})
 # elements whose text is read but carries no mark
 INERT = frozenset({"math"})
 # a void element has no end tag, so it must not be pushed
 VOID = frozenset(
     {"br", "hr", "img", "input", "meta", "link", "col", "wbr", "area", "base", "embed", "source", "track"}
 )
-# a start tag of one of these ends an unclosed head or title: the page's content begins
-CONTENT = frozenset({
-    "body", "p", "div", "table", "ul", "ol", "li", "dl", "section", "article", "main", "header", "footer",
-    "nav", "aside", "form", "pre", "blockquote", "figure", "h1", "h2", "h3", "h4", "h5", "h6", "span", "a",
-    "img",
-}) | frozenset(TAGS)
+# the elements a head may hold: a start tag of any other ends an unclosed head
+HEAD = frozenset({"head", "title", "meta", "link", "style", "script", "base", "noscript", "template"})
 _NUMBER = re.compile(r"\d+")
 
 
@@ -74,12 +73,17 @@ class Marked(NamedTuple):
     """An output's text as `fold` leaves it, and the marks on each of its characters."""
     text: str
     marks: tuple[frozenset[str], ...]
-    emitted: bool   # whether any element or style of the output makes a mark
+    emitted: bool   # whether some character of the text carries a mark
 
 
 def fold(s: str) -> str:
     """What a format test compares: the typography fold, NFC, case-folded, with no whitespace."""
     return "".join(unicodedata.normalize("NFC", normalize.typography(s)).casefold().split())
+
+
+def letters(s: str) -> int:
+    """How many letters and digits `s` has once folded: a span of punctuation or combining marks has none."""
+    return sum(c.isalnum() for c in fold(s))
 
 
 def _bold(word: str) -> bool | None:
@@ -91,13 +95,16 @@ def _bold(word: str) -> bool | None:
     return int(word) >= 600 if _NUMBER.fullmatch(word) else None
 
 
-def style_marks(style: str) -> tuple[frozenset[str], frozenset[str]]:
-    """The marks an inline `style` attribute adds, and the ones it takes away. Only bold and italic can be
-    taken off (`font-weight: normal` inside a `<b>`): a browser draws an underline, a strikethrough or a
-    script from an ancestor whatever `text-decoration: none` or `vertical-align: baseline` says.
-    `vertical-align` replaces the other script: a `<sup style="vertical-align: sub">` is a subscript."""
+def style_marks(style: str) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
+    """What an inline `style` attribute does to marks: the ones it adds, the ones it takes off the text, and
+    the ones it takes off the element's own default mark. Bold and italic can be taken off the text
+    (`font-weight: normal` inside a `<b>`, and a `font` shorthand that names no weight or style); an
+    underline, a strikethrough or a script only off the element that makes it
+    (`<u style="text-decoration: none">`), since a browser draws one an ancestor makes whatever the style
+    says. `vertical-align` replaces the other script: a `<sup style="vertical-align: sub">` is a subscript."""
     add: set[str] = set()
     drop: set[str] = set()
+    own: set[str] = set()
     for decl in style.lower().split(";"):
         name, _, value = decl.partition(":")
         name, value = name.strip(), value.replace("!important", "").strip()
@@ -107,20 +114,26 @@ def style_marks(style: str) -> tuple[frozenset[str], frozenset[str]]:
         elif name == "font-style" and words:
             slant = words[0] in ("italic", "oblique")
             (add if slant else drop if words[0] == "normal" else set()).add("italic")
-        elif name == "font":
-            # Note: the shorthand's style and weight come before the size, which ends them
+        elif name == "font" and words:
+            # Note: the shorthand sets the weight and the style, plain unless it names them; they come
+            # before the size, which ends them
+            named: set[str] = set()
             for w in words:
                 if w[0].isdigit() and not _NUMBER.fullmatch(w):
                     break
                 if w in ("italic", "oblique"):
-                    add.add("italic")
+                    named.add("italic")
                 elif _bold(w):
-                    add.add("bold")
+                    named.add("bold")
+            add |= named
+            drop |= {"bold", "italic"} - named
         elif name in ("text-decoration", "text-decoration-line"):
             if "underline" in words:
                 add.add("underline")
             if "line-through" in words:
                 add.add("strike")
+            if "none" in words:
+                own |= {"underline", "strike"}
         elif name == "vertical-align" and words:
             if words[0] in ("super", "sup"):
                 add.add("sup")
@@ -128,7 +141,9 @@ def style_marks(style: str) -> tuple[frozenset[str], frozenset[str]]:
             elif words[0] == "sub":
                 add.add("sub")
                 drop.add("sup")
-    return frozenset(add), frozenset(drop - add)
+            elif words[0] == "baseline":
+                own |= {"sup", "sub"}
+    return frozenset(add), frozenset(drop - add), frozenset(own - add)
 
 
 class _Reader(HTMLParser):
@@ -143,7 +158,6 @@ class _Reader(HTMLParser):
         self.open: collections.Counter[str] = collections.Counter()   # how many of each tag are open
         self.hidden = 0
         self.inert = 0
-        self.emitted = False
 
     def _push(self, tag: str, add: frozenset[str], drop: frozenset[str]) -> None:
         above = self.stack[-1][3] if self.stack else frozenset()
@@ -152,7 +166,6 @@ class _Reader(HTMLParser):
             self.hidden += 1
         inert = tag in INERT
         self.inert += inert
-        self.emitted = self.emitted or here != above and not self.inert and not self.hidden
         self.open[tag] += 1
         self.stack.append((tag, add, drop, frozenset() if self.inert else here, inert))
 
@@ -162,6 +175,11 @@ class _Reader(HTMLParser):
         self.inert -= inert
         self.open[tag] -= 1
         return tag, add, drop
+
+    def _close(self, tag: str) -> None:
+        """Pops open elements down to and including the innermost `tag`."""
+        while self.open[tag]:
+            self._pop()
 
     def set_cdata_mode(self, elem: str, *args, **kwargs) -> None:
         # Note: only a script and a style hold text the parser must not read as markup. Python 3.13 also reads
@@ -173,12 +191,14 @@ class _Reader(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag in VOID:
             return
-        if tag in CONTENT:   # Note: content ends an unclosed head or title, which hid it
-            for hidden in ("title", "head"):
-                while self.open[hidden]:
-                    self._pop()
-        add, drop = style_marks(dict(attrs).get("style") or "")
-        self._push(tag, frozenset({TAGS[tag]} if tag in TAGS else ()) | add, drop)
+        # Note: a title holds no tags, and a head only those it may: any other ends it, as the page begins
+        if self.open["title"]:
+            self._close("title")
+        if self.open["head"] and tag not in HEAD:
+            self._close("head")
+        add, drop, own = style_marks(dict(attrs).get("style") or "")
+        default = frozenset({TAGS[tag]} if tag in TAGS else ()) - own
+        self._push(tag, default | add, drop)
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         pass
@@ -193,10 +213,13 @@ class _Reader(HTMLParser):
                 break
             if t in TAGS:      # Note: a mark element this end tag crossed goes on after it, as a browser does
                 reopen.append((t, add, drop))
-        for t, add, drop in reversed(reopen):
+        for t, add, drop in reversed(reopen[-REOPEN:]):
             self._push(t, add, drop)
 
     def handle_data(self, data: str) -> None:
+        # Note: text in a head that is not a title, a script or a style begins the page
+        if self.open["head"] and data.strip() and not self.hidden - self.open["head"]:
+            self._close("head")
         if self.hidden or not data:
             return
         marks = self.stack[-1][3] if self.stack else frozenset()
@@ -220,69 +243,32 @@ def read(html: str) -> Marked:
         f = fold("".join(parts))
         text.append(f)
         marks.extend([m] * len(f))
-    return Marked("".join(text), tuple(marks), r.emitted)
+    return Marked("".join(text), tuple(marks), any(marks))
 
 
-def places(text: str, before: str, span: str, after: str, max_diffs: int) -> list[tuple[int, int, int, int]]:
-    """Where the test's context is in `text`, and where its span is inside it: (context start, span start,
-    span end, context end), the strings already folded. Every exact place of the context, and the span at its
-    offset in it; else, when `max_diffs` allows, the nearest matches of the context with the span read off
-    their alignment (the edits that make the context match say where the span sits, so a copy of the span
-    elsewhere in the window is not mistaken for it)."""
-    context = before + span + after
-    s0, s1 = len(before), len(before) + len(span)
-    out, i = [], text.find(context)
-    while i >= 0:
-        out.append((i, i + s0, i + s1, i + len(context)))
-        i = text.find(context, i + 1)
-    if out or not max_diffs:
-        return out
-    import fuzzysearch
-    from rapidfuzz.distance import Levenshtein
-
-    near = fuzzysearch.find_near_matches(context, text, max_l_dist=max_diffs)
-    best = min((m.dist for m in near), default=None)
-    for m in near:
-        if m.dist != best:
-            continue
-        ops = Levenshtein.opcodes(context, text[m.start : m.end])
-        # Note: the window position of the span's first character, and just after its last
-        a = _at(ops, s0, last=False)
-        b = _at(ops, s1 - 1, last=True)
-        if a is not None and b is not None and a < b:
-            out.append((m.start, m.start + a, m.start + b, m.end))
-    return out
-
-
-def _at(ops, p: int, *, last: bool) -> int | None:
-    """The offset in the window of the context's character `p` (for `last`, one past it); None when the edits
-    deleted it."""
-    for op in ops:
-        if op.src_start <= p < op.src_end:
-            if op.tag in ("equal", "replace") and p - op.src_start < op.dest_end - op.dest_start:
-                return op.dest_start + (p - op.src_start) + last
-            return None
-    return None
-
-
-def check(out: Marked, before: str, span: str, after: str, wanted: tuple[str, ...], absent: tuple[str, ...],
-          max_diffs: int = 0) -> tuple[bool, str]:
+def check(out: Marked, before: str, span: str, after: str, wanted: tuple[str, ...],
+          absent: tuple[str, ...]) -> tuple[bool, str]:
     """Whether the span carries exactly the wanted marks and the words around it do not, or carries none of
-    the `absent` ones. Only letters and digits are looked at: a mark that stops at a punctuation mark
-    (`**Total:**` or `**Total**:`) is the same mark, and the words around the span are the letter or digit
-    on each side of it. A positive test passes at any place the context is; a negative one only when no place
-    carries a mark, and only on an output that has a mark somewhere: with none, nothing shows the system could
-    have written one."""
+    the `absent` ones. The context (before, span and after, folded) is found as written, anywhere on the
+    output. Only letters and digits are looked at: a mark that stops at a punctuation mark (`**Total:**` or
+    `**Total**:`) is the same mark, and the words around the span are the letter or digit on each side of it.
+    A positive test passes at any place the context is; a negative one only when no place carries a mark, and
+    only on an output that has a mark somewhere: with none, nothing shows the system could have written
+    one."""
     b, s, a = fold(before), fold(span), fold(after)
     if not s:
         raise ValueError("a format test's span has nothing left after folding")
     if absent and not out.emitted:
         return False, "the output has no marks at all, so it cannot show that a mark is absent"
-    spots = places(out.text, b, s, a, max_diffs)
-    if not spots:
-        return False, "the context is not in the output"
     t, why, verdicts = out.text, "", []
-    for c0, i, j, c1 in spots:
+    context = b + s + a
+    i = t.find(context)
+    if i < 0:
+        return False, "the context is not in the output"
+    while i >= 0:
+        c0, c1 = i, i + len(context)
+        i += len(b)
+        j = i + len(s)
         letters = [k for k in range(i, j) if t[k].isalnum()] or list(range(i, j))
         if wanted:
             missing = sorted({m for m in wanted for k in letters if m not in out.marks[k]})
@@ -300,5 +286,6 @@ def check(out: Marked, before: str, span: str, after: str, wanted: tuple[str, ..
             if carried:
                 why = f"the span carries {carried}"
         verdicts.append(ok)
+        i = t.find(context, c0 + 1)
     ok = any(verdicts) if wanted else all(verdicts)
     return ok, ("" if ok else why)

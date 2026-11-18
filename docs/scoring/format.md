@@ -7,24 +7,30 @@ reads the output's markup: every other test reads the text view, which drops it 
 [blind spots](README.md#what-the-tests-cannot-see)).
 
 A test gives the text before the span, the span and the text after it (`before` and `after` are optional, but a
-span under 3 characters needs one), one `max_diffs` for the three together, and exactly one of two settings: `marks`,
+span under 3 letters or digits needs a context with one), `max_diffs` 0, and exactly one of two settings: `marks`,
 the marks every letter or digit of the span must carry (a span is not both superscript and subscript), or
-`absent`, the marks none of them may carry. `max_diffs` is at most 4 and a fifth of the context's characters. The words
-are compared as `marks.fold` leaves them: the character forms unified, case folded, and no white space (not the
-whole [fold](internals.md): no footnote, hyphen, bullet or maths rule). The context (before, span and after,
-together) is found as written, and the span is then at its place in it; with `max_diffs` and no exact match, the
-nearest matches of the context are aligned to it and the span is read where the alignment puts it, so a copy of the
-span's letters elsewhere in the window is not mistaken for it (case fm-repeat-at-edge).
+`absent`, the marks none of them may carry. There is no edit budget: the context (before, span and after, together)
+is found as written, anywhere on the output, and a wrong, missing or added character in it means it is not found
+(case fm-wrong-letter). Contexts are kept short, just enough to make the span unique on the page. The words are
+compared as `marks.fold` leaves them: the character forms unified, case folded, and no white space (not the whole
+[fold](internals.md): no footnote, hyphen, bullet or maths rule), so the span is read at its place in the context, and
+a span whose letters repeat the end of the context before it is not mistaken for the letters before it (case
+fm-repeat-at-edge).
 
 Only letters and digits are looked at, in the span and around it. A positive test passes when every letter or digit of
 the span carries every mark asked, and the letter or digit on each side of the span (the nearest, within the context)
 carries none of them (cases fm-whole-paragraph, fm-neighbour, fm-far-neighbour): bolding the whole line fails the test
 of one bold word, while a mark that takes in or stops before a comma is the same mark (cases fm-punct-inside,
 fm-punct-outside). A negative test passes when no letter or digit of the span carries a listed mark, and fails when
-the words are not on the page at all (case fm-neg-missing), or when the output has no mark anywhere: with none,
+the words are not on the page at all (case fm-neg-missing), or when no text of the output carries a mark: with none,
 nothing shows the system could have written one, so a system that never writes marks gets no credit for not marking
-(case fm-neg-no-marks). When the context occurs twice, a positive test passes if either place does, and a negative one
-only if neither carries the mark (cases fm-a-copy, fm-neg-all-copies).
+(cases fm-neg-no-marks, fm-neg-empty-element: an empty `<b></b>` or an icon is not a mark on any text). That is how
+`layout_kind` treats an output with no typed blocks: a test the output cannot show an answer to fails. When the
+context occurs twice, a positive test passes if either place does, and a negative one only if neither carries the
+mark (cases fm-a-copy, fm-neg-all-copies).
+
+A format test counts in its family, its test type and its suite, and in none of the tag, arg kind and derivation
+slices: those pool what the headline families measure, and a format test has no tag of its own.
 
 ## What a mark is
 
@@ -37,13 +43,16 @@ only if neither carries the mark (cases fm-a-copy, fm-neg-all-copies).
 | sup, sub | `<sup>`, `<sub>`, `vertical-align` super or sub (the style replaces the other script) |
 
 An element that is a mark by default is a mark, and a style sheet is not read: `<ins>` is underlined and `<del>` struck
-through (cases fm-ins, fm-class). A style that draws the text plain (`font-weight: normal`, `font-style: normal`)
-takes bold or italic off (case fm-style-cancelled); `text-decoration: none` and `vertical-align: baseline` do not take
-an inherited underline, strikethrough or superscript off, as in a browser (cases fm-underline-none, fm-baseline). An
-end tag that crosses another mark leaves it on after it (cases fm-crossed, fm-crossed-goes-on), and an unclosed head or title ends where the
-content begins (case fm-unclosed-head). Markdown is a vendor's output, and the harness turns it into html before any test
+through (cases fm-ins, fm-class). A style that draws the text plain (`font-weight: normal`, `font-style: normal`, a `font` shorthand
+that names neither) takes bold or italic off (cases fm-style-cancelled, fm-font-resets); on an element's own mark,
+`text-decoration: none` takes off its underline or strikethrough and `vertical-align: baseline` its script
+(case fm-own-none), but neither takes off a mark an ancestor makes, as in a browser (cases fm-underline-none,
+fm-baseline). An
+end tag that crosses another mark leaves it on after it (cases fm-crossed, fm-crossed-goes-on), and an unclosed head ends at the first tag or text a
+head does not hold, an unclosed title at the first tag (cases fm-unclosed-head, fm-head-bare-text). Markdown is a vendor's output, and the harness turns it into html before any test
 reads it, so `**x**` and `<strong>x</strong>` are the same marks (case fm-markdown); markdown markers written into an html
-output are text, not marks (case fm-raw-markdown). Markdown has no superscript or subscript and no single-tilde
+output are text, not marks (case fm-raw-markdown), and an html tag inside the markdown is read as html (case
+fm-markdown-html). Markdown has no superscript or subscript and no single-tilde
 strikethrough, so a markdown-only output cannot carry them. Not marks: a heading or a table heading (drawn bold),
 `<mark>`, a link, a class, a Unicode superscript, mathematical bold letters, and LaTeX (cases fm-heading, fm-th,
 fm-mark-element, fm-link, fm-class, fm-unicode-sup, fm-math-bold-letters, fm-latex-sup). Text inside `<math>` carries no
@@ -71,8 +80,8 @@ other text (case fm-in-code).
 | I | one mark written in adjacent runs | bold on `total amount`, context `the total amount due` | `the <b>total</b><b> amount</b> due` | pass | `fm-adjacent` |
 | I | one mark written in a run per word | bold on `total amount`, context `the total amount due` | `the <b>total</b> <b>amount</b> due` | pass | `fm-spaced-runs` |
 | I | a run that continues across a paragraph break | bold on `total amount`, context `the total amount due` | `<p>the <b>total</b></p><p><b>amount</b> due</p>` | pass | `fm-across-paragraphs` |
-| I | one wrong character in the context, one edit allowed | bold on `total`, context `the total due` (md 1) | `thx <b>total</b> due` | pass | `fm-budget` |
-| I | a span whose letters repeat the end of the context before it, one edit allowed | bold on `ggg`, context `xyzg ggg abc` (md 1) | `xy0g <b>ggg</b> abc` | pass | `fm-repeat-at-edge` |
+| I | a span whose letters repeat the end of the context before it | bold on `ggg`, context `xyzg ggg abc` | `xyzg <b>ggg</b> abc` | pass | `fm-repeat-at-edge` |
+| P | one wrong character in the context: there is no edit budget | bold on `total`, context `the total due` | `thx <b>total</b> due` | fail: `the context is not in the output` | `fm-wrong-letter` |
 | I | another mark on the span as well | bold on `total`, context `the total due` | `the <i><b>total</b></i> due` | pass | `fm-other-mark` |
 | I | marked words elsewhere on the page | bold on `total`, context `the total due` | `<p><b>Invoice</b> 12</p><p>the <b>total</b> due</p><p><i>paid</i></p>` | pass | `fm-elsewhere` |
 | I | a negative test on plain words, on a page that has a mark elsewhere | not bold on `total`, context `the total due` | `<p>the total due</p><p><b>note</b></p>` | pass | `fm-neg-plain` |
@@ -92,13 +101,17 @@ other text (case fm-in-code).
 | I | an unclosed head does not hide the body | bold on `total`, context `the total due` | `<html><head><title>t<body><p>the <b>total</b> due` | pass | `fm-unclosed-head` |
 | I | the font shorthand | italic + bold on `total`, context `the total due` | `the <span style="font: italic bold 12px serif">total</span> due` | pass | `fm-font-shorthand` |
 | I | a numeric font weight of 600 or more | bold on `total`, context `the total due` | `the <span style="font-weight:650">total</span> due` | pass | `fm-weight-650` |
-| I | `text-decoration: none` does not take an inherited underline off, as in a browser | underline on `total`, context `the total due` | `the <u><span style="text-decoration:none">total</span></u> due` | pass | `fm-underline-none` |
+| I | `text-decoration: none` on a span inside `<u>` does not take the inherited underline off, as in a browser | underline on `total`, context `the total due` | `the <u><span style="text-decoration:none">total</span></u> due` | pass | `fm-underline-none` |
 | I | `vertical-align: baseline` does not take an inherited superscript off, as in a browser | sup on `2`, context `x2 + 1` | `x<sup><span style="vertical-align: baseline">2</span></sup> + 1` | pass | `fm-baseline` |
 | P | a superscript element with a subscript style is a subscript | sup on `2`, context `H2O` | `H<sup style="vertical-align: sub">2</sup>O` | fail: `the span lacks ['sup']` | `fm-sup-style-sub` |
+| P | a negative test where the only marks are on no text: empty elements do not count | not bold on `total`, context `the total due` | `<p>the total due</p><b></b><i class=fa></i>` | fail: `the output has no marks at all, so it cannot show that a mark is absent` | `fm-neg-empty-element` |
+| I | `text-decoration: none` takes off the element's own underline | not underline on `total`, context `the total due` | `<p>the <u style="text-decoration: none">total</u> due</p><p><b>x</b></p>` | pass | `fm-own-none` |
+| I | a `font` shorthand that names no weight draws the text plain | not bold on `total`, context `the total due` | `<p>the <b style="font: 12px serif">total</b> due</p><p><i>x</i></p>` | pass | `fm-font-resets` |
+| I | an unclosed head ends at the first text that is not its own | bold on `total`, context `the total due` | `<head>intro the <b>total</b> due` | pass | `fm-head-bare-text` |
+| I | an html tag inside markdown is read as html | sub on `2`, context `H2O` | `H<sub>2</sub>O` | pass | `fm-markdown-html` |
 | P | a negative test, the span marked | not bold on `total`, context `the total due` | `the <b>total</b> due` | fail: `the span carries ['bold']` | `fm-neg-marked` |
-| P | a negative test, the words not on the page | not bold on `total`, context `the total due` | `nothing here` | fail: `the output has no marks at all, so it cannot show that a mark is absent` | `fm-neg-missing` |
+| P | a negative test, the words not on a page that has marks | not bold on `total`, context `the total due` | `<p>nothing <b>here</b></p>` | fail: `the context is not in the output` | `fm-neg-missing` |
 | P | the context is not on the page | bold on `total`, context `the total due` | `<b>total</b>` | fail: `the context is not in the output` | `fm-missing-context` |
-| P | two wrong characters in the context, one edit allowed | bold on `total`, context `the total due` (md 1) | `txx <b>total</b> due` | fail: `the context is not in the output` | `fm-budget-over` |
 | P | a heading is drawn bold but is not a mark | bold on `total`, context `total` | `<h2>total</h2>` | fail: `the span lacks ['bold']` | `fm-heading` |
 | P | a table heading is not a mark | bold on `total`, context `total` | `<table><tr><th>total</th></tr></table>` | fail: `the span lacks ['bold']` | `fm-th` |
 | P | `<mark>` is not a mark here | bold on `total`, context `the total due` | `the <mark>total</mark> due` | fail: `the span lacks ['bold']` | `fm-mark-element` |

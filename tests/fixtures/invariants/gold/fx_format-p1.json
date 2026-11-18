@@ -209,32 +209,6 @@
      "italic"
     ]
    }
-  },
-  {
-   "id": "fx_budget",
-   "test_type": "format",
-   "output_type": "html",
-   "derivation": "rendered_source",
-   "tags": [],
-   "args": {
-    "span": {
-     "text": "grew steadily",
-     "max_diffs": 2
-    },
-    "before": {
-     "text": "Revenue ",
-     "max_diffs": 2
-    },
-    "after": {
-     "text": "over the year, helped by a strong quarter.",
-     "max_diffs": 2
-    }
-   },
-   "settings": {
-    "marks": [
-     "bold"
-    ]
-   }
   }
  ]
 }

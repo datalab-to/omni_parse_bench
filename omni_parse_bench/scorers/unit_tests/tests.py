@@ -231,6 +231,9 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
                 if not (isinstance(kinds, list) and kinds and all(isinstance(k, str) for k in kinds)):
                     raise ValueError(
                         f"{where}: format's {key} is a non-empty list of marks, not {kinds!r:.80}")
+                if bad := [r for r, a in args.items() if set(a) != {"text", "max_diffs"}]:
+                    raise ValueError(f"{where}: format's args are text and max_diffs only (no place, no "
+                                     f"exact_case): {bad}")
                 return runners.Format(*(text(r) if r in args else None for r in ("before", "span", "after")),
                                       diffs([r for r in ARG_ROLES["format"] if r in args]),
                                       tuple(kinds) if key == "marks" else (),

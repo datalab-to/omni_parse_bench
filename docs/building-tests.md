@@ -131,7 +131,7 @@ Which kinds each type accepts (`scorers/unit_tests/tests.py`):
 
 - `page_near_empty`: no args;
 - `present`: `text`, `number` or `latex`;
-- `format`: `text` (`span`, `before`, `after`; one shared `max_diffs`, which applies to the three together, never to the span alone);
+- `format`: `text` (`span`, `before`, `after`), each with `max_diffs` 0 (the context is found as written, no `place`, no `exact_case`);
 - `order`, `repeat` and `table_cell`: `text`; and
 - `layout_kind`: `text` with a `place`. Its text is shown to a reader and never compared.
 

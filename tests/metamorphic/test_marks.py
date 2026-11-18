@@ -37,9 +37,9 @@ PHRASE = st.lists(LETTERS, min_size=3, max_size=9, unique=True).flatmap(
     ).filter(lambda t: t[2].strip()))
 
 
-def fmt(before: str, span: str, after: str, kind: str | None = None, absent: str | None = None, k: int = 0):
+def fmt(before: str, span: str, after: str, kind: str | None = None, absent: str | None = None):
     """A format test: `kind` on the span (positive), or `absent` on it (negative)."""
-    return runners.Format(before, span, after, k, (kind,) if kind else (), (absent,) if absent else ())
+    return runners.Format(before, span, after, 0, (kind,) if kind else (), (absent,) if absent else ())
 
 
 def elsewhere(kind: str) -> str:
@@ -181,27 +181,26 @@ def test_a_letter_and_its_combining_accent_marked_differently_still_fold_togethe
     assert passes(fmt("the ", "café", " near", kind="bold"), html)
 
 
-@relation(HOLDS, domain="phrases x 6 marks x the page's text edited in 1 or 2 characters, of the context only")
-@given(PHRASE, KIND, st.integers(1, 2), st.data())
-def test_a_context_with_edits_passes_within_its_budget_and_fails_beyond_it(phrase, kind, edits, data):
-    """A format test whose context has `max_diffs` edits (substituted characters of the words before and after the
-    span) finds its span; with one edit fewer in the budget, it does not. The span itself is exact. [M58]
-    Why it matters for a score: as for M3, a small misreading next to a mark does not hide the mark, and a larger one is
-    not guessed at."""
-    # Given a test, and a page whose context has `edits` substituted characters
+@relation(HOLDS, domain="phrases x 6 marks x one wrong, missing or added character in the words before or after the span")
+@given(PHRASE, KIND, st.sampled_from(["wrong", "missing", "added"]), st.booleans(), st.data())
+def test_a_context_with_a_wrong_missing_or_added_character_is_not_found(phrase, kind, change, in_before, data):
+    """A format test has no edit budget: a page whose context has one character wrong, missing or added does not hold
+    the context, so a positive test and a negative one both fail, with the page otherwise right. [M58]
+    Why it matters for a score: the context is what anchors the span, and a context that is not as the gold has it is
+    not a place to read a mark from; a misread word is the text tests' business."""
+    # Given a page whose words before (or after) the span have one letter changed, and a mark elsewhere
     before, span, after = phrase
-    context = list(before + after)
-    spots = [i for i, c in enumerate(context) if c.isalpha()]
-    assume(len(spots) >= edits + 3)
-    hit = data.draw(st.lists(st.sampled_from(spots), min_size=edits, max_size=edits, unique=True))
-    for i in hit:
-        context[i] = "0"
-    assume(len("".join(context)) == len(before + after))
-    new_before, new_after = "".join(context[:len(before)]), "".join(context[len(before):])
-    html = page(new_before, span, new_after, SPELLINGS[kind][0])
-    # When the test runs with a budget of `edits` and of one less; Then it passes, then it fails
-    assert passes(fmt(before, span, after, kind=kind, k=edits), html)
-    assert not passes(fmt(before, span, after, kind=kind, k=edits - 1), html)
+    part = before if in_before else after
+    # Note: a character added before the context's first character is outside it, so the context is still there
+    spots = [i for i, c in enumerate(part) if c.isalpha() and (change != "added" or not in_before or i > 0)]
+    assume(spots)
+    i = data.draw(st.sampled_from(spots))
+    edited = part[:i] + {"wrong": "0", "missing": "", "added": "0" + part[i]}[change] + part[i + 1:]
+    html = page(edited if in_before else before, span, after if in_before else edited, SPELLINGS[kind][0])
+    html += elsewhere(kind)
+    # When the positive and the negative test run; Then neither finds its context
+    assert not passes(fmt(before, span, after, kind=kind), html), html
+    assert not passes(fmt(before, span, after, absent=kind), html), html
 
 
 @relation(HOLDS, domain="phrases x 6 marks x 3 places: maths (read, no mark), a script and a comment (not read)")
@@ -419,31 +418,28 @@ def test_a_page_of_tens_of_thousands_of_unclosed_or_crossed_tags_is_read_in_boun
     assert time.monotonic() - start < 5
 
 
-@relation(HOLDS, domain="words ending in a letter, a span repeating that letter 2-4 times, 0-2 edits before it, x 6 marks")
-@given(LETTERS, st.integers(2, 4), st.integers(0, 2), KIND)
-@example("vrbg", 3, 2, "bold")
-def test_a_span_whose_letters_repeat_the_end_of_the_context_before_it_is_found_where_it_sits(word, repeats, edits, kind):
+@relation(HOLDS, domain="words ending in a letter, a span repeating that letter 2-4 times, x 6 marks")
+@given(LETTERS, st.integers(2, 4), KIND)
+@example("vrbg", 3, "bold")
+def test_a_span_whose_letters_repeat_the_end_of_the_context_before_it_is_found_where_it_sits(word, repeats, kind):
     """A span of one letter repeated (`ggg`) after a context word ending in that letter (`vrbg`) is found where the page
-    puts it, with up to two wrong characters in the context before it, and its mark is read there. [M67]
-    Why it matters for a score: the span sits one character from where a first search would find it, and a verdict must
-    not depend on which of the two is looked at (found by the deep profile of M58)."""
-    # Given a context word ending in the span's letter, and edits in the first characters of the words before the span
+    puts it, and its mark is read there, not on the letters before it. [M67]
+    Why it matters for a score: the span sits one character from where a search for its letters alone would find it,
+    and a verdict must not depend on which of the two is looked at."""
+    # Given a context word ending in the span's letter, and the span marked
     span = word[-1] * repeats
     before, after = f"{word} ", " tail words"
-    context = list(before)
-    assume(edits <= len(word) - 1)
-    for i in range(edits):
-        context[i] = "0"
-    html = f"<p>{''.join(context)}{SPELLINGS[kind][0].format(span)}{after}</p>"
-    # When the positive test runs with the budget the edits need; Then it passes
-    assert passes(fmt(before, span, after, kind=kind, k=edits), html), html
+    html = f"<p>{before}{SPELLINGS[kind][0].format(span)}{after}</p>"
+    # When the positive test runs; Then it passes
+    assert passes(fmt(before, span, after, kind=kind), html), html
 
 
 @relation(HOLDS, domain="phrases x 6 marks: an output with no mark, and the same with one mark elsewhere")
 @given(PHRASE, KIND)
 def test_a_negative_test_is_scored_only_on_an_output_that_has_a_mark_somewhere(phrase, kind):
-    """A negative format test fails on an output that has no mark anywhere, whatever it says, and passes on the
-    same words with a mark of another kind somewhere else on the page; a positive test is not changed by it. [M68]
+    """A negative format test fails on an output that has no mark on any of its text, whatever it says (empty mark
+    elements do not count), and passes on the same words with a mark of another kind somewhere else on the page; a
+    positive test is not changed by it. [M68]
     Why it matters for a score: a system that writes no marks at all is not given credit for 'not marking' text it
     could not have marked."""
     # Given the plain page, and the plain page with a mark elsewhere
@@ -451,32 +447,33 @@ def test_a_negative_test_is_scored_only_on_an_output_that_has_a_mark_somewhere(p
     # When a negative and a positive test run on both; Then the negative needs the mark elsewhere
     assert not passes(fmt(*phrase, absent=kind), plain)
     assert passes(fmt(*phrase, absent=kind), plain + elsewhere(kind))
+    # an element that marks no text does not count as a mark: empty, whitespace only, or an icon
+    for empty in ("<b></b>", "<i> </i>", "<i class=fa></i>", "<p><u><span></span></u></p>"):
+        assert not passes(fmt(*phrase, absent=kind), plain + empty), empty
     assert not passes(fmt(*phrase, kind=kind), plain) and not passes(fmt(*phrase, kind=kind), plain + elsewhere(kind))
 
 
-@relation(HOLDS, domain="words repeated inside the context, the real span plain or marked, 0 or 1 edit in the context")
-@given(LETTERS, LETTERS, st.integers(0, 1), KIND)
-def test_the_contexts_own_place_decides_which_copy_of_the_span_is_read(word, other, edits, kind):
+@relation(HOLDS, domain="words repeated inside the context, the real span plain or marked, x 6 marks")
+@given(LETTERS, LETTERS, KIND)
+def test_the_contexts_own_place_decides_which_copy_of_the_span_is_read(word, other, kind):
     """When the span's words occur again inside the context (`before` or `after`), only the copy at the span's place
-    is the span: marking the other copy does not pass a positive test and does not fail a negative one, with the
-    context exact or with one wrong character in it. [M69]
+    is the span: marking the other copy does not pass a positive test and does not fail a negative one. [M69]
     Why it matters for a score: a repeated word must not let a mark on one copy stand for the other."""
     assume(word != other and "tail" not in word + other)
     before, span, after = f"{word} {other} ", word, f" {other} tail"
-    # Given the page with the copy in `before` marked and the span plain, or the reverse, and `edits` wrong characters
+    # Given the page with the copy in `before` marked and the span plain, or the reverse
     wrap = SPELLINGS[kind][0]
-    tail = f" {other} tai0" if edits else after
-    copy_marked = f"<p>{wrap.format(word)} {other} {word}{tail}</p>" + elsewhere(kind)
-    span_marked = f"<p>{word} {other} {wrap.format(word)}{tail}</p>"
-    # When the tests run with the budget that makes the context match
-    # Then the span is read at its own place
-    assert not passes(fmt(before, span, after, kind=kind, k=edits), copy_marked)
-    assert passes(fmt(before, span, after, absent=kind, k=edits), copy_marked)
-    assert passes(fmt(before, span, after, kind=kind, k=edits), span_marked)
+    copy_marked = f"<p>{wrap.format(word)} {other} {word}{after}</p>" + elsewhere(kind)
+    span_marked = f"<p>{word} {other} {wrap.format(word)}{after}</p>"
+    # When the tests run; Then the span is read at its own place
+    assert not passes(fmt(before, span, after, kind=kind), copy_marked)
+    assert passes(fmt(before, span, after, absent=kind), copy_marked)
+    assert passes(fmt(before, span, after, kind=kind), span_marked)
 
 
-@relation(HOLDS, domain="phrases x 3 unclosed starts of a page (head, head and title, title)")
-@given(PHRASE, KIND, st.sampled_from(["<html><head>", "<html><head><title>t", "<title>t<body>"]))
+@relation(HOLDS, domain="phrases x 6 unclosed starts of a page (head, head and title, title, bare text, a div)")
+@given(PHRASE, KIND, st.sampled_from(["<html><head>", "<html><head><title>t", "<title>t<body>", "<head>intro ",
+                                      "<head><meta><div>", "<head><noscript>n</noscript> "]))
 def test_an_unclosed_head_or_title_does_not_hide_the_page_from_the_format_reader(phrase, kind, start):
     """A page whose `<head>` or `<title>` is never closed is read as the text test reads it: its content starts at
     the first content tag, and its marks are there. [M70]
@@ -523,3 +520,28 @@ def test_a_mark_that_takes_in_or_leaves_out_the_punctuation_next_to_the_span_is_
             f"{'' if inside else escaped(punct)}{escaped(after[1:])}</p>")
     # When the positive test runs; Then it passes
     assert passes(fmt(before, span, after, kind=kind), html), html
+
+
+@relation(HOLDS, domain="phrases x 4 elements with a style that takes off their own mark, and a font shorthand")
+@given(PHRASE, st.sampled_from([("underline", "u", "text-decoration:none"), ("strike", "s", "text-decoration:none"),
+                                ("sup", "sup", "vertical-align:baseline"), ("sub", "sub", "vertical-align:baseline"),
+                                ("bold", "b", "font: 12px serif"), ("italic", "i", "font: 12px serif")]))
+def test_an_elements_own_style_takes_off_its_own_default_mark_but_not_an_ancestors(phrase, element):
+    """`<u>`, `<s>`, `<sup>` and `<sub>` with `text-decoration: none` or `vertical-align: baseline`, and `<b>` or `<i>`
+    with a `font` shorthand that names no weight or style, carry no mark of their own; inside an ancestor that makes the
+    same mark, the text keeps it. [M73]
+    Why it matters for a score: the page's look is what the mark tests ask about; a style that makes the text plain
+    makes it plain, and one that cannot undo an ancestor's underline does not."""
+    # Given the element with the style around the span, alone and inside the ancestor that makes the same mark
+    kind, tag, style = element
+    before, span, after = phrase
+    alone = f'<p>{escaped(before)}<{tag} style="{style}">{escaped(span)}</{tag}>{escaped(after)}</p>' + elsewhere(kind)
+    # When the positive and the negative tests run; Then it has no mark of its own
+    assert not passes(fmt(*phrase, kind=kind), alone) and passes(fmt(*phrase, absent=kind), alone)
+    ancestor = SPELLINGS[kind][0].format(f'<{tag} style="{style}">{escaped(span)}</{tag}>')
+    inside = f"<p>{escaped(before)}{ancestor}{escaped(after)}</p>"
+    if kind in ("bold", "italic"):
+        # Note: a style that makes the text plain takes the ancestor's bold or italic off too
+        assert not passes(fmt(*phrase, kind=kind), inside)
+    else:
+        assert passes(fmt(*phrase, kind=kind), inside), inside

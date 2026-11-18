@@ -200,16 +200,20 @@ def _count(marks: Iterable[tuple[bool, str, str, Iterable[str], Iterable[str], s
     """One page's counts, each as `{key: {"tests", "passed"}}`: `per_family`, `per_tag`,
     `per_test_type`, `per_arg_kind` and `per_derivation`, from its tests' (passed, test type, derivation,
     tags, arg kinds, test id). A test counts once under each of its tags and of its arg kinds; a blank
-    derivation counts under none. The tag and arg kind counts also hold `ids`, the digest of the key's test
-    ids (`_ids`), the only slices that can have twins; it is left out when a test has no id."""
+    derivation counts under none; a test of a family outside the headline (`format`) counts in none of the
+    tag, arg kind and derivation slices. The tag and arg kind counts also hold `ids`, the digest of the key's
+    test ids (`_ids`), the only slices that can have twins; it is left out when a test has no id."""
     marks = list(marks)
     with_ids = all(m[5] is not None for m in marks)
     out: dict[str, dict[str, dict[str, int]]] = {"per_family": {}, "per_tag": {}, "per_test_type": {},
                                                  "per_arg_kind": {}, "per_derivation": {}}
     for ok, test_type, derivation, tags, arg_kinds, test_id in marks:
-        keys = {"per_family": [vocab.FAMILIES[test_type]], "per_tag": dict.fromkeys(tags),
-                "per_test_type": [test_type], "per_arg_kind": dict.fromkeys(arg_kinds),
-                "per_derivation": [derivation] if derivation else []}
+        # Note: the format family is reported as a family, a suite and a test type, and in none of the slices
+        # a text test's tags, arg kind and derivation pool: those are for what the headline families measure
+        own = vocab.FAMILIES[test_type] not in vocab.HEADLINE_FAMILIES
+        keys = {"per_family": [vocab.FAMILIES[test_type]], "per_tag": {} if own else dict.fromkeys(tags),
+                "per_test_type": [test_type], "per_arg_kind": {} if own else dict.fromkeys(arg_kinds),
+                "per_derivation": [derivation] if derivation and not own else []}
         for slice_, ks in keys.items():
             for k in ks:
                 c = out[slice_].setdefault(k, {"tests": 0, "passed": 0})

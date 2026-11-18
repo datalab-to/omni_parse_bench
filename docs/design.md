@@ -103,7 +103,7 @@ existing rules.
 | `page_near_empty` | `html` | a blank page yields at most N non-space characters (not invisible format characters, nor the marks the text view writes for an element that holds nothing) | no args; `max_chars` | text | 0 |
 | `table_cell` | `html` | this cell exists with these neighbors, under these headings, in this section and in these row groups; the cell may be one line of a multi-line cell | `cell`, `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `headings`, `section`, `row_groups` (text) | tables | 5,386 |
 | `layout_kind` | `blocks` | the smallest block covering half of this line's place has this kind | `content` (text with a `place`); `kind` | layout | 2,403 |
-| `format` | `html` | this span of text carries these marks (bold, italic, underline, strikethrough, superscript, subscript) and the words around it do not; or carries none of them | `span`, optional `before`, `after` (text, one `max_diffs`); `marks` or `absent` | format | 0 |
+| `format` | `html` | this span of text carries these marks (bold, italic, underline, strikethrough, superscript, subscript) and the words around it do not; or carries none of them | `span`, optional `before`, `after` (text, `max_diffs` 0); `marks` or `absent` | format | 0 |
 
 Of the `present` tests, 3,684 compare text, 3,268 an equation and 323 a number.
 
