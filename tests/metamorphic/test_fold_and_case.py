@@ -238,7 +238,10 @@ def leader_survives(text: str, i: int, run: re.Match) -> bool:
     texts alike: a run of 4 or more items loses one and keeps 3, but a run of exactly 3 stops being one (a
     deletion that changes the folded text, which a page must not make). A run that is one character (an
     ellipsis) can be deleted whole between spaces: fold turns the run into a space, and the space is what is
-    left."""
+    left. A leader at the start or the end of the text, whatever its length, may lose any item: fold drops it
+    from the gold ("Total ..." folds to "total"), and a page with fewer dots still holds "total"."""
+    if not text[:run.start()].strip() or not text[run.end():].strip():
+        return True     # a leader at an end: the folded gold has none, and the page holds the rest
     gone = text[:i] + text[i + 1:]
     if run[0].strip() == text[i]:     # the run is this one character (an ellipsis)
         return (run.start() == 0 or text[run.start() - 1].isspace()) and (
@@ -275,7 +278,7 @@ def deletions(t) -> tuple[collections.Counter, list[tuple[int, str]]]:
 
 # Over the real exact text tests: deletions tried, and those skipped by reason (the test below checks both).
 REAL_DELETIONS_TRIED = 86_347
-REAL_DELETIONS_SKIPPED = {"white space": 12_243, "part of a leader run": 75, "a bullet opening the text": 9,
+REAL_DELETIONS_SKIPPED = {"white space": 12_243, "part of a leader run": 69, "a bullet opening the text": 9,
                           "a bracket of a footnote mark": 6, "a hyphen at a line end": 6,
                           "an invisible or private-use character": 3}
 _SKIPPED = sum(REAL_DELETIONS_SKIPPED.values())
