@@ -103,6 +103,7 @@ existing rules.
 | `page_near_empty` | `html` | a blank page yields at most N non-space characters (not invisible format characters, nor the marks the text view writes for an element that holds nothing) | no args; `max_chars` | text | 0 |
 | `table_cell` | `html` | this cell exists with these neighbors, under these headings, in this section and in these row groups; the cell may be one line of a multi-line cell | `cell`, `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `headings`, `section`, `row_groups` (text) | tables | 5,386 |
 | `layout_kind` | `blocks` | the smallest block covering half of this line's place has this kind | `content` (text with a `place`); `kind` | layout | 2,403 |
+| `format` | `html` | this span of text carries these marks (bold, italic, underline, strikethrough, superscript, subscript) and the words around it do not; or carries none of them | `span`, optional `before`, `after` (text, one `max_diffs`); `marks` or `absent` | format | 0 |
 
 Of the `present` tests, 3,684 compare text, 3,268 an equation and 323 a number.
 
@@ -144,6 +145,7 @@ select tests and are scored one tag at a time (summarize the tests of one tag), 
 | `upstream_olmocr` | olmOCR-bench's own tests | 4,386 |
 | `model_panel` | independent models agree on what the page says; no model in the results table sits on a panel | 3,613 |
 | `authored` | we made the page or filled the form, so we know what's on it | 1,402 |
+| `rendered_source` | we rendered the page from markup we hold (a document written with its marks), so each mark is known | 0 |
 | `extractor_agreement` | independent text extractors (two, or three on `tiny_plans`) agree on the line | 823 |
 | `text_layer` | read off the PDF's own text layer: its words, their boxes, their font flags | 521 |
 | `source_transcription` | the source's own transcription of a handwritten page (the handwriting_samples suite) | 284 |
@@ -282,7 +284,10 @@ shows it.
 
 The headline is the mean of the families' scores: text (present, order, repeat, page_near_empty), tables
 (table_cell) and layout (layout_kind), each family's score the share of its tests passed
-(`vocab.FAMILIES` maps every test type to one). Weighting by family rather than by test means a
+(`vocab.FAMILIES` maps every test type to one). A fourth family, format (`format`), is reported beside
+the headline and never in it (`vocab.HEADLINE_FAMILIES`): it asks whether the output keeps a page's
+bold, italic, underline, strikethrough, superscript and subscript, which every other test is certified
+not to see (M7a), and adding it would change every published score. A dataset with no headline family has the mean of the families it has. Weighting by family rather than by test means a
 family's weight never depends on how many tests it has: sampling more layout lines makes the layout
 score more precise without making layout count more. The families are those the graded tests are
 in, so a subset scores on the families it holds, and the summary lists them in a fixed order: text,

@@ -59,6 +59,12 @@ def _documents(table: Table) -> list[str]:
     return sorted({d for ks in table.values() for v in ks.values() for d in v})
 
 
+def _headline(fams: Sequence[str]) -> list[str]:
+    """The families the headline is the mean of: those of `vocab.HEADLINE_FAMILIES` among `fams`, or all of
+    them when none is."""
+    return [k for k in fams if k in vocab.HEADLINE_FAMILIES] or list(fams)
+
+
 def _keys(slice_: str, table: Table) -> list[str]:
     """The slice's keys: the vocabulary's order first, then the rest sorted, as the summary orders them."""
     have = table[slice_]
@@ -157,7 +163,9 @@ def intervals(pages: Iterable[Mapping[str, Any]], *, resamples: int = 1000, seed
     fewer than 5 documents, or absent from more than 5% of the draws: with so few documents the draws say
     little, and a bound made from the draws that are left would look sure of a score it is not.
     `interval` says how it was made. Deterministic for a `seed`. A slice with no tests is left out. The
-    headline is a mean over every family, so a draw missing a family is not one of its draws.
+    headline is a mean over the headline families (`vocab.HEADLINE_FAMILIES`: text, tables, layout; the
+    families present when none of them is), so a draw missing one of them is not one of its draws. `format` is
+    a family of its own, beside the headline.
 
     Note: scores are pooled over tests, so a document with many tests weighs more, and the draws of
     documents already reflect that. `documents` is a raw count; `effective_documents` is what the tests are
@@ -169,7 +177,7 @@ def intervals(pages: Iterable[Mapping[str, Any]], *, resamples: int = 1000, seed
     table = _table(pages)
     docs = _documents(table)
     sparse = _sparse(table, {d: i for i, d in enumerate(docs)})
-    fams = _keys("families", table)
+    fams = _headline(_keys("families", table))
     point = _scores(sparse, [1] * len(docs), fams)
     draws: dict[tuple[str, str], list[float]] = {sk: [] for sk in point}
     rng = random.Random(seed)
@@ -235,7 +243,7 @@ def paired(pages_a: Iterable[Mapping[str, Any]], pages_b: Iterable[Mapping[str, 
     sa, sb = _sparse(ta, index), _sparse(tb, index)
     ones = [1] * len(both)
     present = lambda sp: {k for (s, k), v in sp.items() if s == "families" and v}
-    fams = [k for k in _keys("families", ta) if k in present(sa) and k in present(sb)]
+    fams = _headline([k for k in _keys("families", ta) if k in present(sa) and k in present(sb)])
     pa, pb = _scores(sa, ones, fams), _scores(sb, ones, fams)
     keys = [sk for sk in pa if sk in pb]
     draws: dict[tuple[str, str], list[float]] = {sk: [] for sk in keys}
@@ -397,7 +405,9 @@ def reliability(runs: Mapping[str, Iterable[Mapping[str, Any]]], *, splits: int 
     system has, with the same number of tests in each, are used; the others are
     counted in `documents_dropped`. The tests outside a slice are the page lines' `tests` and `passed` less
     the slice's, so a test with several tags counts under each of them, and the other tests of a tag slice
-    leave out only the tests that carry that tag: co-tagged tests stay in them for the other tags.
+    leave out only the tests that carry that tag: co-tagged tests stay in them for the other tags. The
+    `format` tests are among the other tests of every slice but their own, so the pool is not only the
+    headline's.
 
     Note: the numbers depend on which systems are in `runs`: a few near-identical systems rank by noise,
     and so does a half of few documents. They say a slice can't rank these systems reproducibly, or only

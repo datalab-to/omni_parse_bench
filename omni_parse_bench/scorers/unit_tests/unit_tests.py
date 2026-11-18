@@ -36,8 +36,8 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
       digest for each tag and arg kind; its `row` holds the page's `document` and `suite`;
     - its details (`details/<page_id>.jsonl`) hold one test line per test (`lines`); and
     - the summary is `summarize` over every page, a failed one with all its tests failed (`score_failure`):
-      the families in the order text, tables, layout, and their mean as the headline, then the same scores
-      by tag, suite, test type, arg kind and derivation."""
+      the families in the order text, tables, layout, format, and the mean of the first three as the headline
+      (`vocab.HEADLINE_FAMILIES`), then the same scores by tag, suite, test type, arg kind and derivation."""
 
     name: ClassVar[str] = "unit_tests"
     headline: ClassVar[str] = "score"
@@ -138,7 +138,8 @@ def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.
 
 
 def summarize(lines: Iterable[Line]) -> dict[str, Any]:
-    """Test lines (from `lines`) as one summary: `score`, the mean of the families' scores, and `families`,
+    """Test lines (from `lines`) as one summary: `score`, the mean of the headline families' scores (text,
+    tables, layout; all the families present when none of them is), and `families`,
     each family's `score` (the share of its tests passed), `tests`, `documents` and `effective_documents`;
     then `per_tag`, `per_suite`, `per_test_type`, `per_arg_kind` and `per_derivation`, each a slice's entries
     shaped as a family's. `score` is None when there are no tests, and a slice with no tests is left out.
@@ -271,7 +272,9 @@ def _summary(pages: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
                 for x in pages for k, c in x.get(name, {}).items())
 
     families = _entries(counted("per_family"), vocab.FAMILY_ORDER)
-    return {"score": float(statistics.fmean(x["score"] for x in families.values())) if families else None,
+    head = ([x["score"] for k, x in families.items() if k in vocab.HEADLINE_FAMILIES]
+            or [x["score"] for x in families.values()])
+    return {"score": float(statistics.fmean(head)) if head else None,
             "families": families,
             "per_tag": _entries(counted("per_tag"), twins=twins),
             "per_suite": _entries((x["row"]["suite"], x["row"]["document"], x["passed"], x["tests"])

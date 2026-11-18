@@ -221,3 +221,14 @@ def test_a_scored_page_carries_digests_that_summarize_reads_alike(tmp_path):
     via_tests = unit_tests.summarize(unit_tests.lines(unit_tests.score({"html": "<p>alpha beta</p>"}, TESTS),
                                                       TESTS, PAGE))
     assert via_scores == via_tests
+
+
+def test_the_format_family_is_reported_beside_the_headline_and_never_in_it():
+    xs = [line("a", document="d1", test_type="present"), line("b", document="d2", test_type="table_cell"),
+          line("c", document="d3", test_type="format", ok=False)]
+    s = unit_tests.summarize(xs)
+    assert set(s["families"]) == {"text", "tables", "format"}
+    assert s["families"]["format"]["score"] == 0.0
+    assert s["score"] == (s["families"]["text"]["score"] + s["families"]["tables"]["score"]) / 2
+    only = unit_tests.summarize([xs[2]])
+    assert only["score"] == 0.0     # a dataset with no headline family has the mean of the ones it has

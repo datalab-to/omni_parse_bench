@@ -79,13 +79,15 @@ and in the case files under [tests/scoring_probes](../../tests/scoring_probes/).
 | where on the page the string is | `42` is found in `Page 42 of 100` | `present`, `repeat` | (case num-context) |
 | word edges | `Total` is found in `Totally` | `present`, `order` | (cases text-longer-word, ord-glued) |
 | image descriptions | `Total` is found in `<img alt='Total'>` | `present`, `order` | (cases text-alt, ord-alt) |
-| styling | struck-through text still counts; bold and italic are dropped | every html test | (case text-strike) |
+| styling | struck-through text still counts; bold and italic are dropped | every html test but `format` | (case text-strike) |
 | table structure, outside `table_cell` | two adjacent cells read as one string | `present`, `order` | (case text-table-flat) |
 | an exponent against a digit | `12` is found in `1<sup>2</sup>` | `present` (text) | (case text-exponent) |
 | the slack of an edit budget | with 1 edit, `Total: 41` is found in `Total: 400` | `present`, `table_cell` | (cases text-fuzzy-wrong-gold, cell-insertions) |
 | letters around an equation | `xy` is found in `$wxy$` | `present` (latex) | (case tex-letter-beside) |
 | unknown LaTeX commands | `x+y` is found in `$x+\foo y$` | `present` (latex) | (case tex-unknown-macro) |
 | a second copy elsewhere | `Alpha` before `Beta` passes on `Beta Alpha Beta` | `order` | (case ord-any-pair) |
+| word edges, for a mark | `total` is bold in `<b>subtotal</b>` | `format` | (case fm-word-edge) |
+| a marked copy elsewhere | a bold test passes on a page with one plain and one bold copy of its phrase | `format` | (case fm-a-copy) |
 | the text of a layout block | a block with the right label and box passes, whatever its text | `layout_kind` | (case lay-text-unread) |
 | one block for the whole page | a page-sized `table` block passes every `table` test | `layout_kind` | (case lay-page-block) |
 | extra content | a loop that repeats the string passes; only `repeat` caps a count | all but `repeat` | (case text-loop) |
@@ -94,7 +96,7 @@ and in the case files under [tests/scoring_probes](../../tests/scoring_probes/).
 
 - [present-text.md](present-text.md), [present-number.md](present-number.md),
   [present-latex.md](present-latex.md), [order.md](order.md), [repeat.md](repeat.md),
-  [page_near_empty.md](page_near_empty.md),
+  [page_near_empty.md](page_near_empty.md), [format.md](format.md),
   [table_cell.md](table_cell.md), [layout_kind.md](layout_kind.md): one page per test, each with the same shape:
   what it asks, its rules table, its blind spots.
 - [internals.md](internals.md): how an output becomes the text the tests compare: markdown to html, the text

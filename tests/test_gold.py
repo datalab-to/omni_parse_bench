@@ -27,7 +27,7 @@ def test_a_derivation_is_one_of_the_closed_list():
 
 def with_args(args: dict, test_type: str = "present", settings: dict | None = None, **fields) -> dict:
     output = {"present": "html", "order": "html", "repeat": "html", "page_near_empty": "html",
-              "table_cell": "html", "layout_kind": "blocks"}[test_type]
+              "table_cell": "html", "layout_kind": "blocks", "format": "html"}[test_type]
     return {"id": "t", "test_type": test_type, "output_type": output, "derivation": "authored", "tags": [],
             "args": args, "settings": settings or {}} | fields
 
@@ -189,3 +189,43 @@ def test_exact_case_and_an_edit_budget_exclude_each_other(budget):
     # and either alone is fine
     gold.test("p", with_args({"content": {"text": "abcdef", "max_diffs": budget}}))
     gold.test("p", with_args({"content": {"text": "abcdef", "max_diffs": 0, "exact_case": True}}))
+
+
+def fmt_args(**roles) -> dict:
+    base = {"before": "the ", "span": "total", "after": " due"}
+    return ({r: {"text": t, "max_diffs": 0} for r, t in base.items() if r not in roles}
+            | {r: {"text": t, "max_diffs": 0} for r, t in roles.items() if t is not None})
+
+
+def test_a_format_test_loads_with_its_marks_or_its_absent_marks():
+    t = gold.test("p", with_args(fmt_args(), "format", {"marks": ["bold", "italic"]}))
+    assert t.params == gold.runners.Format("the ", "total", " due", 0, ("bold", "italic"), ())
+    t = gold.test("p", with_args(fmt_args(before=None), "format", {"absent": ["sup"]}))
+    assert t.params == gold.runners.Format(None, "total", " due", 0, (), ("sup",))
+
+
+def fmt_test(settings: dict, args: dict | None = None) -> dict:
+    return with_args(fmt_args() if args is None else args, "format", settings)
+
+
+@pytest.mark.parametrize("t", [
+    fmt_test({}),
+    fmt_test({"marks": ["bold"], "absent": ["italic"]}),
+    fmt_test({"marks": []}),
+    fmt_test({"marks": ["bold", "bold"]}),
+    fmt_test({"marks": ["glow"]}),
+    fmt_test({"marks": "bold"}),
+    fmt_test({"marks": ["bold"], "extra": 1}),
+    fmt_test({"marks": ["bold"]}, {"before": {"text": "a", "max_diffs": 0}}),
+    fmt_test({"marks": ["bold"]}, fmt_args(span=" \u200b ")),
+    fmt_test({"marks": ["bold"]}, fmt_args(span="ab") | {"before": {"text": "x", "max_diffs": 1}}),
+    fmt_test({"marks": ["bold"]}, {"span": {"text": "ab", "max_diffs": 2}}),
+    fmt_test({"marks": ["bold"]}, fmt_args() | {"content": {"text": "x", "max_diffs": 0}}),
+    fmt_test({"marks": ["sup", "sub"]}),                                     # both scripts at once
+    fmt_test({"marks": ["bold"]}, {"span": {"text": "ab", "max_diffs": 0}}),      # a short span, no context
+    fmt_test({"marks": ["bold"]},
+             fmt_args(span="abcdefgh") | {"before": {"text": "xx", "max_diffs": 3}}),   # too many edits
+])
+def test_a_format_test_that_asks_nothing_or_nonsense_does_not_load(t):
+    with pytest.raises(ValueError):
+        _ = gold.test("p", t).params

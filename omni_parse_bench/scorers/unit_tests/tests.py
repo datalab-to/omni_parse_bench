@@ -28,10 +28,12 @@ ARG_ROLES = {
     "page_near_empty": (),
     "table_cell": ("cell", "headings", "section", "row_groups", *RELATIONS),
     "layout_kind": ("content",),
+    "format": ("before", "span", "after"),
 }
 LISTS = frozenset({"headings", "row_groups"})   # roles that take a list of args
 REQUIRED = {"present": ("content",), "order": ("before", "after"), "repeat": ("content",),
-            "page_near_empty": (), "table_cell": ("cell",), "layout_kind": ("content",)}
+            "page_near_empty": (), "table_cell": ("cell",), "layout_kind": ("content",),
+            "format": ("span",)}
 assert set(ARG_ROLES) == set(REQUIRED) == set(runners.TYPES) == set(vocab.READS) == set(vocab.FAMILIES)
 
 
@@ -219,6 +221,20 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
                 if set(settings) != {"kind"}:
                     raise ValueError(f"{where}: layout_kind's settings are exactly {{kind}}")
                 return runners.LayoutKind(_arg(where, "content", args["content"]), settings["kind"])
+            case "format":
+                if set(settings) not in ({"marks"}, {"absent"}):
+                    raise ValueError(
+                        f"{where}: format's settings are exactly {{marks}} (what the span carries) or "
+                        f"{{absent}} (what it must not carry), a list of {runners.marks.KINDS}, not "
+                        f"{sorted(settings)}")
+                (key, kinds), = settings.items()
+                if not (isinstance(kinds, list) and kinds and all(isinstance(k, str) for k in kinds)):
+                    raise ValueError(
+                        f"{where}: format's {key} is a non-empty list of marks, not {kinds!r:.80}")
+                return runners.Format(*(text(r) if r in args else None for r in ("before", "span", "after")),
+                                      diffs([r for r in ARG_ROLES["format"] if r in args]),
+                                      tuple(kinds) if key == "marks" else (),
+                                      tuple(kinds) if key == "absent" else ())
             case "table_cell":
                 _no(where, settings)
                 for r in args:

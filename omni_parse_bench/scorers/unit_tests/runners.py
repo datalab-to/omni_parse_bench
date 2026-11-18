@@ -19,7 +19,7 @@ from fuzzysearch.common import group_matches
 from fuzzysearch.levenshtein import find_near_matches_levenshtein
 from rapidfuzz import fuzz
 
-from omni_parse_bench import normalize, tables, views
+from omni_parse_bench import marks, normalize, tables, views
 from omni_parse_bench.scorers.unit_tests import hyphenation
 
 # Note: a ratio test (table_cell, or present's first pass) allowing k edits in an n-character string
@@ -404,6 +404,30 @@ def holder(place: Sequence[Box], blocks: Sequence[Block]) -> Block | None:
     return best
 
 
+# --------------------------------------------------------------------------- format
+
+
+class Format(NamedTuple):
+    # Note: before and after are context only, None when the test gives none; max_diffs counts edits in the
+    # whole context (before + span + after) after `marks.fold`, and the span is found exactly inside it; marks
+    # is what every letter of the span must carry (and the words around it must not), absent what no letter of
+    # it may.
+    before: str | None
+    span: str
+    after: str | None
+    max_diffs: int
+    marks: tuple[str, ...]
+    absent: tuple[str, ...]
+
+
+def format_mark(p: Format, v: views.Html) -> Mark:
+    """Whether the span carries the marks the page prints on it (`marks`), and not the words around it, or
+    none of the marks in `absent`. Reads the output's markup (`marks.read`), never the text view. See
+    docs/scoring/format.md."""
+    return marks.check(marks.read(v.html), p.before or "", p.span, p.after or "", p.marks, p.absent,
+                       p.max_diffs)
+
+
 # --------------------------------------------------------------------------- registry
 
 Runner = Callable[[Any, Any], Mark]
@@ -415,6 +439,7 @@ TYPES: dict[str, tuple[type, Runner]] = {
     "page_near_empty": (PageNearEmpty, page_near_empty),
     "table_cell": (TableCell, table_cell),
     "layout_kind": (LayoutKind, layout_kind),
+    "format": (Format, format_mark),
 }
 
 
@@ -424,6 +449,17 @@ VALID: dict[str, tuple[Callable[[Any], bool], str]] = {
                 "a number must read as one number, e.g. 1,240.00 or -4.8%"),
     "repeat": (lambda t: t.expected_count > 0, "expected_count must be a positive whole number"),
     "page_near_empty": (lambda t: t.max_chars >= 0, "max_chars must be a whole number, 0 or more"),
+    "format": (lambda t: bool(marks.fold(t.span)) and bool(t.marks) != bool(t.absent)
+               and len(set(t.marks)) == len(t.marks) and len(set(t.absent)) == len(t.absent)
+               and not (set(t.marks) | set(t.absent)) - set(marks.KINDS)
+               and not {"sup", "sub"} <= set(t.marks)
+               and (len(marks.fold(t.span)) >= 3 or bool(marks.fold((t.before or "") + (t.after or ""))))
+               and t.max_diffs <= min(marks.MAX_DIFFS,
+                                      len(marks.fold((t.before or "") + t.span + (t.after or ""))) // 5),
+               f"the span needs a letter, and exactly one of marks and absent, distinct kinds of "
+               f"{marks.KINDS} "
+               "(a span is not both superscript and subscript); a span under 3 characters needs a context; "
+               f"max_diffs is at most {marks.MAX_DIFFS} and a fifth of the context's characters"),
     "layout_kind": (lambda t: bool(t.content.place) and t.kind in views.LABELS,
                     f"its content needs a place, and its kind must be one of {views.LABELS}"),
 }

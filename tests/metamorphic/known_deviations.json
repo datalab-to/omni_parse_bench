@@ -142,5 +142,16 @@
     "how_common": "62 of the 5,386 real table_cell tests carry a max_diffs of 1 or more (counted when the dataset is set); the others have no edit to spend",
     "who_is_affected": "table_cell tests with max_diffs 1 or more: a cell with extra or missing letters can pass with more edits than the test allows",
     "enumerated_over_real_tests": false
+  },
+  "M57b": {
+    "status": "known limitation",
+    "description": "A format test folds each run of marked text on its own, so a character form that spans two runs is read as written when a mark boundary falls inside it: a combining accent that the output marks differently from its base letter does not join it, and two apostrophes or an arrow written in two characters are not folded into the one character a text test would read.",
+    "counterexample": "the page '<p>the <b>cafe</b>́ near</p>' fails a bold test for 'café' with context 'the ' and ' near': the run 'cafe' and the lone accent fold apart; likewise '<b>a</b>-<b>></b>' is not read as the arrow '->'",
+    "why_this_status": "omni_parse_bench/marks.py says so: 'A run is folded as a whole'. Folding the whole text first would need an offset map through the fold (`fold` keeps no such map for the format reader), and a character form next to a mark boundary is rare in an output.",
+    "effect_on_scores": "unknown",
+    "effect_basis": "not measured: this package holds no system outputs, and the format tests of the published dataset do not exist yet",
+    "how_common": "not measured: counting it needs system outputs with a mark boundary inside an accented letter",
+    "who_is_affected": "an output that marks part of a multi-character form (a base letter and its combining accent, two quotes, an arrow) outside the mark",
+    "enumerated_over_real_tests": false
   }
 }
