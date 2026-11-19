@@ -12,8 +12,8 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 
 | parser | weights | parameters | headline | USD / 1,000 pages | text | tables | layout | refusals |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Gemini 4 Argon † § | closed |  | 95.8 | $49.91 ‡ | 93.9 | 97.0 | 96.4 | 8 |
-| Gemini 4 Carbon † § | closed |  | 95.6 | $58.66 ‡ | 94.1 | 97.0 | 95.6 | 5 |
+| Gemini 4 Argon † | closed |  | 96.0 | $49.88 ‡ | 94.4 | 97.1 | 96.4 | 12 |
+| Gemini 4 Carbon † | closed |  | 95.7 | $58.73 ‡ | 94.7 | 97.1 | 95.2 | 5 |
 | Datalab accurate | closed |  | 94.4 | $7.50 | 92.5 | 94.5 | 96.0 | — |
 | Datalab balanced | closed |  | 92.9 | $3.00 | 90.7 | 91.7 | 96.2 | — |
 | Gemini 3.8 Flash * | closed |  | 92.5 | ≈$37.08 | 92.0 | 95.3 | 90.3 | 8 |
@@ -61,7 +61,7 @@ Scores use omni-parse-bench 1.7.0, regraded from each system's saved predictions
 
 Gemini 3.8 Flash's and GPT-5.6 Sol's layout scores come from a separate run that asked each model for blocks; for Gemini 3.8 Flash, five pages missing from that run were asked again. The blocks behind their earlier layout scores were not kept, so those scores could not be reproduced.
 
-† Gemini 4 results use the shared `bbox` reader alias and one rerun of all originally failed pages; original successful pages are unchanged. Other rows have not been rerun with this reader. See [the run notes](docs/gemini4-2026-11-10.md).
+† Gemini 4 results combine one full pass with one rerun of every page that pass failed, made with the reader that accepts `bbox` (omni-parse-bench 1.6.0 and later); the full pass's other pages are unchanged. Carbon also has four pages that hit the output-token limit. See [the run notes](docs/gemini4-2026-11-10.md) for the first measurement.
 
 ‡ Gemini 4 costs include the original full pass **and** all failed-page reruns, divided by 2,937 pages; separate validation probes are excluded. These cumulative experiment costs are not fresh single-pass prices.
 
