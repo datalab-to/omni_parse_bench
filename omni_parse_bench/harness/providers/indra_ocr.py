@@ -14,7 +14,7 @@ from ..adapter import Served
 SUPPORTS = frozenset({"html", "blocks"})
 # Note: the package names its models (a tag of datalab-to/indra-ocr), so its version decides them; the
 # server's answer says which it loaded.
-PACKAGE = "indra-ocr==0.3.2"
+PACKAGE = "indra-ocr==1.1.2"
 # Indra OCR's block classes (its order_post.BLOCK_CLASSES, chandra's labels) onto views.LABELS.
 LABELS = {
     "Text": "text", "Table-Of-Contents": "text", "Section-Header": "heading", "Page-Header": "page_furniture",
@@ -28,7 +28,7 @@ class IndraOcr(Served):
     """Where the Indra OCR server (serve/indra-ocr/) answers, and how its Converter reads a page (the
     package's defaults, but math read as LaTeX and headers and footers kept).
 
-    Run as the `indra-ocr` package (0.3.2) runs it with its `indra-ocr` command, with the models it names.
+    Run as the `indra-ocr` package (1.1.2) runs it with its `indra-ocr` command, with the models it names.
     Steps 1 to 4 run on the server (serve/indra-ocr/server.py); step 5 runs here, with no vendor code.
 
     How a page is processed:
@@ -67,7 +67,7 @@ class IndraOcr(Served):
     base_url: str = "http://127.0.0.1:8001"
     served: dict[str, Any] = dataclasses.field(
         default_factory=lambda: {"weights": "datalab-to/indra-ocr",
-                                 "revision": "v3.1.1"},
+                                 "revision": "v1.1.0"},
         metadata={"help": "the weights its server serves and their revision; by default its package's"})
     mode: str = dataclasses.field(default="auto", metadata={
         "help": "auto reads a PDF's text layer where it passes the checks and OCRs elsewhere; ocr never "
