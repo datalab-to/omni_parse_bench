@@ -44,7 +44,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | Unlimited-OCR | open | 3.3B | 79.5 | — | 70.7 | 76.6 | 91.1 | — |
 | Infinity-Parser2-Flash | open | 2.2B | 78.7 | — | 78.8 | 66.8 | 90.4 | — |
 | DeepSeek-OCR-2 | open | 3.4B | 75.4 | — | 64.6 | 70.2 | 91.4 | — |
-| Indra OCR (Datalab) § | open | about 12M | 69.5 | — | 60.3 | 58.1 | 90.1 | — |
+| Indra OCR (Datalab) | open | about 12M | 71.4 | — | 62.5 | 59.6 | 92.0 | — |
 | HunyuanOCR-1.5 | open | 1.0B | 68.8 | — | 62.3 | 62.6 | 81.4 | — |
 | OvisOCR2 | open | 0.85B | none | — | 74.2 | 79.9 | unsupported | — |
 | Xiaomi-OCR-0 | open | 0.87B | none | — | 73.7 | 90.6 | unsupported | — |
