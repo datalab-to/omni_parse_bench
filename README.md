@@ -12,48 +12,54 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 
 | parser | weights | parameters | headline | USD / 1,000 pages | text | tables | layout | refusals |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Gemini 4 Argon † | closed |  | 95.8 | $49.91 ‡ | 93.9 | 97.0 | 96.4 | 8 |
-| Gemini 4 Carbon † | closed |  | 95.6 | $58.66 ‡ | 94.1 | 97.0 | 95.6 | 5 |
-| Datalab accurate | closed |  | 94.1 | $7.50 | 92.0 | 94.2 | 96.0 | — |
-| Gemini 3.8 Flash * | closed |  | 92.9 | ≈$37.08 | 91.3 | 95.2 | 92.2 | 8 |
-| Datalab balanced | closed |  | 92.6 | $3.00 | 90.1 | 91.6 | 96.2 | — |
-| GPT-6.1 Sol | closed |  | 91.5 | $30.95 | 89.8 | 95.6 | 89.1 | 17 |
-| Reducto | closed |  | 90.8 | $10.00 | 85.4 | 91.2 | 95.8 | — |
-| LlamaParse | closed |  | 90.4 | ≈$56.25 | 88.2 | 92.6 | 90.4 | — |
-| chandra-ocr-2 (Datalab) | open | 4.5B | 90.1 | — | 87.4 | 87.4 | 95.4 | — |
-| Claude Opus 5.5 * | closed |  | 90.0 | $68.45 | 93.9 | 93.4 | 82.6 | 40 |
-| Mistral OCR | closed |  | 89.5 | $4.00 | 82.8 | 91.9 | 93.8 | — |
-| Claude Sonnet 5.5 * | closed |  | 88.7 | ≈$34.30 | 93.1 | 95.4 | 77.5 | 7 |
-| dots.mocr | open | 3.0B | 87.9 | — | 82.5 | 88.6 | 92.5 | — |
-| GPT-5.6 Sol | closed |  | 87.8 | ≈$94.49 | 85.4 | 91.6 | 86.5 | 17 |
-| MinerU2.5-Pro | open | 1.2B | 87.1 | — | 77.4 | 92.1 | 91.7 | — |
-| Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.0 | — | 83.3 | 84.1 | 93.5 | — |
-| Surya OCR 2.5 (Datalab) | open | 0.69B | 85.9 | — | 83.8 | 78.3 | 95.7 | — |
-| OXR-1.0 | open | 1.4B | 85.3 | — | 76.4 | 88.2 | 91.4 | — |
-| OvisOCR3 | open | 0.85B | 84.2 | — | 77.5 | 84.3 | 90.6 | — |
-| Extend | closed |  | 83.3 | ≈$33.75 | 64.1 | 92.5 | 93.4 | — |
-| MiniCPM-OCR-1.0 | open | 1.3B | 83.2 | — | 72.8 | 89.1 | 87.6 | — |
-| Surya OCR 2 (Datalab) | open | 0.67B | 83.1 | — | 80.6 | 74.3 | 94.3 | — |
-| Azure | closed |  | 83.0 | $5.00 | 74.6 | 81.7 | 92.8 | — |
-| LightOnOCR-3-4B | open | 4.5B | 82.9 | — | 83.9 | 70.8 | 94.0 | — |
-| LightOnOCR-3-0.8B | open | 0.85B | 81.6 | — | 81.1 | 72.1 | 91.7 | — |
-| GLM-OCR | open | 1.3B | 81.5 | — | 71.0 | 84.2 | 89.3 | — |
-| Unlimited-OCR 2 | open | 3.3B | 81.2 | — | 72.4 | 79.7 | 91.6 | — |
-| Nemotron 3.5 Parse | open | 0.63B | 80.0 | — | 72.4 | 77.3 | 90.2 | — |
-| Unlimited-OCR | open | 3.3B | 79.3 | — | 70.2 | 76.5 | 91.1 | — |
-| PaddleOCR-VL-1.6 | open | 0.96B | 78.7 | — | 61.7 | 83.7 | 90.7 | — |
-| Infinity-Parser2-Flash | open | 2.2B | 78.4 | — | 78.4 | 66.5 | 90.4 | — |
-| DeepSeek-OCR-2 | open | 3.4B | 75.2 | — | 64.2 | 70.0 | 91.4 | — |
-| Indra OCR (Datalab) | open | about 12M | 69.5 | — | 60.3 | 58.1 | 90.1 | — |
-| HunyuanOCR-1.5 | open | 1.0B | 64.6 | — | 50.5 | 61.9 | 81.4 | — |
-| OvisOCR2 | open | 0.85B | none | — | 73.7 | 79.6 | unsupported | — |
-| OvisOCR | open | 1.4B | none | — | 71.8 | 77.9 | unsupported | — |
-| Xiaomi-OCR-0 | open | 0.87B | none | — | 73.3 | 90.4 | unsupported | — |
-| olmOCR-2 | open | 8.3B | none | — | 71.3 | 56.6 | unsupported | — |
-| Nanonets-OCR2-3B | open | 3.8B | none | — | 68.2 | 62.6 | unsupported | — |
-| Tesseract | open | n/a | none | — | 17.6 | 0.0 | unsupported | — |
+| Gemini 4 Argon † § | closed |  | 95.8 | $49.91 ‡ | 93.9 | 97.0 | 96.4 | 8 |
+| Gemini 4 Carbon † § | closed |  | 95.6 | $58.66 ‡ | 94.1 | 97.0 | 95.6 | 5 |
+| Datalab accurate | closed |  | 94.4 | $7.50 | 92.5 | 94.5 | 96.0 | — |
+| Datalab balanced | closed |  | 92.9 | $3.00 | 90.7 | 91.7 | 96.2 | — |
+| Gemini 3.8 Flash * | closed |  | 92.5 | ≈$37.08 | 92.0 | 95.3 | 90.3 | 8 |
+| GPT-6.1 Sol § | closed |  | 91.5 | $30.95 | 89.8 | 95.6 | 89.1 | 17 |
+| Reducto | closed |  | 91.1 | $10.00 | 86.0 | 91.4 | 95.8 | — |
+| LlamaParse | closed |  | 90.8 | ≈$56.25 | 89.4 | 92.9 | 90.0 | — |
+| chandra-ocr-2 (Datalab) | open | 4.5B | 90.4 | — | 87.9 | 88.0 | 95.4 | — |
+| Claude Opus 5.5 * § | closed |  | 90.0 | $68.45 | 93.9 | 93.4 | 82.6 | 40 |
+| Mistral OCR | closed |  | 89.9 | $4.00 | 83.6 | 92.2 | 93.8 | — |
+| Claude Sonnet 5.5 * | closed |  | 88.9 | ≈$34.30 | 93.7 | 95.5 | 77.5 | 7 |
+| dots.mocr | open | 3.0B | 88.2 | — | 83.1 | 89.0 | 92.5 | — |
+| GPT-5.6 Sol | closed |  | 87.9 | ≈$94.49 | 86.0 | 91.9 | 85.9 | 17 |
+| MinerU2.5-Pro | open | 1.2B | 87.4 | — | 78.0 | 92.5 | 91.7 | — |
+| Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.4 | — | 83.9 | 84.6 | 93.5 | — |
+| Surya OCR 2.5 (Datalab) | open | 0.69B | 86.3 | — | 84.3 | 78.8 | 95.8 | — |
+| OXR-1.0 | open | 1.4B | 85.6 | — | 77.0 | 88.3 | 91.4 | — |
+| OvisOCR3 | open | 0.85B | 84.5 | — | 78.2 | 84.7 | 90.6 | — |
+| MiniCPM-OCR-1.0 | open | 1.3B | 83.5 | — | 73.4 | 89.5 | 87.6 | — |
+| Extend | closed |  | 83.4 | ≈$33.75 | 64.2 | 92.7 | 93.4 | — |
+| Azure | closed |  | 83.4 | $5.00 | 75.2 | 82.3 | 92.8 | — |
+| Surya OCR 2 (Datalab) | open | 0.67B | 83.3 | — | 81.2 | 74.6 | 94.3 | — |
+| LightOnOCR-3-4B | open | 4.5B | 83.1 | — | 84.4 | 70.9 | 94.0 | — |
+| LightOnOCR-3-0.8B | open | 0.85B | 81.9 | — | 81.7 | 72.2 | 91.7 | — |
+| GLM-OCR | open | 1.3B | 81.9 | — | 71.6 | 84.7 | 89.3 | — |
+| Unlimited-OCR 2 | open | 3.3B | 81.5 | — | 73.0 | 80.0 | 91.6 | — |
+| PaddleOCR-VL-1.6 | open | 0.96B | 81.3 | — | 69.2 | 84.0 | 90.7 | — |
+| Nemotron 3.5 Parse | open | 0.63B | 79.9 | — | 72.6 | 77.1 | 90.0 | — |
+| Unlimited-OCR | open | 3.3B | 79.5 | — | 70.7 | 76.6 | 91.1 | — |
+| Infinity-Parser2-Flash | open | 2.2B | 78.7 | — | 78.8 | 66.8 | 90.4 | — |
+| DeepSeek-OCR-2 | open | 3.4B | 75.4 | — | 64.6 | 70.2 | 91.4 | — |
+| Indra OCR (Datalab) § | open | about 12M | 69.5 | — | 60.3 | 58.1 | 90.1 | — |
+| HunyuanOCR-1.5 | open | 1.0B | 68.8 | — | 62.3 | 62.6 | 81.4 | — |
+| OvisOCR2 | open | 0.85B | none | — | 74.2 | 79.9 | unsupported | — |
+| Xiaomi-OCR-0 | open | 0.87B | none | — | 73.7 | 90.6 | unsupported | — |
+| OvisOCR | open | 1.4B | none | — | 72.2 | 78.2 | unsupported | — |
+| olmOCR-2 | open | 8.3B | none | — | 71.8 | 56.6 | unsupported | — |
+| Nanonets-OCR2-3B | open | 3.8B | none | — | 69.0 | 62.6 | unsupported | — |
+| Tesseract | open | n/a | none | — | 17.7 | 0.0 | unsupported | — |
+
+Scores use omni-parse-bench 1.7.0, regraded from each system's saved predictions with no new model calls, except rows marked §.
 
 \* Used in creating and verifying at least some tests.
+
+§ Not yet regraded with 1.7.0: these rows keep the scores they were published with (omni-parse-bench 1.5.0).
+
+Gemini 3.8 Flash's and GPT-5.6 Sol's layout scores come from a separate run that asked each model for blocks; for Gemini 3.8 Flash, five pages missing from that run were asked again. The blocks behind their earlier layout scores were not kept, so those scores could not be reproduced.
 
 † Gemini 4 results use the shared `bbox` reader alias and one rerun of all originally failed pages; original successful pages are unchanged. Other rows have not been rerun with this reader. See [the run notes](docs/gemini4-2026-11-10.md).
 
