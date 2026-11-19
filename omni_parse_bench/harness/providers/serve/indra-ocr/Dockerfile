@@ -14,7 +14,7 @@
 FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1
 
 RUN pip install --no-cache-dir numpy==2.5.4 opencv-python-headless==5.0.0.93 onnxruntime==1.31.0 \
-        pypdfium2==5.14.0 huggingface_hub==2.2.0 indra-ocr==0.3.2
+        pypdfium2==5.14.0 huggingface_hub==2.2.0 indra-ocr==1.1.2
 
 ENV PORT=8001
 COPY server.py start.sh /srv/
