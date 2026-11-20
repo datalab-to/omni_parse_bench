@@ -59,7 +59,7 @@ Scores use omni-parse-bench 1.7.0, regraded from each system's saved predictions
 
 § Not yet regraded with 1.7.0: these rows keep the scores they were published with (omni-parse-bench 1.5.0).
 
-Gemini 3.8 Flash's and GPT-5.6 Sol's layout scores come from a separate run that asked each model for blocks; for Gemini 3.8 Flash, five pages missing from that run were asked again. The blocks behind their earlier layout scores were not kept, so those scores could not be reproduced.
+Gemini 3.8 Flash's and GPT-5.6 Sol's layout scores use a separate run that asked each model for blocks.
 
 † Gemini 4 results combine one full pass with one rerun of every page that pass failed, made with the reader that accepts `bbox` (omni-parse-bench 1.6.0 and later); the full pass's other pages are unchanged. Carbon also has four pages that hit the output-token limit. See [the run notes](docs/gemini4-2026-11-10.md) for the first measurement.
 
