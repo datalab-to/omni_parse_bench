@@ -19,7 +19,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | Gemini 3.8 Flash * | closed |  | 92.5 | ≈$37.08 | 92.0 | 95.3 | 90.3 | 4 |
 | GPT-6.1 Sol § | closed |  | 91.5 | $30.95 | 89.8 | 95.6 | 89.1 | 17 |
 | Reducto | closed |  | 91.1 | $10.00 | 86.0 | 91.4 | 95.8 | — |
-| LlamaParse | closed |  | 90.8 | ≈$56.25 | 89.4 | 92.9 | 90.0 | — |
+| LlamaParse | closed |  | 90.8 | ≈$31.25 | 89.4 | 92.9 | 90.0 | — |
 | chandra-ocr-2 (Datalab) | open | 4.5B | 90.4 | — | 87.9 | 88.0 | 95.4 | — |
 | Claude Opus 5.5 * § | closed |  | 90.0 | $68.45 | 93.9 | 93.4 | 82.6 | 40 |
 | Mistral OCR | closed |  | 89.9 | $4.00 | 83.6 | 92.2 | 93.8 | — |
