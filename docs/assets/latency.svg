@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="497" viewBox="0 0 760 497" font-size="15" role="img" aria-label="Headline against latency with historical HTML-call times and separately marked full-page LLM times">
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="497" viewBox="0 0 760 497" font-size="15" role="img" aria-label="Headline against latency">
 <style>@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap');
 /* Datalab design system -- tokens from svelte/src/styles/datalab-system.css, converted from
    oklch to hex so the figures render identically outside a browser. The system is light-only;
@@ -7,63 +7,56 @@
 text{font-family:Geist,ui-sans-serif,system-ui,sans-serif;fill:#0f1217}
 .h2{font-weight:500;font-size:18px;letter-spacing:-.09px;font-feature-settings:"ss01" 1}
 .cap{font-size:13px;fill:#595e66}
-.hd{font-size:11.5px;font-weight:500;fill:#595e66;letter-spacing:.35px;text-transform:uppercase}
 .nm{font-family:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px;fill:#3a3d44}
 .num{font-family:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;fill:#3a3d44;
   font-feature-settings:"tnum" 1}
 .halo{paint-order:stroke;stroke:#f9fafd;stroke-width:5px;stroke-linejoin:round}
-.cell{font-family:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;font-size:10px;
-  font-feature-settings:"tnum" 1;text-anchor:middle}
 </style>
 <rect width="760" height="497" fill="#f9fafd" />
-<text class="h2" x="24" y="38" text-anchor="start">Headline against latency</text>
-<text class="cap" x="24" y="60" text-anchor="start">Median seconds per page</text>
+<text class="h2" x="24" y="38">Headline against latency</text>
+<text class="cap" x="24" y="60">Median seconds per page</text>
 <line x1="64" x2="610" y1="412.0" y2="412.0" stroke="#e9ebf0" />
-<text class="num" x="56" y="416" text-anchor="end">80</text>
-<line x1="64" x2="610" y1="305.3" y2="305.3" stroke="#e9ebf0" />
-<text class="num" x="56" y="309.333" text-anchor="end">85</text>
-<line x1="64" x2="610" y1="198.7" y2="198.7" stroke="#e9ebf0" />
-<text class="num" x="56" y="202.667" text-anchor="end">90</text>
+<text class="num" x="56" y="416.0" text-anchor="end">80</text>
+<line x1="64" x2="610" y1="332.0" y2="332.0" stroke="#e9ebf0" />
+<text class="num" x="56" y="336.0" text-anchor="end">85</text>
+<line x1="64" x2="610" y1="252.0" y2="252.0" stroke="#e9ebf0" />
+<text class="num" x="56" y="256.0" text-anchor="end">90</text>
+<line x1="64" x2="610" y1="172.0" y2="172.0" stroke="#e9ebf0" />
+<text class="num" x="56" y="176.0" text-anchor="end">95</text>
 <line x1="64" x2="610" y1="92.0" y2="92.0" stroke="#e9ebf0" />
-<text class="num" x="56" y="96" text-anchor="end">95</text>
+<text class="num" x="56" y="96.0" text-anchor="end">100</text>
 <line x1="64.0" x2="64.0" y1="92" y2="412" stroke="#e9ebf0" />
-<text class="num" x="64" y="430" text-anchor="middle">0</text>
+<text class="num" x="64.0" y="430" text-anchor="middle">0</text>
 <line x1="142.0" x2="142.0" y1="92" y2="412" stroke="#e9ebf0" />
-<text class="num" x="142" y="430" text-anchor="middle">5</text>
+<text class="num" x="142.0" y="430" text-anchor="middle">5</text>
 <line x1="220.0" x2="220.0" y1="92" y2="412" stroke="#e9ebf0" />
-<text class="num" x="220" y="430" text-anchor="middle">10</text>
+<text class="num" x="220.0" y="430" text-anchor="middle">10</text>
 <line x1="298.0" x2="298.0" y1="92" y2="412" stroke="#e9ebf0" />
-<text class="num" x="298" y="430" text-anchor="middle">15</text>
+<text class="num" x="298.0" y="430" text-anchor="middle">15</text>
 <line x1="376.0" x2="376.0" y1="92" y2="412" stroke="#e9ebf0" />
-<text class="num" x="376" y="430" text-anchor="middle">20</text>
+<text class="num" x="376.0" y="430" text-anchor="middle">20</text>
 <line x1="454.0" x2="454.0" y1="92" y2="412" stroke="#e9ebf0" />
-<text class="num" x="454" y="430" text-anchor="middle">25</text>
+<text class="num" x="454.0" y="430" text-anchor="middle">25</text>
 <line x1="532.0" x2="532.0" y1="92" y2="412" stroke="#e9ebf0" />
-<text class="num" x="532" y="430" text-anchor="middle">30</text>
+<text class="num" x="532.0" y="430" text-anchor="middle">30</text>
 <line x1="610.0" x2="610.0" y1="92" y2="412" stroke="#e9ebf0" />
-<text class="num" x="610" y="430" text-anchor="middle">35</text>
+<text class="num" x="610.0" y="430" text-anchor="middle">35</text>
 <text class="cap" x="337" y="452" text-anchor="middle">median seconds per page</text>
 <text class="cap" transform="translate(20 252) rotate(-90)" text-anchor="middle">headline</text>
-<polyline points="101.4,347.1 109.2,347.1 109.2,208.9 157.6,208.9 157.6,181.8 214.5,181.8 214.5,142.4 294.1,142.4 294.1,111.8 610.0,111.8" fill="none" stroke="#595e66" stroke-width="1.5" stroke-dasharray="4 3" />
-<circle cx="393.2" cy="136.911" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" />
-<text class="cap halo" x="402.16" y="140.911" text-anchor="start" style="fill:#9a9fa7">Gemini 3.8 Flash*</text>
-<circle cx="294.1" cy="111.8" r="5" fill="#001dbe" />
-<text class="nm halo" x="285.1" y="115.768" text-anchor="end" style="fill:#001dbe">Datalab accurate</text>
-<circle cx="214.5" cy="142.4" r="5" fill="#001dbe" />
-<text class="nm halo" x="223.54" y="146.428" text-anchor="start" style="fill:#001dbe">Datalab balanced</text>
-<circle cx="157.6" cy="181.8" r="5" fill="#3a3d44" />
-<text class="nm halo" x="166.6" y="185.757" text-anchor="start">Reducto</text>
-<circle cx="578.0" cy="190.2" r="5" fill="#3a3d44" />
-<text class="nm halo" x="587.02" y="194.245" text-anchor="start">LlamaParse</text>
-<circle cx="109.2" cy="208.9" r="5" fill="#3a3d44" />
-<text class="nm halo" x="118.24" y="212.934" text-anchor="start">Mistral OCR</text>
-<circle cx="254.3" cy="226.949" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" />
-<text class="cap halo" x="263.32" y="230.949" text-anchor="start" style="fill:#9a9fa7">Claude Sonnet 5.5*</text>
-<circle cx="519.5" cy="244.907" r="5" fill="#3a3d44" />
-<text class="nm halo" x="528.52" y="248.907" text-anchor="start">GPT-5.6 Sol</text>
-<circle cx="262.1" cy="340.7" r="5" fill="#3a3d44" />
-<text class="nm halo" x="271.12" y="344.694" text-anchor="start">Extend</text>
-<circle cx="101.4" cy="347.1" r="5" fill="#3a3d44" />
-<text class="nm halo" x="110.44" y="351.141" text-anchor="start">Azure</text>
-<text class="cap" x="24" y="486" text-anchor="start">* Used in creating and verifying at least some tests.</text>
-<g data-model="GPT-6.1 Sol" data-latency-median="18.5" data-headline="91.5008" data-timing="full-page"><title>GPT-6.1 Sol: headline 91.50, full-page median 18.5s (HTML plus layout when requested; includes failures and retries)</title><circle cx="352.600" cy="166.650" r="5" fill="#3a3d44" /><text class="nm halo" x="361.600" y="160.650">GPT-6.1 Sol</text></g><g data-model="Claude Opus 5.5" data-latency-median="18.5" data-headline="90.0049" data-timing="full-page"><title>Claude Opus 5.5: headline 90.00, full-page median 18.5s (HTML plus layout when requested; includes failures and retries)</title><circle cx="352.600" cy="198.562" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" /><text class="cap halo" x="361.600" y="211.562" style="fill:#9a9fa7">Claude Opus 5.5*</text></g></svg>
+<polyline points="101.4,357.0 109.2,357.0 109.2,253.9 157.6,253.9 157.6,234.6 214.5,234.6 214.5,206.1 294.1,206.1 294.1,182.4 427.5,182.4 427.5,156.2 610.0,156.2" fill="none" stroke="#595e66" stroke-width="1.5" stroke-dasharray="4 3" />
+<g data-model="Gemini 4 Argon" data-headline="95.99"><title>Gemini 4 Argon: headline 95.99</title><circle cx="427.5" cy="156.2" r="5" fill="#3a3d44" /><text class="nm halo" x="418.5" y="160.2" text-anchor="end">Gemini 4 Argon</text></g>
+<g data-model="Gemini 4 Carbon" data-headline="95.67"><title>Gemini 4 Carbon: headline 95.67</title><circle cx="514.8" cy="161.3" r="5" fill="#3a3d44" /><text class="nm halo" x="523.8" y="177.3" text-anchor="start">Gemini 4 Carbon</text></g>
+<g data-model="Datalab accurate" data-headline="94.35"><title>Datalab accurate: headline 94.35</title><circle cx="294.1" cy="182.4" r="5" fill="#001dbe" /><text class="nm halo" x="285.1" y="186.4" text-anchor="end" style="fill:#001dbe">Datalab accurate</text></g>
+<g data-model="Datalab balanced" data-headline="92.87"><title>Datalab balanced: headline 92.87</title><circle cx="214.5" cy="206.1" r="5" fill="#001dbe" /><text class="nm halo" x="205.5" y="210.1" text-anchor="end" style="fill:#001dbe">Datalab balanced</text></g>
+<g data-model="Gemini 3.8 Flash" data-headline="92.54"><title>Gemini 3.8 Flash: headline 92.54</title><circle cx="393.2" cy="211.4" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" /><text class="cap halo" x="402.2" y="215.4" text-anchor="start" style="fill:#9a9fa7">Gemini 3.8 Flash*</text></g>
+<g data-model="GPT-6.1 Sol" data-headline="91.5"><title>GPT-6.1 Sol: headline 91.50</title><circle cx="352.6" cy="228.0" r="5" fill="#3a3d44" /><text class="nm halo" x="361.6" y="232.0" text-anchor="start">GPT-6.1 Sol</text></g>
+<g data-model="Reducto" data-headline="91.09"><title>Reducto: headline 91.09</title><circle cx="157.6" cy="234.6" r="5" fill="#3a3d44" /><text class="nm halo" x="148.6" y="238.6" text-anchor="end">Reducto</text></g>
+<g data-model="LlamaParse" data-headline="90.77"><title>LlamaParse: headline 90.77</title><circle cx="578.0" cy="239.7" r="5" fill="#3a3d44" /><text class="nm halo" x="587.0" y="243.7" text-anchor="start">LlamaParse</text></g>
+<g data-model="Claude Opus 5.5" data-headline="90.0"><title>Claude Opus 5.5: headline 90.00</title><circle cx="352.6" cy="252.0" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" /><text class="cap halo" x="361.6" y="256.0" text-anchor="start" style="fill:#9a9fa7">Claude Opus 5.5*</text></g>
+<g data-model="Mistral OCR" data-headline="89.88"><title>Mistral OCR: headline 89.88</title><circle cx="109.2" cy="253.9" r="5" fill="#3a3d44" /><text class="nm halo" x="118.2" y="269.9" text-anchor="start">Mistral OCR</text></g>
+<g data-model="Claude Sonnet 5.5" data-headline="88.89"><title>Claude Sonnet 5.5: headline 88.89</title><circle cx="254.3" cy="269.8" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" /><text class="cap halo" x="263.3" y="273.8" text-anchor="start" style="fill:#9a9fa7">Claude Sonnet 5.5*</text></g>
+<g data-model="GPT-5.6 Sol" data-headline="87.89"><title>GPT-5.6 Sol: headline 87.89</title><circle cx="519.5" cy="285.8" r="5" fill="#3a3d44" /><text class="nm halo" x="528.5" y="289.8" text-anchor="start">GPT-5.6 Sol</text></g>
+<g data-model="Extend" data-headline="83.44"><title>Extend: headline 83.44</title><circle cx="262.1" cy="357.0" r="5" fill="#3a3d44" /><text class="nm halo" x="271.1" y="361.0" text-anchor="start">Extend</text></g>
+<g data-model="Azure" data-headline="83.44"><title>Azure: headline 83.44</title><circle cx="101.4" cy="357.0" r="5" fill="#3a3d44" /><text class="nm halo" x="110.4" y="373.0" text-anchor="start">Azure</text></g>
+<text class="cap" x="24" y="486">* Used in creating and verifying at least some tests.</text>
+</svg>
