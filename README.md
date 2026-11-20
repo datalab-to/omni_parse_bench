@@ -361,7 +361,7 @@ opb predict --system datalab --page pages/<page_id>.pdf --options '{"mode": "acc
 
 ![Headline against latency](docs/assets/latency.svg)
 
-*Note*: Opus 5.5 and GPT-6.1 Sol use the full-page recorded wall time: HTML plus layout when requested,
+*Note*: Gemini 4, Opus 5.5 and GPT-6.1 Sol use the full-page recorded wall time: HTML plus layout when requested,
 including failed pages and retries, with 32 workers per model, while the other points retain the earlier median of
 successful, unretried HTML calls only. These timing definitions differ and are not directly comparable.
 
