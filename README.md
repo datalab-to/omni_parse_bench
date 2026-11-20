@@ -16,14 +16,14 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | Gemini 4 Carbon † | closed |  | 95.7 | $58.73 ‡ | 94.7 | 97.1 | 95.2 | 5 |
 | Datalab accurate | closed |  | 94.4 | $7.50 | 92.5 | 94.5 | 96.0 | — |
 | Datalab balanced | closed |  | 92.9 | $3.00 | 90.7 | 91.7 | 96.2 | — |
-| Gemini 3.8 Flash * | closed |  | 92.5 | ≈$37.08 | 92.0 | 95.3 | 90.3 | 8 |
+| Gemini 3.8 Flash * | closed |  | 92.5 | ≈$37.08 | 92.0 | 95.3 | 90.3 | 4 |
 | GPT-6.1 Sol § | closed |  | 91.5 | $30.95 | 89.8 | 95.6 | 89.1 | 17 |
 | Reducto | closed |  | 91.1 | $10.00 | 86.0 | 91.4 | 95.8 | — |
 | LlamaParse | closed |  | 90.8 | ≈$56.25 | 89.4 | 92.9 | 90.0 | — |
 | chandra-ocr-2 (Datalab) | open | 4.5B | 90.4 | — | 87.9 | 88.0 | 95.4 | — |
 | Claude Opus 5.5 * § | closed |  | 90.0 | $68.45 | 93.9 | 93.4 | 82.6 | 40 |
 | Mistral OCR | closed |  | 89.9 | $4.00 | 83.6 | 92.2 | 93.8 | — |
-| Claude Sonnet 5.5 * | closed |  | 88.9 | ≈$34.30 | 93.7 | 95.5 | 77.5 | 7 |
+| Claude Sonnet 5.5 * | closed |  | 88.9 | ≈$34.30 | 93.7 | 95.5 | 77.5 | 6 |
 | dots.mocr | open | 3.0B | 88.2 | — | 83.1 | 89.0 | 92.5 | — |
 | GPT-5.6 Sol | closed |  | 87.9 | ≈$94.49 | 86.0 | 91.9 | 85.9 | 17 |
 | MinerU2.5-Pro | open | 1.2B | 87.4 | — | 78.0 | 92.5 | 91.7 | — |
