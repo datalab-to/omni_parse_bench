@@ -41,11 +41,11 @@ text{font-family:Geist,ui-sans-serif,system-ui,sans-serif;fill:#0f1217}
 <text class="num" x="610.0" y="430" text-anchor="middle">100</text>
 <text class="cap" x="337" y="452" text-anchor="middle">dollars per 1,000 pages, log scale</text>
 <text class="cap" transform="translate(20 252) rotate(-90)" text-anchor="middle">headline</text>
-<polyline points="194.3,206.1 302.9,206.1 302.9,182.4 527.5,182.4 527.5,156.2 610.0,156.2" fill="none" stroke="#595e66" stroke-width="1.5" stroke-dasharray="4 3" />
+<polyline points="194.3,193.1 302.9,193.1 302.9,177.0 527.5,177.0 527.5,156.2 610.0,156.2" fill="none" stroke="#595e66" stroke-width="1.5" stroke-dasharray="4 3" />
 <g data-model="Gemini 4 Argon" data-headline="95.99"><title>Gemini 4 Argon: headline 95.99</title><circle cx="527.5" cy="156.2" r="5" fill="#3a3d44" /><text class="nm halo" x="518.5" y="160.2" text-anchor="end">Gemini 4 Argon</text></g>
 <g data-model="Gemini 4 Carbon" data-headline="95.67"><title>Gemini 4 Carbon: headline 95.67</title><circle cx="546.9" cy="161.3" r="5" fill="#3a3d44" /><text class="nm halo" x="555.9" y="177.3" text-anchor="start">Gemini 4 Carbon</text></g>
-<g data-model="Datalab accurate" data-headline="94.35"><title>Datalab accurate: headline 94.35</title><circle cx="302.9" cy="182.4" r="5" fill="#001dbe" /><text class="nm halo" x="293.9" y="186.4" text-anchor="end" style="fill:#001dbe">Datalab accurate</text></g>
-<g data-model="Datalab balanced" data-headline="92.87"><title>Datalab balanced: headline 92.87</title><circle cx="194.3" cy="206.1" r="5" fill="#001dbe" /><text class="nm halo" x="203.3" y="222.1" text-anchor="start" style="fill:#001dbe">Datalab balanced</text></g>
+<g data-model="Datalab accurate" data-headline="94.69"><title>Datalab accurate: headline 94.69</title><circle cx="302.9" cy="177.0" r="5" fill="#001dbe" /><text class="nm halo" x="293.9" y="181.0" text-anchor="end" style="fill:#001dbe">Datalab accurate</text></g>
+<g data-model="Datalab balanced" data-headline="93.68"><title>Datalab balanced: headline 93.68</title><circle cx="194.3" cy="193.1" r="5" fill="#001dbe" /><text class="nm halo" x="203.3" y="209.1" text-anchor="start" style="fill:#001dbe">Datalab balanced</text></g>
 <g data-model="Gemini 3.8 Flash" data-headline="92.54"><title>Gemini 3.8 Flash: headline 92.54</title><circle cx="492.4" cy="211.4" r="4.5" fill="#f9fafd" stroke="#9a9fa7" stroke-width="1.5" /><text class="cap halo" x="501.4" y="215.4" text-anchor="start" style="fill:#9a9fa7">Gemini 3.8 Flash*</text></g>
 <g data-model="GPT-6.1 Sol" data-headline="91.5"><title>GPT-6.1 Sol: headline 91.50</title><circle cx="471.0" cy="228.0" r="5" fill="#3a3d44" /><text class="nm halo" x="462.0" y="232.0" text-anchor="end">GPT-6.1 Sol</text></g>
 <g data-model="Reducto" data-headline="91.09"><title>Reducto: headline 91.09</title><circle cx="337.0" cy="234.6" r="5" fill="#3a3d44" /><text class="nm halo" x="328.0" y="238.6" text-anchor="end">Reducto</text></g>
