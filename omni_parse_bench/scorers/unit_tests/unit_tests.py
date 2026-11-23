@@ -110,9 +110,7 @@ def gold(page: data.Page) -> tuple[_tests.Test, ...]:
 
 def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
     """Every test of `pages`, each page's checked (`gold`), and what no single page can show: a test id used
-    twice, and a suite that mixes `format` tests with tests of the headline families (a suite's score pools
-    all its tests, so the two would be one number). It is what publishing a dataset checks; grading needs
-    none of it.
+    twice. It is what publishing a dataset checks; grading needs none of it.
 
     Note: a gold file no manifest names isn't refused, since a dataset may hold several manifests, each naming
     some of the gold files."""
@@ -121,13 +119,6 @@ def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
         raise ValueError(f"test ids used more than once, across the dataset: "
                          f"{errors.counted(len(twice), 'id')}, e.g. {twice[:3]}; each test's id is "
                          "unique in its dataset")
-    suite = {p.page_id: p.suite for p in pages}
-    families: dict[str, set[str]] = collections.defaultdict(set)
-    for t in every:
-        families[suite[t.page_id]].add(vocab.FAMILIES[t.test_type] in vocab.HEADLINE_FAMILIES)
-    if mixed := sorted(s for s, kinds in families.items() if len(kinds) > 1):
-        raise ValueError(f"suites with both format tests and headline tests: {mixed[:3]}; a suite's score "
-                         "pools its tests, so give the format tests a suite of their own")
     if empty := sorted({p.page_id for p in pages} - {t.page_id for t in every}):
         raise ValueError(f"pages with no tests: {errors.counted(len(empty), 'page')}, e.g. "
                          f"{empty[:3]}; remove them or give them tests")
@@ -148,7 +139,7 @@ def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.
 
 def summarize(lines: Iterable[Line]) -> dict[str, Any]:
     """Test lines (from `lines`) as one summary: `score`, the mean of the headline families' scores (text,
-    tables, layout; all the families present when none of them is), and `families`,
+    tables, layout; all families present when none of them is), and `families`,
     each family's `score` (the share of its tests passed), `tests`, `documents` and `effective_documents`;
     then `per_tag`, `per_suite`, `per_test_type`, `per_arg_kind` and `per_derivation`, each a slice's entries
     shaped as a family's. `score` is None when there are no tests, and a slice with no tests is left out.
@@ -287,11 +278,22 @@ def _summary(pages: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     families = _entries(counted("per_family"), vocab.FAMILY_ORDER)
     head = ([x["score"] for k, x in families.items() if k in vocab.HEADLINE_FAMILIES]
             or [x["score"] for x in families.values()])
+    suites = _entries((x["row"]["suite"], x["row"]["document"], c["passed"], c["tests"])
+                      for x in pages if "suite" in x["row"]
+                      for k, c in x.get("per_family", {}).items() if k in vocab.HEADLINE_FAMILIES)
+    auxiliary = {}
+    for family in vocab.AUXILIARY_FAMILIES:
+        if family not in families:
+            continue
+        per_suite = _entries((x["row"]["suite"], x["row"]["document"], c["passed"], c["tests"])
+                             for x in pages if "suite" in x["row"]
+                             for k, c in x.get("per_family", {}).items() if k == family)
+        auxiliary[family] = families[family] | {"per_suite": per_suite}
     return {"score": float(statistics.fmean(head)) if head else None,
             "families": families,
+            "auxiliary": auxiliary,
             "per_tag": _entries(counted("per_tag"), twins=twins),
-            "per_suite": _entries((x["row"]["suite"], x["row"]["document"], x["passed"], x["tests"])
-                                  for x in pages if "suite" in x["row"]),
+            "per_suite": dict(sorted(suites.items())),
             "per_test_type": _entries(counted("per_test_type"), tuple(vocab.FAMILIES)),
             "per_arg_kind": _entries(counted("per_arg_kind"), tuple(_tests.KINDS), twins=twins),
             "per_derivation": _entries(counted("per_derivation"))}

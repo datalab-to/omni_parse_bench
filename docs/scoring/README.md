@@ -8,9 +8,10 @@ case that is run against the scorer in CI (see [Keeping the pages true](#keeping
 
 1. **A test passes or fails.** Nothing is partial and nothing is weighted. A test that fails has a short reason
    (its *why*), kept with the run's results in `unit_tests/details/<page_id>.jsonl` ([API.md](../API.md)).
-2. **A family score is the share of its tests that pass.** There are three families.
-3. **The headline is the plain mean of the family scores.** Each family weighs a third, however many tests it
-   has. A run over part of the dataset averages the families it holds.
+2. **A family score is the share of its tests that pass.** Text, tables and layout are headline families; format is an auxiliary family.
+3. **The headline is the plain mean of the headline family scores.** Each family weighs a third, however many tests it
+   has. A run over part of the dataset averages the headline families it holds; when it holds none, it
+   averages its available families, preserving the format-only fallback.
 
 | test type | asks | family | tests in the dataset | page |
 |---|---|---|---:|---|

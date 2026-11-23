@@ -103,7 +103,7 @@ A test is a yes/no question about one page. Each test type belongs to one of fou
 | `layout_kind` | the block holding this line is a heading, text or table | layout |
 | `format` | this span of text is bold, italic, underlined, struck through, superscript or subscript, and the words around it are not (reported beside the headline) | format |
 
-A family's score is the share of its tests that pass, and the headline is the mean of the three family scores.
+A family's score is the share of its tests that pass, and the headline is the mean of the three headline family scores. Format is reported separately overall and per suite; a format-only run retains its format-based fallback headline. Format tests may share a page and suite with headline tests, so the page is predicted once.
 
 Each test is tagged by what it checks:
 

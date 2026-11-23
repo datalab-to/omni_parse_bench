@@ -2,7 +2,7 @@
 
 **Asks:** the output keeps the marks a page prints: the span of text is bold, italic, underlined, struck through,
 superscript or subscript (or, in a negative test, none of the marks the test lists), and the words next to it
-are not. Family `format`, reported beside the headline and never in it; reads `html`. It is the only test type that
+are not. Family `format`, reported beside the headline and excluded from it when any headline family is present; reads `html`. It is the only test type that
 reads the output's markup: every other test reads the text view, which drops it (the styling row of the
 [blind spots](README.md#what-the-tests-cannot-see)).
 
@@ -29,7 +29,7 @@ nothing shows the system could have written one, so a system that never writes m
 context occurs twice, a positive test passes if either place does, and a negative one only if neither carries the
 mark (cases fm-a-copy, fm-neg-all-copies).
 
-A format test counts in its family, its test type and its suite, and in none of the tag, arg kind and derivation
+Format tests may share pages and suites with headline tests, so one prediction serves both. The summary reports their pass rate and document and test counts in `auxiliary.format`, overall and in `auxiliary.format.per_suite`; a suite score pools only its headline tests. A format test counts in its family and test type, and in none of the tag, arg kind and derivation
 slices: those pool what the headline families measure, and a format test has no tag of its own.
 
 ## What a mark is

@@ -21,6 +21,7 @@ from omni_parse_bench import pooling, vocab
 from omni_parse_bench.scorers.unit_tests import tests as _tests
 
 SLICES = ("families", "per_tag", "per_suite", "per_test_type", "per_arg_kind", "per_derivation")
+AUX_SLICES = {f: f"auxiliary_suite:{f}" for f in vocab.AUXILIARY_FAMILIES}
 _ORDER = {"families": vocab.FAMILY_ORDER, "per_test_type": tuple(vocab.FAMILIES),
           "per_arg_kind": tuple(_tests.KINDS)}
 _COUNTS = {"families": "per_family", "per_tag": "per_tag", "per_test_type": "per_test_type",
@@ -34,7 +35,7 @@ def _table(pages: Iterable[Mapping[str, Any]]) -> Table:
     """Each slice's tests and passed counts by key and document, from score lines. A line without a count,
     or without `row.suite`, adds nothing to that slice, as in the summary; a line with no `row.document`
     is refused, since a document is what is resampled."""
-    out: Table = {s: {} for s in SLICES}
+    out: Table = {s: {} for s in (*SLICES, *AUX_SLICES.values())}
 
     def add(slice_: str, key: str, document: str, tests: int, passed: int) -> None:
         c = out[slice_].setdefault(key, {}).setdefault(document, [0, 0])
@@ -47,7 +48,11 @@ def _table(pages: Iterable[Mapping[str, Any]]) -> Table:
             raise ValueError(f"a score line ({x.get('id', '?')!r}) has no row.document; intervals resample "
                              "documents, so each line needs the document its page came from")
         if "suite" in row:
-            add("per_suite", row["suite"], row["document"], x["tests"], x["passed"])
+            for family, c in x.get("per_family", {}).items():
+                if family in vocab.HEADLINE_FAMILIES:
+                    add("per_suite", row["suite"], row["document"], c["tests"], c["passed"])
+                elif family in AUX_SLICES:
+                    add(AUX_SLICES[family], row["suite"], row["document"], c["tests"], c["passed"])
         for slice_, name in _COUNTS.items():
             for key, c in x.get(name, {}).items():
                 add(slice_, key, row["document"], c["tests"], c["passed"])
@@ -60,8 +65,7 @@ def _documents(table: Table) -> list[str]:
 
 
 def _headline(fams: Sequence[str]) -> list[str]:
-    """The families the headline is the mean of: those of `vocab.HEADLINE_FAMILIES` among `fams`, or all of
-    them when none is."""
+    """The headline families present, or all families when none is present."""
     return [k for k in fams if k in vocab.HEADLINE_FAMILIES] or list(fams)
 
 
@@ -163,9 +167,9 @@ def intervals(pages: Iterable[Mapping[str, Any]], *, resamples: int = 1000, seed
     fewer than 5 documents, or absent from more than 5% of the draws: with so few documents the draws say
     little, and a bound made from the draws that are left would look sure of a score it is not.
     `interval` says how it was made. Deterministic for a `seed`. A slice with no tests is left out. The
-    headline is a mean over the headline families (`vocab.HEADLINE_FAMILIES`: text, tables, layout; the
-    families present when none of them is), so a draw missing one of them is not one of its draws. `format` is
-    a family of its own, beside the headline.
+    headline is a mean over the headline families (`vocab.HEADLINE_FAMILIES`: text, tables, layout), so a
+    draw missing one of them is not one of its draws. With none present, it averages the available families.
+    `auxiliary.<family>.per_suite` gives intervals for each auxiliary family in each suite.
 
     Note: scores are pooled over tests, so a document with many tests weighs more, and the draws of
     documents already reflect that. `documents` is a raw count; `effective_documents` is what the tests are
@@ -203,6 +207,8 @@ def intervals(pages: Iterable[Mapping[str, Any]], *, resamples: int = 1000, seed
     out: dict[str, Any] = {"headline": entry(HEADLINE) if HEADLINE in point else None}
     for s in SLICES:
         out[s] = {k: entry((s, k)) for k in _keys(s, table) if (s, k) in point}
+    out["auxiliary"] = {f: {"per_suite": {k: entry((s, k)) for k in _keys(s, table) if (s, k) in point}}
+                        for f, s in AUX_SLICES.items() if table[s]}
     return out | {"interval": _method(resamples, seed, level)}
 
 
@@ -289,6 +295,8 @@ def paired(pages_a: Iterable[Mapping[str, Any]], pages_b: Iterable[Mapping[str, 
                            "headline_families": fams}
     for s in SLICES:
         out[s] = {k: entry((s, k)) for k in _keys(s, ta) if (s, k) in draws}
+    out["auxiliary"] = {f: {"per_suite": {k: entry((s, k)) for k in _keys(s, ta) if (s, k) in draws}}
+                        for f, s in AUX_SLICES.items() if any(kind == s for kind, _ in draws)}
     return out | {"documents_paired": len(both),
                   "documents_unpaired": {"a": len(da - db), "b": len(db - da)},
                   "documents_mismatched": sum(ca[i] != cb[i] for i in range(len(both))),

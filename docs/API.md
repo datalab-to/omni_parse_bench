@@ -135,7 +135,7 @@ of the headline. The summary's `failed` counts those pages by cause, and `covera
 ```python
 unit_tests.score(pred, tests) -> [Verdict(id, result, why)]   # pred: one page's {"html": ..., "blocks": [...]}
 unit_tests.lines(verdicts, tests, page) -> [test line]        # each verdict beside its page and its test
-unit_tests.summarize(lines) -> {"score", "families", "per_tag", "per_suite", "per_test_type", "per_arg_kind", "per_derivation"}
+unit_tests.summarize(lines) -> {"score", "families", "auxiliary", "per_tag", "per_suite", "per_test_type", "per_arg_kind", "per_derivation"}
 unit_tests.UnitTests()                                        # the same, as an omni-bench-core scorer
 ```
 
@@ -144,11 +144,14 @@ opb score --pred outputs.json --gold gold/<page_id>.json     # outputs.json: one
 ```
 
 A verdict is `pass` or `fail`, with `why`. A test whose output is missing or malformed fails. A summary holds
-`score`, the mean of the families' scores and the headline, and `families`, always in the order text, tables, layout: each
+`score`, the headline (the mean of the available text, tables and layout family scores; if none are present,
+the mean of the available families), and `families`, in the order text, tables, layout, format: each
 family's `score` (the share of its tests passed), `tests`, `documents` (the source documents its tests are
 from, a raw count) and `effective_documents` (what those documents are worth: scores are pooled over tests, so a
 document with many tests weighs more, and this is the number of equal-sized documents that would carry the same
-information, rounded to 1 decimal). `per_tag`, `per_suite`, `per_test_type`, `per_arg_kind` and `per_derivation` give
+information, rounded to 1 decimal). `auxiliary.format` repeats the format family score and counts and adds
+`per_suite`, with the same numbers for each suite containing format tests. The top-level `per_suite` pools only
+headline-family tests; suites containing only auxiliary tests appear only under `auxiliary`. `per_tag`, `per_suite`, `per_test_type`, `per_arg_kind` and `per_derivation` give
 the same four numbers for each slice; they are not part of the headline, a test with several tags counts under each,
 and an empty slice is left out. When two or more tags, or two arg kinds, have the same tests (by a 64-bit digest of their test ids: a collision is not
 impossible, only negligible), each of those entries also has `same_tests_as`, the other keys, sorted, so a report can
