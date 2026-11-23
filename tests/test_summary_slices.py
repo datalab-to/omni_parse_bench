@@ -231,7 +231,7 @@ def test_the_format_family_is_reported_beside_the_headline_and_never_in_it():
     assert s["families"]["format"]["score"] == 0.0
     assert s["score"] == (s["families"]["text"]["score"] + s["families"]["tables"]["score"]) / 2
     only = unit_tests.summarize([xs[2]])
-    assert only["score"] == 0.0     # a dataset with no headline family has the mean of the ones it has
+    assert only["score"] is None
 
 
 def test_format_tests_are_in_no_tag_arg_kind_or_derivation_slice():
@@ -242,4 +242,43 @@ def test_format_tests_are_in_no_tag_arg_kind_or_derivation_slice():
     assert s["per_tag"]["eng"]["tests"] == 1 and s["per_arg_kind"]["text"]["tests"] == 1
     assert s["per_derivation"]["authored"]["tests"] == 1
     assert s["families"]["format"]["tests"] == 1 and s["per_test_type"]["format"]["tests"] == 1
-    assert s["per_suite"]["s"]["tests"] == 2
+    assert s["per_suite"]["s"]["tests"] == 1
+    assert s["per_suite"]["s"]["auxiliary"]["format"]["tests"] == 1
+
+
+def test_adding_format_on_an_existing_page_leaves_headline_slices_byte_identical():
+    import json
+
+    base = [line("a", page="p", tags=["eng"], ok=True),
+            line("b", page="p", tags=["eng"], test_type="table_cell", ok=False)]
+    extra = line("f", page="p", tags=["eng"], test_type="format", ok=False)
+    before, after = (unit_tests.summarize(xs) for xs in (base, base + [extra]))
+    for key in ("score", "per_tag", "per_arg_kind", "per_derivation"):
+        assert json.dumps(before[key], sort_keys=True) == json.dumps(after[key], sort_keys=True)
+    suite = after["per_suite"]["s"].copy()
+    assert suite.pop("auxiliary")["format"] == after["auxiliary"]["format"]
+    assert json.dumps(before["per_suite"]["s"], sort_keys=True) == json.dumps(suite, sort_keys=True)
+    assert after["auxiliary"]["format"]["tests"] == 1
+    assert after["auxiliary"]["format"]["documents"] == 1
+
+
+def test_existing_fixture_headline_matches_the_previous_calculation_byte_for_byte():
+    import json
+    import statistics
+    from pathlib import Path
+
+    from omni_parse_bench.scorers.unit_tests import tests as gold_tests
+
+    pages = []
+    for path in sorted((Path(__file__).parent / "fixtures/invariants/gold").glob("*.json")):
+        tests = gold_tests.read(path)
+        result = scorer.UnitTests().score({"html": "<p>Quarterly revenue rose 12% on the year.</p>"}, tests)
+        pages.append({"row": {"document": path.stem, "suite": path.stem}, **result.result})
+    assert pages
+    summary = scorer.UnitTests().summarize(pages)
+    rates = []
+    for family in ("text", "tables", "layout"):
+        counts = [page["per_family"][family] for page in pages if family in page["per_family"]]
+        if counts:
+            rates.append(sum(c["passed"] for c in counts) / sum(c["tests"] for c in counts))
+    assert json.dumps(summary["score"]) == json.dumps(float(statistics.fmean(rates)))

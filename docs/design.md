@@ -287,7 +287,7 @@ The headline is the mean of the families' scores: text (present, order, repeat, 
 (`vocab.FAMILIES` maps every test type to one). A fourth family, format (`format`), is reported beside
 the headline and never in it (`vocab.HEADLINE_FAMILIES`): it asks whether the output keeps a page's
 bold, italic, underline, strikethrough, superscript and subscript, which every other test is certified
-not to see (M7a), and adding it would change every published score. A dataset with no headline family has the mean of the families it has. Weighting by family rather than by test means a
+not to see (M7a), and adding it would change every published score. A dataset with no headline family has no headline score. Weighting by family rather than by test means a
 family's weight never depends on how many tests it has: sampling more layout lines makes the layout
 score more precise without making layout count more. The families are those the graded tests are
 in, so a subset scores on the families it holds, and the summary lists them in a fixed order: text,
@@ -296,7 +296,7 @@ failed (`UnitTests.score_failure`, the omni-bench-core hook for a failed row's s
 page's share, and a run where every page failed has headline 0. The families and their mean are over every
 page, a failed one's tests included.
 
-The summary holds `score` (the headline) and the families alone, beside the core's counts. Any other breakdown (by output type, test type,
+The summary holds `score` (the headline), the families and an `auxiliary` map beside the core's counts. A suite may mix format and headline tests: its score pools only headline tests, and its `auxiliary` map reports format separately. Any other breakdown (by output type, test type,
 arg kind, tag, suite or derivation) is computed from each test's verdict, kept in the run's
 `details/<page_id>.jsonl` as a test line (its page, suite, document, test type, tags, derivation, and its args and
 settings as the gold stated them, so a run's details say what each test looked for), and

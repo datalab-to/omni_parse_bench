@@ -29,7 +29,7 @@ nothing shows the system could have written one, so a system that never writes m
 context occurs twice, a positive test passes if either place does, and a negative one only if neither carries the
 mark (cases fm-a-copy, fm-neg-all-copies).
 
-A format test counts in its family, its test type and its suite, and in none of the tag, arg kind and derivation
+Format tests may share pages and suites with headline tests, so one prediction serves both. The summary reports their pass rate and document and test counts in `auxiliary.format`, overall and for each suite; a suite score pools only its headline tests. A format test counts in its family and test type, and in none of the tag, arg kind and derivation
 slices: those pool what the headline families measure, and a format test has no tag of its own.
 
 ## What a mark is

@@ -627,3 +627,27 @@ def test_a_page_may_ask_for_markdown_but_not_an_unknown_output():
     assert data.page(row).outputs == ("markdown",)
     with pytest.raises(ValueError, match="outputs must be a non-empty list of distinct output types"):
         data.page(row | {"outputs": ["htlm"]})
+
+
+def test_a_mixed_page_is_predicted_once_with_the_union_of_outputs(tmp_path):
+    root = tmp_path / "data"
+    dataset(root, n=1)
+    path = root / "gold" / "a-p0.json"
+    gold = json.loads(path.read_text())
+    gold["tests"].append({"id": "format0", "test_type": "format", "output_type": "html",
+                          "derivation": "authored", "tags": [],
+                          "args": {"span": {"text": "alpha", "max_diffs": 0}},
+                          "settings": {"marks": ["bold"]}})
+    path.write_text(json.dumps(gold))
+    CALLS.clear()
+    WANTS.clear()
+    @dataclasses.dataclass(frozen=True)
+    class Both(Alpha):
+        SUPPORTS: ClassVar[frozenset[str]] = frozenset({"html", "blocks"})
+
+    result = benchmark.default(str(root)).run(Both(), tmp_path / "runs")
+    assert CALLS == ["a-p0"]
+    assert WANTS == [frozenset({"html", "blocks"})]
+    [summary] = result["scorers"].values()
+    assert summary["headline"] == 0.5
+    assert summary["auxiliary"]["format"]["score"] == 0.0

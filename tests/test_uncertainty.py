@@ -258,5 +258,5 @@ def test_the_format_family_has_an_interval_beside_the_headline_and_is_not_in_it(
     assert got["families"]["format"]["score"] == 0.5
     both = uncertainty.paired(text + fmt, text + fmt, resamples=100, seed=1)
     assert both["headline_families"] == ["text"]
-    only = uncertainty.intervals(fmt, resamples=100, seed=1)   # no headline family: the mean of its own
-    assert only["headline"]["score"] == 0.5
+    only = uncertainty.intervals(fmt, resamples=100, seed=1)
+    assert only["headline"] is None

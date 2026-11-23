@@ -47,7 +47,9 @@ def _table(pages: Iterable[Mapping[str, Any]]) -> Table:
             raise ValueError(f"a score line ({x.get('id', '?')!r}) has no row.document; intervals resample "
                              "documents, so each line needs the document its page came from")
         if "suite" in row:
-            add("per_suite", row["suite"], row["document"], x["tests"], x["passed"])
+            for family, c in x.get("per_family", {}).items():
+                if family in vocab.HEADLINE_FAMILIES:
+                    add("per_suite", row["suite"], row["document"], c["tests"], c["passed"])
         for slice_, name in _COUNTS.items():
             for key, c in x.get(name, {}).items():
                 add(slice_, key, row["document"], c["tests"], c["passed"])
@@ -60,9 +62,8 @@ def _documents(table: Table) -> list[str]:
 
 
 def _headline(fams: Sequence[str]) -> list[str]:
-    """The families the headline is the mean of: those of `vocab.HEADLINE_FAMILIES` among `fams`, or all of
-    them when none is."""
-    return [k for k in fams if k in vocab.HEADLINE_FAMILIES] or list(fams)
+    """The families the headline is the mean of: those of `vocab.HEADLINE_FAMILIES` among `fams`."""
+    return [k for k in fams if k in vocab.HEADLINE_FAMILIES]
 
 
 def _keys(slice_: str, table: Table) -> list[str]:
@@ -163,9 +164,8 @@ def intervals(pages: Iterable[Mapping[str, Any]], *, resamples: int = 1000, seed
     fewer than 5 documents, or absent from more than 5% of the draws: with so few documents the draws say
     little, and a bound made from the draws that are left would look sure of a score it is not.
     `interval` says how it was made. Deterministic for a `seed`. A slice with no tests is left out. The
-    headline is a mean over the headline families (`vocab.HEADLINE_FAMILIES`: text, tables, layout; the
-    families present when none of them is), so a draw missing one of them is not one of its draws. `format` is
-    a family of its own, beside the headline.
+    headline is a mean over the headline families (`vocab.HEADLINE_FAMILIES`: text, tables, layout), so a
+    draw missing one of them is not one of its draws. `format` is a family of its own, beside the headline.
 
     Note: scores are pooled over tests, so a document with many tests weighs more, and the draws of
     documents already reflect that. `documents` is a raw count; `effective_documents` is what the tests are

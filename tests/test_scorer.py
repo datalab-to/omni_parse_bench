@@ -54,8 +54,8 @@ def test_a_missing_output_fails_its_tests():
 
 def test_the_summary_is_the_score_the_families_and_the_slices():
     s = summarize(lines(score({"html": "<p>alpha beta</p>"}, TESTS), TESTS))
-    assert set(s) == {"score", "families", "per_tag", "per_suite", "per_test_type", "per_arg_kind",
-                      "per_derivation"}
+    assert set(s) == {"score", "families", "auxiliary", "per_tag", "per_suite", "per_test_type",
+                      "per_arg_kind", "per_derivation"}
     assert (s["score"], s["families"]) == (2 / 5, {"text": E(2 / 5, 5)})
 
 
@@ -327,9 +327,8 @@ def test_the_arg_kind_slice_counts_a_test_under_each_kind_and_leaves_layout_out(
     assert "latex" not in s["per_arg_kind"] and sum(e["tests"] for e in s["per_arg_kind"].values()) == 3
 
 
-def test_a_suite_may_not_mix_format_tests_with_headline_tests(tmp_path):
-    """A suite's score pools all its tests, so format and text tests would be one number: `check` refuses the
-    suite that holds both, and takes each in a suite of its own."""
+def test_a_suite_may_mix_format_tests_with_headline_tests(tmp_path):
+    """Tests of both families may share a suite."""
     import json
 
     from omni_parse_bench.scorers.unit_tests import check
@@ -348,5 +347,8 @@ def test_a_suite_may_not_mix_format_tests_with_headline_tests(tmp_path):
         return data.Page(i, i, suite, tmp_path / f"{i}.png", gold, ("html",))
 
     assert len(check([page("a", "text", "present"), page("b", "marks", "format")])) == 2
-    with pytest.raises(ValueError, match="both format tests and headline tests"):
-        check([page("a", "same", "present"), page("b", "same", "format")])
+    assert len(check([page("a", "same", "present"), page("b", "same", "format")])) == 2
+    gold = tmp_path / "mixed.json"
+    gold.write_text(json.dumps({"tests": [test("t-text", "present"), test("t-format", "format")]}))
+    mixed = data.Page("mixed", "mixed", "same", tmp_path / "mixed.png", gold, ("html",))
+    assert len(check([mixed])) == 2
