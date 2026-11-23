@@ -139,7 +139,7 @@ def lines(verdicts: Iterable[Verdict], tests: Iterable[_tests.Test], page: data.
 
 def summarize(lines: Iterable[Line]) -> dict[str, Any]:
     """Test lines (from `lines`) as one summary: `score`, the mean of the headline families' scores (text,
-    tables, layout), and `families`,
+    tables, layout; all families present when none of them is), and `families`,
     each family's `score` (the share of its tests passed), `tests`, `documents` and `effective_documents`;
     then `per_tag`, `per_suite`, `per_test_type`, `per_arg_kind` and `per_derivation`, each a slice's entries
     shaped as a family's. `score` is None when there are no tests, and a slice with no tests is left out.
@@ -276,20 +276,22 @@ def _summary(pages: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
                 for x in pages for k, c in x.get(name, {}).items())
 
     families = _entries(counted("per_family"), vocab.FAMILY_ORDER)
-    head = [x["score"] for k, x in families.items() if k in vocab.HEADLINE_FAMILIES]
+    head = ([x["score"] for k, x in families.items() if k in vocab.HEADLINE_FAMILIES]
+            or [x["score"] for x in families.values()])
     suites = _entries((x["row"]["suite"], x["row"]["document"], c["passed"], c["tests"])
                       for x in pages if "suite" in x["row"]
                       for k, c in x.get("per_family", {}).items() if k in vocab.HEADLINE_FAMILIES)
+    auxiliary = {}
     for family in vocab.AUXILIARY_FAMILIES:
-        auxiliary = _entries((x["row"]["suite"], x["row"]["document"], c["passed"], c["tests"])
+        if family not in families:
+            continue
+        per_suite = _entries((x["row"]["suite"], x["row"]["document"], c["passed"], c["tests"])
                              for x in pages if "suite" in x["row"]
                              for k, c in x.get("per_family", {}).items() if k == family)
-        for suite, entry in auxiliary.items():
-            suites.setdefault(suite, {"score": None, "tests": 0, "documents": 0, "effective_documents": 0})
-            suites[suite].setdefault("auxiliary", {})[family] = entry
+        auxiliary[family] = families[family] | {"per_suite": per_suite}
     return {"score": float(statistics.fmean(head)) if head else None,
             "families": families,
-            "auxiliary": {k: families[k] for k in vocab.AUXILIARY_FAMILIES if k in families},
+            "auxiliary": auxiliary,
             "per_tag": _entries(counted("per_tag"), twins=twins),
             "per_suite": dict(sorted(suites.items())),
             "per_test_type": _entries(counted("per_test_type"), tuple(vocab.FAMILIES)),

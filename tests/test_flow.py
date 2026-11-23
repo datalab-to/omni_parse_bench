@@ -651,3 +651,49 @@ def test_a_mixed_page_is_predicted_once_with_the_union_of_outputs(tmp_path):
     [summary] = result["scorers"].values()
     assert summary["headline"] == 0.5
     assert summary["auxiliary"]["format"]["score"] == 0.0
+
+
+def test_a_format_only_run_keeps_its_fallback_headline(tmp_path):
+    root = tmp_path / "data"
+    dataset(root, n=1)
+    path = root / "gold" / "a-p0.json"
+    tests = [{"id": f"f{i}", "test_type": "format", "output_type": "html", "derivation": "authored",
+              "tags": [], "args": {"span": {"text": text, "max_diffs": 0}},
+              "settings": {"marks": ["bold"]}}
+             for i, text in enumerate(("alpha", "beta"))]
+    path.write_text(json.dumps({"tests": tests}))
+    table = pq.read_table(root / "manifest.parquet").to_pylist()
+    table[0]["outputs"] = ["html"]
+    pq.write_table(pa.Table.from_pylist(table), root / "manifest.parquet")
+
+    @dataclasses.dataclass(frozen=True)
+    class FormatParser(Alpha):
+        def send(self, page, request, *, timeout):
+            return contract.Call({"html": "<b>alpha</b> beta", "page": page.stem})
+
+    result = benchmark.default(str(root)).run(FormatParser(), tmp_path / "runs")
+    [summary] = result["scorers"].values()
+    assert summary["headline"] == 0.5
+    assert summary["per_suite"] == {}
+    assert summary["auxiliary"]["format"]["per_suite"]["s"]["score"] == 0.5
+
+
+def test_a_failed_mixed_page_counts_both_families(tmp_path):
+    from omni_parse_bench.scorers.unit_tests import tests as gold_tests
+    from omni_parse_bench.scorers.unit_tests import unit_tests
+
+    root = tmp_path / "data"
+    dataset(root, n=1)
+    path = root / "gold" / "a-p0.json"
+    gold = json.loads(path.read_text())
+    gold["tests"].append({"id": "f", "test_type": "format", "output_type": "html",
+                          "derivation": "authored", "tags": [],
+                          "args": {"span": {"text": "alpha", "max_diffs": 0}},
+                          "settings": {"marks": ["bold"]}})
+    path.write_text(json.dumps(gold))
+    score = unit_tests.UnitTests().score_failure(gold_tests.read(path))
+    summary = unit_tests.UnitTests().summarize([{"row": {"document": "d", "suite": "s"}, **score.result}])
+    assert summary["score"] == 0.0
+    assert summary["per_suite"]["s"]["tests"] == 2
+    assert summary["auxiliary"]["format"]["per_suite"]["s"]["score"] == 0.0
+    assert summary["auxiliary"]["format"]["tests"] == 1

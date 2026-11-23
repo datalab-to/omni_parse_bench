@@ -36,10 +36,11 @@ FAMILIES = {
 }
 # The families in the order a summary lists them, so two runs' summaries read alike.
 FAMILY_ORDER = tuple(dict.fromkeys(FAMILIES.values()))
-# The families whose mean is the headline. `format` is reported beside it, never in it: it asks whether the
+# The families whose mean is the headline. `format` is reported beside it, excluded when any are present.
+# It asks whether the
 # output keeps a page's bold, italic, underline, strikethrough, superscript and subscript, which most of the
 # other tests are certified not to see (M7a), and adding it would change every published score. A dataset with
-# none of the headline families has no headline score.
+# none of the headline families has the mean of the families it has.
 HEADLINE_FAMILIES = ("text", "tables", "layout")
 AUXILIARY_FAMILIES = ("format",)
 

@@ -337,3 +337,14 @@ def test_the_balanced_option_is_recorded_and_cli_turns_it_off(tmp_path, capsys):
     assert uncertainty.reliability(runs, splits=20, balanced=False)["reliability"]["balanced"] is False
     assert cli.main(["reliability", *folders, "--splits", "20", "--random-halves"]) == 0
     assert json.loads(capsys.readouterr().out)["reliability"]["balanced"] is False
+
+
+def test_reliability_on_mixed_pages_keeps_the_suite_headline_counts():
+    runs = systems(lambda i, s: s, n_systems=5, n_docs=30)
+    for pages in runs.values():
+        for row in pages:
+            row["per_family"]["format"] = {"tests": 2, "passed": 0}
+            row["tests"] += 2
+    result = uncertainty.reliability(runs, splits=10)
+    assert result["per_suite"]["s"]["tests"] == 30 * 2 * PER
+    assert result["families"]["format"]["tests"] == 60

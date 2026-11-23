@@ -259,4 +259,24 @@ def test_the_format_family_has_an_interval_beside_the_headline_and_is_not_in_it(
     both = uncertainty.paired(text + fmt, text + fmt, resamples=100, seed=1)
     assert both["headline_families"] == ["text"]
     only = uncertainty.intervals(fmt, resamples=100, seed=1)
-    assert only["headline"] is None
+    assert only["headline"]["score"] == 0.5
+
+
+def test_mixed_suite_auxiliary_intervals_and_paired_comparison():
+    a = []
+    b = []
+    for i in range(20):
+        x = line(f"d{i}", 2, 1, suite="mixed")
+        y = line(f"d{i}", 2, 2, suite="mixed")
+        for row, passed in ((x, i % 2), (y, 1)):
+            row["per_family"]["format"] = {"tests": 1, "passed": passed}
+            row["tests"] += 1
+            row["passed"] += passed
+        a.append(x)
+        b.append(y)
+    got = uncertainty.intervals(a, resamples=100, seed=1)
+    assert got["headline"]["score"] == got["per_suite"]["mixed"]["score"] == 0.5
+    assert got["auxiliary"]["format"]["per_suite"]["mixed"]["score"] == 0.5
+    pair = uncertainty.paired(a, b, resamples=100, seed=1)
+    assert pair["headline"]["gap"] == pair["per_suite"]["mixed"]["gap"] == -0.5
+    assert pair["auxiliary"]["format"]["per_suite"]["mixed"]["gap"] == -0.5

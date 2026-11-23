@@ -231,7 +231,7 @@ def test_the_format_family_is_reported_beside_the_headline_and_never_in_it():
     assert s["families"]["format"]["score"] == 0.0
     assert s["score"] == (s["families"]["text"]["score"] + s["families"]["tables"]["score"]) / 2
     only = unit_tests.summarize([xs[2]])
-    assert only["score"] is None
+    assert only["score"] == 0.0
 
 
 def test_format_tests_are_in_no_tag_arg_kind_or_derivation_slice():
@@ -243,7 +243,7 @@ def test_format_tests_are_in_no_tag_arg_kind_or_derivation_slice():
     assert s["per_derivation"]["authored"]["tests"] == 1
     assert s["families"]["format"]["tests"] == 1 and s["per_test_type"]["format"]["tests"] == 1
     assert s["per_suite"]["s"]["tests"] == 1
-    assert s["per_suite"]["s"]["auxiliary"]["format"]["tests"] == 1
+    assert s["auxiliary"]["format"]["per_suite"]["s"]["tests"] == 1
 
 
 def test_adding_format_on_an_existing_page_leaves_headline_slices_byte_identical():
@@ -256,7 +256,7 @@ def test_adding_format_on_an_existing_page_leaves_headline_slices_byte_identical
     for key in ("score", "per_tag", "per_arg_kind", "per_derivation"):
         assert json.dumps(before[key], sort_keys=True) == json.dumps(after[key], sort_keys=True)
     suite = after["per_suite"]["s"].copy()
-    assert suite.pop("auxiliary")["format"] == after["auxiliary"]["format"]
+    assert after["auxiliary"]["format"]["per_suite"]["s"]["score"] == 0.0
     assert json.dumps(before["per_suite"]["s"], sort_keys=True) == json.dumps(suite, sort_keys=True)
     assert after["auxiliary"]["format"]["tests"] == 1
     assert after["auxiliary"]["format"]["documents"] == 1
