@@ -21,8 +21,8 @@ ASSETS = Path(__file__).resolve().parents[1] / "docs" / "assets"
 POINTS = [
     ("Gemini 4 Argon", 95.99, 23.3, 49.88, "other", "page"),
     ("Gemini 4 Carbon", 95.67, 28.9, 58.73, "other", "page"),
-    ("Datalab accurate", 94.35, 14.75, 7.50, "datalab", "html"),
-    ("Datalab balanced", 92.87, 9.65, 3.00, "datalab", "html"),
+    ("Datalab accurate", 94.69, 9.0, 7.50, "datalab", "html"),
+    ("Datalab balanced", 93.68, 7.2, 3.00, "datalab", "html"),
     ("Gemini 3.8 Flash", 92.54, 21.1, 37.09, "test", "html"),
     ("GPT-6.1 Sol", 91.50, 18.5, 30.95, "other", "page"),
     ("Reducto", 91.09, 6.0, 10.00, "other", "html"),
