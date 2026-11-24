@@ -697,3 +697,13 @@ def test_a_failed_mixed_page_counts_both_families(tmp_path):
     assert summary["per_suite"]["s"]["tests"] == 2
     assert summary["auxiliary"]["format"]["per_suite"]["s"]["score"] == 0.0
     assert summary["auxiliary"]["format"]["tests"] == 1
+
+
+def test_a_safety_block_is_the_pages_and_not_the_accounts():
+    body = str({"error": {"message": "Gemini blocked the request: SAFETY", "code": 403}})
+    blocked = harness_errors.SystemFailed("HTTP 403: Gemini blocked the request: SAFETY",
+                                          status=403, body=body)
+    assert not Alpha().account_failure(blocked)
+    assert not Alpha().account_failure(harness_errors.SystemFailed("HTTP 403", status=403, body=body))
+    assert Alpha().account_failure(harness_errors.SystemFailed("HTTP 403: Key limit exceeded", status=403,
+                                                               body=str({"error": {"code": 403}})))

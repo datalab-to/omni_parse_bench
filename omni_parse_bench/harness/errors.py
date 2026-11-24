@@ -4,6 +4,7 @@
   errors.SystemFailed` catches what `adapter.reading` raises. A failed call's reply goes in its `body`;
 - `transport`: a transport failure as the page's `SystemTimeout` or `SystemUnreachable`;
 - `refused` and `no_server`: a refused connection, and a note on how to start the model server;
+- `account_403`: whether a 403 is the account's (its key, its credits) and not a refusal of the page;
 - `job`: makes a failure carry its job id; and
 - `unread`: why one output is missing from an answer.
 
@@ -28,6 +29,17 @@ SERVE = "https://github.com/datalab-to/omni_parse_bench/tree/main/omni_parse_ben
 
 # Note: the core's test, so opb and the core agree on what a refused connection is.
 refused = core.refused
+
+
+# A 403 that refuses this page's content, not the account: OpenRouter's moderation flag, or a provider's
+# safety block ("Gemini blocked the request: SAFETY"), recognised by its message or its body's metadata.
+PAGE_REFUSALS = ("moderation", "flagged", "blocked the request", "safety")
+
+
+def account_403(e: SystemFailed) -> bool:
+    """Whether a 403 is the account's, unless its message or body says it refuses this page's content."""
+    body = e.body if isinstance(e.body, str) else ""
+    return not any(m in f"{e} {body}".lower() for m in PAGE_REFUSALS)
 
 
 def no_server(exc: BaseException, url: str, system: str, serve: str | None) -> None:

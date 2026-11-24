@@ -18,8 +18,6 @@ from omni_parse_bench.task import Input
 
 from . import budget, contract, errors, http, raster
 
-# A 403 that refuses this page's content, not the account (OpenRouter's moderation flag).
-PAGE_REFUSALS = ("moderation", "flagged")
 # Note: an option with one of these names means the same in every adapter, so its help is written once; an
 # option whose meaning is the adapter's own carries its help in its field's metadata.
 OPTION_HELP = {
@@ -80,8 +78,9 @@ class Parser(adapter.Adapter[Input]):
     - anything else is a bug: the run stops, the answer is kept, and the same command reads it again after
       the fix.
 
-    A 403 is an account failure too, unless it is a moderation flag on this page's content. A refused
-    connection stops the run, with a note on how to start the server (`errors.no_server`). `send` runs on
+    A 403 is an account failure too, unless it is a moderation flag or a safety block on this page's content,
+    which refuses the page and lets the run go on. A refused connection stops the run, with a note on how to
+    start the server (`errors.no_server`). `send` runs on
     `workers` threads at once, so render a PDF with `raster`, which holds pdfium's lock. A change to the
     adapter's code, such as a prompt, isn't part of a run's question: start a new run after one, never resume
     a run made before it."""
@@ -143,10 +142,10 @@ class Parser(adapter.Adapter[Input]):
                             sent=[a["sent"] for p in pages for a in p])
 
     def account_failure(self, e: errors.SystemFailed) -> bool:
-        """The core's rule, and a 403 too, unless it is a moderation flag on this page's content."""
+        """The core's rule, and a 403 too, unless it is a moderation flag or a safety block on this page's
+        content."""
         if e.status == 403:
-            body = e.body if isinstance(e.body, str) else ""
-            return not any(m in f"{e} {body}".lower() for m in PAGE_REFUSALS)
+            return errors.account_403(e)
         return super().account_failure(e)
 
     def read(self, raw: Any, x: Input) -> dict[str, Any]:

@@ -457,3 +457,123 @@ def test_a_run_is_graded_against_the_dataset_commit_it_ran_on():
             "manifest": "m.parquet"}
     assert cli.recorded(said) == ("hf://datasets/datalab-to/omni_parse_bench@abc123", "m.parquet")
     assert cli.recorded(said, "other") == ("other", "m.parquet")  # a dataset given is graded as given
+
+
+def _llm_client(monkeypatch, replies, completions):
+    """Makes the LLM adapter's client answer with `replies` in turn (a dict is a chat completion; an
+    exception is raised), counting its calls in `completions`."""
+    import time
+
+    class Completions:
+        def create(self, **kwargs):
+            completions.append(1)
+            got = replies[min(len(completions), len(replies)) - 1]
+            if isinstance(got, Exception): raise got
+            return types.SimpleNamespace(model_dump=lambda: got)
+
+    class Client:
+        def __init__(self, **kwargs):
+            self.chat = types.SimpleNamespace(completions=Completions())
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test")
+    monkeypatch.setattr(llm.openai, "OpenAI", Client)
+    monkeypatch.setattr(llm, "image", lambda p: b"png")
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+
+
+def _stop(content):
+    return {"id": "gen-1", "choices": [{"finish_reason": "stop", "message": {"content": content}}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 0, "cost": 0.001}}
+
+
+BLANK_REPLIES = ["", "  \n\t", None, "```html\n```", "```\n```", "<html></html>",
+                 "<html>\n<body>\n</body></html>", "<p></p>",
+                 "```html\n<html><body><p> </p></body></html>\n```"]
+
+
+@pytest.mark.parametrize("text", BLANK_REPLIES)
+def test_an_empty_llm_reply_is_a_blank_page_asked_for_once_more_then_accepted(tmp_path, monkeypatch, text):
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    completions = []
+    _llm_client(monkeypatch, [_stop(text)], completions)
+    r = core.predict(harness.system("org/model"), harness.Input(pdf, frozenset({"html"})))
+    assert len(completions) == 2, "an empty reply may be transient: asked for once more, no more"
+    assert r["output"] == {"pages": [{"html": ""}]}, r
+    assert r["cost"]["usd"] == pytest.approx(0.002), "the retry is paid for"
+
+
+def test_an_empty_llm_reply_that_the_retry_fills_is_the_filled_page(tmp_path, monkeypatch):
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    completions = []
+    _llm_client(monkeypatch, [_stop(""), _stop("<p>alpha</p>")], completions)
+    r = core.predict(harness.system("org/model"), harness.Input(pdf, frozenset({"html"})))
+    assert len(completions) == 2 and r["output"] == {"pages": [{"html": "<p>alpha</p>"}]}
+
+
+def test_an_empty_llm_reply_then_an_unusable_one_is_still_a_blank_page(tmp_path, monkeypatch):
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    completions = []
+    _llm_client(monkeypatch, [_stop(""), {"choices": [{"finish_reason": "error"}]}], completions)
+    r = core.predict(harness.system("org/model"), harness.Input(pdf, frozenset({"html"})))
+    assert r["output"] == {"pages": [{"html": ""}]}
+
+
+def test_an_empty_llm_layout_reply_is_a_page_without_blocks(tmp_path, monkeypatch):
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    _llm_client(monkeypatch, [_stop("```\n```")], [])
+    r = core.predict(harness.system("org/model"), harness.Input(pdf, frozenset({"blocks"})))
+    assert r["output"] == {"pages": [{"blocks": []}]}
+
+
+@pytest.mark.parametrize("reply", [
+    {"choices": [{"finish_reason": "length", "message": {"content": ""}}]},
+    {"choices": [{"finish_reason": "error", "message": {"content": ""}}]},
+    {"choices": [{"finish_reason": "stop", "message": {"content": ["a"]}}]},
+    _stop("not a layout at all"),
+], ids=["truncated", "error", "not text", "no blocks"])
+def test_an_unusable_llm_reply_still_fails_the_page(tmp_path, monkeypatch, reply):
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    _llm_client(monkeypatch, [reply], [])
+    r = core.predict(harness.system("org/model"), harness.Input(pdf, frozenset({"blocks"})))
+    assert r["output"] is None, "an empty page is only what the model returned empty"
+
+
+def test_an_llm_reply_with_a_table_or_picture_and_no_text_is_not_blank():
+    for html in ("<table><tr><td></td></tr></table>", '<p><img alt=""></p>'):
+        got, _ = llm.parse(_stop(html), contract.Request(frozenset({"html"}), {}))
+        assert got == {"html": html}
+
+
+# What OpenRouter returned for a page Gemini 3.8 Flash's safety filter blocked (HTTP 403).
+SAFETY_BODY = {"error": {"message": "Gemini blocked the request: SAFETY", "code": 403,
+                         "metadata": {"provider_name": "Google AI Studio", "raw": ""}}}
+# What it returns for a key with no credit left, or over its limit: the account's, so the run stops.
+ACCOUNT_BODY = {"error": {"message": "Key limit exceeded (total limit). Manage it using "
+                                    "https://openrouter.ai/settings/keys", "code": 403}}
+
+
+def _forbidden(body):
+    import httpx
+
+    request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+    response = httpx.Response(403, request=request, json=body)
+    return llm.openai.PermissionDeniedError(body["error"]["message"], response=response, body=body)
+
+
+def test_a_safety_block_refuses_the_page_and_the_run_goes_on(tmp_path, monkeypatch):
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    completions = []
+    _llm_client(monkeypatch, [_forbidden(SAFETY_BODY)], completions)
+    for wants in ({"html"}, {"blocks"}):
+        r = core.predict(harness.system("org/model"), harness.Input(pdf, frozenset(wants)))
+        assert r["output"] is None and r["error"]["status"] == 403, r
+        assert r["error"]["message"].startswith("the provider refused the page"), r["error"]
+        assert "SAFETY" in r["error"]["message"] and r["error"]["transient"] is False
+    assert len(completions) == 2, "a refusal is final: asked once per page"
+
+
+def test_a_403_about_the_account_still_stops_the_run(tmp_path, monkeypatch):
+    (pdf := tmp_path / "p.pdf").write_bytes(b"%PDF")
+    _llm_client(monkeypatch, [_forbidden(ACCOUNT_BODY)], [])
+    with pytest.raises(PermissionError):
+        core.predict(harness.system("org/model"), harness.Input(pdf, frozenset({"html"})))
