@@ -62,7 +62,14 @@ adapter makes are format changes, and each is checked to lose nothing:
   spent) is the page's failure, `SystemUnreachable` or `SystemTimeout`, which a page asks again only
   under `--retry-failed`; its record's traceback shows the httpx error underneath. A refused connection
   stops the run instead. A model's reply that is cut off by an error or doesn't parse is asked again within the call, up to 3
-  times. A page a vendor still doesn't answer fails, every test failed, whatever the cause: answering is part of
+  times. A model's empty reply (nothing, whitespace, an empty code fence, an empty `<html>`) is a blank
+  page, a valid answer: `html` is "" (no `blocks`), so it passes a `page_near_empty` test and fails every test
+  that asks for content, as any empty page does. It is asked for once more in case it was transient, then
+  accepted, even when the attempts in between were unusable; a reply with text that doesn't parse, or cut at
+  `max_output_tokens`, still fails the page. A page the provider refuses fails, every test failed, and the
+  run goes on: a `content_filter` finish, or an HTTP 403 whose message or body says it is a moderation flag or
+  a safety block ("Gemini blocked the request: SAFETY"), both recorded as `SystemFailed` "the provider refused
+  the page" and never asked again. Any other 403 (a key, its credits) is the account's and stops the run. A page a vendor still doesn't answer fails, every test failed, whatever the cause: answering is part of
   what a product does. Under the core's one rule ([omni-bench-core's "The rules"](https://github.com/datalab-to/omni-bench-core/blob/main/OVERVIEW.md#the-rules)),
   a page fails only when the adapter raises `SystemFailed` on purpose, or reads the answer inside
   `omni_bench_core.adapter.reading`, which raises it for a malformed one. The record keeps the failure

@@ -11,6 +11,15 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 
 ## [Unreleased]
 
+### Score impact
+
+- None on grading: this changes how a run handles two provider replies, not how answers are scored. A page that used to fail as "no usable html" or stop the run now gets a prediction or a refusal instead, so a rerun can score pages that earlier runs lost.
+
+### Fixed
+
+- LLM harness: an empty reply (after the provider's own stripping) is a valid prediction of an empty page, not a failure after retries. This matters for blank pages, where empty is the right answer.
+- LLM harness: a provider safety block (for example an HTTP 403 "blocked the request: SAFETY") is a per-page refusal, like `content_filter`, instead of an account error that stops the whole run. Real key and credit errors still stop the run.
+
 ## [1.8.0] - 2026-11-23
 
 ### Score impact

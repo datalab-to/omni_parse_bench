@@ -73,7 +73,9 @@ class LLM(Parser):
                   [ymin, xmin, ymax, xmax]
 
     A markdown reply goes through `markdown.to_html`, as every system's markdown does; a reply that doesn't
-    parse is asked for again. No sampling setting is sent, so each model runs at its own defaults.
+    parse is asked for again. An empty reply (nothing, whitespace, an empty fence or an empty <html>) is a
+    blank page, a valid answer: `html` "" or no `blocks`, asked for once more in case it was transient, then
+    accepted. No sampling setting is sent, so each model runs at its own defaults.
 
     Auth: OPENROUTER_API_KEY (or OPENAI_API_KEY) for OpenRouter; for another `base_url`, OPB_ENDPOINT_KEY if
     set. `chat`, `answer` and the helpers below are shared with the open models' adapters.
@@ -232,8 +234,11 @@ def _cost(usage: dict) -> contract.Cost:
 def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
          config: LLM) -> contract.Call:
     """One completion for one output, asked again only while the reply isn't usable: one cut off by an
-    error is asked again; one cut at `max_output_tokens` or refused (`content_filter`) is final. The cost
-    counts every attempt. Transport failures aren't retried here: the core's retry decides."""
+    error is asked again; one cut at `max_output_tokens` or refused (`content_filter`, or a 403 safety
+    block) is final. An empty reply is a blank page: asked again once, then accepted as an empty page,
+    even when the other attempts
+    ran out on unusable replies. The cost counts every attempt. Transport failures aren't retried here: the
+    core's retry decides."""
     deadline = budget.Budget(timeout)
     usage = {"extra_body": {"usage": {"include": True}}} if config.base_url == DEFAULT_BASE_URL else {}
     b64 = base64.b64encode(image(page)).decode("ascii")
@@ -241,13 +246,21 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
     messages = [{"role": "user", "content": [
         {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}", "detail": "high"}},
         {"type": "text", "text": PROMPTS[output]}]}]
-    last, spent, cut = None, [], False
+    last, spent, cut, blank = None, [], False, None
     for attempt in range(config.attempts):
         if attempt:
             time.sleep(min((2 ** attempt) + random.uniform(0, 1), deadline.remaining()))
         deadline.check(f"after {attempt} attempt(s) that produced no usable answer")
         ask = {"model": config.model, "messages": messages, "max_tokens": config.max_output_tokens, **usage}
-        body = last = chat(config.base_url, ask, deadline, spent)
+        try:
+            body = last = chat(config.base_url, ask, deadline, spent)
+        except errors.SystemFailed as exc:
+            # Note: a provider's safety block (HTTP 403, "Gemini blocked the request: SAFETY") refuses the
+            # page like `content_filter` does: final, and worded alike. Any other 403 is the account's.
+            if exc.status == 403 and not errors.account_403(exc):
+                raise errors.SystemFailed(f"the provider refused the page (HTTP 403: {exc.body})", status=403,
+                                          body=exc.body, cost=exc.cost) from exc
+            raise
         with adapter.reading("the reply's usage and finish reason"):
             spent.append(_cost(body.get("usage") or {}))
             finish = ((body.get("choices") or [{}])[0]).get("finish_reason")
@@ -259,8 +272,14 @@ def call(page: Path, request: contract.Request, *, timeout: float = 900.0,
             raise errors.SystemFailed("the provider refused the page (content_filter)", status=200, body=body,
                                      cost=contract.Cost.total(spent), job_id=body.get("id"))
         cut = cut or finish != "stop"
-        if finish == "stop" and _usable(body, output):
+        if finish == "stop" and (state := _state(body, output)) == "usable":
             return contract.Call(body, cost=contract.Cost.total(spent), job_id=body.get("id"))
+        if finish == "stop" and state == "blank":
+            # Note: an empty reply may be transient, so it is asked for once more; a second one is the answer.
+            if blank: break
+            blank = body
+    if blank:
+        return contract.Call(blank, cost=contract.Cost.total(spent), job_id=blank.get("id"))
     raise errors.SystemFailed(f"no usable {output} after {config.attempts} attempts"
                              + (" (a reply was cut off by an error)" if cut else ""),
                              status=200, body=last, cost=contract.Cost.total(spent))
@@ -321,13 +340,23 @@ def tokens(bodies: list[dict]) -> contract.Cost:
                                          tokens_out=u.get("completion_tokens")) for u in usages])
 
 
-def _usable(body: dict, output: str) -> bool:
-    """Whether the reply holds a usable `output`: `parse` doesn't raise `SystemFailed` on it. One that does is
-    asked again; anything else `parse` raises is a bug, and stops the run."""
+def _state(body: dict, output: str) -> str:
+    """`usable` when the reply holds a non-empty `output`, `blank` when it holds none (a blank page), else
+    `unusable`: `parse` raised `SystemFailed` on it, so it is asked again; anything else `parse` raises is a
+    bug, and stops the run."""
     try:
-        return bool(parse(body, contract.Request(frozenset({output}), {}), None)[0].get(output))
+        got = parse(body, contract.Request(frozenset({output}), {}), None)[0].get(output)
     except errors.SystemFailed:
-        return False
+        return "unusable"
+    return "usable" if got else "blank"
+
+
+def _blank(html: str) -> bool:
+    """Whether HTML shows nothing: no text, picture or table (an empty <html>, <body> or <p>)."""
+    import html as _html
+
+    text = _html.unescape(re.sub(r"<[^>]*>", "", html)).strip()
+    return not text and not re.search(r"<(?:img|table)\b", html, re.I)
 
 
 def parse(raw: dict, request: contract.Request, config: LLM | None = None) -> tuple[dict, dict]:
@@ -340,7 +369,14 @@ def parse(raw: dict, request: contract.Request, config: LLM | None = None) -> tu
         text = (choice.get("message") or {}).get("content")
         if text is not None and not isinstance(text, str):
             raise errors.SystemFailed(f"the reply's content is a {type(text).__name__}, not text", status=200)
-    value = (as_blocks(text) if output == "blocks" else as_html(text)) if text else None
+    # Note: an empty reply is a blank page, a valid answer: no blocks, or "" for html. A reply with text that
+    # holds no blocks, or content that isn't text, is unusable.
+    if output == "blocks":
+        if not reply(text or ""): return {output: []}, {}
+        value = as_blocks(text)
+    else:
+        value = as_html(text or "")
+        if _blank(value): return {output: ""}, {}
     if not value:
         raise errors.SystemFailed(f"no usable {output} in the reply", status=200)
     return {output: value}, {}

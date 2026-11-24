@@ -121,6 +121,20 @@ def test_a_page_near_empty_test_passes_a_blank_page_and_fails_one_character_over
     assert not bad, f"{len(bad)} page_near_empty tests pass a page over their limit, e.g. {bad[:5]}"
 
 
+def test_a_blank_llm_reply_scores_as_an_empty_page(tests):
+    # What the LLM adapter returns for a model's empty reply is an empty page: it passes the near-empty tests
+    # and fails the rest.
+    from omni_parse_bench.harness.providers import llm
+
+    reply = {"choices": [{"finish_reason": "stop", "message": {"content": ""}}]}
+    html = llm.parse(reply, llm.contract.Request(frozenset({"html"}), {}))[0]["html"]
+    assert html == ""
+    out = {"html": html, "blocks": []}
+    for t in tests:
+        [v] = scorer.score(out, [t])
+        assert v.result == ("pass" if isinstance(t.params, runners.PageNearEmpty) else "fail"), (t.id, v.why)
+
+
 def test_each_tests_own_answer_passes_it(tests):
     bad = failures(tests, answer, "pass")
     assert not bad, f"{len(bad)} tests fail on their own answer, e.g. {bad[:5]}"
