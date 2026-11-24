@@ -159,7 +159,7 @@ def test_plain_text_keeps_double_delimiters(tex, plain):
     ("ℂ", r"\mathbb{C}"), ("ℚ", r"\mathbb{Q}"), ("𝟙", r"\mathbb{1}"),
     ("𝔤", r"\mathfrak{g}"), ("𝑥", "x"), ("𝐱", "x"),
     ("x′", "x'"), ("x″", "x''"), ("x‴", "x'''"), ("x′", r"x^\prime"),
-    ("5%+3", r"5\%+3"), ("ϱ", r"\rho"), ("ϖ", r"\pi"), ("ϰ", r"\kappa"),
+    ("5%+3", r"5\%+3"), ("ϱ", r"\rho"), ("ϰ", r"\kappa"),
     (r"\iint f", r"\int\!\int f"), (r"\iiint f", r"\int\int\int f"),
     (r"x^{}", "x"), (r"x_{}", "x"), (r"x_{}^2", r"x^2"),
     (r"\mbox{hi}", r"\text{hi}"), (r"\mathds{R}", r"\mathbb{R}"),

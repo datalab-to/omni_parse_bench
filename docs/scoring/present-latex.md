@@ -33,7 +33,7 @@ bars compare as a double bar, so `||x||` and `\lVert x\rVert` match. This also f
   matches `\mathbb{R}`, not plain R. `\mathds` is read as `\mathbb` and `\mbox` as `\text`.
 - Unicode prime marks ′, ″ and ‴ match one, two and three LaTeX primes. A raw `%` in math reads as `\%`
   when that renders; otherwise the original TeX is tried.
-- ϱ/ρ, ϖ/π and ϰ/κ match. ∬ and ∭ match two and three consecutive ∫ symbols.
+- ϱ/ρ and ϰ/κ match; ϖ (`\varpi`) is drawn differently from π and stays distinct. ∬ and ∭ match two and three consecutive ∫ symbols.
 - Top-level `\\` in display math marks a row, as in an aligned or gathered environment. Empty superscripts
   and subscripts are dropped. If the row-aware match fails, the matcher also tries the earlier reading that
   ignored top-level row breaks; similarly, it can retry the earlier reading of a TeX percent comment.
@@ -42,7 +42,7 @@ bars compare as a double bar, so `||x||` and `\lVert x\rVert` match. This also f
 These glyph folds do not infer mathematical meaning: for example a long arrow can match a short arrow, and
 an explicitly limited Σ can match a summation sign. Angle brackets stay distinct from inequality signs, and ℓ from `l`.
 Script, double-struck and fraktur letters, Greek and Latin lookalikes, check and breve accents, = and ≡,
-1 and 𝟙, and Δ and △ stay distinct.
+1 and 𝟙, ϖ and π, and Δ and △ stay distinct.
 
 1. **Math spans** are `$..$`, `$$..$$`, `\(..\)`, `\[..\]`, `<math>` (TeX annotation or MathML), an equation
    environment, and a line that is nothing but LaTeX. Which dollars pair is decided by one reader, shared with the

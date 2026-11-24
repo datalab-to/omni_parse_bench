@@ -122,7 +122,7 @@ def test_each_new_equation_fold_is_symmetric(pair):
 @given(st.sampled_from([
     (r"\left<x\right>", r"\langle x\rangle"), ("ℝ", r"\mathbb{R}"),
     ("𝔤", r"\mathfrak{g}"), ("𝑥", "x"), ("x″", "x''"), ("5%+3", r"5\%+3"),
-    ("ϱ", r"\rho"), ("ϖ", r"\pi"), ("ϰ", r"\kappa"), (r"\iint f", r"\int\!\int f"),
+    ("ϱ", r"\rho"), ("ϰ", r"\kappa"), (r"\iint f", r"\int\!\int f"),
     (r"x^{}", "x"), (r"\mbox{hi}", r"\text{hi}"), (r"\mathds{R}", r"\mathbb{R}"),
     (r"a=b\\c=d", r"\begin{aligned}a&=b\\c&=d\end{aligned}"),
 ]))

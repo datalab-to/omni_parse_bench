@@ -87,7 +87,6 @@ EQUIVALENT: dict[str, tuple[list[str], bool]] = {
     "double prime": (["x''", "x″"], False),
     "triple prime": (["x'''", "x‴"], False),
     "rho": ([r"\rho", "ϱ"], False),
-    "pi": ([r"\pi", "ϖ"], False),
     "kappa": ([r"\kappa", "ϰ"], False),
     "double integral": ([r"\iint f", r"\int\!\int f"], False),
     "triple integral": ([r"\iiint f", r"\int\int\int f"], False),
@@ -109,7 +108,7 @@ def in_context(context: str, spelling: str) -> str:
 @relation(HOLDS, domain=f"{len(EQUIVALENT)} folds, each spelling as the gold and as the page, 4 contexts")
 @pytest.mark.parametrize("fold", list(EQUIVALENT))
 def test_equation_spellings_that_render_alike_pass_each_others_tests(fold):
-    """For each of 50 folds of the equation test (transposes, double bars and brackets, bars and arrows over a
+    """For each of 52 folds of the equation test (transposes, double bars and brackets, bars and arrows over a
     symbol, long arrows, binary and big operators with limits, Σ and Π with a relation in the lower limit,
     triangles, subsets, angle fences, Unicode letters and primes, Greek variants, double integrals, top-level
     row breaks, empty scripts, a raw percent), a test written with any spelling passes on a page written with
@@ -147,6 +146,8 @@ DISTINCT: list[tuple[str, str]] = [
     (r"\vec{xy}", r"\overrightarrow{xy}"),
     (r"\vec{1}", r"\overrightarrow{1}"),
     (r"A\cup B", r"A\bigcup B"),
+    (r"\pi", "ϖ"),
+    (r"x=\pi r", r"x=\varpi r"),
     (r"A\cap B", r"A\bigcap B"),
     (r"A\oplus B", r"A\bigoplus B"),
     (r"A\otimes B", r"A\bigotimes B"),
@@ -335,7 +336,6 @@ EQUIVALENT_REWRITES = {
     "\\mathfrak{g} as 𝔤": _rewrite(r"\\mathfrak\{g\}", "𝔤"),
     "an apostrophe as a prime": _rewrite(r"(?<=[A-Za-z0-9])'(?![A-Za-z'_^])", "′"),
     "\\rho as ϱ": _rewrite(r"\\rho" + NOT_A_LETTER, "ϱ"),
-    "\\pi as ϖ": _rewrite(r"\\pi" + NOT_A_LETTER, "ϖ"),
     "\\kappa as ϰ": _rewrite(r"\\kappa" + NOT_A_LETTER, "ϰ"),
     "\\iint as two integrals": _rewrite(r"\\iint" + NOT_A_LETTER, r"\\int\\!\\int "),
     "\\mbox as \\text": _rewrite(r"\\mbox\{", r"\\text{"),
@@ -365,6 +365,7 @@ DISTINCT_REWRITES = {
         _rewrite(NOT_SIZED + r"\\rangle" + NOT_A_LETTER, ">"),
     ),
     "\\cdot as \\bullet": _rewrite(r"\\cdot" + NOT_A_LETTER, r"\\bullet"),
+    "\\pi as ϖ": _rewrite(r"\\pi" + NOT_A_LETTER, "ϖ"),
 }
 # One gold equation for each rewrite, so that a run on the fixtures (three equations) is not vacuous.
 FIXED_LATEX = [
