@@ -5,6 +5,196 @@ import pytest
 
 from omni_parse_bench import equations, markdown, views
 from omni_parse_bench.scorers.unit_tests import runners
+from omni_parse_bench.scorers import unit_tests
+
+
+@pytest.mark.parametrize("mark", [r"\top", "T", r"\mathsf T", r"\intercal", r"\mathrm{T}"])
+def test_transpose_marks_match_in_both_directions(mark):
+    top, other = r"A^\top", f"A^{{{mark}}}"
+    assert equations.symbols(top) == equations.symbols(other)
+    assert equations.appears(top, f"${other}$")[0]
+    assert equations.appears(other, f"${top}$")[0]
+
+
+def test_multiple_transposes_and_subscripts_match_in_both_directions():
+    top = r"(AB)^\top = B^\top A^\top + C_i^\top"
+    other = r"(AB)^T = B^T A^T + C_i^T"
+    assert equations.appears(top, f"${other}$")[0]
+    assert equations.appears(other, f"${top}$")[0]
+
+
+@pytest.mark.parametrize("left, right", [
+    (r"\top \land p", r"T \land p"),
+    (r"\top \land p", r"\intercal \land p"),
+    (r"T+x", r"\top+x"),
+    (r"A^{T_1}", r"A^{\top_1}"),
+    (r"A^{x_T}", r"A^{x_\top}"),
+    (r"A^{\mathbb{T}x}", r"A^{Tx}"),
+    (r"A^{\mathbb{T}}", r"A^{T}"), (r"A^{\mathcal{T}}", r"A^{T}"),
+    (r"A^{\mathfrak{T}}", r"A^{T}"),
+])
+def test_transpose_marks_remain_distinct_elsewhere(left, right):
+    assert equations.symbols(left) != equations.symbols(right)
+    assert not equations.appears(left, f"${right}$")[0]
+    assert not equations.appears(right, f"${left}$")[0]
+
+
+def test_transpose_through_unit_tests_scorer():
+    tests = unit_tests.tests.parse("p", {"tests": [{
+        "id": "transpose", "test_type": "present", "output_type": "html", "derivation": "authored",
+        "tags": ["math"], "args": {"content": {"latex": r"x^\top A x"}}, "settings": {},
+    }]})
+    assert unit_tests.score({"html": r"<p>$x^T A x$</p>"}, tests)[0].result == "pass"
+
+
+@pytest.mark.parametrize("left, right", [(r"A^{-T}", r"A^{-\top}"), (r"A^{Tx}", r"A^{\top x}")])
+def test_transpose_inside_a_superscript_matches_in_both_directions(left, right):
+    assert equations.appears(left, f"${right}$")[0]
+    assert equations.appears(right, f"${left}$")[0]
+
+
+@pytest.mark.parametrize("tex, plain", [("x^T", "x<sup>T</sup>"), ("A^T", "Aᵀ"),
+                                        (r"A^\top", "Aᵀ"), (r"A^{-\top}", "A<sup>-T</sup>")])
+def test_plain_text_transpose_is_read_like_math(tex, plain):
+    assert equations.in_text(tex, f"<p>{plain}</p>")
+    assert runners.present(runners.Present(runners.Latex(tex)), views.html(f"<p>{plain}</p>"))[0]
+
+
+@pytest.mark.parametrize("other", [r"\|x\|", r"\lVert x\rVert", "‖x‖"])
+def test_norm_bars_match_in_both_directions(other):
+    assert equations.symbols("||x||") == equations.symbols(other)
+    assert equations.appears("||x||", f"${other}$")[0]
+    assert equations.appears(other, "$||x||$")[0]
+
+
+@pytest.mark.parametrize("product", ["|a||b|", r"\lvert a\rvert\lvert b\rvert"])
+def test_adjacent_absolute_values_match_themselves_and_each_other(product):
+    for other in ("|a||b|", r"\lvert a\rvert\lvert b\rvert"):
+        assert equations.appears(product, f"${other}$")[0]
+
+
+def test_adjacent_absolute_value_bars_can_match_a_double_bar():
+    assert equations.appears("|a||b|", r"$|a\|b|$")[0]
+
+
+@pytest.mark.parametrize("other", ["W[[z]]", r"W[\![z]\!]", "W⟦z⟧"])
+def test_double_brackets_match_in_both_directions(other):
+    tex = r"W\llbracket z\rrbracket"
+    assert equations.symbols(tex) == equations.symbols(other)
+    assert equations.appears(tex, f"${other}$")[0]
+    assert equations.appears(other, f"${tex}$")[0]
+
+
+def test_single_brackets_are_not_double_brackets():
+    single, double = "[z,w]", "[[z,w]]"
+    assert equations.symbols(single) != equations.symbols(double)
+    assert equations.appears(single, f"${double}$")[0]  # a nested subexpression
+    assert not equations.appears(double, f"${single}$")[0]
+
+
+def test_nested_commutators_remain_distinct_from_each_other_and_double_brackets():
+    left, right, double = "[[x,y],z]", "[x,[y,z]]", r"\llbracket x,y\rrbracket"
+    assert equations.appears(left, f"${left}$")[0]
+    for a, b in ((left, right), (double, left)):
+        assert not equations.appears(a, f"${b}$")[0]
+        assert not equations.appears(b, f"${a}$")[0]
+
+
+@pytest.mark.parametrize("left, right", [
+    (r"\bar{x}", r"\overline{x}"), (r"\vec{x}", r"\overrightarrow{x}"),
+    *[(a, b) for a, b in zip("→↦←⇒⇐⇔↔", "⟶⟼⟵⟹⟸⟺⟷", strict=True)],
+    *[(f"{a}_i", f"{b}_i") for a, b in zip("∪∩⊕⊗⊙∨∧⊔", "⋃⋂⨁⨂⨀⋁⋀⨆", strict=True)],
+    (r"\Sigma_{i=1}^n", r"\sum_{i=1}^n"), (r"\Pi_{i=1}^n", r"\prod_{i=1}^n"),
+    ("⊲", "◃"), ("⊳", "▹"),
+    ("⊊", "⫋"), ("⊋", "⫌"), ("⊆", "⫅"), ("⊇", "⫆"),
+    (r"a\mid b", r"a\vert b"),
+    (r"30^\circ", "30°"),
+    (r"\sum_{i\not\in S}x_i", r"\sum_{i\notin S}x_i"),
+    (r"\Sigma_{i\not\in S}x_i", r"\sum_{i\notin S}x_i"),
+])
+def test_rendered_lookalikes_match_both_directions(left, right):
+    assert equations.symbols(left) == equations.symbols(right)
+    assert equations.appears(left, f"${right}$")[0]
+    assert equations.appears(right, f"${left}$")[0]
+
+
+@pytest.mark.parametrize("left, right", [
+    (r"\bar{x}", r"\overline{xy}"), (r"\bar{xy}", r"\overline{xy}"),
+    (r"\vec{xy}", r"\overrightarrow{xy}"), (r"\vec{1}", r"\overrightarrow{1}"),
+    (r"\mathcal{A}", "A"), (r"\mathbb{A}", "A"), (r"\mathfrak{A}", "A"),
+    ("v", "υ"), ("w", "ω"), ("a", "α"), ("ı", "ι"), ("ε", "∈"),
+    (r"\check{x}", r"\breve{x}"), ("=", "≡"), ("1", "𝟙"), ("Δ", "△"),
+    (r"\langle x,y\rangle", "<x,y>"), ("ℓ", "l"), ("·", "•"), ("⊴", "⊵"),
+    (r"a\cdot b", r"a\bullet b"), (r"A\cup B", r"A\bigcup B"),
+    (r"\Sigma_{xy}", r"\sum_{xy}"), (r"\Pi(x)", r"\prod(x)"),
+    (r"\Sigma_i", r"\sum_i"), (r"\Sigma^{-1}\mu", r"\sum^{-1}\mu"),
+    *[(f"a{a}b", f"a{b}b") for a, b in zip("∪∩⊕⊗⊙∨∧⊔", "⋃⋂⨁⨂⨀⋁⋀⨆", strict=True)],
+])
+def test_distinct_symbols_and_composite_accents_stay_distinct(left, right):
+    assert equations.symbols(left) != equations.symbols(right)
+    assert not equations.appears(left, f"${right}$")[0]
+    assert not equations.appears(right, f"${left}$")[0]
+
+
+@pytest.mark.parametrize("test, output", [
+    (r"|x|<1", r"\{x\mid|x|<1\}"), (r"|x|-1", r"||x|-1|"),
+    ("[B,C]", "[A,[B,C]]"), ("[A,B]", "[[A,B],C]"),
+    ("[0,1]", "[[0,1],[2,3]]"), ("|a|", "|a||b|"),
+])
+def test_nested_delimiters_preserve_existing_substring_matches(test, output):
+    assert equations.appears(test, f"${output}$")[0]
+
+
+@pytest.mark.parametrize("tex, plain", [("[[x]]", "[[x]]"), ("||x||", "||x||"),
+                                        ("|a||b|", "|a||b|"), (r"\llbracket x\rrbracket", "⟦x⟧"),
+                                        (r"\|x\|", "‖x‖")])
+def test_plain_text_keeps_double_delimiters(tex, plain):
+    assert equations.in_text(tex, f"<p>{plain}</p>")
+
+
+@pytest.mark.parametrize("left, right", [
+    (r"\left<x\right>", r"\langle x\rangle"), (r"\bigl<x\bigr>", r"\langle x\rangle"),
+    ("〈x〉", r"\langle x\rangle"), ("〈x〉", r"\langle x\rangle"),
+    ("ℝ", r"\mathbb{R}"), ("ℕ", r"\mathbb{N}"), ("ℤ", r"\mathbb{Z}"),
+    ("ℂ", r"\mathbb{C}"), ("ℚ", r"\mathbb{Q}"), ("𝟙", r"\mathbb{1}"),
+    ("𝔤", r"\mathfrak{g}"), ("𝑥", "x"), ("𝐱", "x"),
+    ("x′", "x'"), ("x″", "x''"), ("x‴", "x'''"), ("x′", r"x^\prime"),
+    ("5%+3", r"5\%+3"), ("ϱ", r"\rho"), ("ϰ", r"\kappa"),
+    (r"\iint f", r"\int\!\int f"), (r"\iiint f", r"\int\int\int f"),
+    (r"x^{}", "x"), (r"x_{}", "x"), (r"x_{}^2", r"x^2"),
+    (r"\mbox{hi}", r"\text{hi}"), (r"\mathds{R}", r"\mathbb{R}"),
+])
+def test_more_rendered_forms_are_equivalent(left, right):
+    assert equations.symbols(left, True) == equations.symbols(right, True)
+    assert equations.appears(left, f"${right}$")[0]
+    assert equations.appears(right, f"${left}$")[0]
+
+
+def test_top_level_display_rows_match_an_aligned_environment():
+    assert equations.symbols(r"a=b\\c=d", True) == equations.symbols(
+        r"\begin{aligned}a&=b\\c&=d\end{aligned}", True)
+    assert equations.appears(r"\begin{aligned}a&=b\\c&=d\end{aligned}", r"$$a=b\\c=d$$")[0]
+
+
+def test_percent_comment_falls_back_when_escaping_would_not_render():
+    assert equations.symbols("x%}") == equations.symbols("x")
+
+
+def test_raw_percent_is_read_in_multiline_display_math():
+    assert equations.symbols("5%+\n3", True) == equations.symbols(r"5\%+3", True)
+    assert equations.appears(r"5\%+3", "$$5%+\n3$$")[0]
+
+
+def test_equations_previously_matched_across_comments_and_top_level_rows_still_match():
+    assert equations.appears(r"x=1% \text{.}", r"$x=1$")[0]
+    assert equations.appears("a+b", "$$a %comment\n + b$$")[0]
+    assert equations.appears(r"a=b\\c=d", r"$a=bc=d$")[0]
+    assert equations.appears(r"a=b+c", r"$$a=b\\+c$$")[0]
+
+
+@pytest.mark.parametrize("tex, plain", [(r"a\longrightarrow b", "a ⟶ b"), (r"a\triangleleft b", "a ⊲ b")])
+def test_plain_text_reads_math_aliases(tex, plain):
+    assert equations.in_text(tex, f"<p>{plain}</p>")
 
 
 @pytest.mark.parametrize("test, output", [
@@ -38,7 +228,6 @@ def test_one_equation_written_two_ways_matches(test, output):
     (r"a^{2}+b", r"<p>$a+b$</p>"),
     (r"\sum_{i=1}^{n} x_i", r"<p>$\sum_{i=1} x_i$</p>"),
     (r"\mathbb{R}^n", r"$R^n$"),
-    (r"\bar{x}", r"$\overline{x}$"),
     (r"A\setminus B", r"$A - B$"),
     (r"\mathcal{Z}", r"$\Z$"),
     (r"d_{\min}^{\mathcal{C}}", r"$d_{\min}^{\mathcal{Q}}$"),
@@ -100,7 +289,7 @@ def test_inline_math_may_hold_a_line_break_but_not_a_block():
     (r"a=b", '\\begin{equation}\na=b\n\\end{equation}', True),
     (r"a=b", r"$$\begin{equation}a=b\end{equation}$$", True),
     (r"\frac{a}{b}", r"$ \frac{a}{b} $", True),
-    (r"\bar{x}", r"$\overline{x}$", False),  # \bar and \overline differ
+    (r"\bar{x}", r"$\overline{x}$", True),
     (r"f=\begin{cases}1&x>0\\0&x\le0\end{cases}",
      r"$$f=\left\{\begin{array}{ll}1&x>0\\0&x\le0\end{array}\right.$$", True),
     (r"x^2+y", r"$x^2+y \badmacro$", True),
@@ -118,7 +307,7 @@ def test_an_equation_is_found_only_as_written(test, output, ok):
 
 
 @pytest.mark.parametrize("test, output, ok", [
-    (r"\mu : S \longrightarrow G", r"$\mu : S \rightarrow G$", False),
+    (r"\mu : S \longrightarrow G", r"$\mu : S \rightarrow G$", True),
     (r"\pi_1: V\longrightarrow W", r"$\pi_1: V\longrightarrow W$", True),
     (r"g \cdot (h \cdot x) = (gh) \cdot x", "g . (h . x) = (gh) . x", False),
     (r"a \cdot b", r"$a.b$", True),

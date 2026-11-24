@@ -27,7 +27,12 @@ Markdown is a vendor's output: the harness turns it into HTML (`markdown.to_html
 it, so `**x**` and `<strong>x</strong>` are the same marks by construction, and an HTML tag inside the
 markdown (`H<sub>2</sub>O`) is read as HTML. Markdown has no superscript or subscript and no single-tilde
 strikethrough, so a markdown-only output cannot carry them. Not a mark: a heading or `<th>` (drawn bold, not
-marked), `<mark>`, `<a>`, `<kbd>`, Unicode superscript characters, and LaTeX. Text inside `<math>` carries
+marked), `<mark>`, `<a>`, `<kbd>`, Unicode superscript characters, and LaTeX, except a subscript or
+superscript written inside inline or display maths (`$V_1$`, `\\(x^{2}\\)`, `$\\mathrm{LC}_{50}$`):
+`maths` reads it as `V<sub>1</sub>`, the base before the script plain, when the whole span is simple (letters,
+digits, signs, `\\mathrm{}`/`\\text{}` groups, argument-less commands such as `\\mu` and `\\times`, scripts of
+those); a span with a command that takes an argument (`\\frac`, `\\sqrt`), a nested script or no script is
+left as written, and maths in code is not read. Text inside `<math>` carries
 no mark, and what `views.html` hides is not read: a comment, a doctype, and a `<script>`, `<style>`, `<head>`
 or `<title>` that an end tag closes, with everything in it. One that is never closed hides nothing, as in
 `views.html`, so its text is read like any other.
@@ -42,14 +47,17 @@ from __future__ import annotations
 
 import collections
 import functools
+import html as _html
 import re
 import unicodedata
 from html.parser import HTMLParser
 from typing import NamedTuple
 
-from omni_parse_bench import normalize, views
+from omni_parse_bench import mathspans, normalize, views
 
 KINDS = ("bold", "italic", "underline", "strike", "sup", "sub")
+# Note: on a character whose script `maths` read from LaTeX, beside its "sub" or "sup"; never a kind
+FROM_MATHS = "~maths"
 # Note: the most mark elements an end tag that crosses them puts back on: a page of 20,000 is not read twice
 REOPEN = 16
 
@@ -72,6 +80,8 @@ class Marked(NamedTuple):
     text: str
     marks: tuple[frozenset[str], ...]
     emitted: bool   # whether some letter or digit of the text carries a mark
+    # whether some letter or digit carries a mark the markup makes, not one `maths` read from a script
+    written: bool = True
 
 
 def fold(s: str) -> str:
@@ -222,7 +232,10 @@ class _Reader(HTMLParser):
             return
         add, drop, own = style_marks(dict(attrs).get("style") or "")
         default = frozenset({TAGS[tag]} if tag in TAGS else ()) - own
-        self._push(tag, default | add, drop)
+        # Note: a script `maths` read from LaTeX is flagged, so it is no evidence for any other mark
+        read = tag in ("sub", "sup") and dict(attrs).get("data-opb-maths") == ""
+        flag = frozenset({FROM_MATHS}) if read else frozenset()
+        self._push(tag, default | add | flag, drop)
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         pass
@@ -250,6 +263,187 @@ class _Reader(HTMLParser):
             self.runs.append(([data], marks))
 
 
+_WRAP = re.compile(r"\\(?:mathrm|mathit|mathbf|mathsf|mathtt|mathnormal|text|textrm|textit|textbf|textsf|"
+                   r"operatorname)(?![A-Za-z])\s*\{")
+_COMMAND = re.compile(r"\\([A-Za-z]+)")
+_ESCAPED = re.compile(r"\\([%&#$_{}])")
+_SPACING = re.compile(r"\\(?:[,;:! ]|quad(?![A-Za-z])|qquad(?![A-Za-z]))")
+# Note: the commands that take no argument and stand for a symbol or a word: read as that text, so the scripts
+# around them are read. One that takes an argument (\frac, \sqrt, \bar, \begin) is not here: the span is left.
+_SYMBOLS = {"times": "×", "pm": "±", "mp": "∓", "cdot": "·", "div": "÷", "leq": "≤", "le": "≤", "geq": "≥",
+            "ge": "≥", "neq": "≠", "ne": "≠", "sim": "∼", "approx": "≈", "infty": "∞", "to": "→",
+            "rightarrow": "→", "propto": "∝", "ell": "ℓ", "hbar": "ℏ", "partial": "∂", "nabla": "∇",
+            "prime": "′", "circ": "°", "ast": "*", "star": "*", "bullet": "•", "ldots": "…", "cdots": "…",
+            "dots": "…", "angstrom": "Å", "degree": "°", "perp": "⊥", "parallel": "∥"}
+_WORDS = frozenset({"sin", "cos", "tan", "log", "ln", "exp", "max", "min", "lim", "sup", "inf", "det", "arg",
+                    "dim", "deg", "gcd", "sinh", "cosh", "tanh"})
+_SIZES = frozenset({"left", "right", "big", "Big", "bigg", "Bigg", "bigl", "bigr", "Bigl", "Bigr", "biggl",
+                    "biggr"})
+_GREEK = {n.lower(): n for n in (
+    "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi pi rho sigma tau upsilon phi "
+    "chi psi omega").split()}
+
+
+def _greek(name: str) -> str | None:
+    """The Greek letter a command names (`\\mu`, `\\Delta`, `\\varepsilon`), or None."""
+    base = name[3:] if name.startswith("var") else name
+    low = _GREEK.get(base.lower())
+    if low is None or (name.startswith("var") and base != base.lower()):
+        return None
+    name = "LAMDA" if low == "lambda" else low.upper()      # Note: Unicode spells it without the b
+    return unicodedata.lookup(f"GREEK {'CAPITAL' if base[0].isupper() else 'SMALL'} LETTER {name}")
+
+
+_PLAIN = re.compile(r"[^\\{}^_$\s]")
+
+
+def _seq(body: str, i: int, closing: bool, scripts: bool) -> tuple[list[str], int, bool] | None:
+    """The items of `body` from `i`, as HTML pieces: up to the `}` that closes a group (`closing`) or the end.
+    A script (`_` or `^` and its argument) becomes `<sub>`/`<sup>`, unless `scripts` is False (inside a
+    script's own argument, where one is not read). Returns the pieces, where it stopped (after the closing
+    brace), and whether a script was met; None for anything this doesn't read."""
+    out: list[str] = []
+    scripted = False
+    while i < len(body):
+        c = body[i]
+        if c.isspace():
+            i += 1
+        elif c == "}":
+            return (out, i + 1, scripted) if closing else None
+        elif c == "{":
+            got = _seq(body, i + 1, True, scripts)
+            if got is None:
+                return None
+            out += got[0]
+            i, scripted = got[1], scripted or got[2]
+        elif c in "_^":
+            if not scripts:
+                return None
+            arg = _argument(body, i + 1)
+            if arg is None:
+                return None
+            tag = "sub" if c == "_" else "sup"
+            out.append(f'<{tag} data-opb-maths="">{arg[0]}</{tag}>')
+            i, scripted = arg[1], True
+        elif c == "\\":
+            if m := _SPACING.match(body, i):
+                i = m.end()
+            elif m := _ESCAPED.match(body, i):
+                out.append(_html.escape(m[1], quote=False))
+                i = m.end()
+            elif m := _WRAP.match(body, i):
+                got = _seq(body, m.end(), True, scripts)
+                if got is None:
+                    return None
+                out += got[0]
+                i, scripted = got[1], scripted or got[2]
+            elif m := _COMMAND.match(body, i):
+                name, i = m[1], m.end()
+                if name in _SIZES:
+                    if name in ("left", "right") and body[i:i + 1] == ".":
+                        i += 1     # `\left.` and `\right.` draw no delimiter
+                elif (text := _SYMBOLS.get(name) or _greek(name)) is not None:
+                    out.append(text)
+                elif name in _WORDS:
+                    out.append(name)
+                else:
+                    return None
+            else:
+                return None
+        else:
+            out.append(_html.escape(c, quote=False))
+            i += 1
+    return (out, i, scripted) if not closing else None
+
+
+def _argument(body: str, i: int) -> tuple[str, int] | None:
+    """The text of the script argument at `body[i]`: one character, one command, or a `{..}` group, none of
+    them with a script of their own; and where it ends. None when it is empty or not read."""
+    while i < len(body) and body[i].isspace():
+        i += 1
+    if i >= len(body):
+        return None
+    if body[i] == "{":
+        got = _seq(body, i + 1, True, False)
+    elif body[i] == "\\":
+        if m := _WRAP.match(body, i):
+            got = _seq(body, m.end(), True, False)
+        elif m := _COMMAND.match(body, i) or _ESCAPED.match(body, i):
+            got = _seq(body[:m.end()], i, False, False)
+            got = got and (got[0], m.end(), got[2])
+        else:
+            return None
+    elif _PLAIN.fullmatch(body[i]):
+        return _html.escape(body[i], quote=False), i + 1
+    else:
+        return None
+    return ("".join(got[0]), got[1]) if got and got[0] else None
+
+
+def maths(body: str) -> str | None:
+    """A maths span's body as HTML where its scripts are `<sub>` and `<sup>`, or None when it holds no script
+    or anything this reads no further than: a command that takes an argument (`\\frac`, `\\sqrt`), a nested
+    script, a script with nothing in it. `V_1` is `V<sub>1</sub>`, `\\mathrm{LC}_{50}` is `LC<sub>50</sub>`,
+    `1.5 \\times 10^{-3}` is `1.5×10<sup>-3</sup>`, `{}^{14}C` is `<sup>14</sup>C`."""
+    # Note: a span that holds a tag straddles elements ("<b>$5 _</b><i>$"), so it is no maths of one
+    # place; the entities of the rest are read as the text they stand for.
+    if "<" in body or ">" in body:
+        return None
+    got = _seq(_html.unescape(body), 0, False, True)
+    return "".join(got[0]) if got and got[2] else None
+
+
+_CODE = re.compile(r"<(code|pre|kbd|samp)\b[^>]*>", re.I)
+
+
+def _code_ranges(html: str) -> list[tuple[int, int]]:
+    """Where `<code>`, `<pre>`, `<kbd>` and `<samp>` hold text: what is written there is not maths. One never
+    closed holds the rest of the page, as in a browser."""
+    out, i = [], 0
+    while m := _CODE.search(html, i):
+        j = html.lower().find(f"</{m[1].lower()}", m.end())
+        out.append((m.start(), len(html) if j < 0 else j))
+        i = out[-1][1]
+    return out
+
+
+def _delimited(html: str, opener: str, closer: str) -> list[tuple[int, int, str]]:
+    """The `opener..closer` spans of `html` (start, end, body), found in one pass: an opener with no closer
+    after it ends the search, so a page of unclosed ones is read once."""
+    out, i = [], 0
+    while (a := html.find(opener, i)) >= 0:
+        b = html.find(closer, a + 2)
+        if b < 0:
+            break
+        out.append((a, b + 2, html[a + 2:b]))
+        i = b + 2
+    return out
+
+
+def with_scripts(html: str) -> str:
+    """`html` with each inline or display maths span (`$..$`, `$$..$$`, `\\(..\\)`, `\\[..\\]`) that `maths`
+    reads written as its markup, so `read` sees `V<sub>1</sub>` where the output has `$V_1$`. Maths in code is
+    left alone."""
+    if "$" not in html and "\\(" not in html and "\\[" not in html:
+        return html
+    code = _code_ranges(html) if _CODE.search(html) else []
+    inside = lambda a: any(s <= a < e for s, e in code)  # noqa: E731
+    edits: list[tuple[int, int, str]] = []
+    taken: list[tuple[int, int]] = []
+    for opener, closer in (("\\(", "\\)"), ("\\[", "\\]")):
+        for a, b, body in _delimited(html, opener, closer):
+            taken.append((a, b))
+            if not inside(a) and (r := maths(body)) is not None:
+                edits.append((a, b, r))
+    for sp in mathspans.find(html, apart=tuple(taken)):
+        d = 2 if sp.display else 1
+        if sp.read and not inside(sp.start) and (r := maths(html[sp.start + d:sp.end - d])) is not None:
+            edits.append((sp.start, sp.end, r))
+    for a, b, r in sorted(edits, reverse=True):
+        html = html[:a] + r + html[b:]
+    return html
+
+
 @functools.lru_cache(maxsize=256)
 def read(html: str) -> Marked:
     """The output's folded text, and the marks of each of its characters. Block boundaries and whitespace fold
@@ -261,6 +455,7 @@ def read(html: str) -> Marked:
     # Note: a "<" that starts no tag is text, as in the text view: an unclosed comment, "<![CDATA[", "<?xml",
     # "</ 3" and a tag left open at the end must not hide what follows from this reader alone
     html = _NOT_A_TAG.sub("&lt;", html)
+    html = with_scripts(html)
     r = _Reader()
     r.feed(html)
     r.close()
@@ -271,7 +466,11 @@ def read(html: str) -> Marked:
         text.append(f)
         marks.extend([m] * len(f))
     flat = "".join(text)
-    return Marked(flat, tuple(marks), any(m and c.isalnum() for c, m in zip(flat, marks, strict=True)))
+    pairs = list(zip(flat, marks, strict=True))
+    return Marked(flat, tuple(marks), any(m and c.isalnum() for c, m in pairs),
+                  any(c.isalnum()
+                      and (m - {FROM_MATHS} if FROM_MATHS not in m else m - {FROM_MATHS, "sub", "sup"})
+                      for c, m in pairs))
 
 
 def check(out: Marked, before: str, span: str, after: str, wanted: tuple[str, ...],
@@ -286,7 +485,9 @@ def check(out: Marked, before: str, span: str, after: str, wanted: tuple[str, ..
     b, s, a = fold(before), fold(span), fold(after)
     if not s:
         raise ValueError("a format test's span has nothing left after folding")
-    if absent and not out.emitted:
+    # Note: a script read from maths shows only that a script could have been written, so it is evidence
+    # for an absent `sub` or `sup` and for no other kind
+    if absent and not (out.emitted if set(absent) <= {"sub", "sup"} else out.written):
         return False, "the output has no marks at all, so it cannot show that a mark is absent"
     t, why, verdicts = out.text, "", []
     context = b + s + a

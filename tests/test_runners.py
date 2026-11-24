@@ -5,12 +5,29 @@ import re
 
 import pytest
 
-from omni_parse_bench import views
+from omni_parse_bench import normalize, views
 from omni_parse_bench.scorers.unit_tests import runners as R
 
 
 def html(s: str) -> views.Html:
     return views.html(s)
+
+
+@pytest.mark.parametrize("prefix", [
+    "", " ", "(", "[", "-", "+", "−", "±", "$", "£", "€", "¥", "<", "=", "≈", "~", "×", "/", ":", "_",
+])
+@pytest.mark.parametrize("dot", ["·", "∙"])
+def test_a_leading_raised_decimal_point_matches_a_full_stop(prefix, dot):
+    raised, point = f"{prefix}{dot}2480550383", f"{prefix}.2480550383"
+    assert normalize.fold(raised) == normalize.fold(point)
+    assert R.found(R.Text(raised, 0), html(f"<p>{point}</p>"))[0]
+    assert R.found(R.Text(point, 0), html(f"<p>{raised}</p>"))[0]
+
+
+@pytest.mark.parametrize("text", ["太原·2020", "A·1", "太原∙2020", "A∙1", "(a)·1", "x)·2", "x]·2"])
+def test_a_middle_dot_after_a_letter_is_not_a_decimal_point(text):
+    assert normalize.fold(text) == text.lower()
+    assert not R.found(R.Text(text, 0), html(f"<p>{text.replace('·', '.').replace('∙', '.')}</p>"))[0]
 
 
 @pytest.mark.parametrize("source, count", [

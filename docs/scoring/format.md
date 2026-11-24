@@ -55,8 +55,22 @@ reads it, so `**x**` and `<strong>x</strong>` are the same marks (case fm-markdo
 output are text, not marks (case fm-raw-markdown), and an html tag inside the markdown is read as html (case
 fm-markdown-html). Markdown has no superscript or subscript and no single-tilde
 strikethrough, so a markdown-only output cannot carry them. Not marks: a heading or a table heading (drawn bold),
-`<mark>`, a link, a class, a Unicode superscript, mathematical bold letters, and LaTeX (cases fm-heading, fm-th,
-fm-mark-element, fm-link, fm-class, fm-unicode-sup, fm-math-bold-letters, fm-latex-sup). Text inside `<math>` carries no
+`<mark>`, a link, a class, a Unicode superscript, mathematical bold letters, and LaTeX other than a script (cases fm-heading, fm-th,
+fm-mark-element, fm-link, fm-class, fm-unicode-sup, fm-math-bold-letters, fm-latex-not-bold). A subscript or superscript
+written inside inline or display maths (`$..$`, `$$..$$`, `\(..\)`, `\[..\]`) is the `sub` or `sup` mark on that text, with the
+base before it plain: `$V_1$`, `$V_{1}$` and `\(V_1\)` read as `V<sub>1</sub>`, `$\mathrm{LC}_{50}$` as `LC<sub>50</sub>` and
+`$x^{2}$` as `x<sup>2</sup>`; a script is one character, one command or a braced group of those, and `\mathrm`, `\text` and similar groups
+(which may hold scripts: `\mathrm{H_2O}`), after any base, an empty one too (`{}^{14}`), with spaces allowed around `_` and `^`
+(cases fm-latex-sup, fm-latex-sub, fm-latex-sub-paren, fm-latex-sub-mathrm). A command with no argument is a symbol and
+the scripts around it are read: Greek letters (`\mu` is μ), `\times`, `\pm`, `\cdot`, `\leq`, `\circ`, `\max` and
+the like, `\left` and `\right` (case fm-latex-times). A span with a command that takes an argument (`\frac`, `\sqrt`,
+`\bar`, `\begin`), a script inside a script, or no script is left as written and makes no mark (case fm-latex-frac); a script that differs from the span does not match (case fm-latex-sub-other-script), and an
+`absent` test fails on one (case fm-latex-sub-absent). Maths in `<code>`, `<pre>`, `<kbd>` or `<samp>` (inline code and
+fences in markdown too) is not read. A script read from maths is evidence for an absent `sub` or `sup` test only: the output
+must show a mark somewhere before a negative test can pass, and `$x_1$` is no mark for an absent bold, italic, underline or
+strike test (case fm-latex-absent-bold). The other ways to write a script (Unicode `₂` `²`, `\textsubscript`,
+`\textsuperscript`) are still not marks: that is the reader's standing rule for Unicode, and an output can write HTML or
+maths. Text inside `<math>` carries no
 mark, and nothing in a script, a comment or the head is read (cases fm-in-math, fm-hidden); code is read like any
 other text (case fm-in-code).
 
@@ -123,7 +137,16 @@ other text (case fm-in-code).
 | P | markdown markers written into an html output | bold on `total`, context `the total due` | `the **total** due` | fail: `the context is not in the output` | `fm-raw-markdown` |
 | P | mathematical bold letters read as the letters, not as a mark | bold on `total`, context `the total due` | `the 𝐭𝐨𝐭𝐚𝐥 due` | fail: `the span lacks ['bold']` | `fm-math-bold-letters` |
 | P | a Unicode superscript is not `<sup>` | sup on `2`, context `x2 + 1` | `x² + 1` | fail: `the span lacks ['sup']` | `fm-unicode-sup` |
-| P | LaTeX is not `<sup>`: maths has its own tests | sup on `2`, context `x2 + 1` | `$x^{2}$ + 1` | fail: `the context is not in the output` | `fm-latex-sup` |
+| I | a superscript written in maths is a superscript | sup on `2`, context `x2 + 1` | `$x^{2}$ + 1` | pass | `fm-latex-sup` |
+| I | a subscript written in inline maths is a subscript | sub on `1`, context `the volume V1 was` | `the volume $V_1$ was` | pass | `fm-latex-sub` |
+| I | the same in `\(..\)`, with braces | sub on `1`, context `the volume V1 was` | `the volume \(V_{1}\) was` | pass | `fm-latex-sub-paren` |
+| I | a `\mathrm` base is plain context | sub on `50`, context `LC50` | `$\mathrm{LC}_{50}$` | pass | `fm-latex-sub-mathrm` |
+| P | a script that differs from the span | sub on `1`, context `the volume V1 was` | `the volume $V_2$ was` | fail: `the context is not in the output` | `fm-latex-sub-other-script` |
+| P | an absent-subscript test fails on a maths subscript | not sub on `1`, context `the volume V1 was` | `<p><b>x</b> the volume $V_1$ was</p>` | fail: `the span carries ['sub']` | `fm-latex-sub-absent` |
+| I | a command with no argument is a symbol and the script after it is read | sup on `-3`, context `1.5×10-3 m` | `$1.5 \times 10^{-3}$ m` | pass | `fm-latex-times` |
+| P | maths is no mark for an absent-bold test | not bold on `total`, context `the total due` | `<p>the total due</p><p>$x_1$</p>` | fail: `the output has no marks at all, so it cannot show that a mark is absent` | `fm-latex-absent-bold` |
+| P | `\frac` makes no script | sub on `1`, context `x1` | `$\frac{x}{y}_1$` | fail: `the context is not in the output` | `fm-latex-frac` |
+| P | maths does not make bold | bold on `total`, context `the total due` | `the $\mathbf{total}$ due` | fail: `the context is not in the output` | `fm-latex-not-bold` |
 | P | a mark inside `<math>` is not read | bold on `total`, context `the total due` | `the <math><b>total</b></math> due` | fail: `the span lacks ['bold']` | `fm-in-math` |
 | I | a mark inside `<code>` is read like any other | bold on `total`, context `the total due` | `the <code><b>total</b></code> due` | pass | `fm-in-code` |
 | P | a mark inside a script is not on the page | bold on `total`, context `the total due` | `the <script><b>total</b></script> due` | fail: `the context is not in the output` | `fm-hidden` |

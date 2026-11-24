@@ -8,6 +8,7 @@ import atexit
 import bisect
 import functools
 import html as _html
+import json
 import re
 import threading
 import unicodedata
@@ -21,10 +22,11 @@ KATEX = Path(__file__).parent / "katex" / "katex.js"   # KaTeX 0.16.22, MIT (LIC
 # Note: KaTeX defines a literal U+00B7 as \cdotp, which is math-only and fails inside \text{..} ("Undefined
 # control sequence" for a macro the source never wrote, so recovery deletes nothing and the whole span
 # reads as empty). It is redefined to its math symbol in either mode.
+_LETTERLIKE = {"ℂ": "C", "ℍ": "H", "ℕ": "N", "ℙ": "P", "ℚ": "Q", "ℝ": "R", "ℤ": "Z"}
 _RENDER = """(tex, display) => {
   try {
     const macros = {"\\\\coloneq": "\\\\coloneqq", "\\\\Coloneq": "\\\\Coloneqq",
-                    "\u00b7": "\\\\TextOrMath{$\\\\cdotp$}{\\\\cdotp}"};
+                    "\u00b7": "\\\\TextOrMath{$\\\\cdotp$}{\\\\cdotp}", ...LETTERLIKE};
     return {mathml: katex.renderToString(tex, {output: "mathml", displayMode: display, strict: "ignore",
                                                 throwOnError: true, trust: false, macros})};
   } catch (e) {
@@ -37,7 +39,12 @@ _KEPT_FONTS = {"double-struck": "double-struck", "script": "script", "fraktur": 
                "bold-script": "script", "bold-fraktur": "fraktur"}
 _ALIASES = str.maketrans({"⩽": "≤", "⩾": "≥", "∥": "‖", "−": "-", "′": "'", "∣": "|", "⋅": "·",
                           "∗": "*", "⋆": "*", "ϵ": "ε", "ϕ": "φ", "ϑ": "θ", "∶": ":",
-                          "…": "⋯", "\\": "∖", "♯": "#", "≔": ":=", "≕": "=:", "≦": "≤", "≧": "≥"})
+                          "…": "⋯", "\\": "∖", "♯": "#", "≔": ":=", "≕": "=:", "≦": "≤", "≧": "≥",
+                          "ϱ": "ρ", "ϰ": "κ", "〈": "⟨", "〉": "⟩", "〈": "⟨", "〉": "⟩"})
+# These folds apply to rendered math, not the plain-text fallback.
+_MATH_ALIASES = str.maketrans({"⟶": "→", "⟼": "↦", "⟵": "←", "⟹": "⇒", "⟸": "⇐", "⟺": "⇔", "⟷": "↔",
+                               "⊲": "◃", "⊳": "▹", "⫋": "⊊", "⫌": "⊋", "⫅": "⊆", "⫆": "⊇"})
+_BIG_OPERATORS = {"⋃": "∪", "⋂": "∩", "⨁": "⊕", "⨂": "⊗", "⨀": "⊙", "⋁": "∨", "⋀": "∧", "⨆": "⊔"}
 _DOTS, _VDOTS = {"⋯", "·", "."}, {"⋮", "⋱", "⋰"}
 _INVISIBLE = {"⁡", "⁢", "⁣", "⁤", "​"}
 _DROPPED = {"mspace", "mphantom", "annotation", "annotation-xml", "none", "mprescripts"}
@@ -87,6 +94,10 @@ class _KaTeX:
         self.lock = threading.Lock()
         self.ctx = py_mini_racer.MiniRacer()
         self.ctx.eval(KATEX.read_text())
+        macros = {ch: "\\TextOrMath{" + letter + "}{\\mathbb{" + letter + "}}"
+                  for ch, letter in _LETTERLIKE.items()}
+        macros.update({"\\mbox": "\\text", "\\mathds": "\\mathbb"})
+        self.ctx.eval(f"var LETTERLIKE = {json.dumps(macros, ensure_ascii=True)}")
         self.ctx.eval(f"var render = {_RENDER}")
 
     def render(self, tex: str, display: bool) -> dict:
@@ -94,6 +105,10 @@ class _KaTeX:
             return self.ctx.call("render", tex, display)
 
     def mathml(self, tex: str, display: bool) -> str | None:
+        # A raw percent in math is a printed sign, unless escaping it makes valid TeX fail to render.
+        escaped = re.sub(r"(?<!\\)((?:\\\\)*)%", lambda m: m[1] + r"\%", tex)
+        if escaped != tex:
+            if mathml := self.render(escaped, display).get("mathml"): return mathml
         return self.render(tex, display).get("mathml")
 
     def close(self) -> None:
@@ -132,10 +147,13 @@ def symbols(tex: str, display: bool = False) -> tuple[str, ...] | None:
                                  (". . . (2)"): dropped, on both sides
         negations                a relation with a slash through it (\not\in) and its negated character (∉)
         restrictions             a | opening a subscript and a | just before it (φ_{|S} and φ|_S)
+        transpose                ⊤, ⊺ and plain T in superscripts, except indexed symbols
+        double bars              two adjacent | and ‖
+        double brackets          ⟦ and ⟧, or pairs of square brackets
         constructions            `cases` and `\left\{ \begin{aligned} … \right.` render alike already
 
-    These stay differences: \bar and \overline, \setminus and a minus, one letter font for another, and a
-    dropped blackboard font."""
+    These stay differences: \setminus and a minus, one letter font for another, and a dropped blackboard
+    font."""
     mathml = _katex().mathml(tex, display)
     return None if mathml is None else _from_mathml(mathml)
 
@@ -145,7 +163,24 @@ def _from_mathml(mathml: str) -> tuple[str, ...] | None:
         root = ET.fromstring(re.sub(r"^<span[^>]*>|</span>$", "", mathml.strip()))
     except ET.ParseError:
         return None
-    return tuple(_degrees(_canonical(_walk(root))))
+    if root.get("display") == "block":
+        def rows(e: ET.Element, in_table: bool = False) -> None:
+            in_table = in_table or e.tag.removeprefix(_NS) == "mtable"
+            if not in_table and e.tag.removeprefix(_NS) == "mspace" and e.get("linebreak") == "newline":
+                e.set("data-row", "true")
+            for child in e: rows(child, in_table)
+        rows(root)
+    return tuple(_brackets(_bars(_degrees(_canonical(_walk(root))))))
+
+
+def _brackets(xs: list[str]) -> list[str]:
+    """Double-bracket glyphs read as two brackets, preserving matches inside nested expressions."""
+    return [t for x in xs for t in ({"⟦": ["[", "["], "⟧": ["]", "]"]}.get(x, [x]))]
+
+
+def _bars(xs: list[str]) -> list[str]:
+    """A double bar reads as two bars, preserving matches inside nested expressions."""
+    return [t for x in xs for t in (["|", "|"] if x == "‖" else [x])]
 
 
 def _degrees(xs: list[str]) -> list[str]:
@@ -186,6 +221,11 @@ def _canonical(xs: list[str]) -> list[str]:
             out[-1:] = ["|", "_("]
         elif x == "·" and out[-2:] == ["·", "·"]:
             out[-2:] = ["⋯"]
+        elif x == "'" and out and out[-1] == ")" and "^(" in out and all(
+                t == "'" for t in out[len(out) - 1 - out[::-1].index("^(") + 1:-1]):
+            out[-1:-1] = ["'"]
+        elif x == "'" and out and out[-1] != "'" and _operand(out[-1]):
+            out += ["^(", "'", ")"]
         else:
             out.append(x)
     return out
@@ -198,6 +238,7 @@ def _walk(e: ET.Element) -> list[str]:
     # position below. Only an invisible operator is dropped: an empty <mo> holds a place
     # (\mathbin{}^{2} is <msup> of an empty <mo> and 2).
     kids = [k for k in e if not (k.tag.removeprefix(_NS) == "mo" and not len(k) and _invisible(k.text))]
+    if tag == "mspace" and e.get("data-row") == "true": return [_ROW]
     if tag in _DROPPED: return []
     if tag == "semantics": return _walk(kids[0]) if kids else []
     if tag in ("mi", "mn", "mo", "mtext", "ms"):
@@ -213,13 +254,18 @@ def _walk(e: ET.Element) -> list[str]:
     if tag == "munder" and e.get("accentunder") == "true":
         return ["underaccent(", *_walk(kids[1]), ")(", *_walk(kids[0]), ")"]
     if tag in ("msub", "munder"):
-        return [*_walk(kids[0]), "_(", *_walk(kids[1]), ")"]
+        sub = _walk(kids[1])
+        return [*(_operator_base(kids) if sub else _walk(kids[0])), *(["_(", *sub, ")"] if sub else [])]
     if tag in ("msup", "mover"):
         if tag == "mover" and e.get("accent") == "true":
-            return ["accent(", *_walk(kids[1]), ")(", *_walk(kids[0]), ")"]
-        return [*_walk(kids[0]), "^(", *_walk(kids[1]), ")"]
+            base, accent = _walk(kids[0]), _walk(kids[1])
+            return ["accent(", *_accent(base, accent), ")(", *base, ")"]
+        sup = _superscript(kids[1])
+        return [*(_operator_base(kids) if sup else _walk(kids[0])), *(["^(", *sup, ")"] if sup else [])]
     if tag in ("msubsup", "munderover"):
-        return [*_walk(kids[0]), "_(", *_walk(kids[1]), ")", "^(", *_walk(kids[2]), ")"]
+        sub, sup = _walk(kids[1]), _superscript(kids[2])
+        return [*(_operator_base(kids) if sub or sup else _walk(kids[0])),
+                *(["_(", *sub, ")"] if sub else []), *(["^(", *sup, ")"] if sup else [])]
     if tag == "msqrt":
         return ["sqrt(", *[s for k in kids for s in _walk(k)], ")"]
     if tag == "mroot":
@@ -238,12 +284,58 @@ def _walk(e: ET.Element) -> list[str]:
     return [s for k in kids for s in _walk(k)]
 
 
+def _superscript(e: ET.Element) -> list[str]:
+    """Transpose marks in a superscript, preserving kept fonts and indexed symbols."""
+    return _transpose(_walk(e))
+
+
+def _operator_base(kids: list[ET.Element]) -> list[str]:
+    """Big binary operators with scripts, and sum/product with an explicit lower limit."""
+    base = _walk(kids[0])
+    if len(base) != 1: return base
+    if base[0] in _BIG_OPERATORS: return [_BIG_OPERATORS[base[0]]]
+    if base[0] in ("Σ", "∑", "Π", "∏") and any(
+            t in {"=", "≠", "∈", "∉", "≤", "≥"} for t in _canonical(_walk(kids[1]))):
+        return [{"∑": "Σ", "∏": "Π"}.get(base[0], base[0])]
+    return base
+
+
+def _accent(base: list[str], accent: list[str]) -> list[str]:
+    """A bar on one symbol and an arrow on one letter have short and long forms."""
+    if len(base) == 1:
+        if accent == ["‾"]: return ["ˉ"]
+        if accent == ["→"] and base[0].split(":")[-1].isalpha(): return ["⃗"]
+    return accent
+
+
+def _transpose(xs: list[str]) -> list[str]:
+    out, stack = [], []
+    for i, x in enumerate(xs):
+        if x in (")", ")(") and stack: stack.pop()
+        if x in {"T", "⊤", "⊺"} and "_(" not in stack and xs[i + 1:i + 2] not in (["_("], ["^("]):
+            x = "⊤"
+        out.append(x)
+        if x.endswith("("): stack.append(x)
+    return out
+
+
 def _leaf(tag: str, text: str, e: ET.Element) -> list[str]:
+    if tag == "mo" and e.get("fence") == "true": text = {"<": "⟨", ">": "⟩"}.get(text, text)
     text = "".join(ch for ch in text if ch not in _INVISIBLE and not ch.isspace()).translate(_ALIASES)
+    text = text.translate(_MATH_ALIASES)
+    text = text.replace("″", "''").replace("‴", "'''").replace("∬", "∫∫").replace("∭", "∫∫∫")
     # Note: a point is a raised dot, whether it is a decimal point, multiplies or ends a sentence.
     text = text.replace(".", "·")
     font = e.get("mathvariant")
-    return [f"{_KEPT_FONTS[font]}:{ch}" if font in _KEPT_FONTS else ch for ch in text]
+    out = []
+    for ch in text:
+        name = unicodedata.name(ch, "")
+        style = next((v for k, v in (("DOUBLE-STRUCK", "double-struck"), ("SCRIPT", "script"),
+                                      ("FRAKTUR", "fraktur")) if k in name), None)
+        normalized = unicodedata.normalize("NFKC", ch) if name.startswith("MATHEMATICAL ") else ch
+        kept = _KEPT_FONTS.get(font) or style
+        out += [f"{kept}:{c}" if kept else c for c in normalized]
+    return out
 
 
 def _invisible(s: str | None) -> bool:
@@ -328,13 +420,19 @@ def _untag(tex: str) -> str:
     return "".join(out) + tex[i:]
 
 
-def _span_symbols(tex: str, display: bool) -> tuple[str, ...]:
+def _span_symbols(tex: str, display: bool, legacy: bool = False) -> tuple[str, ...]:
     if tex.startswith("<math>"):
         return _from_mathml(f'<math xmlns="http://www.w3.org/1998/Math/MathML">{tex[6:-7]}</math>') or ()
     tex = _untag(tex)
     # Note: a command KaTeX doesn't know is left out, not the whole span with it.
     for _ in range(_MAX_UNDEFINED):
-        if (got := symbols(tex, display)) is not None: return got
+        if legacy:
+            mathml = _katex().render(tex, display).get("mathml")
+            got = _from_mathml(mathml) if mathml is not None else None
+        else:
+            got = symbols(tex, display)
+        if got is not None:
+            return tuple(x for x in got if x != _ROW) if legacy and r"\begin" not in tex else got
         if not (m := _UNDEFINED.search(_katex().render(tex, display).get("error", ""))): break
         tex = re.sub(re.escape(m[1]) + r"(?![A-Za-z])", " ", tex)
     return ()
@@ -368,17 +466,30 @@ def appears(test_tex: str, html: str) -> tuple[bool, str]:
     if not want:
         return True, ""
     s = _blocks(html)
-    hay, end, got = [_HARD], 0, 0
-    for tex, display, start, stop in _spans(html):
-        if not (part := _span_symbols(tex, display)): continue
-        part = _unnumber(part) if display else part
-        hay += [*(_gap(s[end:start]) if end else []), *part, *([_DISPLAY_END] if display else [])]
-        end, got = stop, got + len(part)
+    spans_ = _spans(html)
+
+    def read(legacy: bool) -> tuple[list[str], int]:
+        hay, end, got = [_HARD], 0, 0
+        for tex, display, start, stop in spans_:
+            if not (part := _span_symbols(tex, display, legacy)): continue
+            part = _unnumber(part) if display else part
+            hay += [*(_gap(s[end:start]) if end else []), *part, *([_DISPLAY_END] if display else [])]
+            end, got = stop, got + len(part)
+        return [*hay, *_gap(s[end:]), _HARD], got
+
+    hay, got = read(False)
     if not got:
         return False, "no math in the output"
-    hay += [*_gap(s[end:]), _HARD]
     if _search(want, hay):
         return True, ""
+    # Preserve matches of original TeX comments and top-level row breaks, before those were interpreted.
+    if "%" in test_tex or _ROW in want or _ROW in hay or any("%" in tex for tex, _, _, _ in spans_):
+        original = _katex().render(_untag(test_tex), True).get("mathml")
+        prior = _from_mathml(original) if original is not None else None
+        if prior is not None:
+            if r"\begin" not in test_tex: prior = tuple(x for x in prior if x != _ROW)
+            legacy_hay, _ = read(True)
+            if _search(_unnumber(prior), legacy_hay): return True, ""
     return False, f"equation not found ({len(want)} symbols; the output's math has {got})"
 
 
@@ -474,7 +585,8 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
             kind = _SCRIPTS[ch][0]
             j = i
             while j < len(text) and text[j] in _SCRIPTS and _SCRIPTS[text[j]][0] == kind: j += 1
-            out += [kind, *_chars("".join(_SCRIPTS[c][1] for c in text[i:j])), ")"]
+            body = _chars("".join(_SCRIPTS[c][1] for c in text[i:j]))
+            out += [kind, *(_transpose(body) if kind == "^(" else body), ")"]
             i = j
             continue
         elif ch in "^_" and i + 1 < len(text) and not text[i + 1].isspace():
@@ -483,7 +595,8 @@ def _text_tokens(text: str, parts: dict[str, tuple[str, ...]]) -> list[str]:
             # Note: unbraced digits after ^ or _ are one script ("x^23" is x^{23}, never x^{2}3).
             while text[i + 1].isdigit() and j < len(text) and (text[j].isdigit() or text[j] == "." and
                                                               text[j + 1:j + 2].isdigit()): j += 1
-            out += [f"{ch}(", *_chars(text[i + 1:j].strip("{}")), ")"]
+            body = _chars(text[i + 1:j].strip("{}"))
+            out += [f"{ch}(", *(_transpose(body) if ch == "^" else body), ")"]
             i = j
             continue
         elif m := _SPACED_DOTS.match(text, i):
@@ -510,8 +623,9 @@ _DASHES = str.maketrans(dict.fromkeys("‐‑‒–—―", "-"))
 def _chars(s: str) -> list[str]:
     # Note: NFKC would make an ellipsis three full stops.
     s = unicodedata.normalize("NFKC", s.replace("…", "⋯"))
-    s = s.translate(_ALIASES).translate(_DASHES)
+    s = s.translate(_ALIASES).translate(_MATH_ALIASES).translate(_DASHES)
     s = "".join(ch for ch in s if not ch.isspace() and ch not in _INVISIBLE)
     # Note: a point between digits is a decimal point, read as in math; any other ends a sentence.
-    return [ch if ch != "." else "·" if s[i - 1:i].isdigit() and s[i + 1:i + 2].isdigit() else _GAP + "·"
-            for i, ch in enumerate(s)]
+    xs = [ch if ch != "." else "·" if s[i - 1:i].isdigit() and s[i + 1:i + 2].isdigit() else _GAP + "·"
+          for i, ch in enumerate(s)]
+    return _brackets(_bars(xs))

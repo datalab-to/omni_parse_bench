@@ -22,7 +22,7 @@ from hypothesis import assume, given
 from hypothesis import strategies as st
 from test_invariants import DATASET, answer, fixture_tests
 
-from omni_parse_bench import data, normalize, views
+from omni_parse_bench import data, equations, normalize, views
 from omni_parse_bench.scorers import unit_tests as scorer
 from omni_parse_bench.scorers.unit_tests import runners
 
@@ -52,6 +52,86 @@ PARAGRAPH = TOKENS.map(" ".join)
 JOINING = {"$5.00", "$1,000", "US$5", "____", "_", "...", "—", "-", "e.g."}
 APART = st.lists(st.one_of(WORD, st.sampled_from([m for m in MARKS if m not in JOINING])),
                  max_size=12).map(" ".join)
+
+
+@given(st.sampled_from(["", "(", "-", "+", "$", "£"]), st.sampled_from(["·", "∙"]),
+       st.text("0123456789", min_size=1, max_size=12))
+def test_leading_raised_decimals_fold_symmetrically_and_idempotently(prefix, dot, digits):
+    raised, point = f"{prefix}{dot}{digits}", f"{prefix}.{digits}"
+    folded = normalize.fold(raised)
+    assert folded == normalize.fold(point)
+    assert normalize.fold(folded) == folded
+    assert runners.found(runners.Text(raised, 0), views.html(f"<p>{point}</p>"))[0]
+    assert runners.found(runners.Text(point, 0), views.html(f"<p>{raised}</p>"))[0]
+
+
+@given(st.lists(st.sampled_from(["|", "‖", "[", "]", "⟦", "⟧", "T", "⊤", "⊺", "script:T", "x", "_(", ")"]),
+                max_size=20))
+def test_equation_folds_are_idempotent_and_preserve_equal_sequences(xs):
+    for fold in (equations._bars, equations._brackets, equations._transpose):
+        folded = fold(xs)
+        assert fold(folded) == folded
+        assert folded == fold(list(xs))
+
+
+@given(st.sampled_from([r"\top", "T", r"\intercal", r"\mathsf{T}"]),
+       st.sampled_from([r"\top", "T", r"\intercal", r"\mathsf{T}"]),
+       st.sampled_from(["||x||", r"\|x\|", r"\lVert x\rVert"]),
+       st.sampled_from(["||x||", r"\|x\|", r"\lVert x\rVert"]))
+def test_transpose_and_norm_equivalence_is_symmetric_and_preserves_existing_matches(a, b, norm, other):
+    left, right = f"A^{{{a}}}+{norm}", f"A^{{{b}}}+{other}"
+    assert equations.symbols(left) == equations.symbols(right)
+    assert equations.appears(left, f"${right}$")[0]
+    assert equations.appears(right, f"${left}$")[0]
+    assert equations.appears(left, f"${left}$")[0]
+
+
+@given(st.sampled_from([(r"x\leq y", r"x\le y"), (r"A^{T}", r"A^T"),
+                        (r"\|x\|", r"\lVert x\rVert"), (r"|a||b|", r"\lvert a\rvert\lvert b\rvert")]))
+def test_equation_forms_equal_before_these_folds_remain_equal(pair):
+    left, right = pair
+    assert equations.symbols(left) == equations.symbols(right)
+    assert equations.appears(left, f"${right}$")[0]
+    assert equations.appears(right, f"${left}$")[0]
+
+
+@given(st.text("→⟶↦⟼←⟵⇒⟹⇐⟸⇔⟺↔⟷∪⋃∩⋂⊕⨁⊗⨂⊙⨀∨⋁∧⋀⊔⨆Σ∑Π∏⊲◃⊳▹⊊⫋⊋⫌⊆⫅⊇⫆∙·⟦⟧[]x"))
+def test_rendered_math_aliases_are_idempotent_and_preserve_equal_strings(text):
+    folded = text.translate(equations._MATH_ALIASES)
+    assert folded.translate(equations._MATH_ALIASES) == folded
+    assert folded == "".join(text).translate(equations._MATH_ALIASES)
+
+
+@given(st.sampled_from(["x", "α", "1", "xy", "script:x"]), st.sampled_from(["ˉ", "‾", "⃗", "→", "ˇ"]))
+def test_single_accent_fold_is_idempotent(base, accent):
+    base_tokens = list(base) if base == "xy" else [base]
+    folded = equations._accent(base_tokens, [accent])
+    assert equations._accent(base_tokens, folded) == folded
+
+
+@given(st.sampled_from([(r"\bar{x}", r"\overline{x}"), (r"\vec{x}", r"\overrightarrow{x}"),
+                        ("a⟶b", "a→b"), ("⋃_i", "∪_i"), (r"\Sigma_{i=1}", r"\sum_{i=1}"),
+                        ("a⊲b", "a◃b"), ("a⫅b", "a⊆b"), ("W⟦z⟧", "W[[z]]")]))
+def test_each_new_equation_fold_is_symmetric(pair):
+    left, right = pair
+    assert equations.symbols(left) == equations.symbols(right)
+    assert equations.appears(left, f"${right}$")[0]
+    assert equations.appears(right, f"${left}$")[0]
+
+
+@given(st.sampled_from([
+    (r"\left<x\right>", r"\langle x\rangle"), ("ℝ", r"\mathbb{R}"),
+    ("𝔤", r"\mathfrak{g}"), ("𝑥", "x"), ("x″", "x''"), ("5%+3", r"5\%+3"),
+    ("ϱ", r"\rho"), ("ϰ", r"\kappa"), (r"\iint f", r"\int\!\int f"),
+    (r"x^{}", "x"), (r"\mbox{hi}", r"\text{hi}"), (r"\mathds{R}", r"\mathbb{R}"),
+    (r"a=b\\c=d", r"\begin{aligned}a&=b\\c&=d\end{aligned}"),
+]))
+def test_more_math_forms_are_symmetric_and_preserve_their_own_match(pair):
+    left, right = pair
+    assert equations.symbols(left, True) == equations.symbols(right, True)
+    assert equations.appears(left, f"$${right}$$")[0]
+    assert equations.appears(right, f"$${left}$$")[0]
+    assert equations.appears(left, f"$${left}$$")[0]
 
 
 def paragraphs(xs: list[str]) -> str:

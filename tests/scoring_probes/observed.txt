@@ -26,6 +26,7 @@ text-checkbox	pass
 text-math-letter	pass
 text-math-symbol	pass
 text-middot	pass
+text-leading-middot	pass
 text-glued-dash	pass
 text-exact-case-kept	pass
 text-exact-case-folds	pass
@@ -54,6 +55,8 @@ text-inserted	fail	'lorem ipsum dolor sit amet' not found (best 0.885 < 0.923); 
 text-page-edge	fail	'lorem ipsum' not found (best 0.727 < 0.818); closest 'em ipsum'
 text-diacritic	fail	'naïve' not found (best 0.800 < 1.000); closest 'naive'
 text-punctuation	fail	'Mr. Smith' not found (best 0.941 < 1.000); closest 'mr smith'
+text-middot-letter	fail	'A·1' not found (best 0.667 < 1.000); closest 'a.1'
+text-middot-cjk	fail	'太原·2020' not found (best 0.857 < 1.000); closest '太原.2020'
 text-thousands	fail	'1,240' not found (best 0.889 < 1.000); closest '1240'
 text-decimal-comma	fail	'1.5' not found (best 0.667 < 1.000); closest '1,5'
 text-currency-lost	fail	'$5.00' not found (best 0.889 < 1.000); closest '5.00'
@@ -89,6 +92,8 @@ edge-squeeze-digits	pass
 edge-fuzzy	fail	'Total: 40' found only inside a longer number
 ## number-gold
 gold-point	12.5
+gold-leading-point	refused
+gold-leading-middot	refused
 gold-point-long	1.2345678
 gold-point-three	1.240
 gold-comma-three	1240
@@ -144,6 +149,28 @@ tex-mathml	pass
 tex-spacing	pass
 tex-bold	pass
 tex-upright	pass
+tex-transpose	pass
+tex-transpose-composite	pass
+tex-norm-bars	pass
+tex-double-bracket	pass
+tex-angle-fence	pass
+tex-letterlike	pass
+tex-math-bold	pass
+tex-primes	pass
+tex-percent	pass
+tex-greek-variant	pass
+tex-multiple-integrals	pass
+tex-top-level-rows	pass
+tex-empty-script	pass
+tex-mathds	pass
+tex-mbox	pass
+tex-bar	pass
+tex-vector	pass
+tex-long-arrow	pass
+tex-big-union	pass
+tex-sum	pass
+tex-triangle	pass
+tex-subset	pass
 tex-function	pass
 tex-dfrac	pass
 tex-limits	pass
@@ -166,17 +193,25 @@ tex-prefix	pass
 tex-unknown-macro	pass
 tex-unknown-four	pass
 tex-dot	pass
+tex-adjacent-bars	pass
 tex-outside-span	pass
 tex-bare-line	pass
 tex-split-cells	pass
 ## latex-penalized
 tex-case	fail	equation not found (4 symbols; the output's math has 4)
 tex-symbol	fail	equation not found (4 symbols; the output's math has 4)
+tex-single-bracket	fail	equation not found (7 symbols; the output's math has 5)
 tex-blackboard	fail	equation not found (1 symbols; the output's math has 1)
-tex-bar	fail	equation not found (5 symbols; the output's math has 5)
+tex-top-logic	fail	equation not found (3 symbols; the output's math has 3)
+tex-transpose-font	fail	equation not found (4 symbols; the output's math has 4)
+tex-binary-union	fail	equation not found (3 symbols; the output's math has 3)
+tex-sigma-variable	fail	equation not found (5 symbols; the output's math has 5)
+tex-bullet-operator	fail	equation not found (3 symbols; the output's math has 3)
+tex-long-bar	fail	equation not found (5 symbols; the output's math has 6)
+tex-long-vector	fail	equation not found (6 symbols; the output's math has 6)
+tex-angle-relation	fail	equation not found (5 symbols; the output's math has 5)
+tex-ell	fail	equation not found (1 symbols; the output's math has 1)
 tex-times	fail	equation not found (3 symbols; the output's math has 3)
-tex-sum	fail	equation not found (1 symbols; the output's math has 1)
-tex-varrho	fail	equation not found (3 symbols; the output's math has 3)
 tex-epsilon-in	fail	equation not found (3 symbols; the output's math has 3)
 tex-term	fail	equation not found (4 symbols; the output's math has 7)
 tex-sign	fail	equation not found (5 symbols; the output's math has 6)
@@ -186,13 +221,12 @@ tex-prose	fail	equation not found (3 symbols; the output's math has 2)
 tex-fraction-text	fail	equation not found (5 symbols; the output's math has 3)
 tex-decimal-comma	fail	equation not found (3 symbols; the output's math has 3)
 tex-en-dash	fail	equation not found (3 symbols; the output's math has 3)
-tex-math-bold	fail	equation not found (3 symbols; the output's math has 3)
 tex-unknown-five	fail	no math in the output
 tex-no-math	fail	no math in the output
 tex-one-symbol	fail	no math in the output
 tex-plain-near	fail	no math in the output
 tex-bare-prose	fail	no math in the output
-tex-displays-prose	fail	equation not found (6 symbols; the output's math has 6)
+tex-displays-prose	fail	equation not found (7 symbols; the output's math has 6)
 ## order-rules
 ord-pass	pass
 ord-fold	pass
@@ -339,7 +373,16 @@ fm-link	fail	the span lacks ['underline']
 fm-raw-markdown	fail	the context is not in the output
 fm-math-bold-letters	fail	the span lacks ['bold']
 fm-unicode-sup	fail	the span lacks ['sup']
-fm-latex-sup	fail	the context is not in the output
+fm-latex-sup	pass
+fm-latex-sub	pass
+fm-latex-sub-paren	pass
+fm-latex-sub-mathrm	pass
+fm-latex-sub-other-script	fail	the context is not in the output
+fm-latex-sub-absent	fail	the span carries ['sub']
+fm-latex-times	pass
+fm-latex-absent-bold	fail	the output has no marks at all, so it cannot show that a mark is absent
+fm-latex-frac	fail	the context is not in the output
+fm-latex-not-bold	fail	the context is not in the output
 fm-in-math	fail	the span lacks ['bold']
 fm-in-code	pass
 fm-hidden	fail	the context is not in the output
@@ -456,6 +499,7 @@ fold-typography	a-b a-b it's "hi" a b →
 fold-tex-quote	"yes" "no"
 fold-cjk	日本語.3%
 fold-middot	2.3 2⋅3
+fold-middot-leading	(.5) £.5 p<.05 (a)·1 a·1
 fold-case	strasse straße α
 fold-kept	naïve mr. $5.00 **x**
 ## internals-dollars

@@ -1,5 +1,10 @@
 # `present` with a text arg
 
+A raised decimal point directly before a digit folds to `.` unless the character before it is a letter, a digit or a
+closing bracket: `·79` matches `.79`, as do `p<·05`, `≈·5`, `(·5)`, `-·25` and `£·5`. After a letter, a digit-less
+closing bracket or a CJK character the dot separates or multiplies and stays: `A·1`, `太原·2020`, `(a)·1` and `x)·2`
+stay distinct from `A.1`, `太原.2020`, `(a).1` and `x).2`.
+
 **Asks:** this string appears somewhere in the page's text. 3,684 tests; family text; reads `html`.
 
 The test folds the gold and the page text ([README](README.md#two-words-used-everywhere)) and looks for the gold
@@ -43,6 +48,7 @@ What the test ignores:
 | I | a variable in math | `U test` | `$U$ test` | pass | `text-math-letter` |
 | I | a symbol in math | `3σ` | `$3\sigma$` | pass | `text-math-symbol` |
 | I | middle dot as a decimal point | `2.3` | `2·3` | pass | `text-middot` |
+| I | a raised decimal point without a leading zero | `·2480550383` | `.2480550383` | pass | `text-leading-middot` |
 | I | dashes glued to a number are a leader | `Revenue 5` | `Revenue -----5` | pass | `text-glued-dash` |
 | I | with `exact_case`, the case as printed | `iPhone` (exact case) | `I bought an iPhone` | pass | `text-exact-case-kept` |
 | I | with `exact_case`, every other difference still folds | `Total Due` (exact case) | `<p><b>Total</b>  Due</p>` | pass | `text-exact-case-folds` |
@@ -83,6 +89,8 @@ What it penalizes:
 | P | a text at the edge of the page gets no extra edits | `lorem ipsum` (md 2) | `abc xxxem ipsum` | fail | `text-page-edge` |
 | P | a dropped diacritic | `naïve` | `naive` | fail | `text-diacritic` |
 | P | dropped punctuation | `Mr. Smith` | `Mr Smith` | fail | `text-punctuation` |
+| P | a middle-dot separator after a letter | `A·1` | `A.1` | fail | `text-middot-letter` |
+| P | a middle-dot separator after a CJK character | `太原·2020` | `太原.2020` | fail | `text-middot-cjk` |
 | P | a dropped thousands separator | `1,240` | `1240` | fail | `text-thousands` |
 | P | decimal comma for a point | `1.5` | `1,5` | fail | `text-decimal-comma` |
 | P | a dropped currency sign | `$5.00` | `5.00` | fail | `text-currency-lost` |

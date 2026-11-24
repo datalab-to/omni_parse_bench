@@ -518,3 +518,21 @@ def test_leaders_are_any_dash_of_the_dash_family_but_a_pair_or_a_sign_stays(text
 ])
 def test_a_run_of_ideographic_full_stops_is_a_leader_but_a_pair_stays(text, folded):
     assert normalize.fold(text) == folded
+
+
+@pytest.mark.parametrize("text, folded", [
+    ("·79", ".79"), (" ·2480550383", ".2480550383"), ("a ·2", "a .2"), ("(·5)", "(.5)"), ("[·5]", "[.5]"),
+    ("{·5}", "{.5}"),
+    ("-·25", "-.25"), ("+·25", "+.25"), ("−·25", "-.25"), ("±·25", "±.25"),
+    ("$·5", "$.5"), ("£·5", "£.5"), ("€·5", "€.5"), ("¥·5", "¥.5"), ("2·3", "2.3"),
+    ("p<·05", "p<.05"), ("p=·05", "p=.05"), ("r=·45", "r=.45"), ("≈·5", "≈.5"), ("~·5", "~.5"),
+    ("×·5", "×.5"),
+    ("a/·5", "a/.5"), ("a:·5", "a:.5"), ('"·5', '".5'), ("≥·5", "≥.5"), ("%·5", "%.5"), ("<·5", "<.5"),
+])
+def test_a_raised_decimal_folds_at_a_start_after_space_a_bracket_a_sign_or_a_currency_symbol(text, folded):
+    assert normalize.fold(text) == folded
+
+
+@pytest.mark.parametrize("text", ["(a)·1", "x)·2", "A·1", "太原·2020", "a·1", "x]·2", "x}·2", "ab·5", "Ö·5"])
+def test_a_raised_dot_after_anything_else_is_a_separator_not_a_decimal(text):
+    assert "·" in normalize.fold(text) and "." not in normalize.fold(text).replace("·", "")

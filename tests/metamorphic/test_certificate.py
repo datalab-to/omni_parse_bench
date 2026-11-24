@@ -115,26 +115,28 @@ def test_the_certificate_counts_the_real_tests_it_says():
     assert manifest_sha256(os.environ["OPB_DATASET"]) == MANIFEST_SHA256, \
         f"OPB_DATASET is not revision {DATASET_REVISION[:7]} of the dataset: its manifest differs"
     from metamorphic.test_fold_and_case import EXACT, TESTS
+    from metamorphic.test_equivalences import LATEX
     from metamorphic.test_text_matching import DIGIT_EDGED
     sizes = {"number": len(NUMBER), "order": len(ORDER), "exact text": len(EXACT),
              "digit-edged text": len(DIGIT_EDGED["present"]),
              "digit-edged repeat": len(DIGIT_EDGED["repeat"]),
              "digit-edged order": len(DIGIT_EDGED["order"]),
              "text strings": sum(len(text_strings(t.params)) for t in TESTS),
-             "text tests": len([*TEXT, *ORDER, *REPEAT, *CELL])}
+             "text tests": len([*TEXT, *ORDER, *REPEAT, *CELL]), "latex tests": len(LATEX)}
     assert sizes == {k: n for k, (_, n) in REAL.items()}, "update REAL in common.py, then " + COMMAND
 
 
 def test_the_certificate_pools_are_the_loaded_tests():
     """The pool sizes the certificate prints are those loaded: the fixtures in CI, the dataset when set."""
     from metamorphic.test_fold_and_case import EXACT
+    from metamorphic.test_equivalences import LATEX
     from metamorphic.test_text_matching import DIGIT_EDGED
     sizes = {"text, order, table_cell": len(TEXT + ORDER + CELL), "repeat": len(REPEAT),
              "repeat number": len(REPEAT_NUMBER),
              "text, number": len(TEXT + NUMBER), "layout": len(LAYOUT), "number": len(NUMBER),
              "digit-edged text, repeat": len(DIGIT_EDGED["present"]) + len(DIGIT_EDGED["repeat"]),
              "exact text": len(EXACT), "text, order, repeat, table_cell": len(TEXT + ORDER + REPEAT + CELL),
-             "batch": len(TEXT + NUMBER + ORDER + REPEAT + REPEAT_NUMBER + CELL)}
+             "batch": len(TEXT + NUMBER + ORDER + REPEAT + REPEAT_NUMBER + CELL), "latex": len(LATEX)}
     assert sizes == {k: v[2 if LIVE else 1] for k, v in POOLS.items()}, "update POOLS in common.py"
 
 
