@@ -369,6 +369,10 @@ _MATH_MARK = re.compile(r"[\\^_=<>+±×·−]")
 def plain(latex: str) -> bool:
     """Whether plain text writes the equation without loss: every command is a symbol (`_PLAIN_COMMANDS`),
     its scripts are single characters or braced plain text, and it is more than a bare word or number."""
+    # A transpose command inside a superscript has a faithful plain-text T spelling.
+    def transpose(m: re.Match) -> str:
+        return re.sub(r"\\(?:top|intercal)(?![A-Za-z])", "T", m.group())
+    latex = re.sub(r"\^(?:\{[^{}]*\}|\\(?:top|intercal)(?![A-Za-z]))", transpose, latex)
     if any(c not in _PLAIN_COMMANDS for c in _COMMAND.findall(latex)): return False
     if re.search(r"[\^_]\{[^{}]*[\\{^_]", latex): return False
     return bool(_MATH_MARK.search(latex)) and len(normalize.squeeze(f"${latex}$")) >= 2

@@ -6,6 +6,8 @@ TABLES = [
     table(
         "number-gold",
         gold_number("gold-point", "one `.`: a decimal point", "12.5", "12.5"),
+        gold_number("gold-leading-point", "a decimal without a leading digit", ".79", "refused"),
+        gold_number("gold-leading-middot", "a raised decimal without a leading digit", "·79", "refused"),
         gold_number("gold-point-long", "one `.`: any number of decimals", "1.2345678", "1.2345678"),
         gold_number("gold-point-three", "one `.` and three digits: a decimal point too", "1.240", "1.240"),
         gold_number("gold-comma-three", "one `,` and three digits: a thousands mark", "1,240", "1240"),

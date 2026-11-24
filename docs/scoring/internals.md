@@ -97,6 +97,7 @@ a lowercase letter is then read joined (`well-` before `known` reads `wellknown`
 | then two single quotes of any mix are a double quote, as TeX writes one | `` ``Yes'' '’No’' `` | `"yes" "no"` | `fold-tex-quote` |
 | full-width punctuation becomes ASCII | `日本語。３％` | `日本語.3%` | `fold-cjk` |
 | a middle dot between digits is a decimal point; `⋅` is not | `2·3 2⋅3` | `2.3 2⋅3` | `fold-middot` |
+| a leading raised decimal folds unless a letter, digit or closing bracket comes before it | `(·5) £·5 p<·05 (a)·1 A·1` | `(.5) £.5 p<.05 (a)·1 a·1` | `fold-middot-leading` |
 | case is folded, but no letter is changed into others | `STRASSE straße Α` | `strasse straße α` | `fold-case` |
 | kept apart: diacritics, punctuation, currency, `**` | `naïve Mr. $5.00 **x**` | `naïve mr. $5.00 **x**` | `fold-kept` |
 <!-- /cases -->

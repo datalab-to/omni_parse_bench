@@ -11,11 +11,15 @@ or by a dot or comma and a digit. A number found anywhere counts: its row, label
 
 A gold that is ambiguous is refused when the dataset is loaded, so no test in the dataset has one. The reading
 decides only whether a gold loads; the page must still write the gold's separators.
+The number-arg parser requires a leading digit, so `.79` and `·79` are not accepted as number golds. A
+text arg can compare these forms; the page's text fold recognizes a leading raised decimal point.
 
 <!-- cases:number-gold -->
 | rule | input | reads as | case |
 |---|---|---|---|
 | one `.`: a decimal point | `12.5` | `12.5` | `gold-point` |
+| a decimal without a leading digit | `.79` | `refused` | `gold-leading-point` |
+| a raised decimal without a leading digit | `·79` | `refused` | `gold-leading-middot` |
 | one `.`: any number of decimals | `1.2345678` | `1.2345678` | `gold-point-long` |
 | one `.` and three digits: a decimal point too | `1.240` | `1.240` | `gold-point-three` |
 | one `,` and three digits: a thousands mark | `1,240` | `1240` | `gold-comma-three` |

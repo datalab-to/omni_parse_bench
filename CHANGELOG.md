@@ -13,7 +13,17 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 
 ### Score impact
 
-- None on grading: this changes how a run handles two provider replies, not how answers are scored. A page that used to fail as "no usable html" or stop the run now gets a prediction or a refusal instead, so a rerun can score pages that earlier runs lost.
+- Not comparable with 1.8.0: verdicts only move from fail to pass. Regraded on saved predictions of the 40 official public runs, 992 tests go from fail to pass and none from pass to fail. All 992 are `present` tests with a LaTeX argument (text family).
+- Headline change per system: +0.04 to +0.25 points (median +0.05); no system loses. The top 12 ranks are unchanged; the only rank swaps are near-ties below that.
+- Which changes drove it (fail to pass, all systems): `\bar`/`\overline` 341, big operators 94, transpose 86, double bars 75, triangles 75, arrows 71, double brackets 37, `\vec` 4, subsets 2.
+- No `format`, number or table verdict changed on those runs; the format and decimal changes below only affect outputs that use those spellings.
+- LLM harness (#108): no effect on grading; it changes how a run handles two provider replies, not how answers are scored. A page that used to fail as "no usable html" or stop the run now gets a prediction or a refusal instead, so a rerun can score pages that earlier runs lost.
+
+### Changed
+
+- Equations: marks a reader cannot tell apart in print now compare equal: a transpose superscript (`^\top`, `^T`, `^\intercal`, `^{-T}`), `||` and `\|`, `\llbracket`/`\rrbracket` and doubled brackets, `\bar` and `\overline` (or `\vec` and `\overrightarrow`) over one symbol, short and long arrows, binary and big operators when the big one carries limits, `Σ`/`∑` and `Π`/`∏` with an explicit relation in the lower limit, triangle and subset variants, stretchy angle fences, Unicode mathematical letters, Unicode primes, `ϱ ϖ ϰ`, `\iint`/`\iiint`, top-level row breaks, empty scripts and a raw `%`. Each is limited as described in docs/scoring/present-latex.md; script, blackboard and fraktur letters, Greek and Latin lookalikes, check and breve, `=` and `≡` stay distinct.
+- Text: a raised decimal point before a digit (`·79`, `p<·05`) reads as `.` unless a letter, digit or closing bracket comes right before it (`A·1`, `(a)·1`, `太原·2020` are unchanged).
+- Format: a subscript or superscript written in maths (`$V_1$`, `$\mathrm{LC}_{50}$`, `$x^{2}$`, `${}^{a}$`) counts as the `sub` or `sup` mark on that text, and is evidence only for `sub`/`sup` and their absent forms. Maths inside code is not read. Unicode sub/superscript digits are still not marks.
 
 ### Fixed
 

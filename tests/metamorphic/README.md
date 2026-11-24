@@ -7,7 +7,7 @@ Each promise is a *relation*: change a page, or a test, in a way that should not
 known way), and the verdict should follow. Example: putting a passing answer in bold must not make its test
 fail.
 
-- The certificate lists the 109 relations its authors selected: 100 hold and 9 deviate. It is not every
+- The certificate lists the 121 relations its authors selected: 112 hold and 9 deviate. It is not every
   relation of the scorer (see [Not covered](#not-covered)). Four of the 8 (M1a to M1c and M1e) are about
   folding a string twice, which the scorer never does and no document promises, so they change no score.
 - It is generated from the tests. CI fails if it is out of date, or if a status disagrees with its test.
@@ -38,10 +38,10 @@ A healthy run gives:
 
 | | passed | skipped | xfailed |
 |---|---|---|---|
-| this folder, no dataset | 128 | 13 | 9 |
-| this folder, with dataset | 139 | 2 | 9 |
-| whole suite, no dataset | 1540 | 24 | 9 |
-| whole suite, with dataset | 1557 | 7 | 9 |
+| this folder, no dataset | 264 | 16 | 9 |
+| this folder, with dataset | 278 | 2 | 9 |
+| whole suite, no dataset | 2010 | 28 | 9 |
+| whole suite, with dataset | 2030 | 8 | 9 |
 
 All four rows come from runs of this version.
 
@@ -148,7 +148,8 @@ Other commands:
 ## Not covered
 
 - score aggregation: family scores and the headline;
-- equation tests on real golds: M17 uses 8 handmade equations, and M10 compares readings, not real equations;
+- equation tests on real golds beyond the folds M76 to M79 name: M17 uses 8 handmade equations, M78 and M79 rewrite the
+  real equations by those folds only, and M10 compares readings, not real equations;
 - table_cell relations `section`, `row_groups` and `left_heading` beyond M27's mirror check (`down` only inside M6a's agreement check);
 - number tests' sign and percent rules (M12 and M20 cover digits, separators and tails only);
 - repeat's reading without image descriptions, and the equation test's plain-text fallback;

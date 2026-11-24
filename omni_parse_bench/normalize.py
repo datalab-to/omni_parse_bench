@@ -86,7 +86,9 @@ _LATEX_RESIDUE = re.compile(r"[_^{}\\]")
 # (`views.BREAK`) is a line break here too: an output that writes one paragraph per printed line
 # ("<p>Head-</p><p>quarters</p>") breaks its words there.
 _LINE_HYPHEN = re.compile(r"(?<=[^\W\d_])[-\u2010\u2011]\s+([^\W\d_])")
-_DECIMAL_MIDDOT = re.compile(r"(?<=\d)[·∙](?=\d)")
+# Note: a leading raised decimal ("·79", "p<·05", "≈·5") folds unless the character before it is a letter,
+# a digit or a closing bracket ("A·1", "(a)·1", "x)·2", "太原·2020": there the dot separates or multiplies).
+_DECIMAL_MIDDOT = re.compile(r"(?:(?<=\d)|(?<![^\W_])(?<![)\]}]))[·∙](?=\d)")
 # Note: the CJK and half-width middle dots are the same dot as "·" (NFKC would turn ㆍ into a Hangul jamo and
 # ･ into ・). Between two digits they are left as they were: in Japanese "3・11" is a separator, not a
 # decimal.

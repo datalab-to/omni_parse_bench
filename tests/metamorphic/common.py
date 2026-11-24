@@ -146,6 +146,7 @@ POOLS = {
     "exact text": ("text tests with max_diffs 0", 4, 2_314),
     "text, order, repeat, table_cell": ("text, order, repeat and table_cell tests", 11, 10_294),
     "batch": ("text, number, order, repeat and table_cell tests", 19, 10_617),
+    "latex": ("equation tests (present with a latex arg)", 3, 3_268),
 }
 
 # The Hypothesis tests whose input space runs out in CI before the profile's max_examples, and how many
@@ -171,6 +172,7 @@ REAL = {
     "digit-edged order": ("real order tests with an ASCII string starting or ending with a digit", 197),
     "text strings": ("text strings of the real text, order, repeat and table_cell tests", 24_682),
     "text tests": ("real text, order, repeat and table_cell tests", 10_294),
+    "latex tests": ("real equation tests (present with a latex arg)", 3_268),
 }
 
 # --------------------------------------------------------------------------------------------- helpers
