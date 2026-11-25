@@ -524,6 +524,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | Surya OCR 2 | `surya-ocr` | `surya-ocr` | html, blocks |
 | Surya OCR 2.5 | `surya-ocr-2.5` | `surya-ocr-2.5` | html, blocks |
 | MinerU2.5-Pro | `mineru` | `mineru` | html, blocks |
+| MonkeyOCR | `monkeyocr` | `monkeyocr` | html, blocks |
 | GLM-OCR | `glm-ocr` | `glm-ocr` | html, blocks |
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
 | Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
@@ -653,6 +654,25 @@ MinerU2.5-Pro (`providers/mineru.py`):
 | code, algorithm | code |
 | table | table |
 | image, chart, image_block | figure |
+
+MonkeyOCR-pro-3B (`providers/monkeyocr.py`):
+
+| MonkeyOCR block type | label |
+| --- | --- |
+| text, index | text |
+| title | heading |
+| list | list |
+| interline_equation | equation |
+| image_body | figure |
+| image_caption, table_caption | caption |
+| image_footnote, table_footnote | footnote |
+| table_body | table |
+| header, footer, number | page_furniture |
+| header_image, footer_image, seal | figure |
+| formula_number | equation |
+
+It runs with `--pred-abandon`, so the regions its layout model abandons (the last three rows, PP-DocLayoutV2's labels) are
+read; the server restores each one's label, as the middle JSON turns them into plain text blocks.
 
 GLM-OCR (`providers/glm_ocr.py`):
 
