@@ -1,0 +1,172 @@
+{
+ "model": "Dolphin-v2",
+ "page": "synthetic",
+ "provider": "dolphin-v2",
+ "options": {},
+ "outputs": [
+  "html",
+  "blocks"
+ ],
+ "sent": null,
+ "synthetic": "written by hand from Dolphin's documented output (demo_page.py process_elements results and utils/markdown_utils.py MarkdownConverter at befa5dad); not an answer of the model",
+ "raw": {
+  "elements": [
+   {
+    "label": "header",
+    "bbox": [
+     60,
+     24,
+     553,
+     40
+    ],
+    "text": "Journal of Examples, 2024",
+    "reading_order": 0,
+    "tags": []
+   },
+   {
+    "label": "sec_0",
+    "bbox": [
+     72,
+     80,
+     420,
+     104
+    ],
+    "text": "Soil Survey Results",
+    "reading_order": 1,
+    "tags": []
+   },
+   {
+    "label": "para",
+    "bbox": [
+     72,
+     115,
+     540,
+     170
+    ],
+    "text": "We sampled forty plots across the valley and\nrecorded their moisture.",
+    "reading_order": 2,
+    "tags": []
+   },
+   {
+    "label": "equ",
+    "bbox": [
+     200,
+     180,
+     420,
+     210
+    ],
+    "text": "$$\\bar{x} = \\frac{1}{n}\\sum_i x_i$$",
+    "reading_order": 3,
+    "tags": []
+   },
+   {
+    "label": "cap",
+    "bbox": [
+     72,
+     222,
+     300,
+     236
+    ],
+    "text": "Table 1: Moisture by plot",
+    "reading_order": 4,
+    "tags": []
+   },
+   {
+    "label": "tab",
+    "bbox": [
+     72,
+     240,
+     360,
+     310
+    ],
+    "text": "<table><tr><td>Plot</td><td>Moisture</td></tr><tr><td>A</td><td>0.31</td></tr></table>",
+    "reading_order": 5,
+    "tags": []
+   },
+   {
+    "label": "fig",
+    "bbox": [
+     72,
+     320,
+     360,
+     470
+    ],
+    "text": "![Figure](figures/page_figure_006.png)",
+    "figure_path": "figures/page_figure_006.png",
+    "reading_order": 6,
+    "tags": []
+   },
+   {
+    "label": "cap",
+    "bbox": [
+     72,
+     474,
+     300,
+     488
+    ],
+    "text": "Figure 1: Sampling sites",
+    "reading_order": 7,
+    "tags": []
+   },
+   {
+    "label": "watermark",
+    "bbox": [
+     20,
+     200,
+     50,
+     600
+    ],
+    "text": "DRAFT",
+    "reading_order": 8,
+    "tags": [
+     "meta_num"
+    ]
+   },
+   {
+    "label": "anno",
+    "bbox": [
+     520,
+     300,
+     600,
+     330
+    ],
+    "text": "Margin note",
+    "reading_order": 9,
+    "tags": []
+   },
+   {
+    "label": "fnote",
+    "bbox": [
+     72,
+     700,
+     500,
+     716
+    ],
+    "text": "1 Plots were sampled in May.",
+    "reading_order": 10,
+    "tags": []
+   },
+   {
+    "label": "foot",
+    "bbox": [
+     290,
+     760,
+     320,
+     774
+    ],
+    "text": "3",
+    "reading_order": 11,
+    "tags": []
+   }
+  ],
+  "markdown": "Journal of Examples, 2024\n\n# Soil Survey Results\n\nWe sampled forty plots across the valley and recorded their moisture.\n\n$$\\bar{x} = \\frac{1}{n}\\sum_i x_i$$\n\nTable 1: Moisture by plot\n\n<table><tr><td>Plot</td><td>Moisture</td></tr><tr><td>A</td><td>0.31</td></tr></table>\n\n![Figure](figures/page_figure_006.png)\n\nFigure 1: Sampling sites\n\nDRAFT\n\nMargin note\n\n1 Plots were sampled in May.\n\n3\n\n",
+  "image_size": [
+   612,
+   792
+  ],
+  "served": {
+   "weights": "ByteDance/Dolphin-v2",
+   "revision": "c37c62768c644bb594da4283149c627765aa80f3"
+  }
+ }
+}

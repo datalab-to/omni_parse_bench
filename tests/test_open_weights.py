@@ -362,8 +362,9 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
     assert got["extra_body"] == {"repetition_penalty": config.repetition_penalty}
 
 
-@pytest.mark.parametrize("provider", ["chandra-ocr", "deepseek-ocr", "dots-mocr", "glm-ocr", "hunyuan-ocr",
-                                      "infinity-parser2", "lightonocr", "mineru", "nanonets-ocr",
+@pytest.mark.parametrize("provider", ["chandra-ocr", "deepseek-ocr", "dolphin-v2", "dots-mocr", "glm-ocr",
+                                      "hunyuan-ocr", "infinity-parser2", "lightonocr", "mineru",
+                                      "nanonets-ocr",
                                       "nemotron-parse", "olmocr", "ovisocr", "ovisocr2", "ovisocr3",
                                       "paddleocr-vl", "surya-ocr", "surya-ocr-2.5", "unlimited-ocr",
                                       "unlimited-ocr-2"])
@@ -630,3 +631,38 @@ def test_ovis_qwen35_servers_choose_the_vision_encoders_attention(
                          text=True, check=True).stdout.strip()
     assert out == (f"--mm-encoder-attn-backend {expect}" if expect else "")
     assert '"${ENC[@]}"' in text.split("vllm.entrypoints.cli.main serve", 1)[1]
+
+
+def test_dolphin_v2_reads_its_markdown_and_elements_with_labels_and_page_frame():
+    """The fixture is synthetic (written from Dolphin's documented output, not a model's answer): it checks
+    the client side, which needs no vendor code."""
+    fx, outs, errs = _read(HERE / "dolphin_v2.json")
+    assert "synthetic" in fx and not errs
+    assert "Soil Survey Results" in views.text(outs["html"]) and "<table>" in outs["html"]
+    labels = [b["label"] for b in outs["blocks"]]
+    assert labels == ["page_furniture", "heading", "text", "equation", "caption", "table", "figure",
+                      "caption", "page_furniture", "footnote", "page_furniture"]
+    assert [b["text"] for b in outs["blocks"] if b["label"] == "figure"] == [""]
+    # A watermark is page furniture, as hunyuan's; an annotation has no label of ours: no block, text in html.
+    assert any(b["text"] == "DRAFT" and b["label"] == "page_furniture" for b in outs["blocks"])
+    assert "Margin note" in views.text(outs["html"])
+    assert all(b["text"] != "Margin note" for b in outs["blocks"])
+    assert outs["blocks"][1]["bbox"] == pytest.approx([72 / 612, 80 / 792, 420 / 612, 104 / 792])
+
+
+def test_dolphin_v2_blocks_fail_for_a_whole_page_parse_or_an_unknown_label_and_html_stays():
+    from omni_parse_bench.harness.providers import dolphin_v2
+
+    fx = json.loads((HERE / "dolphin_v2.json").read_text())
+    request = dolphin_v2.DolphinV2().requests(frozenset({"html", "blocks"}))[0]
+    whole = [{"label": "distorted_page", "bbox": [0, 0, 612, 792], "text": "Kept", "reading_order": 0,
+              "tags": []}]
+    for elements in (whole, [{"label": "no_such", "bbox": [0, 0, 1, 1], "text": "Kept"}]):
+        outs, errs = dolphin_v2.parse(fx["raw"] | {"elements": elements}, request)
+        assert "Soil" in views.text(outs["html"]) and "blocks" in errs and "blocks" not in outs
+
+
+def test_the_dolphin_v2_server_asks_for_the_documented_page_parse():
+    """server.py can't be imported here (it imports the repository): its settings are read from its source."""
+    src = (Path(harness.__file__).parent / "providers" / "serve" / "dolphin-v2" / "server.py").read_text()
+    assert "MAX_BATCH_SIZE = 4" in src and "post_process=False" in src and "MarkdownConverter(False)" in src

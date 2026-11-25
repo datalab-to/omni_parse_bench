@@ -19,6 +19,10 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 - No `format`, number or table verdict changed on those runs; the format and decimal changes below only affect outputs that use those spellings.
 - LLM harness (#108): no effect on grading; it changes how a run handles two provider replies, not how answers are scored. A page that used to fail as "no usable html" or stop the run now gets a prediction or a refusal instead, so a rerun can score pages that earlier runs lost.
 
+### Added
+
+- Provider `dolphin-v2`: Dolphin-v2 (3B; html and blocks), served from `providers/serve/dolphin-v2/`. Its LICENSE files (code and weights) are the non-commercial Qwen Research License.
+
 ### Changed
 
 - Equations: marks a reader cannot tell apart in print now compare equal: a transpose superscript (`^\top`, `^T`, `^\intercal`, `^{-T}`), `||` and `\|`, `\llbracket`/`\rrbracket` and doubled brackets, `\bar` and `\overline` (or `\vec` and `\overrightarrow`) over one symbol, short and long arrows, binary and big operators when the big one carries limits, `Σ`/`∑` and `Π`/`∏` with an explicit relation in the lower limit, triangle and subset variants, stretchy angle fences, Unicode mathematical letters, Unicode primes, `ϱ ϰ`, `\iint`/`\iiint`, top-level row breaks, empty scripts and a raw `%`. Each is limited as described in docs/scoring/present-latex.md; script, blackboard and fraktur letters, Greek and Latin lookalikes, check and breve, `ϖ` and `π`, `=` and `≡` stay distinct.

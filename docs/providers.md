@@ -370,6 +370,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | Surya OCR 2 | `surya-ocr` | `surya-ocr` | html, blocks |
 | Surya OCR 2.5 | `surya-ocr-2.5` | `surya-ocr-2.5` | html, blocks |
 | MinerU2.5-Pro | `mineru` | `mineru` | html, blocks |
+| Dolphin-v2 | `dolphin-v2` | `dolphin-v2` | html, blocks |
 | GLM-OCR | `glm-ocr` | `glm-ocr` | html, blocks |
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
 | Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
@@ -480,6 +481,24 @@ MinerU2.5-Pro (`providers/mineru.py`):
 | code, algorithm | code |
 | table | table |
 | image, chart, image_block | figure |
+
+Dolphin-v2 (`providers/dolphin_v2.py`):
+
+| Dolphin-v2 label | label |
+| --- | --- |
+| sec_0, sec_1, sec_2, sec_3, sec_4, sec_5 | heading |
+| para, half_para, catalogue, reference | text |
+| list | list |
+| cap | caption |
+| fnote | footnote |
+| header, foot, watermark | page_furniture |
+| equ | equation |
+| code | code |
+| tab | table |
+| fig | figure |
+
+Dolphin-v2's `anno` elements get no block (no existing adapter maps an equivalent; the text stays in the html). A page it parses whole (`distorted_page`) has no layout, so its blocks fail and its html is
+still graded.
 
 GLM-OCR (`providers/glm_ocr.py`):
 
