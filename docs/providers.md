@@ -527,6 +527,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | MonkeyOCR | `monkeyocr` | `monkeyocr` | html, blocks |
 | GLM-OCR | `glm-ocr` | `glm-ocr` | html, blocks |
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
+| PP-StructureV3 | `pp-structurev3` | `pp-structurev3` | html, blocks |
 | Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
 | Docling | `docling` | `docling` | html, blocks |
 | Docling (formula) | `docling-formula` | `docling` | html, blocks |
@@ -555,6 +556,9 @@ both rows. The server runs the formula stage without PyTorch's cuDNN attention: 
 new decode shape, which made a page of formulas take minutes on a B200; with it off (flash or memory-efficient
 attention) a page takes seconds, and a formula's LaTeX can differ by a few characters from the cuDNN path.
 Full public run: 2,937/2,937 pages, 0 failures; 66.9 headline (46.4 text, 63.8 tables, 90.6 layout); GPU, B200, `auto` device; released OPB 1.7.0; OCR: RapidOCR, as the `docling` row.
+PP-StructureV3 (PaddleOCR's `PPStructureV3` pipeline of several models, at its defaults) runs on the CPU by default,
+slowly (a page with formulas can take minutes), and on a GPU where its server's `DEVICE` says so; its markdown
+keeps every block (`markdown_ignore_labels=[]`), and its boxes are turned back from the upright page onto the page as sent.
 
 Their labels (LightOn's table is above):
 
@@ -783,6 +787,21 @@ blocks (`DROPPED`), and stays in the html; a test checks that every label the pa
 | form, key_value_region, checkbox_selected, checkbox_unselected | form |
 | picture, chart | figure |
 | (dropped) grading_scale, empty_value, field_region, field_heading, field_item, field_key, field_value, field_hint, marker, track | none |
+
+PP-StructureV3 (`providers/pp_structurev3.py`; the labels of its layout model PP-DocLayout_plus-L, mapped as
+PaddleOCR-VL's are; every label the model has is in the table):
+
+| PP-StructureV3 label | label |
+| --- | --- |
+| text, abstract, content, reference, reference_content, aside_text | text |
+| paragraph_title, doc_title | heading |
+| header, footer, number | page_furniture |
+| figure_title | caption |
+| footnote | footnote |
+| formula, formula_number | equation |
+| algorithm | code |
+| table | table |
+| image, chart, seal | figure |
 
 Nemotron 3.5 Parse (`providers/nemotron_parse.py`; its class tokens, and Chart):
 

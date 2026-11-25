@@ -1,0 +1,622 @@
+{
+ "model": "PP-StructureV3",
+ "page": "forms_documentcloud-6155329-Class-D-Pharmacy-Exemption-Form-EF05-14426-GS-p1",
+ "provider": "pp-structurev3",
+ "options": {},
+ "outputs": [
+  "html",
+  "blocks"
+ ],
+ "sent": null,
+ "raw": {
+  "input_path": "/var/folders/nk/926ywpcx6tn10v_xkmkhkwh00000gn/T/tmpbqovxg2h.pdf",
+  "page_index": 0,
+  "page_count": 1,
+  "width": 1224,
+  "height": 1584,
+  "model_settings": {
+   "use_doc_preprocessor": true,
+   "use_seal_recognition": false,
+   "use_table_recognition": true,
+   "use_formula_recognition": true,
+   "use_chart_recognition": false,
+   "use_region_detection": true,
+   "format_block_content": false,
+   "markdown_ignore_labels": []
+  },
+  "parsing_res_list": [
+   {
+    "block_label": "paragraph_title",
+    "block_content": "Family Planning Program PARTI- AGENCY/CLINIC INFORMATION Agency Name Class D Pharmacy License Exemption Request ",
+    "block_bbox": [
+     8,
+     0,
+     861,
+     83
+    ],
+    "block_id": 0,
+    "block_order": 1
+   },
+   {
+    "block_label": "paragraph_title",
+    "block_content": "PARTII—PHARMACY REFERRAL PROCESS ",
+    "block_bbox": [
+     12,
+     324,
+     408,
+     361
+    ],
+    "block_id": 1,
+    "block_order": 2
+   },
+   {
+    "block_label": "table",
+    "block_content": "<html><body><table><tbody><tr><td colspan=\"7\"></td></tr><tr><td colspan=\"8\">Clinic Name (Clinic Requesting Waiver) Clinic Address (Clinic Requesting Waiver-Physical Address)</td></tr><tr><td>Clinic Address (Clinic Requesting Waiver-Physical Address) Contact Name</td><td>City</td><td colspan=\"3\">County</td><td>State</td><td>ZIP</td><td>Contact Name</td></tr><tr><td>Contact Telephone Number</td><td colspan=\"3\">Contact Email Address</td><td colspan=\"3\"></td></tr></tbody></table></body></html>",
+    "block_bbox": [
+     4,
+     75,
+     1200,
+     311
+    ],
+    "block_id": 2,
+    "block_order": null
+   },
+   {
+    "block_label": "text",
+    "block_content": "a)location ofrefral phamacy/pharmacies in relationto clients and clinic site,\nb)discoio \nc)howthealillnret cisilltincdtilctstoobdcation.\n",
+    "block_bbox": [
+     14,
+     367,
+     907,
+     465
+    ],
+    "block_id": 3,
+    "block_order": 3
+   },
+   {
+    "block_label": "paragraph_title",
+    "block_content": "PART III— PHARMACY EXEMPTIONJUSTIFICATION ",
+    "block_bbox": [
+     1,
+     732,
+     455,
+     754
+    ],
+    "block_id": 4,
+    "block_order": 4
+   },
+   {
+    "block_label": "text",
+    "block_content": "Briefly provide justification of the benefits to the agency and/or clients for requesting a Class D phamacy license exemption.",
+    "block_bbox": [
+     1,
+     771,
+     937,
+     796
+    ],
+    "block_id": 5,
+    "block_order": 5
+   },
+   {
+    "block_label": "paragraph_title",
+    "block_content": "PART IV —MEMORANDUM OF UNDERSTANDING (MOU)",
+    "block_bbox": [
+     0,
+     971,
+     494,
+     993
+    ],
+    "block_id": 6,
+    "block_order": 6
+   },
+   {
+    "block_label": "text",
+    "block_content": "Provide a copyofasignedand fully executed MoU with thereferral pharmacy/phamacies.The MoUmust include the purposeofcooperation and detail coordination between the agency/clini and referral phamacy/pharmaciesto provide thefollowing medication:",
+    "block_bbox": [
+     0,
+     1008,
+     1151,
+     1046
+    ],
+    "block_id": 7,
+    "block_order": 7
+   },
+   {
+    "block_label": "text",
+    "block_content": "a)non-clinician adminitered hormonal cotracetive methodsoral contraceptives,transdermal homonal contraceptives \"patch\",or vainal hormonal contraceptives \"ring\");",
+    "block_bbox": [
+     32,
+     1049,
+     1120,
+     1086
+    ],
+    "block_id": 8,
+    "block_order": 8
+   },
+   {
+    "block_label": "text",
+    "block_content": "b)anti-infectives for the treatment of STls and other infections; and ",
+    "block_bbox": [
+     34,
+     1090,
+     575,
+     1107
+    ],
+    "block_id": 9,
+    "block_order": 9
+   },
+   {
+    "block_label": "paragraph_title",
+    "block_content": "PARTV-POLICY ",
+    "block_bbox": [
+     0,
+     1179,
+     163,
+     1197
+    ],
+    "block_id": 10,
+    "block_order": 10
+   },
+   {
+    "block_label": "text",
+    "block_content": "Provide a copyoftheagencys/clinic's policythatensuresclientscanobtainprescribedmedicationrefillsfrom the cooperating phamacy/pharmacies without an additional clinic visit (unless medically indicated/necessary).\n",
+    "block_bbox": [
+     0,
+     1209,
+     1128,
+     1246
+    ],
+    "block_id": 11,
+    "block_order": 11
+   },
+   {
+    "block_label": "text",
+    "block_content": "The factsafimed bymeinthis waivrequstaretruthful and,asthe authorizd representativeofthe agncyamed above,Iarrantthattheagncy will follow all procedures outlined above for the provision of phamaceuticals to eligible clients.\n",
+    "block_bbox": [
+     0,
+     1297,
+     1178,
+     1336
+    ],
+    "block_id": 12,
+    "block_order": 12
+   },
+   {
+    "block_label": "text",
+    "block_content": "Date ",
+    "block_bbox": [
+     907,
+     1389,
+     947,
+     1407
+    ],
+    "block_id": 13,
+    "block_order": 13
+   },
+   {
+    "block_label": "text",
+    "block_content": "Class D Phammacy Exemption Granted:□Yes No ",
+    "block_bbox": [
+     0,
+     1473,
+     493,
+     1493
+    ],
+    "block_id": 14,
+    "block_order": 14
+   },
+   {
+    "block_label": "header",
+    "block_content": "TEXAS Health and Human Services Commission ",
+    "block_bbox": [
+     944,
+     0,
+     1188,
+     69
+    ],
+    "block_id": 15,
+    "block_order": 15
+   }
+  ],
+  "table_res_list": [
+   {
+    "cell_box_list": [
+     [
+      10.063638687133789,
+      75.96173986792564,
+      1196.0799560546875,
+      117.94097137451172
+     ],
+     [
+      9.13612174987793,
+      114.86099243164062,
+      1197.3780517578125,
+      213.3265609741211
+     ],
+     [
+      6.518920660018921,
+      171.31414031982422,
+      514.0585632324219,
+      253.2944107055664
+     ],
+     [
+      514.0079650878906,
+      200.9469757080078,
+      729.061767578125,
+      257.1672897338867
+     ],
+     [
+      728.2095336914062,
+      205.95169830322266,
+      924.7670288085938,
+      260.5956344604492
+     ],
+     [
+      924.2034301757812,
+      208.91466522216797,
+      1017.8883056640625,
+      262.84188079833984
+     ],
+     [
+      1017.0577392578125,
+      211.3491439819336,
+      1200.1053466796875,
+      265.37512969970703
+     ],
+     [
+      5.140547871589661,
+      226.92198944091797,
+      512.9836120605469,
+      305.02074432373047
+     ],
+     [
+      512.5350952148438,
+      253.14289093017578,
+      803.864013671875,
+      309.91410064697266
+     ],
+     [
+      803.1419067382812,
+      259.1182174682617,
+      1200.558837890625,
+      311.39420318603516
+     ]
+    ],
+    "pred_html": "<html><body><table><tbody><tr><td colspan=\"7\"></td></tr><tr><td colspan=\"8\">Clinic Name (Clinic Requesting Waiver) Clinic Address (Clinic Requesting Waiver-Physical Address)</td></tr><tr><td>Clinic Address (Clinic Requesting Waiver-Physical Address) Contact Name</td><td>City</td><td colspan=\"3\">County</td><td>State</td><td>ZIP</td><td>Contact Name</td></tr><tr><td>Contact Telephone Number</td><td colspan=\"3\">Contact Email Address</td><td colspan=\"3\"></td></tr></tbody></table></body></html>",
+    "table_ocr_pred": {
+     "rec_polys": [
+      [
+       [
+        10,
+        26
+       ],
+       [
+        373,
+        62
+       ],
+       [
+        371,
+        86
+       ],
+       [
+        7,
+        50
+       ]
+      ],
+      [
+       [
+        299,
+        21
+       ],
+       [
+        865,
+        46
+       ],
+       [
+        864,
+        79
+       ],
+       [
+        297,
+        54
+       ]
+      ],
+      [
+       [
+        18,
+        55
+       ],
+       [
+        142,
+        67
+       ],
+       [
+        139,
+        91
+       ],
+       [
+        15,
+        79
+       ]
+      ],
+      [
+       [
+        20,
+        115
+       ],
+       [
+        336,
+        142
+       ],
+       [
+        334,
+        163
+       ],
+       [
+        18,
+        136
+       ]
+      ],
+      [
+       [
+        18,
+        168
+       ],
+       [
+        495,
+        198
+       ],
+       [
+        493,
+        225
+       ],
+       [
+        17,
+        194
+       ]
+      ],
+      [
+       [
+        518,
+        196
+       ],
+       [
+        559,
+        199
+       ],
+       [
+        557,
+        225
+       ],
+       [
+        516,
+        222
+       ]
+      ],
+      [
+       [
+        734,
+        202
+       ],
+       [
+        797,
+        204
+       ],
+       [
+        795,
+        230
+       ],
+       [
+        732,
+        227
+       ]
+      ],
+      [
+       [
+        929,
+        208
+       ],
+       [
+        974,
+        208
+       ],
+       [
+        974,
+        230
+       ],
+       [
+        929,
+        230
+       ]
+      ],
+      [
+       [
+        1024,
+        210
+       ],
+       [
+        1055,
+        210
+       ],
+       [
+        1055,
+        231
+       ],
+       [
+        1024,
+        231
+       ]
+      ],
+      [
+       [
+        15,
+        222
+       ],
+       [
+        142,
+        231
+       ],
+       [
+        141,
+        255
+       ],
+       [
+        14,
+        246
+       ]
+      ],
+      [
+       [
+        521,
+        249
+       ],
+       [
+        726,
+        255
+       ],
+       [
+        725,
+        275
+       ],
+       [
+        520,
+        270
+       ]
+      ],
+      [
+       [
+        811,
+        256
+       ],
+       [
+        981,
+        261
+       ],
+       [
+        980,
+        281
+       ],
+       [
+        810,
+        277
+       ]
+      ]
+     ],
+     "rec_texts": [
+      "PARTI- AGENCY/CLINIC INFORMATION",
+      "Class D Pharmacy License Exemption Request",
+      "Agency Name",
+      "Clinic Name (Clinic Requesting Waiver)",
+      "Clinic Address (Clinic Requesting Waiver-Physical Address)",
+      "City",
+      "County",
+      "State",
+      "ZIP",
+      "Contact Name",
+      "Contact Telephone Number",
+      "Contact Email Address"
+     ],
+     "rec_scores": [
+      0.9732731580734253,
+      0.9748018980026245,
+      0.9936046600341797,
+      0.9690548777580261,
+      0.903229296207428,
+      0.9987966418266296,
+      0.9995975494384766,
+      0.9994338154792786,
+      0.9946650862693787,
+      0.9895033836364746,
+      0.9780738353729248,
+      0.9691635966300964
+     ],
+     "rec_boxes": [
+      [
+       7,
+       26,
+       373,
+       86
+      ],
+      [
+       297,
+       21,
+       865,
+       79
+      ],
+      [
+       15,
+       55,
+       142,
+       91
+      ],
+      [
+       18,
+       115,
+       336,
+       163
+      ],
+      [
+       17,
+       168,
+       495,
+       225
+      ],
+      [
+       516,
+       196,
+       559,
+       225
+      ],
+      [
+       732,
+       202,
+       797,
+       230
+      ],
+      [
+       929,
+       208,
+       974,
+       230
+      ],
+      [
+       1024,
+       210,
+       1055,
+       231
+      ],
+      [
+       14,
+       222,
+       142,
+       255
+      ],
+      [
+       520,
+       249,
+       726,
+       275
+      ],
+      [
+       810,
+       256,
+       981,
+       281
+      ]
+     ]
+    }
+   }
+  ],
+  "angle": 0,
+  "markdown": "## Family Planning Program PARTI- AGENCY/CLINIC INFORMATION Agency Name Class D Pharmacy License Exemption Request \n\n## PARTII—PHARMACY REFERRAL PROCESS \n\n\n<div style=\"text-align: center;\"><html><body><table border=\"1\"><tbody><tr><td colspan=\"7\"></td></tr><tr><td colspan=\"8\">Clinic Name (Clinic Requesting Waiver) Clinic Address (Clinic Requesting Waiver-Physical Address)</td></tr><tr><td>Clinic Address (Clinic Requesting Waiver-Physical Address) Contact Name</td><td>City</td><td colspan=\"3\">County</td><td>State</td><td>ZIP</td><td>Contact Name</td></tr><tr><td>Contact Telephone Number</td><td colspan=\"3\">Contact Email Address</td><td colspan=\"3\"></td></tr></tbody></table></body></html></div>\n\n\na)location ofrefral phamacy/pharmacies in relationto clients and clinic site,\n\nb)discoio \n\nc)howthealillnret cisilltincdtilctstoobdcation.\n\n\n\n## PART III— PHARMACY EXEMPTIONJUSTIFICATION \n\nBriefly provide justification of the benefits to the agency and/or clients for requesting a Class D phamacy license exemption.\n\n## PART IV —MEMORANDUM OF UNDERSTANDING (MOU)\n\nProvide a copyofasignedand fully executed MoU with thereferral pharmacy/phamacies.The MoUmust include the purposeofcooperation and detail coordination between the agency/clini and referral phamacy/pharmaciesto provide thefollowing medication:\n\na)non-clinician adminitered hormonal cotracetive methodsoral contraceptives,transdermal homonal contraceptives \"patch\",or vainal hormonal contraceptives \"ring\");\n\nb)anti-infectives for the treatment of STls and other infections; and \n\n## PARTV-POLICY \n\nProvide a copyoftheagencys/clinic's policythatensuresclientscanobtainprescribedmedicationrefillsfrom the cooperating phamacy/pharmacies without an additional clinic visit (unless medically indicated/necessary).\n\n\n\nThe factsafimed bymeinthis waivrequstaretruthful and,asthe authorizd representativeofthe agncyamed above,Iarrantthattheagncy will follow all procedures outlined above for the provision of phamaceuticals to eligible clients.\n\n\n\nDate \n\nClass D Phammacy Exemption Granted:□Yes No \n\nTEXAS Health and Human Services Commission ",
+  "vendor": {
+   "paddleocr": "3.7.0",
+   "paddlex": "3.7.2",
+   "paddlepaddle": "3.3.1"
+  },
+  "served": {
+   "weights": "PaddlePaddle/PP-StructureV3",
+   "revision": "3.7.0"
+  }
+ }
+}
