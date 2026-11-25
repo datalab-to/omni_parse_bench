@@ -51,6 +51,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | OvisOCR | open | 1.4B | none | — | 72.2 | 78.2 | unsupported | — |
 | olmOCR-2 | open | 8.3B | none | — | 71.8 | 56.6 | unsupported | — |
 | Nanonets-OCR2-3B | open | 3.8B | none | — | 69.0 | 62.6 | unsupported | — |
+| pdftext | open | n/a | none | — | 20.6 | 0.0 | unsupported | — |
 | pdftotext | open | n/a | none | — | 20.4 | 0.0 | unsupported | — |
 | Tesseract | open | n/a | none | — | 17.7 | 0.0 | unsupported | — |
 
@@ -420,6 +421,7 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | OvisOCR | 36.0 | 92.8 | 77.0 | 70.0 | 73.2 | 63.6 | 35.3 | 50.4 | 27.1 |
 | olmOCR-2 | 61.2 | 84.9 | 58.7 | 70.3 | 68.6 | 57.5 | 57.7 | 65.5 | 39.5 |
 | Nanonets-OCR2-3B | 54.6 | 77.6 | 64.1 | 74.2 | 63.8 | 46.2 | 29.3 | 59.6 | 44.4 |
+| pdftext | 0.0 | 4.5 | 6.0 | 21.1 | 22.2 | 34.6 | 13.4 | 0.9 | 31.5 |
 | pdftotext | 0.0 | 4.4 | 6.0 | 20.0 | 21.4 | 33.9 | 14.3 | 0.9 | 33.2 |
 | Tesseract | 1.7 | 1.4 | 3.1 | 27.1 | 23.3 | 43.3 | 3.7 | 5.2 | 25.0 |
 
