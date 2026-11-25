@@ -39,6 +39,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 - Providers: `markitdown` (microsoft/markitdown 0.1.9, MIT), a local CPU text-layer parser at its defaults: html only, no OCR; scanned PDFs without a text layer are empty, and images may return EXIF metadata when `exiftool` is installed (#111).
 - Providers: `pdf-inspector` (pdf-inspector 1.27.1, local; html only), as a text-mode row and, with `ocr=auto`, an OCR-mode row (PP-OCRv6 Small); image inputs use lossless PDF wrapping (#112).
 - Providers: `pymupdf4llm` and `pymupdf4llm-ocr` (PyMuPDF4LLM 2.1, AGPL-3.0), local CPU rows with html and layout blocks; the OCR row uses RapidOCR or tesseract only when available (#113).
+- Provider: `opendataloader` (OpenDataLoader PDF 2.5.24, Apache-2.0), local Java engine; html and blocks, no OCR (#114).
 
 ### Fixed
 

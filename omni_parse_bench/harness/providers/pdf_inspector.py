@@ -184,14 +184,14 @@ def run_python(script: str, args: list[str], deadline: budget.Budget,
     return subprocess.CompletedProcess(command, proc.returncode, stdout, stderr)
 
 
-def as_pdf(page: Path, dest: Path) -> None:
-    """Wrap an image in a one-page PDF losslessly at `DPI`, preserving its pixel dimensions and alpha."""
+def as_pdf(page: Path, dest: Path, *, dpi: float = DPI) -> None:
+    """Wrap an image in a one-page PDF losslessly at `dpi`, preserving its pixel dimensions and alpha."""
     if page.suffix.lower() != ".pdf":
         import img2pdf
         import io
         from PIL import Image
 
-        layout = img2pdf.get_fixed_dpi_layout_fun((DPI, DPI))
+        layout = img2pdf.get_fixed_dpi_layout_fun((dpi, dpi))
         with Image.open(page) as image:
             image.load()
             png = io.BytesIO()
