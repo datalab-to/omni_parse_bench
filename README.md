@@ -54,6 +54,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | pdftext | open | n/a | none | — | 20.6 | 0.0 | unsupported | — |
 | pdftotext | open | n/a | none | — | 20.4 | 0.0 | unsupported | — |
 | Tesseract | open | n/a | none | — | 17.7 | 0.0 | unsupported | — |
+| MarkItDown | open | n/a | none | — | 16.0 | 13.9 | unsupported | — |
 
 Scores use omni-parse-bench 1.7.0, regraded from each system's saved predictions with no new model calls, except rows marked §.
 
@@ -424,6 +425,7 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | pdftext | 0.0 | 4.5 | 6.0 | 21.1 | 22.2 | 34.6 | 13.4 | 0.9 | 31.5 |
 | pdftotext | 0.0 | 4.4 | 6.0 | 20.0 | 21.4 | 33.9 | 14.3 | 0.9 | 33.2 |
 | Tesseract | 1.7 | 1.4 | 3.1 | 27.1 | 23.3 | 43.3 | 3.7 | 5.2 | 25.0 |
+| MarkItDown | 0.0 | 3.5 | 16.4 | 18.6 | 19.4 | 33.1 | 4.5 | 0.7 | 19.6 |
 
 
 ## License

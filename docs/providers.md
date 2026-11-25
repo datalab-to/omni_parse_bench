@@ -234,6 +234,7 @@ that is missing stops a run before any call and says which `export` to type.
 | `tesseract` | the local `tesseract` binary, no model of the page | html | kept: it has no notion of them | none |
 | `pdftotext` | the local poppler `pdftotext` binary, the PDF's text layer | html | kept: it has no notion of them | none |
 | `pdftext` | the `pdftext` package (pdfium): the PDF's text layer, no OCR | html | kept: it has no notion of them | none |
+| `markitdown` | the local `markitdown` 0.1.9 package, a PDF's text layer as Markdown | html | kept: it has no notion of them | none |
 
 A vendor's tiers are runs of their own, one config each (or one config and `--set`), with the same pages:
 
@@ -305,6 +306,15 @@ Per vendor:
   scanned PDF page without a text layer is empty (a scan with an embedded OCR layer has text), as is an
   image file. Its text is written as html inside `<pre>`, escaped, and it gives no layout blocks. Cost: `usd` 0.0.
   Not a dependency of this package, and it pins `pypdfium2==5.10.1`: `uv pip install pdftext==0.7.1`.
+- markitdown: microsoft/markitdown 0.1.9 (MIT), run locally at no cost at its defaults:
+  `MarkItDown().convert(page).markdown`, no LLM client, no Document Intelligence and no plugins. A
+  PDF page is its text layer (pdfminer.six, tables through pdfplumber), with no OCR; a scanned PDF
+  page without a text layer is empty (a scan with an embedded OCR layer has text). An image page
+  gets EXIF metadata only when `exiftool` is installed; otherwise it is empty. The answer records
+  whether `exiftool` was available. Conversion runs in a killable process group, bounded by the page
+  budget, so timeout also stops an `exiftool` child. The Markdown goes through `markdown.to_html`,
+  recorded in `sent` as `derived`; no layout blocks. It is free (`usd` 0.0). Needs
+  `pip install 'omni-parse-bench[markitdown]'`.
 
 ## Serving an open model
 
