@@ -25,6 +25,10 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 - `present` setting `{"blank_after": true}` (below): no verdict moves, because no published test uses it. Regraded on saved predictions of the 27 published systems (unlimited-ocr-2 with `--partial`), old main 222f0cd against this change: 439,776 verdicts, none changed.
 - `table_cell` `section`: a section label written in every cell of its row (`<td>Cohort 1</td><td>Cohort 1</td>`) now reads as the section row a merged cell (`colspan`) already did, for a test that names it: a row whose cells all fold to one string that matches the test's section (within its `max_diffs`, as a merged label does), start in the row and span no other, is read as that section in a second reading (the first still passes what it passed, so no verdict goes from pass to fail). Any other repeated row (`Yes | Yes`, `0 | 0`) stays data. Remaining tradeoff: a test that names `Yes` as its section passes on a `Yes | Yes` row, and, as a merged label does, a repeated value within the test's `max_diffs` of the section; copies that differ from each other stay data; published tests name real section labels (case cell-section-repeated-value). Regraded on the saved predictions of the 27 published systems (unlimited-ocr-2 holds 2,934 of 2,937 pages; the 3 missing hold no `table_cell` test, so each system has all 5,386), old main 24adb7e against this change, `table_cell` tests only (`section` is read nowhere else): 145,422 verdicts, none changed, no score changed.
 
+### Added
+
+- Provider: Docling (`docling`, docling 2.153.0), its standard PDF pipeline at its defaults, with a CPU server image: html from its own HTML export and layout blocks from its items.
+
 ### Changed
 
 - Indra OCR: update the CPU adapter to `indra-ocr==1.2.0` and model revision `v1.2.0`. Math is enabled by default; the full public run scores 78.8 (text 68.0, tables 75.8, layout 92.6) on 2,937 pages (#129).

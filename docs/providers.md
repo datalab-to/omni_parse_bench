@@ -527,6 +527,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | GLM-OCR | `glm-ocr` | `glm-ocr` | html, blocks |
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
 | Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
+| Docling | `docling` | `docling` | html, blocks |
 | Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets-ocr` | html |
 | Nemotron 3.5 Parse | `nemotron-parse` | `nemotron-parse` | html, blocks |
 | MiniCPM-OCR 1.0 | `minicpm-ocr` | `minicpm-ocr` | html, markdown, blocks |
@@ -538,6 +539,11 @@ which enables math by default; optional word boxes are off because OPB consumes 
 are unchanged. It runs on CPU (ONNX Runtime), without `--gpus`; its server reads pages in one worker process per core.
 Full public run: 2,937/2,937 pages, 0 failures; 78.8 headline (68.0 text, 75.8 tables, 92.6 layout), graded with
 released OPB 1.7.0 on dataset revision `d70182b9`; the blog reports 78.9 / 68.0 / 75.9 / 92.7.
+Docling (the `docling` package's standard PDF pipeline) is not one model but a pipeline of several; it runs on
+Docling's default device, the GPU when there is one (`docker run --gpus all`) and the CPU without `--gpus`; its html
+is the document's own `export_to_html` (headers and footers kept), and its picture and formula items are not read
+by default (a formula is exported as "Formula not decoded").
+Full public run: Docling, 2,937/2,937 pages; 0 failures; GPU, B200, `auto` device; released OPB 1.7.0.
 
 Their labels (LightOn's table is above):
 
@@ -727,6 +733,24 @@ Indra OCR (`providers/indra_ocr.py`):
 | Footnote | footnote |
 | Table | table |
 | Form | form |
+
+Docling (`providers/docling.py`; its `DocItemLabel`s). A label with no clear view label is left out of the
+blocks (`DROPPED`), and stays in the html; a test checks that every label the package has is in one list or the other:
+
+| Docling label | label |
+| --- | --- |
+| text, paragraph, reference, handwritten_text, document_index | text |
+| title, section_header | heading |
+| page_header, page_footer | page_furniture |
+| list_item | list |
+| caption | caption |
+| footnote | footnote |
+| formula | equation |
+| code | code |
+| table | table |
+| form, key_value_region, checkbox_selected, checkbox_unselected | form |
+| picture, chart | figure |
+| (dropped) grading_scale, empty_value, field_region, field_heading, field_item, field_key, field_value, field_hint, marker, track | none |
 
 Nemotron 3.5 Parse (`providers/nemotron_parse.py`; its class tokens, and Chart):
 
