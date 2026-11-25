@@ -44,6 +44,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | Unlimited-OCR | open | 3.3B | 79.5 | — | 70.7 | 76.6 | 91.1 | — |
 | Indra OCR (Datalab) | open | about 17M | 78.8 | — | 68.0 | 75.8 | 92.6 | — |
 | Infinity-Parser2-Flash | open | 2.2B | 78.7 | — | 78.8 | 66.8 | 90.4 | — |
+| Marker (fast) (Datalab) | open | n/a | 78.2 | — | 67.8 | 75.0 | 91.7 | — |
 | DeepSeek-OCR-2 | open | 3.4B | 75.4 | — | 64.6 | 70.2 | 91.4 | — |
 | LiteParse (ocria-nano) | open | n/a | 74.8 | — | 59.4 | 74.1 | 90.9 | — |
 | HunyuanOCR-1.5 | open | 1.0B | 68.8 | — | 62.3 | 62.6 | 81.4 | — |
@@ -66,7 +67,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 
 Scores use omni-parse-bench 1.7.0: saved predictions are regraded with it, and locally run open tools are fresh full runs (see the next paragraph); rows marked § keep their published 1.5.0 grades.
 
-Rows for open tools run locally (pdftotext, pdftext, MarkItDown, pdf-inspector, PyMuPDF4LLM, OpenDataLoader and LiteParse) are full runs graded with released omni-parse-bench 1.7.0, failed pages counted; settings and failures per tool are in [docs/providers.md](docs/providers.md).
+Rows for open tools run locally (pdftotext, pdftext, MarkItDown, pdf-inspector, PyMuPDF4LLM, OpenDataLoader, LiteParse and Marker (fast)) are full runs graded with released omni-parse-bench 1.7.0, failed pages counted; settings and failures per tool are in [docs/providers.md](docs/providers.md).
 
 \* Used in creating and verifying at least some tests.
 
@@ -429,6 +430,7 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | Unlimited-OCR | 31.3 | 89.3 | 75.3 | 69.1 | 68.8 | 59.3 | 15.6 | 50.4 | 36.8 |
 | Indra OCR (Datalab) | 28.1 | 63.5 | 76.6 | 65.4 | 68.7 | 78.1 | 61.5 | 34.6 | 71.1 |
 | Infinity-Parser2-Flash | 63.6 | 93.5 | 67.5 | 75.6 | 77.5 | 73.7 | 33.6 | 71.8 | 41.0 |
+| Marker (fast) (Datalab) | 28.2 | 63.1 | 75.9 | 65.1 | 68.7 | 78.1 | 59.2 | 34.6 | 71.3 |
 | DeepSeek-OCR-2 | 28.5 | 82.0 | 68.9 | 59.6 | 64.3 | 50.6 | 9.6 | 37.0 | 43.0 |
 | LiteParse (ocria-nano) | 8.5 | 55.4 | 74.7 | 63.9 | 61.4 | 72.9 | 55.8 | 30.2 | 52.9 |
 | HunyuanOCR-1.5 | 40.2 | 67.4 | 63.3 | 58.1 | 65.1 | 53.7 | 45.3 | 50.5 | 42.6 |

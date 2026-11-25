@@ -1,0 +1,300 @@
+{
+ "provider": "marker-fast",
+ "options": {},
+ "sent": {
+  "package": "marker-pdf==2.2.0",
+  "mode": "fast",
+  "settings": {
+   "keep_pageheader_in_output": true,
+   "keep_pagefooter_in_output": true
+  }
+ },
+ "raw": {
+  "html": "\n            <!DOCTYPE html>\n            <html>\n                <head>\n                    <meta charset=\"utf-8\" />\n                </head>\n                <body>\n                    <h2>Family Planning Program</h2><h2>Class D Pharmacy License Exemption Request</h2><p>PART I – AGENCY/CLINIC INFORMATION</p><p>Agency Name</p><p>Clinic Name (Clinic Requesting Waiver)</p><table>\n<tr><th>Clinic Address (Clinic Requesting Waiver - Physical Address)</th><th>City</th><th>County</th><th>State</th><th>ZIP</th></tr>\n<tr><td>Contact Name</td><td>Contact Telephone Number</td><td></td><td>Contact Email Address</td><td></td></tr>\n</table><h2>PART II – PHARMACY REFERRAL PROCESS</h2><p>Briefly describe the process through which patients will obtain medications from referral pharmacy/pharmacies. Include:</p><p>a) location of referral pharmacy/pharmacies in relation to clients and clinic site,<br/>b) discussion of elimination of barriers to clients receiving medications, and<br/>c) how the agency/clinic will ensure that clients will not incur additional costs to obtain medication.</p><h2>PART III – PHARMACY EXEMPTION JUSTIFICATION</h2><p>Briefly provide justification of the benefits to the agency and/or clients for requesting a Class D pharmacy license exemption.</p><h2>PART IV – MEMORANDUM OF UNDERSTANDING (MOU)</h2><p>Provide a copy of a signed and fully executed MoU with the referral pharmacy/pharmacies. The MoU must include the purpose of cooperation and detail coordination between the agency/clinic and referral pharmacy/pharmacies to provide the following medications:</p><p>a) non-clinician administered hormonal contraceptive methods (oral contraceptives, transdermal hormonal contraceptives “patch”, or vaginal hormonal contraceptives “ring”);<br/>b) anti-infectives for the treatment of STIs and other infections; and</p><h2>PART V – POLICY</h2><p>Provide a copy of the agency’s/clinic’s policy that ensures clients can obtain prescribed medication refills from the cooperating pharmacy/pharmacies without an additional clinic visit (unless medically indicated/necessary).</p><p>The facts affirmed by me in this waiver request are truthful and, as the authorized representative of the agency named above, I warrant that the agency will follow all procedures outlined above for the provision of pharmaceuticals to eligible clients.</p><p>Signature Date</p><p>Class D Pharmacy Exemption Granted:</p><p>□ Yes ☐ No</p><p>Signature</p><p>Date</p><p></p><p>Revised 9/30/16</p><p></p><p>EF05-14426</p>\n                </body>\n            </html>\n",
+  "mode": "fast",
+  "version": "2.2.0",
+  "json": {
+   "block_type": "Document",
+   "metadata": {},
+   "children": [
+    {
+     "id": "/page/0/Page/23",
+     "block_type": "Page",
+     "bbox": [
+      0.0,
+      0.0,
+      612.0,
+      792.0
+     ],
+     "html": "<content-ref src='/page/0/SectionHeader/0'></content-ref><content-ref src='/page/0/SectionHeader/1'></content-ref><content-ref src='/page/0/Text/2'></content-ref><content-ref src='/page/0/Text/3'></content-ref><content-ref src='/page/0/Text/4'></content-ref><content-ref src='/page/0/Table/5'></content-ref><content-ref src='/page/0/SectionHeader/6'></content-ref><content-ref src='/page/0/Text/7'></content-ref><content-ref src='/page/0/ListGroup/8'></content-ref><content-ref src='/page/0/SectionHeader/9'></content-ref><content-ref src='/page/0/Text/10'></content-ref><content-ref src='/page/0/SectionHeader/11'></content-ref><content-ref src='/page/0/Text/12'></content-ref><content-ref src='/page/0/ListGroup/13'></content-ref><content-ref src='/page/0/SectionHeader/14'></content-ref><content-ref src='/page/0/Text/15'></content-ref><content-ref src='/page/0/Text/16'></content-ref><content-ref src='/page/0/Text/17'></content-ref><content-ref src='/page/0/Text/18'></content-ref><content-ref src='/page/0/Form/19'></content-ref><content-ref src='/page/0/Form/20'></content-ref><content-ref src='/page/0/Form/21'></content-ref><content-ref src='/page/0/PageFooter/22'></content-ref><content-ref src='/page/0/PageFooter/23'></content-ref>",
+     "children": [
+      {
+       "id": "/page/0/SectionHeader/0",
+       "block_type": "SectionHeader",
+       "bbox": [
+        214.95000000000002,
+        22.3125,
+        354.29999999999995,
+        33.1875
+       ],
+       "html": "<h2>Family Planning Program</h2>"
+      },
+      {
+       "id": "/page/0/SectionHeader/1",
+       "block_type": "SectionHeader",
+       "bbox": [
+        154.6125,
+        39.675,
+        422.40000000000003,
+        50.587500000000006
+       ],
+       "html": "<h2>Class D Pharmacy License Exemption Request</h2>"
+      },
+      {
+       "id": "/page/0/Text/2",
+       "block_type": "Text",
+       "bbox": [
+        26.700000000000003,
+        54.637499999999996,
+        186.78750000000002,
+        62.362500000000004
+       ],
+       "html": "<p>PART I – AGENCY/CLINIC INFORMATION</p>"
+      },
+      {
+       "id": "/page/0/Text/3",
+       "block_type": "Text",
+       "bbox": [
+        26.737499999999997,
+        67.125,
+        81.525,
+        74.4
+       ],
+       "html": "<p>Agency Name</p>"
+      },
+      {
+       "id": "/page/0/Text/4",
+       "block_type": "Text",
+       "bbox": [
+        28.162499999999998,
+        92.92500000000001,
+        169.83749999999998,
+        101.0625
+       ],
+       "html": "<p>Clinic Name (Clinic Requesting Waiver)</p>"
+      },
+      {
+       "id": "/page/0/Table/5",
+       "block_type": "Table",
+       "bbox": [
+        29.700000000000003,
+        118.57499999999999,
+        517.5374999999999,
+        151.7625
+       ],
+       "html": "<table>\n<tr><th>Clinic Address (Clinic Requesting Waiver - Physical Address)</th><th>City</th><th>County</th><th>State</th><th>ZIP</th></tr>\n<tr><td>Contact Name</td><td>Contact Telephone Number</td><td></td><td>Contact Email Address</td><td></td></tr>\n</table>"
+      },
+      {
+       "id": "/page/0/SectionHeader/6",
+       "block_type": "SectionHeader",
+       "bbox": [
+        32.962500000000006,
+        190.46249999999998,
+        208.35000000000002,
+        197.54999999999998
+       ],
+       "html": "<h2>PART II – PHARMACY REFERRAL PROCESS</h2>"
+      },
+      {
+       "id": "/page/0/Text/7",
+       "block_type": "Text",
+       "bbox": [
+        31.3125,
+        210.22500000000002,
+        446.66249999999997,
+        217.91250000000002
+       ],
+       "html": "<p>Briefly describe the process through which patients will obtain medications from referral pharmacy/pharmacies. Include:</p>"
+      },
+      {
+       "id": "/page/0/ListGroup/8",
+       "block_type": "ListGroup",
+       "bbox": [
+        49.875,
+        219.71249999999998,
+        398.70000000000005,
+        245.85000000000002
+       ],
+       "html": "<p>a) location of referral pharmacy/pharmacies in relation to clients and clinic site,<br/>b) discussion of elimination of barriers to clients receiving medications, and<br/>c) how the agency/clinic will ensure that clients will not incur additional costs to obtain medication.</p>"
+      },
+      {
+       "id": "/page/0/SectionHeader/9",
+       "block_type": "SectionHeader",
+       "bbox": [
+        32.925,
+        375.9,
+        234.67499999999998,
+        383.25
+       ],
+       "html": "<h2>PART III – PHARMACY EXEMPTION JUSTIFICATION</h2>"
+      },
+      {
+       "id": "/page/0/Text/10",
+       "block_type": "Text",
+       "bbox": [
+        31.3125,
+        393.07500000000005,
+        462.11249999999995,
+        400.76250000000005
+       ],
+       "html": "<p>Briefly provide justification of the benefits to the agency and/or clients for requesting a Class D pharmacy license exemption.</p>"
+      },
+      {
+       "id": "/page/0/SectionHeader/11",
+       "block_type": "SectionHeader",
+       "bbox": [
+        31.200000000000003,
+        485.84999999999997,
+        253.42499999999998,
+        494.32500000000005
+       ],
+       "html": "<h2>PART IV – MEMORANDUM OF UNDERSTANDING (MOU)</h2>"
+      },
+      {
+       "id": "/page/0/Text/12",
+       "block_type": "Text",
+       "bbox": [
+        31.3125,
+        502.53749999999997,
+        561.1125,
+        519.2249999999999
+       ],
+       "html": "<p>Provide a copy of a signed and fully executed MoU with the referral pharmacy/pharmacies. The MoU must include the purpose of cooperation and detail coordination between the agency/clinic and referral pharmacy/pharmacies to provide the following medications:</p>"
+      },
+      {
+       "id": "/page/0/ListGroup/13",
+       "block_type": "ListGroup",
+       "bbox": [
+        49.875,
+        520.9875,
+        545.625,
+        546.7874999999999
+       ],
+       "html": "<p>a) non-clinician administered hormonal contraceptive methods (oral contraceptives, transdermal hormonal contraceptives “patch”, or vaginal hormonal contraceptives “ring”);<br/>b) anti-infectives for the treatment of STIs and other infections; and</p>"
+      },
+      {
+       "id": "/page/0/SectionHeader/14",
+       "block_type": "SectionHeader",
+       "bbox": [
+        32.962500000000006,
+        581.0250000000001,
+        104.69999999999999,
+        588.1125
+       ],
+       "html": "<h2>PART V – POLICY</h2>"
+      },
+      {
+       "id": "/page/0/Text/15",
+       "block_type": "Text",
+       "bbox": [
+        31.3125,
+        594.3375000000001,
+        548.7375,
+        611.4749999999999
+       ],
+       "html": "<p>Provide a copy of the agency’s/clinic’s policy that ensures clients can obtain prescribed medication refills from the cooperating pharmacy/pharmacies without an additional clinic visit (unless medically indicated/necessary).</p>"
+      },
+      {
+       "id": "/page/0/Text/16",
+       "block_type": "Text",
+       "bbox": [
+        29.737499999999997,
+        634.5374999999999,
+        568.9124999999999,
+        651.6375
+       ],
+       "html": "<p>The facts affirmed by me in this waiver request are truthful and, as the authorized representative of the agency named above, I warrant that the agency will follow all procedures outlined above for the provision of pharmaceuticals to eligible clients.</p>"
+      },
+      {
+       "id": "/page/0/Text/17",
+       "block_type": "Text",
+       "bbox": [
+        28.237499999999997,
+        676.6500000000001,
+        463.57500000000005,
+        684.7874999999999
+       ],
+       "html": "<p>Signature Date</p>"
+      },
+      {
+       "id": "/page/0/Text/18",
+       "block_type": "Text",
+       "bbox": [
+        28.125,
+        717.2625,
+        168.33749999999998,
+        725.7
+       ],
+       "html": "<p>Class D Pharmacy Exemption Granted:</p>"
+      },
+      {
+       "id": "/page/0/Form/19",
+       "block_type": "Form",
+       "bbox": [
+        179.7375,
+        716.7375,
+        253.20000000000002,
+        725.0999999999999
+       ],
+       "html": "<p>□ Yes ☐ No</p>"
+      },
+      {
+       "id": "/page/0/Form/20",
+       "block_type": "Form",
+       "bbox": [
+        29.8125,
+        751.2375,
+        64.57499999999999,
+        758.8875
+       ],
+       "html": "<p>Signature</p>"
+      },
+      {
+       "id": "/page/0/Form/21",
+       "block_type": "Form",
+       "bbox": [
+        441.45000000000005,
+        751.3499999999999,
+        460.34999999999997,
+        757.6125
+       ],
+       "html": "<p>Date</p>"
+      },
+      {
+       "id": "/page/0/PageFooter/22",
+       "block_type": "PageFooter",
+       "bbox": [
+        60.862500000000004,
+        767.4749999999999,
+        126.30000000000001,
+        774.1125000000001
+       ],
+       "html": "<p></p><p>Revised 9/30/16</p>"
+      },
+      {
+       "id": "/page/0/PageFooter/23",
+       "block_type": "PageFooter",
+       "bbox": [
+        534.2249999999999,
+        767.4375,
+        585.7125000000001,
+        774.0749999999999
+       ],
+       "html": "<p></p><p>EF05-14426</p>"
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

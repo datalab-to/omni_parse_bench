@@ -46,6 +46,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 - Providers: `pymupdf4llm` and `pymupdf4llm-ocr` (PyMuPDF4LLM 2.1, AGPL-3.0), local CPU rows with html and layout blocks; the OCR row uses RapidOCR or tesseract only when available (#113).
 - Provider: `opendataloader` (OpenDataLoader PDF 2.5.24, Apache-2.0), local Java engine; html and blocks, no OCR (#114).
 - Providers: `liteparse` (LiteParse 2.21.1, local; html and blocks), as a text-layer row and, with `ocr=true`, a Tesseract row (`liteparse-tesseract`) and, with `ocr_backend=ocria-nano`, a row for LiteParse's own OCR and table models (`liteparse-ocria-nano`; its weights are under their own license, which allows benchmarking). Replaces #80 (#115).
+- Providers: Marker (fast) (`marker-fast`) and Marker (`marker`), the `marker-pdf` 2.2.0 package (Apache-2.0 code, weights under Datalab's modified AI Pubs Open RAIL-M license) and layout blocks. No verdict changes (#116).
 
 ### Fixed
 
