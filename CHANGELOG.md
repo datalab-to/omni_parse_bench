@@ -25,6 +25,10 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 - Text: a raised decimal point before a digit (`·79`, `p<·05`) reads as `.` unless a letter, digit or closing bracket comes right before it (`A·1`, `(a)·1`, `太原·2020` are unchanged).
 - Format: a subscript or superscript written in maths (`$V_1$`, `$\mathrm{LC}_{50}$`, `$x^{2}$`, `${}^{a}$`) counts as the `sub` or `sup` mark on that text, and is evidence only for `sub`/`sup` and their absent forms. Maths inside code is not read. Unicode sub/superscript digits are still not marks.
 
+### Added
+
+- Providers: `pdftotext` (poppler-utils), a local CPU text-layer parser at its documented default: html only, no OCR, so image pages are empty (#109).
+
 ### Fixed
 
 - LLM harness: an empty reply (after the provider's own stripping) is a valid prediction of an empty page, not a failure after retries. This matters for blank pages, where empty is the right answer.
