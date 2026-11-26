@@ -102,6 +102,53 @@ num-fuzzy-script	fail	'3.' not found with its numbers exact (a number differs, o
 num-fuzzy-letter	pass
 num-fuzzy-fullwidth	pass
 num-fuzzy-after	pass
+## blank-after
+blank-nothing	pass
+blank-last	pass
+blank-underscores	pass
+blank-dots	pass
+blank-two-underscores	pass
+blank-leader-glued	pass
+blank-printed	pass
+blank-white-space	pass
+blank-case	pass
+blank-moved-field	pass
+blank-image-alt	pass
+blank-glued-words	pass
+blank-markdown	pass
+blank-table-2col	pass
+blank-table-2col-mask	pass
+blank-table-rest-of-cell	pass
+blank-table-header-row	pass
+blank-table-header-row-end	pass
+blank-table-last-column	pass
+blank-table-label-below	pass
+blank-repeated-one-blank	pass
+blank-inside-label	pass
+blank-checkbox	fail	'Date of birth:' is followed by '☐' to the end of the page
+blank-markdown-mask	fail	'Date of birth:' is followed by '//' before the next field
+invent-value	fail	'Date of birth:' is followed by '01/02/1990' before the next field
+invent-na	fail	'Date of birth:' is followed by 'n/a' before the next field
+invent-dash	fail	'Date of birth:' is followed by '-' before the next field
+invent-blank-word	fail	'Date of birth:' is followed by '[blank]' to the end of the page
+invent-mask-twice	fail	'Date of birth:' is followed by '/__/' to the end of the page
+invent-mask-without	fail	'Date of birth:' is followed by '__/__/' to the end of the page
+invent-last	fail	'Date of birth:' is followed by '5 may' to the end of the page
+invent-glued	fail	'Date of birth:' is followed by '1990' to the end of the page
+invent-no-stop	fail	'Date of birth:' is followed by 'place of birth: paris' to the end of the page
+invent-table-right	fail	'Date of birth:' cell's value cell (right) holds '01/02/1990'
+invent-table-below	fail	'Date of birth:' cell's value cell (below) holds '01/02/1990'
+invent-table-shifted	fail	'Date of birth:' cell's value cell (right) holds 'paris'
+invent-table-rest	fail	'Date of birth:' is followed by '5' in its cell
+invent-table-last-column	fail	'Date of birth:' cell's value cell (below) holds '1990'
+invent-table-image	fail	'Date of birth:' cell's value cell (right) holds 'an image'
+invent-table-merged	fail	'Date of birth:' cell's value cell (right) holds '1990'
+invent-markdown	fail	'Date of birth:' is followed by '01/02/1990' before the next field
+invent-missing	fail	'Date of birth:' not found (best 0.300 < 1.000); closest 'name:ann'
+invent-word-edge	fail	'Name' not found whole, at a word edge, in one paragraph or one table cell
+invent-split-label	fail	'Date of birth:' not found whole, at a word edge, in one paragraph or one table cell
+invent-read-across	fail	'Date of birth:' is followed by 'sex: f' to the end of the page
+blank-read-across	pass
 ## number-gold
 gold-point	12.5
 gold-leading-point	refused

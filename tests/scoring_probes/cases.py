@@ -85,6 +85,19 @@ def text(label, mark, rule, gold, out, md=0, exact=False, **kw) -> Case:
                    lambda: _v(R.found(R.Text(gold, md, (), exact), views.html(html(out)))), **kw)
 
 
+def blank(label, mark, rule, gold, out, printed=None, stops=(), from_markdown=False, **kw) -> Case:
+    """`present` with `{"blank_after": true}`: nothing follows `gold`, the label. `printed` is the field's
+    placeholder, `stops` the other fields' labels. `from_markdown`: `out` is markdown, turned to html as the
+    harness does."""
+    from omni_parse_bench import markdown
+    p = R.Present(R.Text(gold, 0), True, R.Text(printed, 0) if printed else None,
+                  tuple(R.Text(x, 0) for x in stops))
+    shown = code(gold) + (f", printed {code(printed)}" if printed else "") + (
+        f", stops {', '.join(code(x) for x in stops)}" if stops else "")
+    page = markdown.to_html(out) if from_markdown else out if "<" in out else f"<p>{out}</p>"
+    return verdict(label, mark, rule, shown, out, lambda: _v(R.present(p, views.html(page))), **kw)
+
+
 def number(label, mark, rule, gold, out, **kw) -> Case:
     """`present` with a number arg."""
     return verdict(label, mark, rule, code(gold), out,

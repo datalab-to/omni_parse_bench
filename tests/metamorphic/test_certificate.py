@@ -115,6 +115,7 @@ def test_the_certificate_counts_the_real_tests_it_says():
     assert manifest_sha256(os.environ["OPB_DATASET"]) == MANIFEST_SHA256, \
         f"OPB_DATASET is not revision {DATASET_REVISION[:7]} of the dataset: its manifest differs"
     from metamorphic.test_fold_and_case import EXACT, TESTS
+    from omni_parse_bench.scorers.unit_tests import runners
     from metamorphic.test_equivalences import LATEX
     from metamorphic.test_tables_and_layout import SIDED
     from metamorphic.test_text_matching import DIGIT_EDGED, FUZZY_NUMBERED, NUMBERED, VULGAR
@@ -126,6 +127,7 @@ def test_the_certificate_counts_the_real_tests_it_says():
              "text tests": len([*TEXT, *ORDER, *REPEAT, *CELL]), "latex tests": len(LATEX),
              "fuzzy numbered text": len(FUZZY_NUMBERED), "numbered text": len(NUMBERED),
              "table sides": len(SIDED), "table tests": len(CELL),
+             "present tests": len([t for t in TESTS if isinstance(t.params, runners.Present)]),
              "fraction text": sum(any(VULGAR.search(x) for x in text_strings(t.params))
                                   for t in TEXT + ORDER + REPEAT + CELL)}
     assert sizes == {k: n for k, (_, n) in REAL.items()}, "update REAL in common.py, then " + COMMAND

@@ -24,7 +24,7 @@ FLAGS = ("empty", "end")
 RELATIONS = ("up", "down", "left", "right", "top_heading", "left_heading", "right_heading")
 # The roles of each test type's args, the content it compares. Not `vocab.ROLES`, which are tags.
 ARG_ROLES = {
-    "present": ("content",),
+    "present": ("content", "printed", "stops"),
     "order": ("before", "after"),
     "repeat": ("content",),
     "page_near_empty": (),
@@ -32,7 +32,7 @@ ARG_ROLES = {
     "layout_kind": ("content",),
     "format": ("before", "span", "after"),
 }
-LISTS = frozenset({"headings", "row_groups"})   # roles that take a list of args
+LISTS = frozenset({"headings", "row_groups", "stops"})   # roles that take a list of args
 REQUIRED = {"present": ("content",), "order": ("before", "after"), "repeat": ("content",),
             "page_near_empty": (), "table_cell": ("cell",), "layout_kind": ("content",),
             "format": ("span",)}
@@ -201,8 +201,13 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
     try:
         match test_type:
             case "present":
-                _no(where, settings)
-                return runners.Present(_arg(where, "content", args["content"]))
+                blank = _blank_after(where, args, settings)
+                content = _arg(where, "content", args["content"])
+                if not blank:
+                    return runners.Present(content)
+                return runners.Present(content, True, _arg(where, "printed", args["printed"])
+                                       if "printed" in args else None,
+                                       tuple(_arg(where, "stops", a) for a in args.get("stops", [])))
             case "order":
                 _no(where, settings)
                 return runners.Order(text("before"), text("after"), diffs(["before", "after"]))
@@ -262,6 +267,35 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
                 raise AssertionError(test_type)
     except TypeError as e:
         raise ValueError(f"{where}: {e}") from None
+
+
+def _blank_after(where: str, args: Mapping[str, Any], settings: Mapping[str, Any]) -> bool:
+    """Whether a present test is a `blank_after` test (its settings are exactly `{"blank_after": true}`),
+    checking what it needs: a text label (exact match, case folded), and the optional roles `printed` and
+    `stops` exact text of their own. A present test without the setting has no `printed` or `stops`."""
+    if not settings:
+        if extra := [r for r in ("printed", "stops") if r in args]:
+            raise ValueError(f"{where}: present's {extra} are roles of {{blank_after: true}} only")
+        return False
+    if not (set(settings) == {"blank_after"} and settings["blank_after"] is True):
+        raise ValueError(f"{where}: present's settings are {{}} or exactly {{\"blank_after\": true}}, "
+                         f"not {dict(settings)!r:.80}")
+    given = [("content", args["content"]), *[("printed", args[r]) for r in ("printed",) if r in args],
+             *[("stops", a) for a in args.get("stops", [])]]
+    for r, a in given:
+        if not (isinstance(a, dict) and set(a) == {"text", "max_diffs"}):
+            raise ValueError(f"{where}: blank_after's {r} is a text arg {{text, max_diffs}} (no place, no "
+                             f"exact_case, no number or latex), not {a!r:.80}")
+        if a["max_diffs"] != 0:
+            raise ValueError(f"{where}: blank_after's {r} is matched exactly: max_diffs must be 0, since a "
+                             "fuzzy match has no exact boundary")
+    stops = [normalize.fold(a["text"]) for a in args.get("stops", [])]
+    if normalize.fold(args["content"]["text"]) in stops:
+        raise ValueError(f"{where}: blank_after's stops must not include its own label "
+                         f"{args['content']['text']!r:.80}")
+    if len(set(stops)) != len(stops):
+        raise ValueError(f"{where}: blank_after's stops repeat a label")
+    return True
 
 
 def arg_kinds(test_type: str, args: Mapping[str, Any]) -> tuple[str, ...]:

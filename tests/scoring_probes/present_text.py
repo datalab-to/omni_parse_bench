@@ -1,6 +1,8 @@
 # ruff: noqa: E501
 """Cases for docs/scoring/present-text.md."""
-from cases import table, text
+from cases import blank, table, text
+
+DOB, PRINTED, STOPS = "Date of birth:", "__/__/____", ("Name:", "Place of birth:")
 
 TABLES = [
     table(
@@ -110,5 +112,54 @@ TABLES = [
         text("num-fuzzy-letter", "I", "a letter edit beside a number", "Total: 41", "Totel: 41", md=1),
         text("num-fuzzy-fullwidth", "I", "full-width digits fold first", "Room 3", "Room ３", md=1),
         text("num-fuzzy-after", "I", "a number after the matched text is outside it", "Figure 3", "Figure 3 2019 data", md=1),
+    ),
+    table(
+        "blank-after",
+        blank("blank-nothing", "I", "nothing after the label, then the next field", DOB, "<p>Name: Ann</p><p>Date of birth:</p><p>Place of birth: Paris</p>", PRINTED, STOPS),
+        blank("blank-last", "I", "the last field on the page, nothing after it", DOB, "<p>Name: Ann</p><p>Date of birth:</p>", PRINTED, STOPS),
+        blank("blank-underscores", "I", "a run of underscores (a leader)", DOB, "<p>Date of birth: ____</p><p>Place of birth: Paris</p>", PRINTED, STOPS),
+        blank("blank-dots", "I", "a run of dots", DOB, "<p>Date of birth: ........</p><p>Place of birth: Paris</p>", PRINTED, STOPS),
+        blank("blank-two-underscores", "I", "two underscores (not a leader, still a placeholder)", DOB, "<p>Date of birth: __</p><p>Place of birth: Paris</p>", PRINTED, STOPS),
+        blank("blank-leader-glued", "I", "leaders glued to the next label", DOB, "<p>Date of birth: _____Place of birth: ____</p>", PRINTED, STOPS),
+        blank("blank-printed", "I", "the printed mask copied once", DOB, "<p>Date of birth: __/__/____</p><p>Place of birth: Paris</p>", PRINTED, STOPS),
+        blank("blank-white-space", "I", "white space, `<br>` and an empty element", DOB, "<p>Date of birth: <br>  <span></span></p><p>Place of birth: Paris</p>", PRINTED, STOPS),
+        blank("blank-case", "I", "the label in another case", DOB, "<p>DATE OF BIRTH:</p><p>Place of birth: Paris</p>", PRINTED, STOPS),
+        blank("blank-moved-field", "I", "another field written before it", DOB, "<p>Place of birth: Paris</p><p>Date of birth:</p><p>Name: Ann</p>", PRINTED, STOPS),
+        blank("blank-image-alt", "I", "an image description in the region is not text", DOB, "<p>Date of birth: <img alt='box'></p><p>Place of birth: Paris</p>", PRINTED, STOPS),
+        blank("blank-glued-words", "I", "a text layer that glues words, found with its spaces removed", DOB, "<p>Dateofbirth:____Placeofbirth:Paris</p>", PRINTED, STOPS),
+        blank("blank-markdown", "I", "markdown, as the harness converts it", DOB, "Name: Ann\n\nDate of birth: \n\nPlace of birth: Paris", PRINTED, STOPS, from_markdown=True),
+        blank("blank-table-2col", "I", "a two-column label and value table, the value cell empty", DOB, "<table><tr><td>Date of birth:</td><td></td></tr><tr><td>Place of birth:</td><td>Paris</td></tr></table>", PRINTED, STOPS),
+        blank("blank-table-2col-mask", "I", "the value cell holds the printed mask", DOB, "<table><tr><td>Date of birth:</td><td>__/__/____</td></tr></table>", PRINTED, STOPS),
+        blank("blank-table-rest-of-cell", "I", "the rest of the label's own cell is blank", DOB, "<table><tr><td>Date of birth: ____</td><td></td></tr></table>", PRINTED, STOPS),
+        blank("blank-table-header-row", "I", "a header-row table: the cell below the label is empty", DOB, "<table><tr><td>Date of birth:</td><td>Place of birth:</td></tr><tr><td></td><td>Paris</td></tr></table>", PRINTED, STOPS),
+        blank("blank-table-header-row-end", "I", "a header-row table: no row below", DOB, "<table><tr><td>Name:</td><td>Date of birth:</td></tr></table>", PRINTED, STOPS),
+        blank("blank-table-last-column", "I", "the label in the last column: the cell below is empty", DOB, "<table><tr><td>Name: Ann</td><td>Date of birth:</td></tr><tr><td>x</td><td></td></tr></table>", PRINTED, STOPS),
+        blank("blank-table-label-below", "I", "the cell below is another field's label, not a value", DOB, "<table><tr><td>Date of birth:</td><td>Place of birth:</td></tr><tr><td>Name:</td><td></td></tr></table>", PRINTED, STOPS),
+        blank("blank-repeated-one-blank", "B", "a second copy of the label followed by nothing passes, even if the first holds a value", DOB, "<p>Date of birth: 01/02/1990</p><p>Date of birth:</p>", PRINTED, STOPS),
+        blank("blank-inside-label", "I", "a copy inside a longer stop is that stop, not the label", "Name:", "<p>Last Name: ____</p><p>Name: ____</p>", None, ("Last Name:",)),
+        blank("blank-checkbox", "P", "a checkbox is out of scope: it reads as text, so a box beside the label fails", DOB, "<p>Date of birth: <input type=checkbox></p>", PRINTED, STOPS, why=True),
+        blank("blank-markdown-mask", "P", "a mask of underscores in markdown: the converter reads `__` as bold and the mask is mangled", DOB, "Date of birth: __/__/____\n\nPlace of birth: Paris", PRINTED, STOPS, from_markdown=True),
+        blank("invent-value", "P", "an invented value", DOB, "<p>Date of birth: 01/02/1990</p><p>Place of birth: Paris</p>", PRINTED, STOPS, why=True),
+        blank("invent-na", "P", "`N/A` is a value the page does not print", DOB, "<p>Date of birth: N/A</p><p>Place of birth: Paris</p>", PRINTED, STOPS, why=True),
+        blank("invent-dash", "P", "a lone dash (not a leader) is a value", DOB, "<p>Date of birth: -</p><p>Place of birth: Paris</p>", PRINTED, STOPS),
+        blank("invent-blank-word", "P", "`[blank]` is a value", DOB, "<p>Date of birth: [blank]</p>", PRINTED, STOPS),
+        blank("invent-mask-twice", "P", "the printed mask copied twice", DOB, "<p>Date of birth: __/__/____ __/__/____</p>", PRINTED, STOPS),
+        blank("invent-mask-without", "P", "the mask written but the gold names none", DOB, "<p>Date of birth: __/__/____</p>", None, STOPS),
+        blank("invent-last", "P", "an invented value after the last field", DOB, "<p>Name: Ann</p><p>Date of birth: 5 May</p>", PRINTED, STOPS, why=True),
+        blank("invent-glued", "P", "a value glued to the label", DOB, "<p>Date of birth:1990</p>", PRINTED, STOPS),
+        blank("invent-no-stop", "P", "without stops the region runs to the page's end: the next field's value is in it", DOB, "<p>Date of birth:</p><p>Place of birth: Paris</p>", PRINTED),
+        blank("invent-table-right", "P", "a value in the value cell to the right", DOB, "<table><tr><td>Date of birth:</td><td>01/02/1990</td></tr></table>", PRINTED, STOPS, why=True),
+        blank("invent-table-below", "P", "a value under the label in a header-row table", DOB, "<table><tr><td>Date of birth:</td><td>Place of birth:</td></tr><tr><td>01/02/1990</td><td></td></tr></table>", PRINTED, STOPS, why=True),
+        blank("invent-table-shifted", "P", "the next field's value shifted into the cell", DOB, "<table><tr><td>Date of birth:</td><td>Paris</td></tr><tr><td>Place of birth:</td><td></td></tr></table>", PRINTED, STOPS),
+        blank("invent-table-rest", "P", "a value in the label's own cell", DOB, "<table><tr><td>Date of birth: 5</td><td></td></tr></table>", PRINTED, STOPS, why=True),
+        blank("invent-table-last-column", "P", "a value under a label in the last column", DOB, "<table><tr><td>Name: Ann</td><td>Date of birth:</td></tr><tr><td>x</td><td>1990</td></tr></table>", PRINTED, STOPS),
+        blank("invent-table-image", "P", "an image in the value cell", DOB, "<table><tr><td>Date of birth:</td><td><img src='a.png'></td></tr></table>", PRINTED, STOPS),
+        blank("invent-table-merged", "P", "a merged label cell: every cell beside it must be blank", DOB, "<table><tr><td rowspan=2>Date of birth:</td><td></td></tr><tr><td>1990</td></tr></table>", PRINTED, STOPS),
+        blank("invent-markdown", "P", "an invented value in markdown", DOB, "Date of birth: 01/02/1990\n\nPlace of birth: Paris", PRINTED, STOPS, from_markdown=True),
+        blank("invent-missing", "P", "the label missing: a plain `present` failure", DOB, "<p>Name: Ann</p>", PRINTED, STOPS, why=True),
+        blank("invent-word-edge", "P", "the label inside a longer word", "Name", "<p>Surnames: Ann</p>", None, (), why=True),
+        blank("invent-split-label", "P", "the label split over two cells", DOB, "<table><tr><td>Date of</td><td>birth:</td></tr></table>", PRINTED, STOPS, why=True),
+        blank("invent-read-across", "P", "a two-column form read across, the next field's label not a stop", DOB, "<p>Date of birth: Sex: F</p>", PRINTED, STOPS),
+        blank("blank-read-across", "I", "a two-column form read across with the other field's label a stop", DOB, "<p>Date of birth: ____ Sex: F</p>", PRINTED, (*STOPS, "Sex:")),
     ),
 ]

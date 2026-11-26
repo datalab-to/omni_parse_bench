@@ -87,7 +87,7 @@ It reads as: "some table in the output has a cell `167.8`, under the column head
 
 | test_type | roles | settings | passes when |
 |---|---|---|---|
-| present | `content` | | the arg is in the html; a text arg `{text, max_diffs, exact_case, place}` with `exact_case: true` is found only in the case it was printed |
+| present | `content`; with `blank_after`, optional `printed` and list `stops` | optional `blank_after` | the arg is in the html; with `{"blank_after": true}` (text args, `max_diffs` 0) the content is a form label and nothing is written after it, up to the next stop ([present-text.md](scoring/present-text.md#blank-fields-blank_after)); a text arg `{text, max_diffs, exact_case, place}` with `exact_case: true` is found only in the case it was printed |
 | order | `before`, `after` | | `before` is found before `after` in the html |
 | repeat | `content` | `expected_count` | the arg appears exactly that many times in the html, as whole words |
 | page_near_empty | none | `max_chars` | the html has at most `max_chars` non-space characters outside image alt text |
