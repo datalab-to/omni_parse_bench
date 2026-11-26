@@ -303,11 +303,13 @@ Per vendor:
   Its text is written as html inside `<pre>`, escaped, and it gives no layout blocks. It is free
   (`usd` 0.0). License: GPL-2.0-or-later, run as a subprocess. Needs `brew install poppler` (or
   `apt install poppler-utils`).
+  Full public run: 2,937/2,937 pages; 0 failures.
 - pdftext: Marker's text-layer extractor (`pdftext` 0.7.1, Apache-2.0, no model weights), run locally
   at its defaults (`plain_text_output`: no reading-order sort, line-end hyphens joined). It does no OCR: a
   scanned PDF page without a text layer is empty (a scan with an embedded OCR layer has text), as is an
   image file. Its text is written as html inside `<pre>`, escaped, and it gives no layout blocks. Cost: `usd` 0.0.
   Not a dependency of this package, and it pins `pypdfium2==5.10.1`: `uv pip install pdftext==0.7.1`.
+  Full public run: 2,937/2,937 pages; 0 failures.
 - markitdown: microsoft/markitdown 0.1.9 (MIT), run locally at no cost at its defaults:
   `MarkItDown().convert(page).markdown`, no LLM client, no Document Intelligence and no plugins. A
   PDF page is its text layer (pdfminer.six, tables through pdfplumber), with no OCR; a scanned PDF
@@ -317,6 +319,7 @@ Per vendor:
   budget, so timeout also stops an `exiftool` child. The Markdown goes through `markdown.to_html`,
   recorded in `sent` as `derived`; no layout blocks. It is free (`usd` 0.0). Needs
   `pip install 'omni-parse-bench[markitdown]'`.
+  Full public run: 2,934/2,937 pages; 3 failed with `PDFKeyError` on malformed PDF streams.
 
 - pdf-inspector: pdf-inspector 1.27.1 (MIT; its OCR models, PP-OCRv6 Small, are Apache-2.0 and fetched at run
   time), run locally on the CPU, as two rows. `pdf-inspector` is its text mode, `process_pdf`: the page's text
@@ -332,6 +335,7 @@ Per vendor:
   that differs from passing the vendor a PDF directly. The
   package returns no labeled regions, so html only. html is the Markdown through `markdown.to_html`. Free
   (`usd` 0.0). Needs `pip install 'omni-parse-bench[pdf-inspector]'`.
+  Full public run: both rows scored 2,937/2,937 pages with 0 failures; OCR used PP-OCRv6 Small.
 
 - pymupdf4llm: PyMuPDF4LLM 2.1 (PyMuPDF is AGPL-3.0 or Artifex commercial), run locally at no cost at
   the package's defaults, one page at a time (PyMuPDF isn't thread-safe), as two rows: `pymupdf4llm`
@@ -358,6 +362,7 @@ Per vendor:
 
   The layout model defines no code, form or key-value class. Layout boxes are normalized to the page frame;
   table cell text is joined with spaces. Needs `pip install 'omni-parse-bench[pymupdf4llm]'`.
+  Full public run: each row scored 2,920/2,937 pages, with 17 failures (14 unsupported image formats, 3 form-widget errors); OCR used Tesseract.
 
 ## Serving an open model
 

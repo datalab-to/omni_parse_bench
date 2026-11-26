@@ -62,7 +62,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 
 Scores use omni-parse-bench 1.7.0: saved predictions are regraded with it, and locally run open tools are fresh full runs (see the next paragraph); rows marked § keep their published 1.5.0 grades.
 
-Rows for open tools run locally (pdftotext, pdftext, MarkItDown, pdf-inspector and PyMuPDF4LLM) are full runs graded with released omni-parse-bench 1.7.0, with failed pages counted; [run notes](docs/local-runs.md).
+Rows for open tools run locally are full runs graded with released omni-parse-bench 1.7.0, failed pages counted; settings and failures per tool are in [docs/providers.md](docs/providers.md).
 
 \* Used in creating and verifying at least some tests.
 
@@ -92,7 +92,7 @@ Contents:
 5. [Grade](#grade): a run again, or predictions of your own;
 6. [Score on your own](#score-on-your-own): the scorer on its own, in code or from the command line;
 7. [Predict one page](#predict-one-page): one page through one system;
-8. [Results details](#results-details): local run notes, latency and price charts;
+8. [Results details](#results-details): latency and price charts;
 9. [License](#license); and
 10. [Citation](#citation).
 
