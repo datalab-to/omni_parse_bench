@@ -403,7 +403,8 @@ def test_splitting_or_joining_paragraphs_keeps_present_and_order_verdicts():
 
 
 @relation(HOLDS, domain="a gold of 2 words x a paragraph break, a space or nothing between its copies, 1 or 2 "
-                        "expected copies; a leader run and a line-end hyphen across the break")
+                        "expected copies; a space-grouped number repeat across the break; a leader run and a line-end hyphen "
+                        "across the break")
 def test_a_paragraph_break_changes_repeat_and_present_only_by_edges_leaders_and_hyphens():
     """A block break is a space except in four places: `repeat` counts the copies of a line in
     `<p>the cat</p><p>the cat</p>` and `<p>the cat the cat</p>` alike (2), and changes only when the copies are
