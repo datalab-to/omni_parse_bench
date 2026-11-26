@@ -123,10 +123,27 @@ blank-table-header-row	pass
 blank-table-header-row-end	pass
 blank-table-last-column	pass
 blank-table-label-below	pass
-blank-repeated-one-blank	pass
+blank-repeated-both	pass
+blank-split-table	pass
+blank-table-field-before	pass
 blank-inside-label	pass
 blank-checkbox	fail	'Date of birth:' is followed by '☐' to the end of the page
-blank-markdown-mask	fail	'Date of birth:' is followed by '//' before the next field
+blank-markdown-mask	pass
+invent-repeated-one-filled	fail	'Date of birth:' is followed by '01/02/1990' before the next field
+invent-repeated-cell-paragraph	fail	'Date of birth:' is followed by '01/02/1990' before the next field
+blank-repeated-line	pass
+blank-repeated-row	pass
+invent-repeated-row	fail	'Date of birth:' cell's value cell (right) holds '01/02/1990'
+invent-table-right-column-below	fail	'Date of birth:' cell's value cell (below) holds '01/02/1990'
+invent-slashes-html	fail	'Date of birth:' is followed by '//' to the end of the page
+invent-after-one-column	fail	'Date of birth:' is followed by '01/02/1990' after its table, to the end of the page
+invent-before-label	fail	'Date of birth:' has '01/02/1990' before it
+invent-table-before-label	fail	'Date of birth:' has '01/02/1990' before it
+invent-table-left	fail	'Date of birth:' cell's value cell (left) holds '01/02/1990'
+invent-table-two-right	fail	'Date of birth:' cell's value cell (right) holds '01/02/1990'
+invent-table-below-blank-right	fail	'Date of birth:' cell's value cell (below) holds '01/02/1990'
+invent-table-two-down	fail	'Date of birth:' cell's value cell (below) holds '01/02/1990'
+invent-after-table	fail	'Date of birth:' is followed by '01/02/1990' after its table, to the end of the page
 invent-value	fail	'Date of birth:' is followed by '01/02/1990' before the next field
 invent-na	fail	'Date of birth:' is followed by 'n/a' before the next field
 invent-dash	fail	'Date of birth:' is followed by '-' before the next field
@@ -532,6 +549,15 @@ cell-end-invented-row-far	fail	cells matching '70' found, but: down: row 5 holds
 cell-end-right	pass
 cell-end-invented-column	fail	cells matching '80' found, but: right: column 4 holds 'x'
 cell-end-empty-column	pass
+cell-empty-twice	fail	cells matching '100' found, but: right '200' isn't empty
+cell-empty-twice-blank	pass
+cell-empty-second-line	fail	cells matching '100' found, but: the cell holds more than '100': '100 200'
+cell-end-next-table	fail	cells matching '70' found, but: down: a table continuing this one holds 'tax', '9', '8'
+cell-end-repeated-header	pass
+cell-end-twice	pass
+cell-end-wrapped	fail	cells matching '70' found, but: down: a table continuing this one holds 'tax', '9', '8'
+cell-end-other-header	pass
+cell-end-text-between	pass
 cell-end-up	fail	cells matching 'Item' found, but: up: row 1 holds 'report'
 cell-end-anchor	fail	cells matching 'Rent' found, but: down: row 3 holds 'fuel', '70', '80'
 ## layout-rules

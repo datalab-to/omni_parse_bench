@@ -220,8 +220,10 @@ def test_a_copy_inside_a_longer_stop_is_that_stop():
     assert not passes("<p>Last Name: Roe</p><p>Name: Ann</p>", label="Name:", printed=None, stops=["Last Name:"])
 
 
-def test_a_repeated_label_passes_when_any_copy_is_blank_a_blind_spot():
-    assert passes("<p>Date of birth: 1990</p><p>Date of birth:</p>")
+def test_a_repeated_label_passes_only_when_every_copy_is_blank():
+    assert passes("<p>Date of birth:</p><p>Date of birth: ____</p>")
+    assert not passes("<p>Date of birth: 1990</p><p>Date of birth:</p>")
+    assert not passes("<p>Date of birth:</p><p>Date of birth: 1990</p>")
     assert not passes("<p>Date of birth: 1990</p><p>Date of birth: 1991</p>")
 
 
@@ -322,9 +324,10 @@ def test_an_unclosed_or_stray_table_tag_does_not_raise():
     assert passes(f"<table><tr><td>{DOB}</td><td></td></tr>")
 
 
-def test_a_label_in_both_a_cell_and_a_paragraph_passes_when_one_is_blank():
-    assert passes(f"<p>{DOB} 1990</p>" + rows(f"<td>{DOB}</td><td></td>"))
-    assert not passes(f"<p>{DOB} 1990</p>" + rows(f"<td>{DOB}</td><td>1991</td>"))
+def test_a_label_in_both_a_cell_and_a_paragraph_passes_only_when_both_are_blank():
+    assert passes(f"<p>{DOB}</p>" + rows(f"<td>{DOB}</td><td></td>"))
+    assert not passes(f"<p>{DOB} 1990</p>" + rows(f"<td>{DOB}</td><td></td>"))
+    assert not passes(f"<p>{DOB}</p>" + rows(f"<td>{DOB}</td><td>1991</td>"))
 
 
 def test_the_why_names_the_value_and_where():
@@ -354,3 +357,85 @@ def test_an_unparseable_table_is_read_as_text_whatever_else_is_on_the_page(valid
     assert passes(page(DOB))
     assert not passes(f"<table><td>{DOB}</td><td>1990</td></table>" if not before else
                       "<table><tr><td>other</td></tr></table><table><td>" + DOB + "</td><td>1990</td></table>")
+
+
+# ------------------------------------------------------------------------- every copy, and the region's edges
+
+
+def test_a_value_before_the_label_fails_unless_another_field_comes_first():
+    assert not passes(f"<p>12/03/1985 {DOB} {MASK}</p>")
+    assert passes(f"<p>Name: Ann Lee {DOB} {MASK}</p>")    # that value is Name:'s
+    assert passes(f"<p>____ {DOB} {MASK}</p>")
+    assert verdict(f"<p>12/03/1985 {DOB}</p>")[1] == "'Date of birth:' has '12/03/1985' before it"
+    assert not passes(rows(f"<td>12/03/1985 {DOB}</td><td></td>"))
+    assert not passes(rows(f"<td>12/03/1985</td><td>{DOB}</td><td></td>"))
+    assert passes(rows("<td>Name:</td><td>Ann</td><td>" + DOB + "</td><td></td>"))    # Name:'s value
+
+
+def test_every_cell_to_the_right_is_read_up_to_another_label():
+    assert not passes(rows(f"<td>{DOB}</td><td></td><td>1990</td>"))
+    assert passes(rows(f"<td>{DOB}</td><td></td><td></td>"))
+    assert passes(rows(f"<td>{DOB}</td><td>Place of birth:</td><td>Paris</td>"))
+
+
+def test_the_cells_below_are_read_down_to_another_label_when_the_right_is_blank():
+    assert not passes(rows(f"<td>{DOB}</td><td></td>", "<td>1990</td><td></td>"))
+    assert not passes(rows(f"<td>{DOB}</td><td>Place of birth:</td>", "<td></td><td>Paris</td>", "<td>1990</td><td></td>"))
+    assert passes(rows(f"<td>{DOB}</td><td></td>", "<td></td><td></td>", "<td>Name:</td><td>Ann</td>"))
+    assert passes(rows(f"<td>{DOB}</td><td></td>", "<td>Name:</td><td>Ann</td>"))
+
+
+def test_the_text_after_a_table_that_ends_with_the_label_is_the_fields_region():
+    table = rows(f"<td>{DOB}</td><td></td>")
+    assert not passes(table + "<table><tr><td>1990</td></tr></table>")
+    assert not passes(table + "<p>1990</p>")
+    assert passes(table + "<p>Place of birth: Paris</p>")
+    assert passes(table)
+    assert passes(rows(f"<td>{DOB}</td><td></td>", "<td>Name:</td><td>Ann</td>") + "<p>footer</p>")    # a label below: not the end
+    assert "after its table" in verdict(table + "<p>1990</p>")[1]
+
+
+def test_a_printed_mask_of_underscores_survives_markdown():
+    page = markdown.to_html(f"{DOB} {MASK}\n\nPlace of birth: Paris")
+    assert passes(page)
+    assert not passes(markdown.to_html(f"{DOB} {MASK} 1990\n\nPlace of birth: Paris"))
+    assert not passes(markdown.to_html(f"{DOB} 1990\n\nPlace of birth: Paris"))
+
+
+def test_a_label_printed_twice_blank_is_faithful_in_every_layout_and_one_filled_copy_fails():
+    two = f"{DOB} {MASK} {DOB} {MASK}"
+    assert passes(f"<p>{two} Place of birth: Paris</p>")
+    assert not passes(f"<p>{DOB} {MASK} {DOB} {MASK} 1990 Place of birth: Paris</p>")
+    assert not passes(f"<p>{DOB} {MASK} 1990 {DOB} {MASK} Place of birth: Paris</p>")
+    assert passes(rows(f"<td>{DOB}</td><td></td><td>{DOB}</td><td></td>"))
+    assert passes(rows(f"<td>{DOB}</td><td></td><td></td><td>{DOB}</td><td></td>"))
+    assert not passes(rows(f"<td>{DOB}</td><td></td><td>{DOB}</td><td>1990</td>"))
+    assert not passes(rows(f"<td>{DOB}</td><td></td><td>1990</td><td>{DOB}</td><td></td>"))
+
+
+def test_the_value_may_be_in_the_blank_right_cells_column_below():
+    value = rows(f"<td>{DOB}</td><td></td>", "<td></td><td>12/03/1985</td>", "<td>Name:</td><td>Ann Lee</td>")
+    assert not passes(value)
+    assert passes(value.replace("12/03/1985", ""))
+    assert passes(rows(f"<td>{DOB}</td><td></td>", "<td>Name:</td><td>Ann Lee</td>"))
+    assert passes(rows(f"<td>{DOB}</td><td>Place of birth:</td>", "<td></td><td>Paris</td>"))
+
+
+def test_a_one_column_table_does_not_read_below_but_its_tail_is_the_region():
+    assert not passes(rows(f"<td>{DOB}</td>") + "<p>1990</p>")
+    assert passes(rows(f"<td>{DOB}</td>") + "<p>Place of birth: Paris</p>")
+    assert passes(rows(f"<td>{DOB}</td>", "<td>Name:</td>") + "<p>1990</p>")    # a label below: not the end
+
+
+def test_a_literal_slash_pair_is_not_the_markdown_mask():
+    assert not passes(f"<p>{DOB} //</p>")
+    assert passes(f"<p>{DOB} {MASK}</p>")
+    assert passes(markdown.to_html(f"{DOB} {MASK}"))
+    assert not passes(markdown.to_html(f"{DOB} {MASK}") .replace("</p>", " //</p>"))
+
+
+def test_the_markdown_mask_is_the_mask_only_where_the_converter_wrote_it():
+    md = markdown.to_html(f"{DOB} {MASK}")
+    assert passes(md) and not passes(f"<p>{DOB} //</p>" + markdown.to_html(f"Name: {MASK}"))
+    assert not passes(markdown.to_html(f"{DOB} {MASK}\n\n{DOB} //"))
+    assert not passes(markdown.to_html(f"{DOB} //\n\nName: {MASK}"))

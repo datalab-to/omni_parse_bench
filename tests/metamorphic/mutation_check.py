@@ -54,7 +54,7 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
      'groups = [table.text[c] for c in tables.beside(table, rc) if tables.spanning_rows(table, c)]',
      'groups = []'),
     ('M140', 'scorers/unit_tests/runners.py',
-     'wholes.append(bool(tables.parse(html[begun:m.end()])))',
+     'wholes.append(bool(tables.parse(chunks[-1])))',
      'wholes.append(True)'),
     ('M139', 'scorers/unit_tests/compare.py',
      'built[t.output_type] = _view(t.output_type, pred[t.output_type])',
