@@ -500,7 +500,7 @@ Per vendor:
   | `Page`, `Document` | frame/container; not blocks themselves |
 
   Full public run: 2,937/2,937 pages; 0 failures; Marker (fast), CPU (`--mode fast`).
-  Full public run: 2,937 pages; 1 failed on Marker's empty-image JPEG error for a skewed scan; Marker (balanced), 81.5 headline (83.3 text, 65.9 tables, 95.3 layout), released OPB 1.7.0, B200 job 5648, run `marker-20261126-173920-178e`, dataset revision `24e3ef4d2aa1718e622d357db7f6d0d10742c93d`.
+  Full public run: 2,937 pages; 1 failed on Marker's empty-image JPEG error for a skewed scan; Marker (balanced), 81.5 headline (83.3 text, 65.9 tables, 95.3 layout), released OPB 1.7.0, B200 job 5648, run `marker-20261126-173920-178e`, dataset revision `24e3ef4d2aa1718e622d357db7f6d0d10742c93d`; Surya VLM via vLLM 0.25.1 with Marker's B200 settings (`VLLM_GPU_TYPE=b200`, 240 sequences, 32,768 batched tokens, greedy decoding).
 
 ## Serving an open model
 
