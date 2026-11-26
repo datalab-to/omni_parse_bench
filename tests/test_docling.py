@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -94,3 +95,50 @@ def test_the_server_reads_a_documents_boxes_from_the_top_left_and_its_tables_cel
     assert body[0]["bbox"] == [10, 10, 60, 50] and body[1]["text"] == "a b"
     assert [i["label"] for i in server.items(doc, {ContentLayer.BODY, ContentLayer.FURNITURE})] == [
         "text", "page_footer", "table"]
+
+
+def _start(tmp_path: Path, monkeypatch, *, cuda: bool, **env) -> list[str]:
+    """start.sh's uvicorn arguments, with a `python` that says whether torch finds CUDA and a `uvicorn` that
+    prints its arguments (no torch, docling or GPU needed)."""
+    import subprocess
+
+    for name, body in (("python", f"exit {0 if cuda else 1}"), ("uvicorn", 'echo "$@"')):
+        stub = tmp_path / name
+        stub.write_text(f"#!/bin/sh\n{body}\n")
+        stub.chmod(0o755)
+    monkeypatch.delenv("WORKERS", raising=False)
+    monkeypatch.delenv("DOCLING_DEVICE", raising=False)
+    environ = {**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}", **env}
+    out = subprocess.run(["bash", str(SERVER.parent / "start.sh")], env=environ, capture_output=True,
+                         text=True, check=True).stdout
+    return out.split()
+
+
+def test_the_image_leaves_the_device_to_docling_and_its_torch_has_cuda():
+    dockerfile = (SERVER.parent / "Dockerfile").read_text()
+    env = [line for line in dockerfile.splitlines() if line.startswith("ENV")]
+    assert env and not [line for line in env if "DOCLING_DEVICE" in line]
+    assert "whl/cu128" in dockerfile and "torch==2.11.0+cu128" in dockerfile
+
+
+@pytest.mark.parametrize(("cuda", "env", "workers"), [
+    (True, {}, "4"), (False, {}, "2"), (True, {"DOCLING_DEVICE": "cpu"}, "2"), (True, {"WORKERS": "3"}, "3"),
+    (False, {"WORKERS": "1"}, "1")])
+def test_the_server_starts_4_workers_on_a_gpu_2_on_the_cpu_or_the_workers_asked(tmp_path, monkeypatch, cuda,
+                                                                                   env, workers):
+    args = _start(tmp_path, monkeypatch, cuda=cuda, **env)
+    assert args[args.index("--workers") + 1] == workers
+
+
+def test_the_servers_converter_is_on_doclings_default_device_auto(monkeypatch):
+    pytest.importorskip("docling")
+    from docling.datamodel.accelerator_options import AcceleratorOptions
+    from docling.datamodel.base_models import InputFormat
+
+    monkeypatch.delenv("DOCLING_DEVICE", raising=False)
+    spec = importlib.util.spec_from_file_location("docling_server", SERVER)
+    server = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(server)
+    assert AcceleratorOptions().device == "auto"
+    options = server.make_converter().format_to_options[InputFormat.PDF].pipeline_options
+    assert options.accelerator_options.device == "auto"

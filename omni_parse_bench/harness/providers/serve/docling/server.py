@@ -21,7 +21,9 @@ _LOCK = threading.Lock()
 _converter = None
 # The two Hugging Face models the pipeline loads, at exact commits. The layout model's default is `main`, so
 # it is pinned here; TableFormer's is the tag v2.3.0 in the package's own code (table_structure_model.py),
-# which is this commit. OCR is RapidOCR, whose models ship inside the pinned `rapidocr` wheel.
+# which is this commit. OCR is RapidOCR's torch backend (adapter docstring), whose models the pinned
+# `rapidocr` names by its own version (ModelScope RapidAI/RapidOCR at v3.10.0), downloaded when the image is
+# built.
 LAYOUT = ("docling-project/docling-layout-heron", "8f39ad3c0b4c58e9c2d2c84a38465abf757272d8")
 TABLES = ("docling-project/docling-models", "fc0f2d45e2218ea24bce5045f58a389aed16dc23")
 # What it serves, in every reply: those models and the package whose version names the rest.
@@ -37,7 +39,7 @@ def make_converter():
 
     # Note: the standard pipeline's own default options (`DocumentConverter()` builds these), with one change:
     # the layout model's revision, `main` by default, is the commit in LAYOUT. Its models are in the image
-    # (Dockerfile), downloaded when it was built.
+    # (Dockerfile), downloaded when it was built. Their device is Docling's default, `auto` (start.sh).
     options = ThreadedPdfPipelineOptions()
     options.layout_options.model_spec = options.layout_options.model_spec.model_copy(
         update={"revision": LAYOUT[1]})
@@ -48,7 +50,11 @@ def make_converter():
 @contextlib.asynccontextmanager
 async def lifespan(_: FastAPI):
     global _converter
+    from docling.datamodel.accelerator_options import AcceleratorOptions
+    from docling.utils.accelerator_utils import decide_device
+
     _converter = make_converter()
+    print(f"docling device: {decide_device(AcceleratorOptions().device)}", flush=True)
     yield
 
 

@@ -1,9 +1,10 @@
-"""Docling (docling-project/docling), served from providers/serve/docling/ on any host; it needs no GPU.
+"""Docling (docling-project/docling), served from providers/serve/docling/ on any host, on its GPU if any.
 
 Licenses, from PyPI and the Hugging Face model cards (read 2026-11-25): the `docling` package is MIT;
 the layout model docling-project/docling-layout-heron is apache-2.0; the table model
-docling-project/docling-models lists cdla-permissive-2.0 and apache-2.0; RapidOCR (`rapidocr`, whose PP-OCRv6
-models ship in its wheel) is Apache-2.0 on PyPI (its models' own cards are not checked here).
+docling-project/docling-models lists cdla-permissive-2.0 and apache-2.0; RapidOCR (`rapidocr`, whose torch
+backend runs here, with the PP-OCRv6 models it downloads from ModelScope when the image is built) is
+Apache-2.0 on PyPI (its models' own cards are not checked here).
 """
 from __future__ import annotations
 
@@ -62,8 +63,9 @@ class Docling(Served):
       2. Image preprocessing  the pipeline's: the page rendered for layout analysis, OCR and table
                               structure.
       3. Model inference      the layout model (docling-layout-heron), OCR where the page has no text layer,
-                              and the table model (TableFormer), all on the CPU. The two Hugging Face models
-                              are at exact commits (LAYOUT_WEIGHTS, TABLE_WEIGHTS), which /served reports.
+                              and the table model (TableFormer), all on Docling's default device (below).
+                              The two Hugging Face models are at exact commits (LAYOUT_WEIGHTS,
+                              TABLE_WEIGHTS), which /served reports.
       4. Vendor output parsing  the `DoclingDocument`: its items in reading order, each with a label and a
                               box on the page, exported by the document's own `export_to_html`; the page's
                               header and footer items (the furniture layer, which the export leaves out by
@@ -79,12 +81,20 @@ class Docling(Served):
         applies to any `DoclingDocument`)"; the default is the body alone; `furniture` is defined in
         concepts/docling_document.md);
       - the layout model is pinned to a commit: its spec's revision is `main` by default (the `revision` field
-        of `PdfPipelineOptions().layout_options.model_spec`, in docling's source; the docs do not mention it);
-      - it runs on the CPU (`DOCLING_DEVICE=cpu`, named in docling's `AcceleratorOptions` source, not in its
-        docs pages) for a server of any host.
+        of `PdfPipelineOptions().layout_options.model_spec`, in docling's source; the docs do not mention it).
+
+    Its device is Docling's default, as the vendor's: `AcceleratorOptions().device` is `auto`
+    (docling/datamodel/accelerator_options.py, in docling-slim 2.153.0, which `docling` installs), and
+    `decide_device` (docling/utils/accelerator_utils.py) resolves `auto` to `cuda:0` when torch has CUDA, else
+    `mps`, else `xpu`, else the CPU. The image's torch is a CUDA 12.8 build, so with `--gpus` the models run
+    on the GPU and without it on the CPU. OCR is on the same device: `auto` OCR
+    (docling/models/stages/ocr/auto_ocr_model.py) takes RapidOCR on onnxruntime only when onnxruntime is
+    installed, which `docling` does not install, so here it is RapidOCR's torch backend, which
+    rapid_ocr_model.py sets to CUDA whenever the device is CUDA.
+    `DOCLING_DEVICE=cpu` (docker run -e) keeps a GPU host on the CPU.
 
         docker build -t opb-docling omni_parse_bench/harness/providers/serve/docling
-        docker run -p 8001:8001 opb-docling
+        docker run --gpus all -p 8001:8001 opb-docling     # without --gpus it runs on the CPU
         opb init docling > config.yaml
         opb run --config config.yaml --set system.docling.base_url=http://localhost:8001 \\
             --set rows.sample=20
