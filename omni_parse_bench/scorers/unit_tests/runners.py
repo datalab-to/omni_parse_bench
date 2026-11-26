@@ -572,14 +572,19 @@ class Region(NamedTuple):
     max_diffs: int          # edits allowed over the whole content; 0 when there is none
 
 
-# Note: a hyphen between two letters may be printed and dropped (a compound broken at a line end, which fold
-# joins: "self- aware" reads "selfaware"), so a region is also compared with every such hyphen removed.
-_WORD_HYPHEN = re.compile(r"(?<=[^\W\d_])-(?=[^\W\d_])")
-# Note: white space is no content, except between two digits, where it splits two numbers ("12 500"); nor
-# is an underscore, a line printed to write on, which fold keeps in a run of fewer than 3 and markdown may
-# read as emphasis ("__/__/____" -> "//"); nor a bullet glyph before a space, a list's mark, which fold drops
-# only at the start of a line, so a page that sets list items as paragraphs keeps it.
-_NO_CONTENT = re.compile(r"_+|[•‣◦▪▶∙●](?=\s|$)|\s+(?!\d)|(?<!\d)\s+")
+# Note: where fold joins a hyphen a line broke after ("self-" then "aware"), a region writes this mark
+# instead, so that the hyphen can be read either way: kept ("self-aware") or joined ("selfaware"), never as a
+# space. A page's own NUL is read as U+FFFD, as an HTML parser reads it, and the loader refuses one in a
+# region's text, so the mark is only ever a joined hyphen.
+_WRAP = "\x00"
+# Note: what a region does not compare: a run of underscores that touches no letter or digit (a line
+# printed to write on, which fold keeps when shorter than 3 and markdown may read as emphasis: "__/__/____"
+# -> "//"), and a bullet glyph before a space, a list's mark, which fold drops only at the start of a line.
+# An underscore that touches a letter or a digit ("foo_bar", "_token", "__init__") is text.
+_UNCOMPARED = re.compile(r"(?<!\w)_+(?!\w)|[•‣◦▪▶∙●](?=\s|$)")
+# A number as a region compares it: its sign, its digits and the separators between them (a leading decimal
+# point too, ".5"), and a percent sign.
+_REGION_NUMBER = re.compile(r"(?:(?<![^\W_])[-+±])?(?:[.,](?=\d))?\d+(?:[.,]\d+)*%?")
 
 
 def region(t: Region, v: views.Html) -> Mark:
@@ -588,11 +593,11 @@ def region(t: Region, v: views.Html) -> Mark:
     See docs/scoring/region.md.
 
     The page is the text view without image descriptions, nothing for an element that holds nothing (as
-    `page_near_empty`), folded, in the html's order: a table is read cell by cell, row by row, and a region
-    runs on across it. An anchor is a whole copy of its folded text at a word edge (`_anchors`). Each copy of
-    `start` opens a region that runs to the first copy of `end` after it (or to the page end); without a
-    `start`, one region opens at the page start."""
-    page = normalize.fold(views.text(_NOTHING.sub("", v.html), alt=False))
+    `page_near_empty`), folded as a region reads it (`_region_fold`), in the html's order: a table is read
+    cell by cell, row by row, and a region runs on across it. An anchor is a copy of its text at a word edge,
+    under fold (`_anchors`). Each copy of `start` opens a region that runs to the first copy of `end` after it
+    (or to the page end); without a `start`, one region opens at the page start."""
+    page = _region_fold(views.text(_NOTHING.sub("", v.html), alt=False).replace(_WRAP, "\ufffd"))
     if t.start is None:
         opens = [0]
     elif not (opens := [j for _, j in _anchors(t.start, page, t.end)]):
@@ -612,44 +617,83 @@ def region(t: Region, v: views.Html) -> Mark:
     return False, reasons[0] + (f" (and {len(reasons) - 1} more)" if len(reasons) > 1 else "")
 
 
+def region_anchor_copies(page_text: str, anchor: str) -> int:
+    """How many copies of `anchor` the scorer finds in `page_text` (a page's full text, as a gold author holds
+    it): a `region` anchor must have exactly one. See docs/scoring/region.md, Building a region test."""
+    return len(_anchors(anchor, _region_fold(page_text)))
+
+
+def _region_fold(s: str) -> str:
+    """`normalize.fold`, with two things kept that it would lose: `_WRAP` where it joins a hyphen a line broke
+    after, and a run of underscores between two letters or digits, which it would fold as a leader."""
+    return normalize._cased(s, line_mark=_WRAP, keep_word_underscores=True).lower()
+
+
 def _anchors(text: str, page: str, inside: str | None = None) -> list[tuple[int, int]]:
-    """The copies of the folded `text` in the folded `page` at a word edge (not inside a longer word, not cut
-    out of a longer number), as spans of `page`; when it has none, those found with the spaces removed, as
-    `present` searches a page that glues its words. A copy inside a copy of the longer text `inside` (the
-    start `Table 3` inside the end `Table 3 (continued)`) is that text's, not a copy."""
-    want = normalize.fold(text)
-    squeezed = not (spans := _copies(want, page, False))
-    if squeezed:
-        spans = _copies(want, page, True)
-    kept = [k for k, c in enumerate(page) if c != " "] if squeezed else None
-    spans = [_folded_span(i, j, kept) for i, j in spans]
-    if inside and len(other := normalize.fold(inside)) > len(want):
-        outer = _anchors(other, page)
+    """The copies of `text` in the region-folded `page` at a word edge (not inside a longer word, not cut out
+    of a longer number), as spans of `page`. They are found with every `_WRAP` removed from both, so a hyphen
+    a line broke after is joined as fold joins it: one equivalence, with no retry without spaces. A copy
+    inside a copy of the longer text `inside` (the start `Table 3` inside the end `Table 3 (continued)`) is
+    that text's, not a copy."""
+    want = _region_fold(text).replace(_WRAP, "")
+    kept = [k for k, c in enumerate(page) if c != _WRAP]
+    flat = page.replace(_WRAP, "")
+    spans = [(kept[i], kept[j - 1] + 1) for i, j in _copies(want, flat, False)]
+    if inside and len(_region_fold(inside).replace(_WRAP, "")) > len(want):
+        outer = _anchors(inside, page)
         spans = [(i, j) for i, j in spans if not any(a <= i and j <= b for a, b in outer)]
     return spans
 
 
 def _closed(got: str, t: Region) -> str:
     """Why the folded region `got` is not the test's content within its edits; "" when it is. Both are read
-    without white space (except a space between two digits), underscores and bullets, and compared as whole
-    strings (an edit is a character substituted, inserted or deleted, or two adjacent ones swapped); their
-    numbers (maximal runs of digits) must be equal, in order, at any budget. A second reading drops every
-    hyphen between two letters on both sides."""
-    want = normalize.fold(t.content or "")
-    a, b = _NO_CONTENT.sub("", want), _NO_CONTENT.sub("", got.strip())
-    numbers = re.findall(r"\d+", a) == re.findall(r"\d+", b)
-    edits = OSA.distance(a, b)
-    if edits > t.max_diffs and "-" in a + b:
-        edits = min(edits, OSA.distance(_WORD_HYPHEN.sub("", a), _WORD_HYPHEN.sub("", b)))
+    without the underscores and bullets a region does not compare (`_UNCOMPARED`), their white space one
+    space, and compared as whole strings: an edit is a character substituted, inserted or deleted, or two
+    adjacent ones swapped, and a `_WRAP` is free to drop or to read as a hyphen. Their numbers
+    (`_REGION_NUMBER`: sign, digits, separators) must be equal, in order, at any budget."""
+    a, b = (re.sub(r" +", " ", _UNCOMPARED.sub("", x)).strip()
+            for x in (_region_fold(t.content or ""), got))
+    numbers = (_REGION_NUMBER.findall(a.replace(_WRAP, "")) == _REGION_NUMBER.findall(b.replace(_WRAP, "")))
+    edits = _region_edits(a, b, t.max_diffs)
     if numbers and edits <= t.max_diffs:
         return ""
     where = (f"between {t.start[:40]!r} and {t.end[:40]!r}" if t.start is not None and t.end is not None
              else f"after {t.start[:40]!r} to the page end" if t.start is not None
              else f"from the page start to {t.end[:40]!r}" if t.end is not None else "the page")
-    shown, gold = _difference(got.strip(), want)
+    shown, gold = _difference(b.replace(_WRAP, "-"), a.replace(_WRAP, "-"))
     how = (f"{edits} edit{'s' * (edits != 1)}, max_diffs {t.max_diffs}" if edits > t.max_diffs
            else "a number differs")
     return f"{where} holds {shown} where the gold has {gold} ({how})"
+
+
+def _region_edits(a: str, b: str, k: int) -> int:
+    """The edits between `a` and `b` (as `_closed` counts them), or more than `k` when there are more."""
+    if _WRAP not in a and _WRAP not in b:
+        return OSA.distance(a, b)
+    # Note: a dynamic program over the band of diagonals any alignment within k paid edits can reach; a free
+    # drop of a `_WRAP` moves an alignment one diagonal, so the band grows by the marks of each side.
+    lo, hi = -(k + a.count(_WRAP)), k + b.count(_WRAP)    # j - i
+    big = k + 1
+
+    def same(x: str, y: str) -> bool:
+        return x == y or {x, y} == {_WRAP, "-"}
+
+    prev2: dict[int, int] = {}
+    prev = {0: 0}
+    for j in range(1, min(len(b), hi) + 1):
+        prev[j] = min(big, prev[j - 1] + (b[j - 1] != _WRAP))
+    for i in range(1, len(a) + 1):
+        cur: dict[int, int] = {}
+        for j in range(max(0, i + lo), min(len(b), i + hi) + 1):
+            best = prev.get(j, big) + (a[i - 1] != _WRAP)
+            if j:
+                best = min(best, cur.get(j - 1, big) + (b[j - 1] != _WRAP),
+                           prev.get(j - 1, big) + (not same(a[i - 1], b[j - 1])))
+                if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                    best = min(best, prev2.get(j - 2, big) + 1)
+            cur[j] = min(best, big)
+        prev2, prev = prev, cur
+    return prev.get(len(b), big)
 
 
 def _difference(got: str, want: str, n: int = 60) -> tuple[str, str]:

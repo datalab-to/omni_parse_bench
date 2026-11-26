@@ -419,10 +419,11 @@ rg-blank-line	pass
 rg-blank-leader	pass
 rg-blank-markup	pass
 rg-mask	pass
+rg-mask-lost	pass
 rg-mask-markdown	pass
 rg-spacing	pass
-rg-glued	pass
 rg-hyphen	pass
+rg-hyphen-joined	pass
 rg-across-table	pass
 rg-table-end	pass
 rg-two-copies-clean	pass
@@ -433,25 +434,36 @@ rg-alt	pass
 rg-before-start	pass
 rg-header-row	pass
 rg-budget-letters	pass
+## region-alt
+rg-alt-present	pass
+rg-alt-region	fail	between 'Figure 2' and 'Source: WHO' holds nothing where the gold has 'a bar chart of rates by year' (28 edits, max_diffs 0)
 ## region-penalized
 rg-filled	fail	between 'Date of birth:' and 'Place of birth:' holds '12/03/1985' where the gold has nothing (10 edits, max_diffs 0)
 rg-filler	fail	between 'Date of birth:' and 'Place of birth:' holds 'n/a' where the gold has nothing (3 edits, max_diffs 0)
 rg-dash	fail	between 'Date of birth:' and 'Place of birth:' holds '-' where the gold has nothing (1 edit, max_diffs 0)
-rg-mask-filled	fail	between 'Date of birth:' and 'Place of birth:' holds '12/03/1985' where the gold has '__/__/' (8 edits, max_diffs 0)
+rg-mask-filled	fail	between 'Date of birth:' and 'Place of birth:' holds '12/03/1985' where the gold has '//' (8 edits, max_diffs 0)
 rg-second-copy	fail	copy 2 of 2: between 'Date of birth:' and 'Place of birth:' holds '1985' where the gold has nothing (4 edits, max_diffs 0)
 rg-second-cell	fail	between 'Date of birth:' and 'Place of birth:' holds '1985' where the gold has nothing (4 edits, max_diffs 0)
 rg-split-table	fail	between 'Date of birth:' and 'Place of birth:' holds '1985' where the gold has nothing (4 edits, max_diffs 0)
-rg-row-after	fail	between 'Fuel 70' and 'The costs fell' holds 'total 170' where the gold has nothing (8 edits, max_diffs 0)
-rg-duplicate-sentence	fail	between 'Abstract' and 'Introduction' holds 'we study parsing. it is hard. it is hard.' where the gold has 'we study parsing. it is hard.' (9 edits, max_diffs 0)
-rg-caption-added	fail	between 'Table 3' and 'Mean' holds 'results of the trial. source: who' where the gold has 'results of the trial' (11 edits, max_diffs 2)
+rg-row-after	fail	between 'Fuel 70' and 'The costs fell' holds 'total 170' where the gold has nothing (9 edits, max_diffs 0)
+rg-duplicate-sentence	fail	between 'Abstract' and 'Introduction' holds 'we study parsing. it is hard. it is hard.' where the gold has 'we study parsing. it is hard.' (12 edits, max_diffs 0)
+rg-caption-added	fail	between 'Table 3' and 'Mean' holds 'results of the trial. source: who' where the gold has 'results of the trial' (13 edits, max_diffs 2)
 rg-number-in-budget	fail	between 'Table 3' and 'Mean' holds 'results of 2018' where the gold has 'results of 2019' (a number differs)
 rg-number-split	fail	the page holds 'total 12 500' where the gold has 'total 12500' (1 edit, max_diffs 0)
-rg-missing-text	fail	between 'Abstract' and 'Introduction' holds 'we study parsing.' where the gold has 'we study parsing. it is hard.' (9 edits, max_diffs 0)
+rg-missing-text	fail	between 'Abstract' and 'Introduction' holds 'we study parsing.' where the gold has 'we study parsing. it is hard.' (12 edits, max_diffs 0)
 rg-no-start	fail	start 'Date of birth:' not found whole, at a word edge
 rg-no-end	fail	end 'Place of birth:' not found whole, at a word edge
 rg-end-first	fail	no end 'Place of birth:' after start 'Date of birth:'
-rg-footnote	fail	between 'Abstract' and 'Introduction' holds 'we study parsing. 1' where the gold has 'we study parsing.' (1 edit, max_diffs 0)
-rg-whole-page-extra	fail	the page holds 'page intentionally left blank this page is empty.' where the gold has 'page intentionally left blank' (16 edits, max_diffs 0)
+rg-glued	fail	between 'Abstract' and 'Introduction' holds 'westudyparsing.' where the gold has 'we study parsing.' (2 edits, max_diffs 0)
+rg-split-word	fail	the page holds 'please sign in to the portal' where the gold has 'please sign into the portal' (1 edit, max_diffs 0)
+rg-hyphen-dropped	fail	the page holds 'resign the lease' where the gold has 're-sign the lease' (1 edit, max_diffs 0)
+rg-underscore	fail	the page holds 'set maxrows' where the gold has 'set max_rows' (1 edit, max_diffs 0)
+rg-hyphen-space	fail	the page holds 'a self-aware system' where the gold has 'a self aware system' (1 edit, max_diffs 0)
+rg-sign	fail	the page holds 'net +12.5' where the gold has 'net -12.5' (a number differs)
+rg-decimal	fail	the page holds 'rate 1,25' where the gold has 'rate 1.25' (a number differs)
+rg-longer-label	fail	copy 2 of 2: between 'Date of birth:' and 'Place of birth:' holds "1960 mother's" where the gold has nothing (13 edits, max_diffs 0)
+rg-footnote	fail	between 'Abstract' and 'Introduction' holds 'we study parsing. 1' where the gold has 'we study parsing.' (2 edits, max_diffs 0)
+rg-whole-page-extra	fail	the page holds 'page intentionally left blank this page is empty.' where the gold has 'page intentionally left blank' (20 edits, max_diffs 0)
 ## format-rules
 fm-bold	pass
 fm-strong	pass

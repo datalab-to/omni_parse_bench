@@ -313,12 +313,16 @@ def _region(where: str, args: Mapping[str, Any], settings: Mapping[str, Any]) ->
         if r != "content" and a["max_diffs"] != 0:
             raise ValueError(f"{where}: region's {r} is matched exactly: max_diffs must be 0, since a fuzzy "
                              "match has no exact boundary")
+        if isinstance(a["text"], str) and runners._WRAP in a["text"]:
+            raise ValueError(f"{where}: region's {r} holds a NUL character, which a page never shows")
     start, end = (args[r]["text"] if r in args else None for r in ("start", "end"))
-    if start is not None and end is not None and normalize.fold(start) == normalize.fold(end):
+    flat = lambda x: runners._region_fold(x).replace(runners._WRAP, "")  # noqa: E731
+    if start is not None and end is not None and flat(start) == flat(end):
         raise ValueError(f"{where}: region's start and end must differ, not both {start!r:.80}")
     content = args.get("content")
     for r, x in (("start", start), ("end", end)):
-        if x is not None and content is not None and runners._anchors(x, normalize.fold(content["text"])):
+        fold = runners._region_fold
+        if x is not None and content is not None and runners._anchors(x, fold(content["text"])):
             raise ValueError(f"{where}: region's content holds its {r} {x!r:.80}, which would cut the region "
                              "there; choose another anchor")
     return runners.Region(start, end, content["text"] if content else None,

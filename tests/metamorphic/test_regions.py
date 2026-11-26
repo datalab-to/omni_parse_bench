@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Relations of `region` tests (M150 to M158): a region the page leaves as printed passes however it is
+"""Relations of `region` tests (M150 to M159): a region the page leaves as printed passes however it is
 written and wherever it sits, fails once anything is added to it or taken from it, and keeps its verdict
 when the page changes outside it."""
 from __future__ import annotations
@@ -78,14 +78,14 @@ def test_a_blank_region_passes_however_the_blank_is_written_in_every_layout(layo
     assert passes(field_test(), page), (layout, page)
 
 
-@relation(HOLDS, domain="6 respellings x 8 layouts; on 4 regions of known content (a caption, a sentence, a "
+@relation(HOLDS, domain="5 respellings x 8 layouts; on 4 regions of known content (a caption, a sentence, a "
                         "table row, a mask)")
-@given(st.sampled_from(["spaces", "entity", "markup", "case", "breaks", "glued"]), LAYOUT,
+@given(st.sampled_from(["spaces", "entity", "markup", "case", "breaks"]), LAYOUT,
        st.sampled_from(["Results of the trial", "We study parsing. It is hard.", "Rent 100", "__/__/____"]))
 def test_respelling_a_region_keeps_its_pass(how, layout, content):
     """A region whose content is written with other spacing, with `&nbsp;` for its spaces, inside inline
-    markup, in another case, with a line break between its words, or with its words glued, passes as the
-    region written plainly does. [M155]
+    markup, in another case, or with a line break between its words passes as the region written plainly does.
+    [M155]
     Why it matters for a score: what the region holds is judged, not how its characters are spaced or
     styled."""
     # Given the region written plainly, passing
@@ -95,12 +95,45 @@ def test_respelling_a_region_keeps_its_pass(how, layout, content):
     # When it is respelled
     value = {"spaces": "  ".join(words), "entity": "&nbsp;".join(words),
              "markup": f"<b>{escaped(words[0])}</b> <i>{escaped(' '.join(words[1:]))}</i>" if len(words) > 1 else f"<b>{escaped(content)}</b>",
-             "case": content.upper(), "breaks": "<br>".join(words), "glued": "".join(words)}[how]
+             "case": content.upper(), "breaks": "<br>".join(words)}[how]
     if layout in MARKDOWN and how in ("markup", "breaks", "entity"):
         value = " ".join(words)     # (markdown has no tags; the respelling is the html one)
     # Then it still passes
     page = LAYOUTS[layout](form(OTHER_LABELS, 1, value))
     assert passes(test, page), (how, layout, page)
+
+
+SPELLINGS = {"spaces": lambda x: x.replace(" ", "  "), "entity": lambda x: x.replace(" ", "&nbsp;"),
+             "markup": lambda x: f"<b>{x.split(' ', 1)[0]}</b> {x.split(' ', 1)[1]}",
+             "case": str.upper, "breaks": lambda x: x.replace(" ", "<br>", 1), "as printed": lambda x: x}
+HTML_ONLY = {"entity", "markup", "breaks"}
+
+
+@relation(HOLDS, domain="6 spellings of the start x 6 of the end x 8 layouts x 2 values (blank, filled); and "
+                        "each anchor glued in turn")
+@given(st.sampled_from(list(SPELLINGS)), st.sampled_from(list(SPELLINGS)), LAYOUT, st.booleans())
+def test_an_anchor_is_found_however_it_is_spaced_or_styled_and_not_when_its_words_are_glued(at_start, at_end,
+                                                                                            layout, filled):
+    """The start and the end, each written with other spacing, `&nbsp;`, inline markup, in another case or with
+    a line break between its words (the two ends spelled independently), give the verdict the anchors written as
+    printed give: a blank field passes, a filled one fails. An anchor written with its words glued is not
+    found. [M159]
+    Why it matters for a score: an anchor is found under the one equivalence the page is read with, never under
+    a second, looser search, so a region's ends are where the page prints them."""
+    if layout in MARKDOWN:
+        at_start, at_end = (x if x not in HTML_ONLY else "as printed" for x in (at_start, at_end))
+    value = "1990" if filled else ""
+    # Given the form, its target field blank or filled
+    fields = form(OTHER_LABELS, 1, value)
+    assert passes(field_test(), LAYOUTS[layout](fields)) is not filled
+    # When its anchors are respelled; Then the verdict stays
+    ends = {TARGET: SPELLINGS[at_start](TARGET), NEXT: SPELLINGS[at_end](NEXT)}
+    page = LAYOUTS[layout]([(ends.get(label, label), v) for label, v in fields])
+    assert passes(field_test(), page) is not filled, (at_start, at_end, layout, page)
+    # When either anchor is glued; Then it is not found
+    for glued in (TARGET, NEXT):
+        page = LAYOUTS[layout]([(label.replace(" ", "") if label == glued else label, v) for label, v in fields])
+        assert not passes(field_test(), page), (glued, layout, page)
 
 
 # ------------------------------------------------------------------------------------------ what fails
@@ -226,12 +259,14 @@ STRING_LAYOUTS = {
 ANCHORS = ("§ region start §", "§ region end §")
 
 
-@relation(HOLDS, domain="every text string of the loaded tests x 4 layouts x 3 pages (as written, a token "
-                        "inside, a token outside)", pool="text, order, repeat, table_cell")
+@relation(HOLDS, domain="every text string of the loaded tests x 4 layouts x 5 pages (as written, a word "
+                        "with a digit inside, a word of letters inside, a letter inside a word, the word outside)",
+          pool="text, order, repeat, table_cell")
 def test_every_loaded_text_string_as_a_region_passes_as_written_and_fails_with_a_token_added():
     """Each text string of the loaded text, order, repeat and table_cell tests, made a region's content between
     two anchors, passes when written between them as a paragraph, inline, in a table cell or in a list item;
-    fails with a word added inside the region; and passes with the same word added outside it. [M157]
+    fails with a word added inside the region (one with a digit, one of letters only) or a letter added in its
+    middle; and passes with the word added outside it. [M157]
     Why it matters for a score: the whole-string comparison meets the dataset's own strings (its fold, its
     spacing, its bullets and numbers), not only generated words."""
     start, end = ANCHORS
@@ -248,10 +283,15 @@ def test_every_loaded_text_string_as_a_region_passes_as_written_and_fails_with_a
                     bad.append((t.id, name, "as written"))
                 if passes(test, fill(f"{escaped(x)} zq7")):
                     bad.append((t.id, name, "token inside"))
+                if passes(test, fill(f"{escaped(x)} zq")):
+                    bad.append((t.id, name, "letters inside"))
+                mid = len(x) // 2
+                if passes(test, fill(escaped(f"{x[:mid]}q{x[mid:]}"))):
+                    bad.append((t.id, name, "a letter inside"))
                 if not passes(test, f"<p>zq7</p>{fill(escaped(x))}<p>zq7</p>"):
                     bad.append((t.id, name, "token outside"))
     assert n, "no loaded text string"
-    assert not bad, f"{len(bad)} of {n * 12} cases break, e.g. {bad[:5]}"
+    assert not bad, f"{len(bad)} of {n * 20} cases break, e.g. {bad[:5]}"
 
 
 @more_evidence()
@@ -282,12 +322,16 @@ json.dump(out, sys.stdout)
 """
 
 
+BASELINE = Path(__file__).parent / "region_old_verdicts.json"
+
+
 @pytest.fixture(scope="module")
 def old_package(tmp_path_factory):
     """The package at OLD_COMMIT, checked out from git into a folder of its own and run in a subprocess, so it
-    shares no code with the working tree. Skipped when the history does not hold that commit."""
+    shares no code with the working tree. A checkout without that commit fails: fetch the full history
+    (`git fetch --unshallow`)."""
     if subprocess.run(["git", "cat-file", "-e", OLD_COMMIT], cwd=ROOT, capture_output=True).returncode:
-        pytest.skip(f"needs git history holding {OLD_COMMIT}")
+        pytest.fail(f"needs git history holding {OLD_COMMIT}: run `git fetch --unshallow`")
     where = tmp_path_factory.mktemp("old")
     tar = subprocess.run(["git", "archive", OLD_COMMIT, "omni_parse_bench"], cwd=ROOT, check=True,
                          capture_output=True).stdout
@@ -324,21 +368,32 @@ def _compare(old_package, cases) -> None:
     assert {n[0] for n in new} == {"pass", "fail"}, "the cases hold both verdicts"
 
 
-@relation(HOLDS, domain="every loaded html test x 4 pages (its answer, a character dropped, a word added, an "
-                        "empty page); needs git history holding cf19df3")
-def test_every_loaded_test_of_another_type_keeps_its_verdict(old_package):
-    """Every loaded html test (none is a region) gets the verdict and the why that the package at cf19df3 gives
-    (run from git in a subprocess, sharing no code), on its own answer, the answer with a character dropped, the
-    answer and a word, and an empty page. [M158]
+@relation(HOLDS, domain="136 frozen cases: the 34 html tests of tests/fixtures/invariants/ at cf19df3 x 4 pages "
+                        "(its answer, a character dropped, a word added, an empty page)")
+def test_every_frozen_case_of_another_type_keeps_its_verdict():
+    """Each frozen case (a fixture test of a type older than `region`, on its answer, the answer with a character
+    dropped, the answer and a word, and an empty page) gets the verdict and the why that the package at cf19df3
+    gave it, recorded in region_old_verdicts.json. [M158]
     Why it matters for a score: the new test type changes no existing test's verdict."""
-    _compare(old_package, _cases(TESTS))
+    from omni_parse_bench import score
+    from omni_parse_bench.scorers.unit_tests import tests as gold
+    rows = json.loads(BASELINE.read_text())
+    # Note: recorded by running `_cases` over the fixtures in the package at OLD_COMMIT (RUNNER); frozen so that
+    # a type added later never reaches the old package, which could not read it
+    assert len(rows) == 136 and {r["result"] for r in rows} == {"pass", "fail"}
+    assert not {r["test"]["test_type"] for r in rows} - {"present", "format", "repeat", "table_cell", "order",
+                                                          "page_near_empty", "layout_kind"}
+    differ = [(r["test"]["id"], r["html"][:60], (r["result"], r["why"]), (v.result, v.why)) for r in rows
+              for v in score({"html": r["html"]}, [gold.test("p", r["test"])]) if (v.result, v.why) != (r["result"], r["why"])]
+    assert not differ, f"{len(differ)}/{len(rows)} differ, e.g. {differ[:3]}"
 
 
 @every_real_test("text tests", note="each on its answer, the answer altered, the answer and a word, and an "
                                     "empty page; old package against new")
 def test_every_real_test_keeps_its_old_verdict(old_package):
     """Every real text, order, repeat and table_cell test gets the verdict and the why that the package at cf19df3
-    gives on four pages, as in the check above. [M158]
+    gives on four pages, as in the check above, run from git in a subprocess; a checkout without cf19df3 fails
+    rather than skips. [M158]
     Why it matters for a score: as for M158, over the dataset's own tests."""
     from metamorphic.common import CELL, ORDER, REPEAT, TEXT
     _compare(old_package, _cases([*TEXT, *ORDER, *REPEAT, *CELL]))
