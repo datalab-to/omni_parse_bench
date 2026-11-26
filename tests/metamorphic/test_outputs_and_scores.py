@@ -79,7 +79,7 @@ def test_a_test_whose_output_is_missing_fails_as_no_output_and_the_others_are_un
 
 
 @relation(HOLDS, domain="every loaded test, 8 values that are not a string for html, 20 malformed blocks, the "
-                        "other output right or wrong")
+                        "other output right or wrong, and a mixed html and layout batch in both orders")
 def test_an_output_of_the_wrong_shape_fails_only_the_tests_that_read_it():
     """A test whose `html` is not a string, or whose `blocks` are not a list of `{label, bbox[, text]}` objects
     with a label of the eleven, a box of four numbers from 0 to 1 and a text that is a string or null, fails
@@ -111,6 +111,7 @@ def test_an_output_of_the_wrong_shape_fails_only_the_tests_that_read_it():
                 value = BAD_BLOCKS[0] if bad == "blocks" else BAD_HTML[0]
                 got = {v.id: v for v in compare.score({**both, bad: value}, tests)}
                 assert got[good.id].result == "pass", (bad, good.id, got[good.id])
+                assert got[bad_test.id].result == "fail", (bad, got[bad_test.id])
                 assert got[bad_test.id].why.startswith(f"malformed {bad} output"), (bad, got[bad_test.id])
 
 

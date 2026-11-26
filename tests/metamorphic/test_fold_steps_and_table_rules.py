@@ -343,12 +343,12 @@ def test_row_groups_are_the_cells_to_the_left_that_span_the_cells_rows_in_order(
 
 
 @relation(HOLDS, domain="4 distinct row labels, rows of 2 to 4 columns, the label a `<th>` or a `<td>`, every "
-                        "cell right of the label, and two `<th>` in a row")
+                        "cell right of the label, two `<th>` in a row, and a `<thead>` of `<td>` cells, to the left and above")
 def test_a_cells_left_heading_is_the_label_of_its_own_row():
     """A cell's `left_heading` is the heading cell found walking left in the cell's own row (the first cell of
-    the row when the walk meets no `<th>`, any `<th>` of the row to its left when it does): the test passes for its row's
+    the row when the walk meets no heading cell, any `<th>` or `<thead>` cell of the row to its left when it does): the test passes for its row's
     label, at any distance from the label, and fails for the label of another row; swapping the labels of two
-    rows flips both verdicts; and in `top_heading`, the cells of a `<thead>` are headings of their column. [M135]
+    rows flips both verdicts; and the cells of a `<thead>` are headings, to the left in their row and above in their column. [M135]
     Why it matters for a score: row labels are what a reader reads a figure against; a figure under another
     row's label is a wrong figure."""
     @given(LABELS4, VALUES, st.integers(2, 4), st.booleans())
@@ -381,6 +381,12 @@ def test_a_cells_left_heading_is_the_label_of_its_own_row():
         assert cell_passes(cell_test("5", {"top_heading": "Head"}), page) == expected
         assert cell_passes(cell_test("5", {"top_heading": "Group"}), page)
         assert not cell_passes(cell_test("5", {"top_heading": "Row"}), page)
+    # And a `<td>` of a `<thead>` row is a heading to the left: both cells read, and without the `<thead>` only
+    # the cell at the edge of the walk does
+    for page, expected in [("<table><thead><tr><td>Edge</td><td>Heading</td><td>5</td></tr></thead></table>", True),
+                           ("<table><tr><td>Edge</td><td>Heading</td><td>5</td></tr></table>", False)]:
+        assert cell_passes(cell_test("5", {"left_heading": "Heading"}), page) == expected
+        assert cell_passes(cell_test("5", {"left_heading": "Edge"}), page)
     # And with two headings in a row, each is a heading of the cell; a `<td>` beside a `<th>` is not
     page = rows_html([[th("Group"), th("Name"), td("5")]])
     assert cell_passes(cell_test("5", {"left_heading": "Name"}), page)
