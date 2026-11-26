@@ -253,7 +253,7 @@ that is missing stops a run before any call and says which `export` to type.
 | `llamaparse` | /api/v2/parse/upload, poll, expand=markdown,items,usage | html, blocks | header and footer fields beside the markdown, put back | LLAMA_CLOUD_API_KEY |
 | `azure` | Content Understanding, prebuilt-layout | html, blocks | comments in its markdown, unwrapped | AZURE_CU_KEY, and the `endpoint` option |
 | `mistral` | /v1/ocr (mistral-ocr-4-1) | html, blocks | header and footer fields beside the markdown, put back | MISTRAL_API_KEY |
-| a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2, OvisOCR, OvisOCR2: html) | kept: vendor defaults that leave them out turned off | none; OPB_ENDPOINT_KEY, when the server has one |
+| a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2, OCRia-1, OvisOCR, OvisOCR2: html) | kept: vendor defaults that leave them out turned off | none; OPB_ENDPOINT_KEY, when the server has one |
 | `tesseract` | the local `tesseract` binary, no model of the page | html | kept: it has no notion of them | none |
 | `pdftotext` | the local poppler `pdftotext` binary, the PDF's text layer | html | kept: it has no notion of them | none |
 | `pdftext` | the `pdftext` package (pdfium): the PDF's text layer, no OCR | html | kept: it has no notion of them | none |
@@ -491,7 +491,7 @@ A server.py takes exactly its `SETTINGS` and refuses any other. Its adapter send
 which its field marks `metadata={"local": True}` (hunyuan's `long_edge`, chandra-ocr's
 `headers_footers`). A test checks that each adapter sends exactly its server's `SETTINGS`.
 
-A model whose vendor offers only the model, with no code of its own around it (Nanonets-OCR2), has no
+A model whose vendor offers only the model, with no code of its own around it (Nanonets-OCR2, OCRia-1), has no
 server.py: its port is vLLM's `/v1`, and its adapter asks it directly, through `llm.chat`.
 
 OPB_ENDPOINT_KEY, when the server has it, is required as the bearer token, and opb sends it to any
@@ -528,11 +528,18 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
 | Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
 | Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets-ocr` | html |
+| OCRia-1 | `ocria-1` | `ocria-1` | html |
 | Nemotron 3.5 Parse | `nemotron-parse` | `nemotron-parse` | html, blocks |
 | MiniCPM-OCR 1.0 | `minicpm-ocr` | `minicpm-ocr` | html, markdown, blocks |
 | OXR-1.0 | `oxr` | `oxr` | html, markdown, blocks |
 
 olmOCR-2, Nanonets-OCR2, OvisOCR and OvisOCR2 return no layout, so they have no blocks. OvisOCR3 gets html
+from its markdown prompt and blocks from its structured one: two calls a page. Indra OCR uses `indra-ocr==1.2.0`,
+which enables math by default; optional word boxes are off because OPB consumes block boxes. Its ten block classes
+are unchanged. It runs on CPU (ONNX Runtime), without `--gpus`; its server reads pages in one worker process per core.
+Full public run: 2,937/2,937 pages, 0 failures; 78.8 headline (68.0 text, 75.8 tables, 92.6 layout), graded with
+released OPB 1.7.0 on dataset revision `d70182b9`; the blog reports 78.9 / 68.0 / 75.9 / 92.7.
+olmOCR-2, Nanonets-OCR2, OCRia-1, OvisOCR and OvisOCR2 return no layout, so they have no blocks. OvisOCR3 gets html
 from its markdown prompt and blocks from its structured one: two calls a page. Indra OCR uses `indra-ocr==1.2.0`,
 which enables math by default; optional word boxes are off because OPB consumes block boxes. Its ten block classes
 are unchanged. It runs on CPU (ONNX Runtime), without `--gpus`; its server reads pages in one worker process per core.
@@ -831,3 +838,32 @@ Qwen3.5 providers. Input uses opb's RGB PNG at a 2048-pixel long edge (Pillow's 
 BICUBIC thumbnail rather than the vendor's LANCZOS; PDFs are rendered by opb).
 The server allows 900 seconds per inference request, versus the vendor CLI's default 600.
 No benchmark score has been measured for this provider yet.
+
+### OCRia-1
+
+`ocria-1` serves [OCRia-1](https://huggingface.co/llamaindex/OCRia-1) by LlamaIndex (a 4B model
+fine-tuned from Qwen3.5-4B; 5.17 billion parameters in BF16, about 10.3 GB of weights), pinned at
+revision `489f5fa`. Build and run `omni_parse_bench/harness/providers/serve/ocria-1/`, then
+`opb init ocria-1`. It is vLLM alone, as the model card runs it (`--max-model-len 32768`, one image per
+prompt); the card asks for vLLM 0.30 or later with `nvcc`, which the pinned `vllm/vllm-openai:v0.30.0`
+image has. Plan for one 24 GB GPU at least (weights, the 32,768-token context and the image tokens of a
+4.1-megapixel page).
+
+Each page is one call: a PDF rendered at 300 DPI and scaled down to the card's 4.1-megapixel budget (an
+image file is only scaled down), the card's `prompt.txt` (downloaded from the pinned revision at run time, its sha256 checked, not stored in this repository) as the system message, no user text, thinking
+off, temperature 0, at most 24,576 tokens. The reply is Markdown with tables in HTML and the model's own
+tags: `<page_header>`, `<page_footer>`, `<watermark>` and `<page_number>` stay in the page as text, in
+place, and `![label: description]` becomes an image whose alt text is `label: description`.
+
+The adapter produces `html` only, so it has no layout score. The card's layout boxes are experimental
+and not part of the model: a separate package of the model repository, `ocria_grounding`, reads a second
+pass of the weights under Transformers 5.22.2 and Docling's Heron detector, and on an image its word
+positions are rougher. Running it means a second GPU server and its licensed code; it is not run here.
+
+License: the OCRia-1 Model and Code License, a modified OpenRAIL-M, not open source. Its Research
+Purposes include "evaluating or benchmarking the Model, by any person or organization, including
+publishing the results". Section 7 asks for credit to LlamaIndex, a link to the model and the license
+(huggingface.co/llamaindex/OCRia-1/blob/main/LICENSE); this repository holds no weights or model code.
+Other uses of the model or its output are restricted by revenue, funding and competing-service terms, and
+its output may not train another model except for Research Purposes. No benchmark score has been
+measured for this provider yet.
