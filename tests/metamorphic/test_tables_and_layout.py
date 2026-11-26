@@ -641,8 +641,9 @@ def same_as_before(old_package, tests) -> tuple[int, int, list]:
                         "needs git history holding 416c17b")
 def test_a_table_cell_test_without_empty_or_end_gives_the_verdict_it_gave_before(old_package):
     """A table_cell test with no `empty` or `end` arg gets the verdict and the why that the package at
-    416c17b gives (run from git in a subprocess, sharing no code), on 20 random tables of cells, blanks, spans and
-    figures (240 tests): for each body cell its neighbours, headings, row groups and section, true or altered. [M97]
+    416c17b gives (run from git in a subprocess, sharing no code), on 20 random tables of cells, blanks,
+    spans and figures (240 tests): for each body cell its neighbours, headings, row groups and section, true
+    or altered. [M97]
     Why it matters for a score: the new args, and the table reader's figure flag, change no existing
     test's score."""
     # Given random 4 x 3 tables with blanks, one figure or span, and tests drawn from each body cell
