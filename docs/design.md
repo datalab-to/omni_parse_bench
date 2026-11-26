@@ -100,6 +100,7 @@ existing rules.
 | `present` | `html` | this content appears | `content` | text | 7,275 |
 | `order` | `html` | A comes before B | `before`, `after` (text) | text | 1,189 |
 | `repeat` | `html` | this line, or this number, appears exactly N times | `content` (text or number); `expected_count` | text | 35 |
+| `present` with `{"absent": true}` | `html` | a known wrong reading is not in the output: fails exactly where the same `present` test without the setting passes on the output without its images | `content` (text, 20+ folded characters, `max_diffs` at most a quarter of them); no settings | text | 0 |
 | `page_near_empty` | `html` | a blank page yields at most N non-space characters (not invisible format characters, nor the marks the text view writes for an element that holds nothing) | no args; `max_chars` | text | 0 |
 | `verbatim` | `html` | the text between two exact anchors (or the page start and end) is this content as a whole string, verbatim within the test's edit budget, for every copy of the start: nothing else is written there | optional `start`, `end` (text, `max_diffs` 0) and `content` (text); no settings | text | 0 |
 | `no_excess_repeats` | `html` | no run of 16 words appears twice or more while each of its words appears more often than in the page's full text (tables read as text; math, figures but their caption and image descriptions not read) | `content` (the page's full text, any order; `max_diffs` 0); no settings | text | 0 |
@@ -365,7 +366,9 @@ A test runs in four steps:
   `blocks`. Alt text holds an image's printed words or a description of it, so tests that credit
   text read the text view and tests that fault extra text (`repeat`, `page_near_empty`, `verbatim`,
   `no_excess_repeats`) read the
-  seen view: printed words count wherever an output writes them, and a description never costs;
+  seen view: printed words count wherever an output writes them, and a description never costs. A `present`
+  test with `{"absent": true}` is `not present` on the seen view: a known wrong reading costs wherever the page shows it, and a figure's
+  description, which may say anything about the figure, never costs;
 - Mark: `runner(params, view)` returns `(passed, why)`. A runner is a pure function of its
   parameters and one output's value: it never reads a file, and never sees another output; and
 - File: the page's verdicts are counted per family on its line of `scores.jsonl`, for `summarize`, and

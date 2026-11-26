@@ -87,7 +87,7 @@ It reads as: "some table in the output has a cell `167.8`, under the column head
 
 | test_type | roles | settings | passes when |
 |---|---|---|---|
-| present | `content`; with `blank_after`, optional `printed` and list `stops` | optional `blank_after` | the arg is in the html; with `{"blank_after": true}` (text args, `max_diffs` 0) the content is a form label and nothing is written after it, up to the next stop ([present-text.md](scoring/present-text.md#blank-fields-blank_after)); a text arg `{text, max_diffs, exact_case, place}` with `exact_case: true` is found only in the case it was printed |
+| present | `content`; with `blank_after`, optional `printed` and list `stops` | optional `blank_after` or `absent` | the arg is in the html; with `{"absent": true}` (a text arg) it is not, in the html without its images ([present-absent.md](scoring/present-absent.md)); with `{"blank_after": true}` (text args, `max_diffs` 0) the content is a form label and nothing is written after it, up to the next stop ([present-text.md](scoring/present-text.md#blank-fields-blank_after)); a text arg `{text, max_diffs, exact_case, place}` with `exact_case: true` is found only in the case it was printed |
 | order | `before`, `after` | | `before` is found before `after` in the html |
 | repeat | `content` | `expected_count` | the arg appears exactly that many times in the html, as whole words |
 | page_near_empty | none | `max_chars` | the html has at most `max_chars` non-space characters outside image alt text |
@@ -143,7 +143,8 @@ Which kinds each type accepts (`scorers/unit_tests/tests.py`):
 - `page_near_empty`: no args;
 - `verbatim`: `text` only (`start` and `end` with `max_diffs` 0, no `place`, no `exact_case`);
 - `no_excess_repeats`: `text` only (`content`, the page's full text, `max_diffs` 0, no `place`, no `exact_case`);
-- `present`: `text`, `number` or `latex`;
+- `present`: `text`, `number` or `latex`; with `{"absent": true}`, `text` with at least 20 folded characters and
+  `max_diffs` at most a quarter of them (no `place`, no `exact_case`);
 - `format`: `text` (`span`, `before`, `after`), each with `max_diffs` 0 (the context is found as written, no `place`, no `exact_case`);
 - `order`, `repeat` and `table_cell`: `text`; and
 - `layout_kind`: `text` with a `place`. Its text is shown to a reader and never compared.

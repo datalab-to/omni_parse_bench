@@ -510,6 +510,27 @@ rx-printed-twice-three	fail	'the committee met on monday to review the budget an
 rx-paragraph-split	fail	'the committee met on monday to review the budget and the plans for the new libra' appears 2x, and its words more often than the page prints them (e.g. 'the' 9x, the page 5x)
 rx-table-row-twice	fail	'see note one for the details of the lease terms and the fees listed in the' appears 2x, and its words more often than the page prints them (e.g. 'the' 13x, the page 9x)
 rx-short-blocks-across	fail	'one two three four five six seven eight nine ten eleven twelve thirteen fourteen' appears 2x, and its words more often than the page prints them (e.g. 'two' 2x, the page 1x)
+## absent-ignored
+ab-faithful	pass
+ab-box	pass
+ab-redacted-word	pass
+ab-over-budget	pass
+ab-part	pass
+ab-number-changed	pass
+ab-alt	pass
+ab-text-order	pass
+## absent-blind
+ab-paraphrase	pass
+ab-split	pass
+## absent-penalized
+ab-read-through	fail	'Johnathan Quincy Smithers' found, a reading the page does not print
+ab-near	fail	'Johnathan Quincy Smithers' found, a reading the page does not print
+ab-case-spacing	fail	'Johnathan Quincy Smithers' found, a reading the page does not print
+ab-table	fail	'Johnathan Quincy Smithers' found, a reading the page does not print
+ab-markdown	fail	'Johnathan Quincy Smithers' found, a reading the page does not print
+ab-next-page	fail	'Chapter 4. The harbor at night' found, a reading the page does not print
+ab-line-hyphen	fail	'Chapter 4. The harbor at night' found, a reading the page does not print
+ab-other-order	fail	'North station opens Tuesday' found, a reading the page does not print
 ## format-rules
 fm-bold	pass
 fm-strong	pass

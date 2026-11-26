@@ -25,7 +25,8 @@ OBSERVED = HERE / "observed.txt"
 MODULES = {"readme": "README.md", "present_text": "present-text.md", "present_number": "present-number.md",
            "present_latex": "present-latex.md", "order": "order.md", "repeat": "repeat.md",
            "page_near_empty": "page_near_empty.md", "verbatim": "verbatim.md",
-           "no_excess_repeats": "no_excess_repeats.md", "format_mark": "format.md",
+           "no_excess_repeats": "no_excess_repeats.md", "present_absent": "present-absent.md",
+           "format_mark": "format.md",
            "table_cell": "table_cell.md", "layout_kind": "layout_kind.md", "internals": "internals.md"}
 BLOCK = re.compile(r"(<!-- cases:([a-z0-9-]+) -->\n)(.*?)(<!-- /cases -->)", re.S)
 TIMEOUT = 300

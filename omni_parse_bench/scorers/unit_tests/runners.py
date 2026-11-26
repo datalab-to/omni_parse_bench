@@ -14,7 +14,7 @@ import html as html_lib
 import itertools
 import re
 import unicodedata
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any, Literal, NamedTuple
 
 import fuzzysearch
@@ -117,10 +117,53 @@ class Present(NamedTuple):
     blank_after: bool = False
     printed: Text | None = None     # the field's printed placeholder (`__/__/____`), allowed once
     stops: tuple[Text, ...] = ()    # every other field label on the page: where a field's region ends
+    # `{"absent": true}`: the content is a reading the page does not print, and is not found (`absent`)
+    absent: bool = False
 
 
 def present(t: Present, v: views.Html) -> Mark:
+    if t.absent:
+        return absent(t, v)
     return blank_after(t, v) if t.blank_after else found(t.content, v)
+
+
+# --------------------------------------------------------------------------- known-wrong readings
+
+# Note: the loader refuses an absent text (a present test with `{"absent": true}`) shorter than this, so
+# that a test names a specific reading (a name with its initial, a whole line). It is a floor, not a
+# certificate: an absent test is authored only where the reading is not found in any reading of the page
+# (`absent_collisions`).
+ABSENT_MIN_CHARS = 20
+# Note: an absent text's edit budget is at most this share of its folded length, so that the budget catches a
+# near copy without reaching the page's own text; the loader refuses a larger one.
+ABSENT_MAX_DIFFS_SHARE = 0.25
+# An image in html or markdown: an absent test does not read its description.
+_IMAGE = re.compile(rf"<img\b{views._ATTRS}>|{views._MD_IMAGE.pattern}", re.I)
+
+
+def absent(t: Present, v: views.Html) -> Mark:
+    """A present test with `{"absent": true}`: the content, a reading the page does not print, is not in the
+    visible output. The test fails exactly where the same test without the setting passes (`found`) on the
+    output with its images left out, wherever the output writes it (a duplicate, a table, markdown), within
+    its `max_diffs` edits. An image description is not read: a figure's alt may say what it likes. See
+    docs/scoring/present-absent.md."""
+    ok, _ = found(t.content, _visible(v))
+    return _mark(not ok, f"{t.content.text[:60]!r} found, a reading the page does not print")
+
+
+def _visible(v: views.Html) -> views.Html:
+    """The output without its images, so that no view of it holds an image description."""
+    return views.html(_IMAGE.sub(" ", v.html)) if _IMAGE.search(v.html) else v
+
+
+def absent_collisions(readings: Iterable[str], content: Text) -> list[int]:
+    """Which readings of a page hold `content` as a present test with `{"absent": true}` finds it: the
+    indexes of those in which `found` finds it, each reading a plain text of the page's visible text (a line
+    per line or block) in one order and flow a system may write it. An absent test is authored only where
+    this is empty for every reading the page admits (docs/scoring/present-absent.md, Building an absent
+    test)."""
+    pages = ("".join(f"<p>{html_lib.escape(line)}</p>" for line in r.split("\n")) for r in readings)
+    return [i for i, page in enumerate(pages) if found(content, views.html(page))[0]]
 
 
 # --------------------------------------------------------------------------- blank form fields
