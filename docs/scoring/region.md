@@ -24,8 +24,9 @@ paragraph), a caption, a header band and a short page. The published dataset hol
 **How the page is read.** The page is the text view without image descriptions and without the marks the text
 view writes for an element that holds nothing (as `page_near_empty`), folded, in the html's order. Two things
 fold would lose are kept: where fold joins a hyphen a line broke after (`self-` then `aware` on the next line), a
-region marks the join, so that it can be read either way (below); and a run of underscores between two letters
-or digits (`foo___bar`) stays, where fold would read it as a leader. A table is read cell by cell, row by row,
+region marks the join, so that it can be read either way (below); and a run of underscores that touches a
+letter or a digit on either side (`foo___bar`, `token____`, `____init`) stays, where fold would read it as a
+leader. A table is read cell by cell, row by row,
 and a region runs on across it, so a value written in a second `<table>` or a row written as a paragraph after
 `</table>` is inside the region (cases rg-split-table, rg-row-after).
 
@@ -33,7 +34,11 @@ and a region runs on across it, so a value written in a second `<table>` or a ro
 longer number), under fold: a hyphen a line broke after is joined as fold joins it, on both sides. That is one
 equivalence, with no second search: a page that glues the anchor's words does not hold the anchor. A copy
 inside a longer label is a copy (`Date of birth:` in `Mother's Date of birth:`, case rg-longer-label). A copy
-of `start` inside a copy of a longer `end` (`Table 3` in `Table 3 (continued)`) belongs to the end.
+of `start` inside a copy of a longer `end` (`Table 3` in `Table 3 (continued)`) belongs to the end. An anchor
+may not hold a hyphen after a letter: where a page breaks the line there, fold joins the word
+(`<h1>Self-<br>aware systems</h1>` reads `selfaware systems`), so the anchor `Self-aware systems` would not be
+found on a faithful page. The loader refuses one; a hyphen after a digit or a space (`3-D`, `Name -`) is
+kept.
 
 **Every copy.** Each copy of `start` opens a region that runs to the first copy of `end` after it, or to the page
 end when the test has no `end`. The test passes only when **every** region is right, so writing the field twice,
@@ -46,7 +51,8 @@ other. With no edits to spend, nothing that changes the text passes:
 - a run of white space is one space, and a space is text: `in to` is not `into`, `Total Due` is not `TotalDue`
   (cases rg-glued, rg-split-word);
 - a hyphen or an underscore that touches a letter or a digit is text: `re-sign` is not `resign`, `max_rows` is
-  not `maxrows`, `_token` is not `token` (cases rg-hyphen-dropped, rg-underscore);
+  not `maxrows`, `_token` and `token____` are not `token` (cases rg-hyphen-dropped, rg-underscore,
+  rg-underscore-run);
 - not compared: a run of underscores that touches no letter or digit (a line printed to write on, which fold
   keeps when shorter than 3 and markdown may read as emphasis: `__/__/____` is written `//`; cases
   rg-blank-line, rg-mask-markdown, rg-mask-lost), and a bullet glyph before a space (a list's mark);
@@ -58,6 +64,11 @@ other. With no edits to spend, nothing that changes the text passes:
 - their numbers must be equal, in order, at any budget: a number is its sign, its digits, the `.` and `,`
   between them or before them, and a `%` after them, so `-12.5` is not `+12.5`, `1.25` is not `1,25`, `.5` is
   not `5` and `12 500` is not `12500` (cases rg-number-in-budget, rg-sign, rg-decimal, rg-number-split).
+  A sign is the number's wherever it stands before the digits: after a space, a letter or a symbol, so an
+  exponent's sign counts (`1e-3` reads 1 and -3, and is not `1e+3`, case rg-exponent), and so does a code's
+  (`Δ-12` is not `Δ+12`, and `COVID-19` is not `COVID 19`, case rg-code-hyphen). A `-` or `+` right after a
+  digit is not a sign: it joins two numbers, a range or a date (`10-12`, `12-05-2021`, case rg-range). These
+  are the only numeric forms a region reads; it does not change how `present` or `absent` read numbers.
 
 The text view writes a superscript as a word of its own (`parsing.<sup>1</sup>` reads `parsing. 1`); content
 that holds a superscript writes it so. A NUL character on the page is read as U+FFFD, as an HTML parser reads it;
@@ -80,6 +91,7 @@ What the test ignores:
 | I | spacing, case and markup inside the region | `Abstract` … `Introduction`: `We study parsing. It is hard.` | `<h2>ABSTRACT</h2><p>We  study <b>parsing</b>.<br>It is hard.</p><h2>Introduction</h2>` | pass | `rg-spacing` |
 | I | a compound broken at a line end | page start … page end: `A self-aware system` | `A self-<br>aware system` | pass | `rg-hyphen` |
 | I | a word broken at a line end, joined in the gold | page start … page end: `Our developers` | `Our develop-<br>ers` | pass | `rg-hyphen-joined` |
+| I | a date's hyphens written as slashes, within the budget: a hyphen after a digit joins two numbers | page start … page end: `Issued 12-05-2021` (md 2) | `Issued 12/05/2021` | pass | `rg-range` |
 | I | the region runs across a table, cell by cell | `Table 2. Costs` … `The costs fell`: `Rent 100 Fuel 70` | `<p>Table 2. Costs</p><table><tr><td>Rent</td><td>100</td></tr><tr><td>Fuel</td><td>70</td></tr></table><p>The costs fell.</p>` | pass | `rg-across-table` |
 | I | nothing after a table's last cell | `Fuel 70` … `The costs fell`: nothing | `<table><tr><td>Rent</td><td>100</td></tr><tr><td>Fuel</td><td>70</td></tr></table><p>The costs fell.</p>` | pass | `rg-table-end` |
 | I | the page written twice, both copies right | `Date of birth:` … `Place of birth:`: nothing | `<p>Name: Ann Lee</p><p>Date of birth: </p><p>Place of birth: Paris</p><p>Name: Ann Lee</p><p>Date of birth: </p><p>Place of birth: Paris</p>` | pass | `rg-two-copies-clean` |
@@ -134,6 +146,9 @@ What it penalizes:
 | P | an underscore inside a name dropped | page start … page end: `set max_rows` | `set maxrows` | fail | `rg-underscore` |
 | P | a hyphen a line broke after, read as a space | page start … page end: `A self aware system` | `A self-<br>aware system` | fail: `the page holds 'a self-aware system' where the gold has 'a self aware system' (1 edit, max_diffs 0)` | `rg-hyphen-space` |
 | P | a sign changed, within the budget | page start … page end: `Net -12.5` (md 2) | `Net +12.5` | fail: `the page holds 'net +12.5' where the gold has 'net -12.5' (a number differs)` | `rg-sign` |
+| P | an exponent's sign changed, within the budget | page start … page end: `Concentration 1e-3 M` (md 1) | `Concentration 1e+3 M` | fail: `the page holds 'concentration 1e+3 m' where the gold has 'concentration 1e-3 m' (a number differs)` | `rg-exponent` |
+| P | a code's hyphen before a digit, its minus sign, written as a space | page start … page end: `Strain COVID-19` (md 2) | `Strain COVID 19` | fail: `the page holds 'strain covid 19' where the gold has 'strain covid-19' (a number differs)` | `rg-code-hyphen` |
+| P | an underscore run at the end of a name dropped | page start … page end: `set token____` | `set token` | fail: `the page holds 'set token' where the gold has 'set token____' (4 edits, max_diffs 0)` | `rg-underscore-run` |
 | P | a decimal point written as a comma, within the budget | page start … page end: `Rate 1.25` (md 2) | `Rate 1,25` | fail | `rg-decimal` |
 | P | the start inside a longer label opens a region too: a start must be unique on the page | `Date of birth:` … `Place of birth:`: nothing | `<p>Date of birth:</p><p>Place of birth: Paris</p><p>Mother's Date of birth: 1960</p><p>Mother's Place of birth: Rome</p>` | fail: `copy 2 of 2: between 'Date of birth:' and 'Place of birth:' holds "1960 mother's" where the gold has nothing (13 edits, max_diffs 0)` | `rg-longer-label` |
 | P | a footnote marker the content does not hold | `Abstract` … `Introduction`: `We study parsing.` | `<p>Abstract</p><p>We study parsing.<sup>1</sup></p><p>Introduction</p>` | fail | `rg-footnote` |
@@ -148,7 +163,8 @@ What it penalizes:
 - **Each anchor must have exactly one copy in the page's text**, found as the scorer finds it: at a word edge,
   inside longer labels too (`Date of birth:` has a copy in `Mother's Date of birth:`, case rg-longer-label), and
   in page furniture (a running header, a footer). `runners.region_anchor_copies(page_text, anchor)` counts them on
-  the page's full text; author a region only where it returns 1 for each anchor. Pick anchors inside one column
+  the page's full text; author a region only where it returns 1 for each anchor. An anchor holds no hyphen
+  after a letter (the loader refuses one, see Anchors): pick `Self` … or the line before. Pick anchors inside one column
   or block, so that reading order cannot put other text between them.
 - **Author regions only where no figure is.** An image's description is not read (as in `page_near_empty`), so
   text a system writes as an `alt` is lost to the region, though `present` credits it (cases rg-alt-present,

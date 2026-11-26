@@ -224,10 +224,14 @@ def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool
 
 
 def _leader_in_word(m: re.Match) -> str:
-    """A leader run folds to a space, unless it is underscores alone between two letters or digits."""
-    s, i, j = m.string, m.start(), m.end()
-    inside = i and j < len(s) and _LETTER_OR_DIGIT.match(s, i - 1) and _LETTER_OR_DIGIT.match(s, j)
-    return m[0] if inside and set(m[0]) == {"_"} else " "
+    """A leader run folds to a space, unless it is underscores alone touching a letter or a digit on either
+    side: part of an identifier ("foo___bar", "token____", "____init"), not a line to write on."""
+    # Note: a leader run takes the white space after it; the run is the underscores before it, and the white
+    # space stays one space.
+    run = m[0].rstrip()
+    s, i, j = m.string, m.start(), m.start() + len(run)
+    touches = (i and _LETTER_OR_DIGIT.match(s, i - 1)) or (j < len(s) and _LETTER_OR_DIGIT.match(s, j))
+    return run + " " * (j < m.end()) if touches and set(run) == {"_"} else " "
 
 
 _LETTER_OR_DIGIT = re.compile(r"[^\W_]")

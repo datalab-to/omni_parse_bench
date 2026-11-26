@@ -5,6 +5,7 @@ when the page changes outside it."""
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -177,23 +178,42 @@ def test_a_value_written_anywhere_between_the_anchors_fails(where, token, conten
     assert not passes(field_test(content), page), (where, page)
 
 
-@relation(HOLDS, domain="3 contents x 4 edits (a word dropped, a character dropped, a word doubled, a "
-                        "number changed) x 2 budgets")
-@given(st.sampled_from(["Results of the trial in 2019", "We study parsing. It is hard.", "Rent 100 Fuel 70"]),
-       st.sampled_from(["drop word", "drop char", "double word", "number"]), st.sampled_from([0, 1]))
-def test_text_taken_from_a_region_or_a_number_changed_fails(content, edit, md):
-    """A region that loses a word, loses a character (with no edit to spend), doubles a word or changes a number
-    (at any budget) fails, while the region as printed passes. [M152]
+CONTENTS = ["Results of the trial in 2019", "We study parsing. It is hard.", "Rent 100 Fuel 70",
+            "Concentration 1e-3 M", "Strain Δ-12 cells", "Set token____ now", "Call ____init now"]
+
+
+@relation(HOLDS, domain="7 contents (two with a sign after a letter: an exponent's, a code's; two with an "
+                        "underscore run at one side of a word) x 6 edits (a word dropped, a character dropped, a "
+                        "word doubled, a number changed, the sign flipped, the underscores dropped; each where "
+                        "the content holds what it edits) x 2 budgets (0, 1)")
+def test_text_taken_from_a_region_or_a_number_changed_fails():
+    """A region that loses a word, loses a character (with no edit to spend), doubles a word, changes a number
+    or flips a sign after a letter (an exponent's, a code's; at any budget), or drops an underscore run that
+    touches a letter on one side (with no edit to spend), fails, while the region as printed passes. [M152]
     Why it matters for a score: a region is compared as a whole, so a missing or changed part costs as an added
-    one does."""
-    test = runners.Region("Abstract", "Introduction", content, md)
+    one does, and a number is read with its sign wherever the sign stands."""
     page = "<p>Abstract</p><p>{}</p><h2>Introduction</h2>"
-    assert passes(test, page.format(escaped(content)))
-    words = content.split(" ")
-    changed = {"drop word": " ".join(words[1:]), "drop char": content[1:] if md == 0 else content[2:] + "zz",
-               "double word": " ".join([words[0], *words]),
-               "number": content.replace("2019", "2018").replace("100", "101").replace("parsing", "parsing 1")}[edit]
-    assert not passes(test, page.format(escaped(changed))), (edit, changed)
+    n, bad = 0, []
+    for content in CONTENTS:
+        words = content.split(" ")
+        for md in (0, 1):
+            test = runners.Region("Abstract", "Introduction", content, md)
+            if not passes(test, page.format(escaped(content))):
+                bad.append((content, md, "as printed"))
+            changed = {"drop word": " ".join(words[1:]),
+                       "drop char": content[1:] if md == 0 else content[2:] + "zz",
+                       "double word": " ".join([words[0], *words]),
+                       "number": re.sub(r"\d(?!.*\d)", lambda m: str((int(m[0]) + 1) % 10), content),
+                       "sign": content.replace("-", "+")}
+            if md == 0:
+                changed["underscores"] = content.replace("_", "")
+            for edit, x in changed.items():
+                if x == content:
+                    continue
+                n += 1
+                if passes(test, page.format(escaped(x))):
+                    bad.append((content, md, edit, x))
+    assert n and not bad, f"{len(bad)} of {n} cases break, e.g. {bad[:5]}"
 
 
 # ------------------------------------------------------------------------------- copies, splits, outside

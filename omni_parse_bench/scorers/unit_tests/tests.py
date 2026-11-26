@@ -303,8 +303,9 @@ def _blank_after(where: str, args: Mapping[str, Any], settings: Mapping[str, Any
 
 def _region(where: str, args: Mapping[str, Any], settings: Mapping[str, Any]) -> runners.Region:
     """A region test's parameters, checked: text args only, with no place and no exact_case; `start` and `end`
-    matched exactly (max_diffs 0, as an anchor needs an exact boundary), distinct, and neither found in the
-    content, which would cut the region short or open another; no settings."""
+    matched exactly (max_diffs 0, as an anchor needs an exact boundary), with no hyphen after a letter (which
+    a line break would join, `runners._WRAPS`), distinct, and neither found in the content, which would cut
+    the region short or open another; no settings."""
     _no(where, settings)
     for r, a in args.items():
         if not (isinstance(a, dict) and set(a) == {"text", "max_diffs"}):
@@ -315,6 +316,11 @@ def _region(where: str, args: Mapping[str, Any], settings: Mapping[str, Any]) ->
                              "match has no exact boundary")
         if isinstance(a["text"], str) and runners._WRAP in a["text"]:
             raise ValueError(f"{where}: region's {r} holds a NUL character, which a page never shows")
+        if r != "content" and isinstance(a["text"], str) and runners._WRAPS.search(
+                runners._region_fold(a["text"])):
+            raise ValueError(f"{where}: region's {r} {a['text']!r:.80} holds a hyphen after a letter, "
+                             "which a line break there joins ('Self-' then 'aware' reads 'selfaware'); "
+                             "choose an anchor without one")
     start, end = (args[r]["text"] if r in args else None for r in ("start", "end"))
     flat = lambda x: runners._region_fold(x).replace(runners._WRAP, "")  # noqa: E731
     if start is not None and end is not None and flat(start) == flat(end):

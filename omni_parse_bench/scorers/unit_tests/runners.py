@@ -577,14 +577,20 @@ class Region(NamedTuple):
 # space. A page's own NUL is read as U+FFFD, as an HTML parser reads it, and the loader refuses one in a
 # region's text, so the mark is only ever a joined hyphen.
 _WRAP = "\x00"
+# A hyphen after a letter in a folded anchor: where a line breaks after it, fold joins the word
+# ("Self-<br>aware" reads "selfaware"), so an exact anchor holding one is not found on a faithful page. The
+# loader refuses it.
+_WRAPS = re.compile(r"[^\W\d_]-")
 # Note: what a region does not compare: a run of underscores that touches no letter or digit (a line
 # printed to write on, which fold keeps when shorter than 3 and markdown may read as emphasis: "__/__/____"
 # -> "//"), and a bullet glyph before a space, a list's mark, which fold drops only at the start of a line.
 # An underscore that touches a letter or a digit ("foo_bar", "_token", "__init__") is text.
 _UNCOMPARED = re.compile(r"(?<!\w)_+(?!\w)|[•‣◦▪▶∙●](?=\s|$)")
 # A number as a region compares it: its sign, its digits and the separators between them (a leading decimal
-# point too, ".5"), and a percent sign.
-_REGION_NUMBER = re.compile(r"(?:(?<![^\W_])[-+±])?(?:[.,](?=\d))?\d+(?:[.,]\d+)*%?")
+# point too, ".5"), and a percent sign. The sign is read wherever it stands before the digits, after a space,
+# a letter or a symbol: an exponent's ("1e-3" reads 1 and -3) and a code's ("Δ-12", "COVID-19"). Only a sign
+# right after a digit is not one: it joins two numbers, a range or a date ("10-12", "12-05-2021").
+_REGION_NUMBER = re.compile(r"(?:(?<!\d)[-+±])?(?:[.,](?=\d))?\d+(?:[.,]\d+)*%?")
 
 
 def region(t: Region, v: views.Html) -> Mark:
@@ -625,7 +631,8 @@ def region_anchor_copies(page_text: str, anchor: str) -> int:
 
 def _region_fold(s: str) -> str:
     """`normalize.fold`, with two things kept that it would lose: `_WRAP` where it joins a hyphen a line broke
-    after, and a run of underscores between two letters or digits, which it would fold as a leader."""
+    after, and a run of underscores that touches a letter or a digit on either side ("foo___bar", "token____",
+    "____init"), which it would fold as a leader."""
     return normalize._cased(s, line_mark=_WRAP, keep_word_underscores=True).lower()
 
 
@@ -650,7 +657,8 @@ def _closed(got: str, t: Region) -> str:
     without the underscores and bullets a region does not compare (`_UNCOMPARED`), their white space one
     space, and compared as whole strings: an edit is a character substituted, inserted or deleted, or two
     adjacent ones swapped, and a `_WRAP` is free to drop or to read as a hyphen. Their numbers
-    (`_REGION_NUMBER`: sign, digits, separators) must be equal, in order, at any budget."""
+    (`_REGION_NUMBER`: sign, digits, separators, an exponent's sign) must be equal, in order, at any
+    budget."""
     a, b = (re.sub(r" +", " ", _UNCOMPARED.sub("", x)).strip()
             for x in (_region_fold(t.content or ""), got))
     numbers = (_REGION_NUMBER.findall(a.replace(_WRAP, "")) == _REGION_NUMBER.findall(b.replace(_WRAP, "")))

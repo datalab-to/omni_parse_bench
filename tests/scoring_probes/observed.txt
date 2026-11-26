@@ -424,6 +424,7 @@ rg-mask-markdown	pass
 rg-spacing	pass
 rg-hyphen	pass
 rg-hyphen-joined	pass
+rg-range	pass
 rg-across-table	pass
 rg-table-end	pass
 rg-two-copies-clean	pass
@@ -460,6 +461,9 @@ rg-hyphen-dropped	fail	the page holds 'resign the lease' where the gold has 're-
 rg-underscore	fail	the page holds 'set maxrows' where the gold has 'set max_rows' (1 edit, max_diffs 0)
 rg-hyphen-space	fail	the page holds 'a self-aware system' where the gold has 'a self aware system' (1 edit, max_diffs 0)
 rg-sign	fail	the page holds 'net +12.5' where the gold has 'net -12.5' (a number differs)
+rg-exponent	fail	the page holds 'concentration 1e+3 m' where the gold has 'concentration 1e-3 m' (a number differs)
+rg-code-hyphen	fail	the page holds 'strain covid 19' where the gold has 'strain covid-19' (a number differs)
+rg-underscore-run	fail	the page holds 'set token' where the gold has 'set token____' (4 edits, max_diffs 0)
 rg-decimal	fail	the page holds 'rate 1,25' where the gold has 'rate 1.25' (a number differs)
 rg-longer-label	fail	copy 2 of 2: between 'Date of birth:' and 'Place of birth:' holds "1960 mother's" where the gold has nothing (13 edits, max_diffs 0)
 rg-footnote	fail	between 'Abstract' and 'Introduction' holds 'we study parsing. 1' where the gold has 'we study parsing.' (2 edits, max_diffs 0)

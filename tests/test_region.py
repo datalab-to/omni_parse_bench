@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from omni_parse_bench import markdown, score
+from omni_parse_bench import markdown, score, views
 from omni_parse_bench.scorers.unit_tests import runners as R
 from omni_parse_bench.scorers.unit_tests import tests as gold
 
@@ -295,10 +295,56 @@ def test_a_line_end_hyphen_is_one_unit_kept_or_joined():
 def test_an_anchor_is_found_under_fold_and_only_there():
     page = "<p>Date of self-<br>aware birth: </p><p>Place of birth:</p>"
     assert verdict(page, "Date of selfaware birth:", POB)[0]
-    assert not verdict(page, "Date of self-aware birth:", POB)[0]
     assert not verdict(page, "Date of self aware birth:", POB)[0]
     assert R.region_anchor_copies("A self-\naware x", "selfaware") == 1
     assert R.region_anchor_copies("A self-\naware x", "self-aware") == 0
+
+
+@pytest.mark.parametrize("anchor", ["Self-aware systems", "Date of self-aware birth:", "Self-", "SELF‐AWARE"])
+@pytest.mark.parametrize("role", ["start", "end"])
+def test_an_anchor_with_a_hyphen_after_a_letter_is_refused(anchor, role):
+    with pytest.raises(ValueError, match="hyphen after a letter"):
+        gold_of({role: text(anchor), "content": text("x")})
+
+
+def test_why_a_hyphen_after_a_letter_cannot_be_an_anchor():
+    # Note: the loader refuses it, since a faithful page that breaks the line at the hyphen does not hold it
+    t = R.Region("Self-aware systems", None, "Learn.", 0)
+    assert R.region(t, views.html("<h1>Self-aware systems</h1><p>Learn.</p>"))[0]
+    assert not R.region(t, views.html("<h1>Self-<br>aware systems</h1><p>Learn.</p>"))[0]
+
+
+@pytest.mark.parametrize("anchor", ["3-D model", "pages 10-12", "COVID 19", "Name -"])
+def test_a_hyphen_after_no_letter_may_be_in_an_anchor(anchor):
+    [t] = gold_of({"start": text(anchor), "content": text("x")})
+    assert t.params.start == anchor
+
+
+@pytest.mark.parametrize("got, want, md", [
+    ("Concentration 1e+3 M", "Concentration 1e-3 M", 1), ("Concentration 1e3 M", "Concentration 1e-3 M", 1),
+    ("Δ+12", "Δ-12", 1), ("Δ12", "Δ-12", 1), ("COVID 19", "COVID-19", 2), ("x+5", "x-5", 1),
+])
+def test_a_sign_after_a_letter_or_a_symbol_is_part_of_the_number(got, want, md):
+    ok, why = verdict(f"<p>{got}</p>", None, None, want, md)
+    assert not ok and why.endswith("(a number differs)"), why
+    assert verdict(f"<p>{want}</p>", None, None, want, md)[0]
+
+
+@pytest.mark.parametrize("got, want", [("pages 10–12", "pages 10-12"), ("12/05/2021", "12-05-2021")])
+def test_a_sign_after_a_digit_joins_two_numbers(got, want):
+    assert verdict(f"<p>{got}</p>", None, None, want, 2)[0]
+
+
+@pytest.mark.parametrize("got, want", [("token", "token____"), ("token____", "token"), ("set token now", "set token____ now"), ("token", "____token"),
+                                       ("____token", "token"), ("foo bar", "foo___bar"), ("foobar", "foo___bar")])
+def test_an_underscore_run_touching_a_letter_on_either_side_is_text(got, want):
+    assert not verdict(f"<p>{got}</p>", None, None, want)[0]
+    assert verdict(f"<p>{want}</p>", None, None, want)[0]
+
+
+@pytest.mark.parametrize("got", ["Name: ____", "Name: ", "Name:______ ", "Name: ____  ______"])
+def test_an_underscore_run_touching_no_letter_is_a_line_to_write_on(got):
+    assert verdict(f"<p>{got}</p>", None, None, "Name:")[0]
 
 
 def test_a_nul_is_refused_in_the_gold_and_read_as_a_replacement_on_the_page():
