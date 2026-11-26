@@ -6,9 +6,10 @@ A rewrite of olmOCR-bench's table parser (https://github.com/allenai/olmocr, Apa
 from __future__ import annotations
 
 import functools
+from collections.abc import Callable
 from typing import Literal, NamedTuple
 
-from omni_parse_bench import views
+from omni_parse_bench import normalize, views
 
 Cell = tuple[int, int]
 Direction = Literal["up", "down", "left", "right"]
@@ -139,9 +140,10 @@ def _filled(table: Table, slots, stop: frozenset[Cell] = frozenset()) -> Cell | 
     return None
 
 
-def section(table: Table, cell: Cell) -> list[str]:
+def section(table: Table, cell: Cell, repeated: Callable[[str], bool] | None = None) -> list[str]:
     """The labels of the section rows nearest above `cell`, top to bottom: the consecutive run of
-    them closest to it ("1982" then "Age"), or [] when no section row is above it."""
+    them closest to it ("1982" then "Age"), or [] when no section row is above it. With `repeated` (a test
+    of a label), a row that writes one label that passes it in every cell (`_repeated_label`) is one too."""
     labels = label_rows(table)
     width = len(table.grid[0]) if table.grid else 0
     run: list[str] = []
@@ -151,12 +153,25 @@ def section(table: Table, cell: Cell) -> list[str]:
             across = {x for x in table.grid[r] if x is not None}
             if len(across) == 1 and (x := next(iter(across)))[0] == r and table.text[x].strip() and width > 1:
                 label = x
+            elif repeated is not None:
+                label = _repeated_label(table, r, repeated)
         if label is None:
             # Note: a blank spacer row between two section rows doesn't end their run.
             if run and any(x is not None and table.text[x].strip() for x in table.grid[r]): break
             continue
         run.insert(0, table.text[label])
     return run
+
+
+def _repeated_label(table: Table, r: int, wanted: Callable[[str], bool]) -> Cell | None:
+    """The first cell of row `r` when the row writes one label in each cell instead of merging it, and
+    `wanted` accepts that label: every slot is a cell that starts in the row and covers no other, and all
+    fold to one string. Any other repeated row (`Yes Yes`, `0 0`) is data: only a test that names the label
+    reads its row as a section."""
+    row = table.grid[r]
+    if len(row) < 2 or any(x is None or x[0] != r or len(table.covers[x][0]) > 1 for x in row): return None
+    folded = {normalize.fold(table.text[x]) for x in row}
+    return row[0] if len(folded) == 1 and "" not in folded and wanted(table.text[row[0]]) else None
 
 
 def label_rows(table: Table) -> dict[int, Cell]:

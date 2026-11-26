@@ -153,16 +153,5 @@
     "how_common": "not measured: counting it needs system outputs with a mark boundary inside an accented letter",
     "who_is_affected": "an output that marks part of a multi-character form (a base letter and its combining accent, two quotes, an arrow) outside the mark",
     "enumerated_over_real_tests": false
-  },
-  "M120": {
-    "status": "known limitation",
-    "description": "A section label written in every cell it covers is not a section row, so a `section` arg fails on it, while the same label written once across the table passes.",
-    "counterexample": "a table_cell test for `6` with section `Cohort 1` passes on `<tr><td colspan=2>Cohort 1</td></tr>` and fails on `<tr><td>Cohort 1</td><td>Cohort 1</td></tr>`",
-    "why_this_status": "docs/scoring/table_cell.md promises that a merged heading, a repeated one and one written once beside empty cells all count as `headings`, but says of a section only 'a row of one label'; omni_parse_bench/tables.py reads 'a row of one label, in its first column', so a label repeated across the row is not one. Whether it should be is not documented.",
-    "effect_on_scores": "unknown",
-    "effect_basis": "not measured: it was not re-scored on cached leaderboard re-runs, and this package holds no system outputs to measure it with",
-    "how_common": "not measured: counting it needs system outputs that repeat a spanned section label, which this package does not hold",
-    "who_is_affected": "an output that writes a section row by repeating its label in each cell: its table_cell tests with a `section` arg fail",
-    "enumerated_over_real_tests": false
   }
 }

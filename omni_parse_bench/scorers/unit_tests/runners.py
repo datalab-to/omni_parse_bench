@@ -1204,13 +1204,18 @@ def _structure(t: TableCell, table: tables.Table, rc: tables.Cell) -> list[str]:
         want = _fold_cell(t.section)
         thr = _cell_threshold(want, t.max_diffs)
         run = tables.section(table, rc)
+        # Note: a row that writes the test's section in every cell is that section row written without a
+        # merge, in a second reading (the first still passes what it passed); another repeated row
+        # (`Yes Yes`) is data. So a test that names `Yes` passes on a `Yes | Yes` row, which tests do not:
+        # they name section labels.
+        runs = [run, tables.section(table, rc, repeated=lambda x: _one_of(want, x, thr, t.section))]
         groups = [table.text[c] for c in tables.beside(table, rc) if tables.spanning_rows(table, c)]
         # Note: a section label printed on its own line above its row may fairly be written as that row's
         # first cell instead ("ADH-I intron 5 | 851 (703) | 306"): a long label set on a line of its own
         # still names the row below it.
         first = next((c for c in table.grid[min(table.covers[rc][0])] if c is not None), None)
         groups += [table.text[first]] if first is not None and first != rc else []
-        in_run = any(_one_of(want, " ".join(run[i:]), thr, t.section) for i in range(len(run)))
+        in_run = any(_one_of(want, " ".join(r[i:]), thr, t.section) for r in runs for i in range(len(r)))
         if not in_run and not any(_one_of(want, g, thr, t.section) for g in groups):
             out.append(f"not in the section {t.section!r} (nearest above: {' '.join(run) or 'none'!r})")
     return out

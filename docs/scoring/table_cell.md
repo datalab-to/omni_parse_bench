@@ -26,7 +26,7 @@ the gold or the cell) read kept or dropped, so a hyphenated compound broken at a
   right edge, so its `left_heading` is the label at the right edge (cases cell-rtl-reading-order, cell-dir-rtl).
 - `headings`: these texts, in order, among the cells above the cell's column (any cell, `<td>` too). A merged
   heading, a repeated one, or one written once beside empty cells all count.
-- `section`: the nearest section row above (a row of one label), a row-spanning cell to the left, or the first
+- `section`: the nearest section row above (a row of one label; one written in every cell counts when the gold names it, a row repeating another value is data), a row-spanning cell to the left, or the first
   cell of the row.
 - `row_groups`: these texts, in order, among the cells to the left in the cell's rows.
 
@@ -84,6 +84,8 @@ What the test ignores:
 | I | a merged heading over the column | `5`, headings `Group` > `A` | B | pass | `cell-headings-merged` |
 | I | a heading written once beside an empty cell | `6`, headings `Group` > `B` | B[`<th colspan=2>Group</th>` → `<th>Group</th><th></th>`] | pass | `cell-headings-beside` |
 | I | the section row above | `6`, section `Cohort 1` | C | pass | `cell-section` |
+| I | a data row that repeats a value does not hide the section above it | `6`, section `Cohort 1` | C[`<td colspan=2>Cohort 1</td>` → `<td colspan=2>Cohort 1</td></tr><tr><td>Yes</td><td>Yes</td>`] | pass | `cell-section-then-data` |
+| I | a section label written in each cell of its row, not merged | `6`, section `Cohort 1` | C[`<td colspan=2>Cohort 1</td>` → `<td>Cohort 1</td><td>Cohort 1</td>`] | pass | `cell-section-repeated` |
 | I | a row-spanning cell to the left | `6`, row groups `Male` | C | pass | `cell-row-group` |
 <!-- /cases -->
 
@@ -96,6 +98,7 @@ What it does not look at, so a wrong output passes:
 | B | a short gold with an edit to spend | `ab` (md 1) | `<table><tr><td>abcd</td></tr></table>` | pass | `cell-short` |
 | B | `dir=rtl` changes nothing: roles follow the html's order | `5`, left_heading `A` | `<table dir='rtl'><tr><th>A</th><td>5</td></tr></table>` | pass | `cell-dir-rtl` |
 | B | a gold with no relations: any cell of any table | `2024` | A | pass | `cell-any-table` |
+| B | a test naming the repeated value reads its row as the section: `Yes` passes | `6`, section `Yes` | C[`<td colspan=2>Cohort 1</td>` → `<td>Yes</td><td>Yes</td>`] | pass | `cell-section-repeated-value` |
 | B | `headings` read any cell above, `<td>` too | `1,240`, headings `Total` | `<table><tr><td>Year</td><td>Total</td></tr><tr><td>2024</td><td>1,240</td></tr></table>` | pass | `cell-headings-td` |
 <!-- /cases -->
 
@@ -122,6 +125,7 @@ What it penalizes:
 | P | a wrong heading | `1,240`, top_heading `Year` | A | fail: `cells matching '1,240' found, but: top_heading 'total' doesn't match 'year' (0.22)` | `cell-top-heading-wrong` |
 | P | headings in the wrong order | `5`, headings `A` > `Group` | B | fail: `cells matching '5' found, but: not under the headings 'A > Group'` | `cell-headings-swapped` |
 | P | a wrong section | `6`, section `Cohort 2` | C | fail: `cells matching '6' found, but: not in the section 'Cohort 2' (nearest above: 'Cohort 1')` | `cell-section-wrong` |
+| P | a row that repeats a value is data for a test naming another section | `6`, section `Cohort 1` | C[`<td colspan=2>Cohort 1</td>` → `<td>Yes</td><td>Yes</td>`] | fail: `cells matching '6' found, but: not in the section 'Cohort 1' (nearest above: 'none')` | `cell-section-data-row` |
 | P | a wrong row group | `6`, row groups `Female` | C | fail: `cells matching '6' found, but: not in the row groups 'Female'` | `cell-row-group-wrong` |
 | P | pipes in a paragraph are not a table | `1,240` | `<p>\| 2024 \| 1,240 \|</p>` | fail: `no tables found` | `cell-no-table` |
 | I | hyphenated compound broken at a line end | `self-aware` | `<table><tr><td>self- aware</td></tr></table>` | pass | `cell-compound` |
@@ -188,6 +192,12 @@ Fixture T, used by the cases below:
 
 ## Blind spots
 
+- **A named section may be a repeated value.** A test that names `Yes` as its section passes on a `Yes | Yes` row,
+  because a row that writes the named label in every cell is read as that section row (case
+  cell-section-repeated-value). The match is the section's own, so a repeated value within the test's `max_diffs`
+  of the section passes too (`Cohort 1 | Cohort 1` for `Cohort 2` with one edit, as a merged `Cohort 1` does). The
+  cells must fold to one string: `Cohort 1 | Cohort 3` is data. A repeated row that does not match the named
+  section is data (case cell-section-data-row).
 - **Whole cells, but a loose ratio.** With an edit to spend, insertions cost half an edit each:
   `abcdefghij` with one edit matches `abcdefghijkl` (case cell-insertions), and `ab` matches `abcd` (case
   cell-short).

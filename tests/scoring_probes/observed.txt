@@ -475,12 +475,15 @@ cell-top-heading-outer	pass
 cell-headings-merged	pass
 cell-headings-beside	pass
 cell-section	pass
+cell-section-then-data	pass
+cell-section-repeated	pass
 cell-row-group	pass
 ## cell-blind
 cell-insertions	pass
 cell-short	pass
 cell-dir-rtl	pass
 cell-any-table	pass
+cell-section-repeated-value	pass
 cell-headings-td	pass
 ## cell-penalized
 cell-changed	fail	no cell matching '1,240' in any table
@@ -501,6 +504,7 @@ cell-up-wrong	fail	cells matching '1,300' found, but: up '1,240' doesn't match '
 cell-top-heading-wrong	fail	cells matching '1,240' found, but: top_heading 'total' doesn't match 'year' (0.22)
 cell-headings-swapped	fail	cells matching '5' found, but: not under the headings 'A > Group'
 cell-section-wrong	fail	cells matching '6' found, but: not in the section 'Cohort 2' (nearest above: 'Cohort 1')
+cell-section-data-row	fail	cells matching '6' found, but: not in the section 'Cohort 1' (nearest above: 'none')
 cell-row-group-wrong	fail	cells matching '6' found, but: not in the row groups 'Female'
 cell-no-table	fail	no tables found
 cell-compound	pass
