@@ -307,7 +307,7 @@ def test_the_helpers_build_the_regions_they_say():
 
 # ------------------------------------------------------------------- other test types are unchanged
 
-OLD_COMMIT = "cf19df3"    # main before `region`
+OLD_COMMIT = "52a8965"    # main before `region`
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER = """
 import json, sys
@@ -368,11 +368,11 @@ def _compare(old_package, cases) -> None:
     assert {n[0] for n in new} == {"pass", "fail"}, "the cases hold both verdicts"
 
 
-@relation(HOLDS, domain="136 frozen cases: the 34 html tests of tests/fixtures/invariants/ at cf19df3 x 4 pages "
+@relation(HOLDS, domain="136 frozen cases: the 34 html tests of tests/fixtures/invariants/ at 52a8965 x 4 pages "
                         "(its answer, a character dropped, a word added, an empty page)")
 def test_every_frozen_case_of_another_type_keeps_its_verdict():
     """Each frozen case (a fixture test of a type older than `region`, on its answer, the answer with a character
-    dropped, the answer and a word, and an empty page) gets the verdict and the why that the package at cf19df3
+    dropped, the answer and a word, and an empty page) gets the verdict and the why that the package at 52a8965
     gave it, recorded in region_old_verdicts.json. [M158]
     Why it matters for a score: the new test type changes no existing test's verdict."""
     from omni_parse_bench import score
@@ -391,8 +391,8 @@ def test_every_frozen_case_of_another_type_keeps_its_verdict():
 @every_real_test("text tests", note="each on its answer, the answer altered, the answer and a word, and an "
                                     "empty page; old package against new")
 def test_every_real_test_keeps_its_old_verdict(old_package):
-    """Every real text, order, repeat and table_cell test gets the verdict and the why that the package at cf19df3
-    gives on four pages, as in the check above, run from git in a subprocess; a checkout without cf19df3 fails
+    """Every real text, order, repeat and table_cell test gets the verdict and the why that the package at 52a8965
+    gives on four pages, as in the check above, run from git in a subprocess; a checkout without 52a8965 fails
     rather than skips. [M158]
     Why it matters for a score: as for M158, over the dataset's own tests."""
     from metamorphic.common import CELL, ORDER, REPEAT, TEXT
