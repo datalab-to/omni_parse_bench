@@ -7,7 +7,7 @@ Each promise is a *relation*: change a page, or a test, in a way that should not
 known way), and the verdict should follow. Example: putting a passing answer in bold must not make its test
 fail.
 
-- The certificate lists the 154 relations its authors selected: 145 hold and 9 deviate. It is not every
+- The certificate lists the 173 relations its authors selected: 164 hold and 9 deviate. It is not every
   relation of the scorer (see [Not covered](#not-covered)). Four of the 9 (M1a to M1c and M1e) are about
   folding a string twice, which the scorer never does and no document promises, so they change no score.
 - It is generated from the tests. CI fails if it is out of date, or if a status disagrees with its test.
@@ -38,10 +38,10 @@ A healthy run gives:
 
 | | passed | skipped | xfailed |
 |---|---|---|---|
-| this folder, no dataset | 627 | 22 | 9 |
-| this folder, with dataset | 647 | 2 | 9 |
-| whole suite, no dataset | 2796 | 37 | 9 |
-| whole suite, with dataset | 2823 | 10 | 9 |
+| this folder, no dataset | 647 | 22 | 9 |
+| this folder, with dataset | 667 | 2 | 9 |
+| whole suite, no dataset | 2816 | 37 | 9 |
+| whole suite, with dataset | 2843 | 10 | 9 |
 
 All four rows come from runs of this version.
 
@@ -133,6 +133,16 @@ Other commands:
 - `HYPOTHESIS_PROFILE=deep` before the pytest command runs the deep profile.
 - `PYTHONPATH=. uv run python tests/metamorphic/render_certificate.py --write` regenerates the certificate.
 
+## Mutation check
+
+Each of M126 to M144 was shown to fail when the scorer rule it pins is removed or changed: `mutation_check.py`
+lists the changes, applies each to a copy of `omni_parse_bench`, and runs the relation's test against
+the copy. It first runs every relation on an unchanged copy, which must pass. CI does not run it (it takes a few
+minutes); the certificate counts the mutations that kill each relation, and a test checks that each change's
+target text is still in the scorer.
+
+    PYTHONPATH=. uv run python tests/metamorphic/mutation_check.py [M131 ...]
+
 ## When a certified relation fails
 
 - **A HOLDS test fails.** The scorer broke a promise. Fix the scorer. If the change is deliberate:
@@ -154,33 +164,24 @@ relation's docstring credits it.
 
 ## Not covered
 
-- score aggregation: family scores and the headline;
 - equation tests on real golds beyond the folds M76 to M79 name: M17 uses 8 handmade equations, M78 and M79 rewrite the
   real equations by those folds only, and M10 compares readings, not real equations;
-- table_cell relations `section`, `row_groups` and `left_heading` beyond M27's mirror check, M114 (transpose) and M115 and M120 (spanned cells) (`down` only inside M6a's agreement check and M113);
+- table_cell's `down` relation, only inside M6a's agreement check and M113;
 - repeat's reading without image descriptions, and the equation test's plain-text fallback;
 - markdown beyond pipe tables, paragraphs and the dialects M104 and M105 name (headings, emphasis, bullets, numbering, a fence);
-- missing or malformed outputs;
 - a batch where some test fails: M19 draws only pages where every test passes;
-- layout_kind's list-or-form-as-text rule;
-- these steps of fold: no relation fails when one is removed or changed (each was tried on a copy of the
-  scorer):
-  - a superscript digit after a digit set apart (`1,240¹`);
-  - invisible and private-use characters removed;
-  - the quote and arrow families;
-  - full-width punctuation made ASCII;
-  - a decimal middle dot made a point;
-  - the minimum run of 3 for dots, dashes, `=` and `*` (the one for `_` is pinned by M22a's check);
-- these rules of the tests, tried the same way:
-  - table_cell's floor ratio (`TABLE_MIN_RATIO`, 0.5);
-  - layout_kind's list-or-form-as-text rule (named above);
+- a superscript digit after a letter (`m²`): M126 pins the set-apart digit after a digit only, because a text test
+  retries with every space removed, which reads a space that fold adds or leaves as unchanged; M130 pins `。` and
+  `、` only among the full-width marks, as NFKC reads the others before that step runs;
 - M14 restates fold's rules in its own code, to skip deletions that cannot count; it does not call the
   scorer's rules, so it does not check them;
 - edges the sweep found that no row states:
   - a dollar's padding evidence read across a paragraph break;
   - punctuation between a math span and a price read as math (`$2x$, ($5)`), which the documented rules give;
-  - a later colspan running into an earlier rowspan, which no doc covers;
-  - a bare `<` or `>` that a browser would read another way, which no doc covers;
+  - a later colspan running into an earlier rowspan, which no doc covers (so no relation: any verdict would be
+    this scorer's choice, not a documented rule);
+  - a bare `<` or `>` that a browser would read another way, which no doc covers (the text view's rule is for a
+    `<` before a letter, M24a);
 - anything not named in a certificate row.
 
 ## Glossary

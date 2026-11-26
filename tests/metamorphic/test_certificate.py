@@ -133,6 +133,17 @@ def test_the_certificate_counts_the_real_tests_it_says():
     assert sizes == {k: n for k, (_, n) in REAL.items()}, "update REAL in common.py, then " + COMMAND
 
 
+def test_every_mutation_names_a_relation_and_a_scorer_text_that_exists():
+    """`mutation_check.py` changes texts of the scorer; each must still be there, in a file of the package,
+    and belong to a relation."""
+    from metamorphic.mutation_check import MUTATIONS
+    load_every_test_file()
+    for label, path, old, new in MUTATIONS:
+        assert label in RELATIONS, label
+        assert old in (ROOT / "omni_parse_bench" / path).read_text(), (label, path, old)
+        assert old != new, (label, old)
+
+
 def test_the_certificate_pools_are_the_loaded_tests():
     """The pool sizes the certificate prints are those loaded: the fixtures in CI, the dataset when set."""
     from metamorphic.test_fold_and_case import EXACT
