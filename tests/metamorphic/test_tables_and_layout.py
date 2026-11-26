@@ -637,12 +637,12 @@ def same_as_before(old_package, tests) -> tuple[int, int, list]:
              if tuple(n) != o])
 
 
-@relation(HOLDS, domain="20 random 4x3 tables with blanks, a figure or a span, 240 tests of 4 kinds each; "
-                        "needs git history holding 416c17b")
+@relation(HOLDS, domain="20 random 4x3 tables with blanks, a figure or a span, 36 tests each (9 cells, 4 "
+                        "kinds), 720 in all; needs git history holding 416c17b")
 def test_a_table_cell_test_without_empty_or_end_gives_the_verdict_it_gave_before(old_package):
     """A table_cell test with no `empty` or `end` arg gets the verdict and the why that the package at
     416c17b gives (run from git in a subprocess, sharing no code), on 20 random tables of cells, blanks,
-    spans and figures (240 tests): for each body cell its neighbours, headings, row groups and section, true
+    spans and figures (720 tests): for each body cell its neighbours, headings, row groups and section, true
     or altered. [M97]
     Why it matters for a score: the new args, and the table reader's figure flag, change no existing
     test's score."""
