@@ -161,9 +161,9 @@ cell or after an opening bracket (in a page text `- 12` may start a list item).
 A `-` after a Latin letter or a digit is a hyphen: `A-12`, `2026-11-26`, `1-2` and `COVID-19` keep costing one
 edit to drop, as do a list dash (`- 5` in the middle of a text) and a space-dash-space (`3 - 2`). This differs
 on purpose from the number reader of `region`, which reads a sign after a letter too (`A-12`): a page often
-writes such an id as `COVID 19` or `A12`, and a budget exists for that kind of noise. Spacing the page adds or
-drops does not change what a number is: a gold's hyphen before a number (`kg-1`) is matched by the page's spaced
-`kg -1`. The cost of this narrow rule: a minus written right after a Latin letter (`x-5`) reads as a hyphen, so
+writes such an id as `COVID 19` or `A12`, and a budget exists for that kind of noise. Spacing a unit exponent either way does not change
+what a number is: a gold's `kg-1` is matched by the page's spaced `kg -1`, and a gold's `dm -3` by `dm-3` (after a
+letter only). A `+` or `±` between two values (`6% ± 2%`, `1 +2`) is an operator, not a sign. The cost of this narrow rule: a minus written right after a Latin letter (`x-5`) reads as a hyphen, so
 a budget can still drop it, and a spaced minus in the middle of a text (`was − 5`) is not guarded. `order` and
 `table_cell` apply the same rule ([order.md](order.md#how-it-differs-from-present),
 [table_cell.md](table_cell.md#blind-spots)).

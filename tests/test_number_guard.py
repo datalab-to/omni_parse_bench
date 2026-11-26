@@ -211,3 +211,20 @@ def test_a_leading_point_number_matches_itself(gold, page):
 ])
 def test_a_missing_space_after_a_comma_or_full_stop_is_not_a_number_change(gold, page):
     assert all(all_types(gold, page, 1)), (gold, page)
+
+
+@pytest.mark.parametrize("gold, page", [
+    ("conc 0.100 mol·dm -3 here", "conc 0.100 mol·dm-3 here"),   # a unit exponent the page does not space
+    ("conc 0.100 mol·dm-3 here", "conc 0.100 mol·dm -3 here"),
+    ("shall hold 6% ± 2% here", "shall hold 6% ±2% here"),      # a plus-minus between two values is no sign
+    ("a 0.2 ± 0.1 b", "a 0.2 ±0.1 b"),
+])
+def test_spacing_around_a_unit_exponent_or_a_plus_minus_between_values_is_free(gold, page):
+    assert all(all_types(gold, page, 0)) or all(all_types(gold, page, 1)), (gold, page)
+    assert all(all_types(gold, page, 1)), (gold, page)
+
+
+@pytest.mark.parametrize("gold, lost", [("conc 0.100 mol·dm -3 here", "conc 0.100 mol·dm 3 here"),
+                                        ("a ±0.1 b", "a 0.1 b")])
+def test_a_lost_sign_still_fails_with_the_spacing_tolerance(gold, lost):
+    assert not any(all_types(gold, lost, 2)), (gold, lost)

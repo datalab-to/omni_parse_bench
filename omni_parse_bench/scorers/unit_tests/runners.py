@@ -1110,6 +1110,19 @@ def _exponent(s: str, i: int) -> bool:
     return s[i - 1:i] in ("e", "E") and s[i - 2:i - 1].isdigit()
 
 
+def _operator(s: str, i: int) -> bool:
+    """Whether the `+` or `±` at `s[i]` stands between two values (`6% ± 2%`, `1 +2`), not before a number."""
+    before = s[:i].rstrip()[-1:]
+    return s[i] != "-" and (before.isdigit() or before in ("%", ")"))
+
+
+def _unit_signed(s: str) -> set[str]:
+    """The signed numbers of the folded `s` written after a letter and a space (`dm -3`, `kg -1`): a text that
+    does not space the minus (`dm-3`) holds the same number."""
+    return {"".join(s[a:b].split()) for a, b, number in _number_pieces(s, spaced=True)
+            if number and s[a] == "-" and s[a - 1:a] == " " and s[a - 2:a - 1].isalpha()}
+
+
 def _hyphened(s: str) -> set[str]:
     """The numbers of the folded `s` that have a hyphen directly before them (`A-12`, `kg-1`): spaced, as in
     `kg -1`, that hyphen reads as a sign, and a text that spaces it is not holding a different number."""
@@ -1146,7 +1159,7 @@ def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
     for a, b in nums:
         if s[a - 1:a] == "." and a > last and (a == 1 or s[a - 2] in _BEFORE_POINT):
             a -= 1
-        if s[a - 1:a] in ("-", "+", "±") and a - 1 >= last and (
+        if s[a - 1:a] in ("-", "+", "±") and a - 1 >= last and not _operator(s, a - 1) and (
                 not _joins_hyphen(s[a - 2:a - 1]) or _exponent(s, a - 1)):
             a -= 1
         elif spaced and s[a - 2:a] == "- " and a - 2 >= last and (a == 2 or s[a - 3] in "([{"):
@@ -1168,6 +1181,7 @@ def _encode(want: str, hay: str, copies: int = 1) -> tuple[str, str, list[int]] 
     from `hay`, which no stretch can then match."""
     codes: dict[str, str] = {}
     hyphened = _hyphened(want)
+    unit_signed = _unit_signed(want)
 
     def encode(s: str, gold: bool) -> tuple[str, list[int]]:
         s = _PLANE_15_16.sub("\ufffd", s)
@@ -1179,7 +1193,13 @@ def _encode(want: str, hay: str, copies: int = 1) -> tuple[str, str, list[int]] 
                     out.append("-")           # a spaced hyphen in front of a number the gold hyphenates
                     index.append(a)
                     a += 1
-                key = "".join(s[a:b].split())
+                    key = "".join(s[a:b].split())
+                elif (not gold and s[a - 1:a] == "-" and s[a - 2:a - 1].isalpha() and "-" + key in unit_signed
+                      and out and out[-1][-1:] == "-" and index[-1] == a - 1):
+                    out[-1] = out[-1][:-1]    # a hyphen in front of a number the gold writes with a minus
+                    index.pop()
+                    key = "-" + key
+                key = "".join(key.split())
                 if gold:
                     codes.setdefault(key, chr(ord(_NUMBER_CHAR) + 1 + len(codes)))
                 out.append(codes.get(key, _NUMBER_CHAR) * copies)
@@ -1294,9 +1314,18 @@ def _same_numbers(want: str, got: str) -> bool:
     has none (as `present`, whose rule is about the numbers of a gold that has one)."""
     if not (numbers := _numbers_of(want)):
         return True
-    hyphened = _hyphened(want)
-    return numbers == [n[1:] if n[0] == "-" and n[1:] in hyphened and n not in numbers else n
-                         for n in _numbers_of(got)]
+    hyphened, unit_signed = _hyphened(want), _unit_signed(want)
+    ours = []
+    for a, b, number in _number_pieces(got, spaced=True):
+        if number:
+            n = "".join(got[a:b].split())
+            if n[0] == "-" and n[1:] in hyphened and n not in numbers:        # `kg -1` for the gold's `kg-1`
+                n = n[1:]
+            elif (n[0] != "-" and got[a - 1:a] == "-" and got[a - 2:a - 1].isalpha()
+                  and "-" + n in unit_signed):                         # `dm-3` for the gold's `dm -3`
+                n = "-" + n
+            ours.append(n)
+    return numbers == ours
 
 
 def _cell_threshold(cell: str, max_diffs: int) -> float:
