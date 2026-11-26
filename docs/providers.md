@@ -235,6 +235,7 @@ that is missing stops a run before any call and says which `export` to type.
 | `pdftotext` | the local poppler `pdftotext` binary, the PDF's text layer | html | kept: it has no notion of them | none |
 | `pdftext` | the `pdftext` package (pdfium): the PDF's text layer, no OCR | html | kept: it has no notion of them | none |
 | `markitdown` | the local `markitdown` 0.1.9 package, a PDF's text layer as Markdown | html | kept: it has no notion of them | none |
+| `pdf-inspector` | the local pdf-inspector package: its text mode, or with `ocr` its PP-OCRv6 Small mode | html | kept: it filters page numbers only | none |
 
 A vendor's tiers are runs of their own, one config each (or one config and `--set`), with the same pages:
 
@@ -315,6 +316,21 @@ Per vendor:
   budget, so timeout also stops an `exiftool` child. The Markdown goes through `markdown.to_html`,
   recorded in `sent` as `derived`; no layout blocks. It is free (`usd` 0.0). Needs
   `pip install 'omni-parse-bench[markitdown]'`.
+
+- pdf-inspector: pdf-inspector 1.27.1 (MIT; its OCR models, PP-OCRv6 Small, are Apache-2.0 and fetched at run
+  time), run locally on the CPU, as two rows. `pdf-inspector` is its text mode, `process_pdf`: the page's text
+  layer as Markdown, no OCR, so a scanned PDF without a text layer is empty (a scan with an embedded OCR
+  layer returns that text). `pdf-inspector-ocr` (`ocr: auto`) is its OCR mode, `process_pdf_with_ocr` with the
+  package's default `mode=auto`: PP-OCRv6 Small reads pages its native extraction rejects (`force` reads every
+  page). OCR needs PDFium (firecrawl/pdfium-rs `native-v7988`, via `PDFIUM_LIB_PATH`) and ONNX Runtime 1.27.0
+  (via `ORT_DYLIB_PATH`), and downloads its three model files (about 31 MB) on the first page it routes; the
+  package's docs/ocr-runtime.md has the downloads. The vendor API takes PDFs only; for OPB image inputs, this
+  adapter decodes and rewrites image inputs as canonical PNGs, then uses `img2pdf` 0.6.3 (LGPL-3.0) to wrap
+  them losslessly in one-page PDFs at 150 DPI, preserving decoded pixels and pixel dimensions. RGBA alpha is
+  kept in a PDF soft mask. This PDF wrapper is an adapter input conversion
+  that differs from passing the vendor a PDF directly. The
+  package returns no labeled regions, so html only. html is the Markdown through `markdown.to_html`. Free
+  (`usd` 0.0). Needs `pip install 'omni-parse-bench[pdf-inspector]'`.
 
 ## Serving an open model
 

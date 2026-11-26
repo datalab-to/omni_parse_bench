@@ -30,6 +30,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 - Providers: `pdftotext` (poppler-utils), a local CPU text-layer parser at its documented default: html only, no OCR, so image pages are empty (#109).
 - Provider: pdftext (`pdftext`), the PDF text layer with no OCR, html only. No verdict changes (#110).
 - Providers: `markitdown` (microsoft/markitdown 0.1.9, MIT), a local CPU text-layer parser at its defaults: html only, no OCR; scanned PDFs without a text layer are empty, and images may return EXIF metadata when `exiftool` is installed (#111).
+- Providers: `pdf-inspector` (pdf-inspector 1.27.1, local; html only), as a text-mode row and, with `ocr=auto`, an OCR-mode row (PP-OCRv6 Small); image inputs use lossless PDF wrapping (#112).
 
 ### Fixed
 
