@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import io
+from pathlib import Path
 
 import pytest
 from omni_bench_core import adapter as core
@@ -343,8 +344,8 @@ def test_an_item_type_not_in_labels_fails_the_blocks_alone():
         assert ocria_1.LABELS[heron] in views.LABELS
 
 
-def test_a_box_server_with_other_weights_or_detector_stops_the_run(downloaded, box_server, tmp_path,
-                                                                    monkeypatch):
+def test_a_box_server_with_other_weights_stops_the_run_and_a_failing_one_fails_the_blocks(
+        downloaded, box_server, tmp_path, monkeypatch):
     from PIL import Image
 
     monkeypatch.setattr(http, "served", lambda *a: ("llamaindex/OCRia-1@x", SERVED))
@@ -359,9 +360,19 @@ def test_a_box_server_with_other_weights_or_detector_stops_the_run(downloaded, b
     with pytest.raises(ValueError, match="box server"):
         ocria_1.call(page, request, config=config)
     box_server["served"] = BOX_SERVED
+    # a box server that fails fails the blocks alone: the html of the paid answer stands
     box_server["status"] = 500
-    with pytest.raises(errors.SystemFailed, match="HTTP 500"):
-        ocria_1.call(page, request, config=config)
+    call = ocria_1.call(page, request, config=config)
+    assert "HTTP 500" in call.raw["layout"]["error"]
+    (both,) = config.requests(frozenset({"html", "blocks"}))
+    outs, errs = ocria_1.parse(call.raw, both)
+    assert "Results" in views.text(outs["html"]) and "blocks" not in outs and "HTTP 500" in errs["blocks"]
+
+
+def test_several_box_servers_take_pages_in_turn():
+    config = harness.system("ocria-1", {"layout": True, "grounding_url": "http://a:1, http://b:2/"})
+    got = {ocria_1.server(config) for _ in range(4)}
+    assert got == {"http://a:1", "http://b:2"}
 
 
 def test_no_box_server_stops_the_run_and_says_how_to_start_it(downloaded, tmp_path, monkeypatch):
@@ -380,3 +391,37 @@ def test_no_box_server_stops_the_run_and_says_how_to_start_it(downloaded, tmp_pa
         core.predict(api, harness.Input(page, frozenset({"html", "blocks"})))
     note = "\n".join(getattr(e.value, "__notes__", []))
     assert f"no box server at http://127.0.0.1:{port}" in note and "boxes.sh" in note, note
+
+
+def test_the_box_server_scales_text_layer_words_to_the_image_it_was_sent(tmp_path, monkeypatch):
+    """boxes.py reads the words with the card's `page_words` at `dpi`, in the frame of a render at `dpi`, and
+    scales them to the image the answer came from; the card's own code is stood in for here."""
+    import importlib.util
+    import sys
+    import types
+
+    import pypdfium2 as pdfium
+
+    asked = []
+
+    def page_words(page, dpi):
+        asked.append(dpi)
+        return [{"text": "Total", "box": [100.0, 200.0, 300.0, 250.0]}]
+
+    pdf_mod = types.ModuleType("ocria_grounding.pdf")
+    pdf_mod.page_words = page_words
+    monkeypatch.setitem(sys.modules, "ocria_grounding", types.ModuleType("ocria_grounding"))
+    monkeypatch.setitem(sys.modules, "ocria_grounding.pdf", pdf_mod)
+    path = Path(ocria_1.__file__).parent / "serve" / "ocria-1" / "boxes.py"
+    spec = importlib.util.spec_from_file_location("ocria_boxes", path)
+    boxes = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(boxes)
+    doc = pdfium.PdfDocument.new()
+    doc.new_page(612, 792)
+    doc.save(pdf := tmp_path / "p.pdf")
+    doc.close()
+    req = {"pdf_b64": base64.b64encode(pdf.read_bytes()).decode(), "dpi": 300, "render_size": [2550, 3300]}
+    (w,) = boxes.words(req, (1275, 1650))
+    assert asked == [300] and w["text"] == "Total" and w["box"] == [50.0, 100.0, 150.0, 125.0]
+    # an image has no text layer: the card's words as sent, or none
+    assert boxes.words({"pdf_b64": None}, (10, 10)) is None

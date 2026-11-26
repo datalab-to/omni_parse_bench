@@ -894,8 +894,10 @@ by the image's size, its markdown as plain text, and its type mapped as Docling'
 | Form, Key-Value Region | form |
 | Picture | figure |
 
-The package drops Heron's checkboxes. Items with no area are left out. One box server runs one page at
-a time; for throughput, run several, one port each.
+The package drops Heron's checkboxes. Items with no area are left out. A box server that fails (an
+error status or a timeout) fails the page's blocks alone; its html stands. One box server runs one page
+at a time; for throughput, run several, one port each, and give them all, comma-separated, in
+`grounding_url`: pages take them in turn.
 
 License: the OCRia-1 Model and Code License, a modified OpenRAIL-M, not open source. Its Research
 Purposes include "evaluating or benchmarking the Model, by any person or organization, including

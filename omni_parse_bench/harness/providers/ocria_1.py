@@ -5,6 +5,7 @@ import base64
 import dataclasses
 import hashlib
 import io
+import itertools
 import re
 from pathlib import Path
 from typing import Any, ClassVar
@@ -25,7 +26,7 @@ DETECTOR = "docling-project/docling-layout-heron"
 DETECTOR_REVISION = "8f39ad3c0b4c58e9c2d2c84a38465abf757272d8"
 # The item types of `ocria_grounding`'s layout (its layout.py: the Heron region labels, as Docling names them,
 # and the types of items placed from attention alone) onto views.LABELS, as Docling's own labels map
-# (providers/docling.py). Heron's checkboxes are dropped by `ocria_grounding` before items are made.
+# (the docling adapter's table). Heron's checkboxes are dropped by `ocria_grounding` before items are made.
 LABELS = {
     "Text": "text", "Document Index": "text",
     "Title": "heading", "Section-header": "heading",
@@ -131,7 +132,8 @@ class Ocria1(Served):
         "local": True, "help": "blocks from the card's experimental layout boxes (ocria_grounding with "
                                "Docling Heron), from the box server at grounding_url"})
     grounding_url: str = dataclasses.field(default="http://127.0.0.1:8100", metadata={
-        "local": True, "help": "where the box server (serve/ocria-1/boxes.sh) answers, with layout on"})
+        "local": True, "help": "where the box server (serve/ocria-1/boxes.sh) answers, with layout on; "
+                               "several, comma-separated, take pages in turn"})
 
     name: ClassVar[str] = "ocria-1"
     located: ClassVar[tuple[str, ...]] = ("base_url", "grounding_url")
@@ -237,9 +239,13 @@ def boxes(page: Path, png: bytes, size: tuple[int, int], answer: str, config: Oc
     body = {"image_png_b64": base64.b64encode(png).decode("ascii"), "answer": answer,
             "pdf_b64": base64.b64encode(page.read_bytes()).decode("ascii") if pdf else None,
             "dpi": config.dpi, "render_size": list(size) if pdf else None}
-    url = config.grounding_url.rstrip("/")
+    url = server(config)
     try:
         got = http.post(f"{url}/ground", body, deadline)
+    except errors.SystemFailed as exc:
+        # Note: the chat answer is paid for and its html stands; a box server that fails (an error status, a
+        # timeout) fails the page's blocks alone, as an unreadable layout does.
+        return {"error": f"{type(exc).__name__}: {exc}"[:2000], "url": url}
     except Exception as exc:
         if errors.refused(exc):
             exc.add_note(f"no box server at {url}: the connection was refused. Start it (how: "
@@ -289,9 +295,21 @@ def parse(raw: dict, request: contract.Request, config: Ocria1 | None = None) ->
     return outputs, errs
 
 
+_TURN = itertools.count()
+
+
+def server(config: Ocria1) -> str:
+    """The box server for the next page: `grounding_url` may name several, comma-separated, each running one
+    page at a time; pages take them in turn."""
+    urls = [u.strip().rstrip("/") for u in config.grounding_url.split(",") if u.strip()]
+    return urls[next(_TURN) % len(urls)]
+
+
 def blocks(lay: dict) -> list[dict]:
     """The box server's items as blocks: the type through `LABELS`, the box divided by the image's size,
     the markdown as the text a reader sees. An item with no area is left out."""
+    if "error" in lay:
+        raise errors.SystemFailed(f"the box server failed: {lay['error']}", status=200)
     frame = (lay["width"], lay["height"])
     out = []
     for it in lay["items"]:
