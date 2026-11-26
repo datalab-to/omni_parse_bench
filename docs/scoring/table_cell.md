@@ -12,7 +12,9 @@ the gold or the cell) read kept or dropped, so a hyphenated compound broken at a
 (case cell-compound). The test passes when one matching cell satisfies every stated role.
 
 - `up`, `down`, `left`, `right`: the neighbouring cell. An empty neighbour stands for the value written over it
-  (above, for `left` and `right`; to the left, for `up` and `down`).
+  (above, for `left` and `right`; to the left, for `up` and `down`). Instead of a text, one of these four may
+  be `{"empty": true}` or `{"end": true}`, which catch invented table content (see "Empty cells and the end of a
+  table").
 - `top_heading`, `left_heading`, `right_heading`: a heading cell (`<th>` or in `<thead>`) reached walking up, left or
   right; when the walk meets none, the cell at the end of the walk (the first cell of the row for `left_heading`,
   the last for `right_heading`). The walk stays in the columns of the cell for `top_heading` and in its rows for
@@ -125,6 +127,63 @@ What it penalizes:
 | I | hyphenated compound broken at a line end | `self-aware` | `<table><tr><td>self- aware</td></tr></table>` | pass | `cell-compound` |
 <!-- /cases -->
 
+## Empty cells and the end of a table
+
+A text arg cannot say that a cell is blank, nor that a table stops: an empty neighbour reads as the value over or
+beside it, so a copy of that value passes. Two args say it, on `up`, `down`, `left` and `right` only
+(refused elsewhere):
+
+- `{"empty": true}`: every slot touching that side of the cell is blank, read raw with no stand-in. A cell is
+  blank when its folded text is empty (spaces, `&nbsp;`, `<br>`, invisible characters, leaders such as `...`);
+  a short row's missing trailing cell is blank too. An image-only cell is not. A cell that spans rows is checked
+  at each row (`left`, `right`) or column (`up`, `down`) it covers. The edge of the table is not a blank cell:
+  the why is `no right cell`. A `colspan` that covers the slot fails.
+- `{"end": true}`: no cell in any row below (`down`), column to the right (`right`), row above (`up`) or column
+  to the left (`left`) of the cell has text. Empty rows and columns pass: they invent nothing. The why names the
+  first row or column that holds text (`down: row 3 holds '9', '8'`).
+
+They check structure the page prints, so a gold should use them only where the page shows it: a body cell
+printed empty; the last row or column of a table with nothing printed below it. Not in a header or section row:
+a heading beside empty cells is written either as a merged cell or as a label with empty cells, and `empty` tells
+the two apart (cases cell-empty-header, cell-empty-header-flat). Roles combine with every other arg. A text arg
+keeps the stand-in, so no existing test changes.
+
+Fixture T, used by the cases below:
+
+<!-- cases:table-t -->
+```html
+<table><tr><th>Item</th><th>Q1</th><th>Q2</th></tr><tr><td>Rent</td><td>100</td><td></td></tr><tr><td>Fuel</td><td>70</td><td>80</td></tr></table>
+```
+<!-- /cases -->
+
+<!-- cases:cell-empty-end -->
+| | difference | gold | output | verdict | case |
+|---|---|---|---|---|---|
+| I | an empty cell beside the anchor | `100`, right `empty` | T | pass | `cell-empty-blank` |
+| I | a blank cell: spaces | `100`, right `empty` | T[`<td></td>` → `<td> </td>`] | pass | `cell-empty-space` |
+| I | a blank cell: `&nbsp;` | `100`, right `empty` | T[`<td></td>` → `<td>&nbsp;</td>`] | pass | `cell-empty-nbsp` |
+| I | a blank cell: `<br>` | `100`, right `empty` | T[`<td></td>` → `<td><br></td>`] | pass | `cell-empty-br` |
+| I | a trailing cell left out of a short row | `100`, right `empty` | T[`<td></td>` → ``] | pass | `cell-empty-dropped` |
+| P | a copy of the value beside it (a text arg would read the stand-in) | `100`, right `empty` | T[`<td></td>` → `<td>100</td>`] | fail: `cells matching '100' found, but: right '100' isn't empty; no right cell` | `cell-empty-copy` |
+| P | an invented value | `100`, right `empty` | T[`<td></td>` → `<td>200</td>`] | fail: `cells matching '100' found, but: right '200' isn't empty` | `cell-empty-invented` |
+| P | cells shifted: the value moved to the last column | `100`, right `empty` | `<table><tr><th>Item</th><th>Q1</th><th>Q2</th></tr><tr><td>Rent</td><td></td><td>100</td></tr><tr><td>Fuel</td><td>70</td><td>80</td></tr></table>` | fail: `cells matching '100' found, but: no right cell` | `cell-empty-shifted` |
+| I | the mirror: an empty cell to the left | `100`, left `empty` | `<table><tr><th>Item</th><th>Q1</th><th>Q2</th></tr><tr><td>Rent</td><td></td><td>100</td></tr></table>` | pass | `cell-empty-left` |
+| P | the mirror, filled with a copy | `100`, left `empty` | `<table><tr><th>Item</th><th>Q1</th><th>Q2</th></tr><tr><td>Rent</td><td>100</td><td>100</td></tr></table>` | fail: `cells matching '100' found, but: left 'rent' isn't empty; left '100' isn't empty` | `cell-empty-left-copy` |
+| P | a colspan swallows the empty slot | `100`, right `empty` | `<table><tr><th>Item</th><th>Q1</th><th>Q2</th></tr><tr><td>Rent</td><td colspan=2>100</td></tr></table>` | fail: `cells matching '100' found, but: no right cell` | `cell-empty-colspan` |
+| P | no cell at the table's edge | `80`, right `empty` | `<table><tr><th>Item</th><th>Q1</th><th>Q2</th></tr><tr><td>Rent</td><td>100</td><td></td></tr><tr><td>Fuel</td><td>70</td><td>80</td></tr></table>` | fail: `cells matching '80' found, but: no right cell` | `cell-empty-edge` |
+| P | a merged heading is not a heading beside empty cells | `Group`, right `empty` | `<table><tr><th colspan=2>Group</th></tr><tr><td>5</td><td>6</td></tr></table>` | fail: `cells matching 'Group' found, but: no right cell` | `cell-empty-header` |
+| I | a heading beside an empty cell | `Group`, right `empty` | `<table><tr><th>Group</th><th></th></tr><tr><td>5</td><td>6</td></tr></table>` | pass | `cell-empty-header-flat` |
+| I | the last row: nothing below | `70`, down `end` | T | pass | `cell-end-down` |
+| I | an empty row added below | `70`, down `end` | T + an empty row | pass | `cell-end-empty-row` |
+| P | an invented row | `70`, down `end` | T + a row `Tax 9 8` | fail: `cells matching '70' found, but: down: row 4 holds 'tax', '9', '8'` | `cell-end-invented-row` |
+| P | an invented row after empty ones | `70`, down `end` | T + an empty row + a row `9` | fail: `cells matching '70' found, but: down: row 5 holds '9'` | `cell-end-invented-row-far` |
+| I | the last column: nothing to the right | `80`, right `end` | T | pass | `cell-end-right` |
+| P | an invented column | `80`, right `end` | T + a column holding `x` | fail: `cells matching '80' found, but: right: column 4 holds 'x'` | `cell-end-invented-column` |
+| I | an empty column added | `80`, right `end` | T + an empty column | pass | `cell-end-empty-column` |
+| P | an invented header row above | `Item`, up `end` | `<table><tr><td>Report</td><td></td><td></td></tr><tr><th>Item</th><th>Q1</th><th>Q2</th></tr></table>` | fail: `cells matching 'Item' found, but: up: row 1 holds 'report'` | `cell-end-up` |
+| P | the anchor is not at the end: a row below holds text | `Rent`, down `end` | `<table><tr><th>Item</th><th>Q1</th><th>Q2</th></tr><tr><td>Rent</td><td>100</td><td></td></tr><tr><td>Fuel</td><td>70</td><td>80</td></tr></table>` | fail: `cells matching 'Rent' found, but: down: row 3 holds 'fuel', '70', '80'` | `cell-end-anchor` |
+<!-- /cases -->
+
 ## Blind spots
 
 - **Whole cells, but a loose ratio.** With an edit to spend, insertions cost half an edit each:
@@ -133,6 +192,11 @@ What it penalizes:
 - **A test with no relations is a cell-shaped `present`.** Any cell of any table will do (case cell-any-table).
 - **`headings` read any cell above**, not only heading cells (case cell-headings-td).
 - **Footnote markers cost here** and not in `present` (cases cell-sup, text-sup-marker).
+- **`empty` and `end` read the markup.** A note printed under a table but moved into its last row fails `down: end`
+  without any invention, so the gold must not use `end` on a table with something printed below. A table the output
+  splits in two passes `end` for the fragment that holds the anchor, wherever the rest went. In a right-to-left
+  table `right` is the html's last cell, the visual left. `...` and other leaders fold to blank, so a cell holding
+  only dots reads as empty.
 - **A cell is not its own edge heading**: the last cell of a row fails a `right_heading` test for itself (case
   cell-edge-self).
 - **A right-to-left table copied in page order fails**: the roles are written in the html's order, so a row copied

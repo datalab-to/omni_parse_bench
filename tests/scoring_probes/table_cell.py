@@ -3,6 +3,8 @@
 text replaced."""
 from cases import cell, table
 
+EMPTY, END = {"empty": True}, {"end": True}
+
 FIXTURES = {
     "table-a": "<table><thead><tr><th>Year</th><th>Total</th></tr></thead>\n"
                "<tr><td>2024</td><td>1,240</td></tr><tr><td>2025</td><td>1,300</td></tr></table>",
@@ -79,3 +81,41 @@ TABLES = [
         cell("cell-compound", "I", "hyphenated compound broken at a line end", "self-aware", "<table><tr><td>self- aware</td></tr></table>"),
     ),
 ]
+
+def t(*rows: str) -> str:
+    """A table of body rows, each a string of cells."""
+    return "<table>" + "".join(f"<tr>{r}</tr>" for r in rows) + "</table>"
+
+
+TQ = t("<th>Item</th><th>Q1</th><th>Q2</th>", "<td>Rent</td><td>100</td><td></td>", "<td>Fuel</td><td>70</td><td>80</td>")
+FIXTURES["table-t"] = TQ
+TE = [
+    table(
+        "cell-empty-end",
+        cell("cell-empty-blank", "I", "an empty cell beside the anchor", "100", TQ, right=EMPTY, show="T"),
+        cell("cell-empty-space", "I", "a blank cell: spaces", "100", TQ.replace("<td></td>", "<td> </td>"), right=EMPTY, show="T[`<td></td>` → `<td> </td>`]"),
+        cell("cell-empty-nbsp", "I", "a blank cell: `&nbsp;`", "100", TQ.replace("<td></td>", "<td>&nbsp;</td>"), right=EMPTY, show="T[`<td></td>` → `<td>&nbsp;</td>`]"),
+        cell("cell-empty-br", "I", "a blank cell: `<br>`", "100", TQ.replace("<td></td>", "<td><br></td>"), right=EMPTY, show="T[`<td></td>` → `<td><br></td>`]"),
+        cell("cell-empty-dropped", "I", "a trailing cell left out of a short row", "100", TQ.replace("<td></td>", ""), right=EMPTY, show="T[`<td></td>` → ``]"),
+        cell("cell-empty-copy", "P", "a copy of the value beside it (a text arg would read the stand-in)", "100", TQ.replace("<td></td>", "<td>100</td>"), right=EMPTY, show="T[`<td></td>` → `<td>100</td>`]", why=True),
+        cell("cell-empty-invented", "P", "an invented value", "100", TQ.replace("<td></td>", "<td>200</td>"), right=EMPTY, show="T[`<td></td>` → `<td>200</td>`]", why=True),
+        cell("cell-empty-shifted", "P", "cells shifted: the value moved to the last column", "100", t("<th>Item</th><th>Q1</th><th>Q2</th>", "<td>Rent</td><td></td><td>100</td>", "<td>Fuel</td><td>70</td><td>80</td>"), right=EMPTY, why=True),
+        cell("cell-empty-left", "I", "the mirror: an empty cell to the left", "100", t("<th>Item</th><th>Q1</th><th>Q2</th>", "<td>Rent</td><td></td><td>100</td>"), left=EMPTY),
+        cell("cell-empty-left-copy", "P", "the mirror, filled with a copy", "100", t("<th>Item</th><th>Q1</th><th>Q2</th>", "<td>Rent</td><td>100</td><td>100</td>"), left=EMPTY, why=True),
+        cell("cell-empty-colspan", "P", "a colspan swallows the empty slot", "100", t("<th>Item</th><th>Q1</th><th>Q2</th>", "<td>Rent</td><td colspan=2>100</td>"), right=EMPTY, why=True),
+        cell("cell-empty-edge", "P", "no cell at the table's edge", "80", TQ, right=EMPTY, why=True),
+        cell("cell-empty-header", "P", "a merged heading is not a heading beside empty cells", "Group", "<table><tr><th colspan=2>Group</th></tr><tr><td>5</td><td>6</td></tr></table>", right=EMPTY, why=True),
+        cell("cell-empty-header-flat", "I", "a heading beside an empty cell", "Group", "<table><tr><th>Group</th><th></th></tr><tr><td>5</td><td>6</td></tr></table>", right=EMPTY),
+        cell("cell-end-down", "I", "the last row: nothing below", "70", TQ, down=END, show="T"),
+        cell("cell-end-empty-row", "I", "an empty row added below", "70", TQ.replace("</table>", "<tr><td></td><td></td><td></td></tr></table>"), down=END, show="T + an empty row"),
+        cell("cell-end-invented-row", "P", "an invented row", "70", TQ.replace("</table>", "<tr><td>Tax</td><td>9</td><td>8</td></tr></table>"), down=END, show="T + a row `Tax 9 8`", why=True),
+        cell("cell-end-invented-row-far", "P", "an invented row after empty ones", "70", TQ.replace("</table>", "<tr><td></td><td></td><td></td></tr><tr><td></td><td>9</td><td></td></tr></table>"), down=END, show="T + an empty row + a row `9`", why=True),
+        cell("cell-end-right", "I", "the last column: nothing to the right", "80", TQ, right=END, show="T"),
+        cell("cell-end-invented-column", "P", "an invented column", "80", TQ.replace("<td>80</td>", "<td>80</td><td>x</td>"), right=END, show="T + a column holding `x`", why=True),
+        cell("cell-end-empty-column", "I", "an empty column added", "80", TQ.replace("<td>80</td>", "<td>80</td><td></td>"), right=END, show="T + an empty column"),
+        cell("cell-end-up", "P", "an invented header row above", "Item", t("<td>Report</td><td></td><td></td>", "<th>Item</th><th>Q1</th><th>Q2</th>"), up=END, why=True),
+        cell("cell-end-anchor", "P", "the anchor is not at the end: a row below holds text", "Rent", TQ, down=END, why=True),
+    ),
+]
+
+TABLES += TE

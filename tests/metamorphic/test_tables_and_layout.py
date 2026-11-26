@@ -8,7 +8,8 @@ from hypothesis import HealthCheck, assume, example, find, given, settings
 from hypothesis import strategies as st
 from test_invariants import answer
 
-from metamorphic.common import HOLDS, INTENDED, LAYOUT, deviation, more_evidence, passes, relation
+from metamorphic.common import (CELL, HOLDS, INTENDED, LAYOUT, deviation, escaped, every_real_test,
+                                more_evidence, passes, relation)
 from omni_parse_bench import views
 from omni_parse_bench.scorers.unit_tests import runners
 from omni_parse_bench.scorers.unit_tests.runners import _area as area
@@ -282,3 +283,222 @@ def test_mirroring_every_row_swaps_left_heading_and_right_heading(cells, heads):
                     one = passes(runners.TableCell(x, {here: want}, 0), page(grid))
                     other = passes(runners.TableCell(x, {there: want}, 0), page(mirror))
                     assert one == other, (x, want, here)
+
+# ------------------------------------------------------------------------- empty cells and table ends
+
+EMPTY, END = {"empty": True}, {"end": True}
+BLANKS = ["<td></td>", "<td> </td>", "<td>&nbsp;</td>", "<td><br></td>", "<td>​</td>", "<td><p></p></td>",
+          "<td>...</td>", "<th></th>"]
+TOKENS = st.sampled_from(["x", "0", "-", "N/A", "100", "a b", "<img alt='icon'>"])
+HOLE = st.tuples(st.integers(1, 3), st.integers(0, 2))     # a body cell of a 4 x 3 table, to blank
+
+
+def shaped(cell: str, **sides) -> runners.TableCell:
+    """A table_cell test of `cell` whose sides are text, or {"empty": true} / {"end": true}."""
+    return runners.TableCell(cell, {k: v for k, v in sides.items() if isinstance(v, str)}, 0,
+                             shapes={k: next(iter(v)) for k, v in sides.items() if isinstance(v, dict)})
+
+
+def grid_html(rows, hole=None, blank="<td></td>", swallow=False, drop=False, tail=()) -> str:
+    """The table of `rows` (first row <th>), with its `hole` cell written as `blank`: or left
+    out (`drop`), or, with `swallow`, left out and the cell before it spanning two columns. `tail` are
+    cells appended to the last row."""
+    out = []
+    for i, row in enumerate(rows):
+        cells = []
+        for j, x in enumerate(row):
+            tag = "th" if i == 0 else "td"
+            if (i, j) == hole:
+                cells += [] if swallow or drop else [blank]
+            else:
+                span = " colspan=2" if swallow and hole == (i, j + 1) else ""
+                cells.append(f"<{tag}{span}>{x}</{tag}>")
+        out.append("<tr>" + "".join(cells) + "".join(tail if i == len(rows) - 1 else ()) + "</tr>")
+    return "<table>" + "".join(out) + "</table>"
+
+
+def beside(rows, i, j):
+    """Each side of the hole at (i, j) that has a cell, with the cell that anchors it: (side, anchor, what the
+    anchor's own test names as its column heading)."""
+    found = [("right", rows[i][j - 1]) if j else None, ("left", rows[i][j + 1]) if j < 2 else None,
+             ("down", rows[i - 1][j]) if i > 1 else None, ("up", rows[i + 1][j]) if i < 3 else None]
+    return [x for x in found if x]
+
+
+def side_test(rows, i, j, side, anchor):
+    return shaped(anchor, **{side: EMPTY})
+
+
+@relation(HOLDS, domain="4x3 tables of distinct cells, one body cell blank in 8 spellings (a dropped "
+                        "trailing cell too), as html and as a markdown pipe table")
+@given(CELLS, HOLE, st.sampled_from(BLANKS))
+def test_every_spelling_of_a_blank_cell_is_empty(cells, hole, blank):
+    """A body cell written as nothing, white space, `&nbsp;`, `<br>`, an invisible character, an empty
+    element, a leader (`...`), a blank `<th>`, a trailing cell left out, or an empty markdown cell is
+    `empty` for the cell beside it, on each side. [M93]
+    Why it matters for a score: a system that draws an empty cell in any of these ways is graded as one that
+    leaves it empty."""
+    # Given a 4 x 3 table with one body cell blank, and each neighbour's `empty` test on that side
+    rows = [cells[i:i + 3] for i in range(0, 12, 3)]
+    i, j = hole
+    # When the blank is written in any spelling (or left out at the end of a row, or in markdown)
+    pages = [grid_html(rows, hole, blank)]
+    if j == 2:
+        pages.append(grid_html(rows, hole, drop=True))
+    line = lambda r: "| " + " | ".join(r) + " |"  # noqa: E731
+    md = [line(rows[0]), "|---|---|---|", *(line(["" if (a, b) == hole else x for b, x in enumerate(r)])
+                                              for a, r in enumerate(rows) if a)]
+    pages.append(views.html(markdown_html("\n".join(md))).html)
+    # Then every one passes
+    for side, anchor in beside(rows, i, j):
+        for page in pages:
+            assert passes(side_test(rows, i, j, side, anchor), page), (side, anchor, page)
+
+
+def markdown_html(md: str) -> str:
+    from omni_parse_bench import markdown
+    return markdown.to_html(md)
+
+
+@relation(HOLDS, domain="4x3 tables of distinct cells, one body cell blank; 7 tokens put in it, the value "
+                        "beyond it shifted in, or a cell merged over it")
+@given(CELLS, HOLE, TOKENS)
+def test_any_content_in_a_blank_cell_or_a_shift_or_a_merge_fails_empty(cells, hole, token):
+    """A token written in a blank cell (a copy of its neighbour, an invented value, an image), the values
+    shifted one cell into it, or the cell beside it merged over it fails that neighbour's `empty` test, while
+    the blank table passes. [M94]
+    Why it matters for a score: an output that fills, shifts or merges an empty cell does not pass for
+    leaving it empty."""
+    rows = [cells[i:i + 3] for i in range(0, 12, 3)]
+    i, j = hole
+    # Given the blank table passes each neighbour's `empty` test
+    for side, anchor in beside(rows, i, j):
+        test = side_test(rows, i, j, side, anchor)
+        assert passes(test, grid_html(rows, hole))
+        # When a token fills the cell, or the anchor's own value is copied into it, Then the test fails
+        assert not passes(test, grid_html(rows, hole, f"<td>{token}</td>"))
+        assert not passes(test, grid_html(rows, hole, f"<td>{anchor}</td>"))
+    # When the row shifts one cell toward the hole (the cell beyond it moves in): Then the side test fails
+    if j == 1:
+        shifted = [r if a != i else [r[0], r[2], ""] for a, r in enumerate(rows)]
+        page = grid_html(shifted, (i, 2))
+        assert not passes(shaped(rows[i][0], right=EMPTY), page)
+    # When a cell is merged over the blank (colspan), Then `right: empty` fails on the merged cell
+    if j:
+        assert passes(shaped(rows[i][j - 1], right=EMPTY), grid_html(rows, hole))
+        assert not passes(shaped(rows[i][j - 1], right=EMPTY), grid_html(rows, hole, swallow=True))
+
+
+@relation(HOLDS, domain="4x3 tables of distinct cells with two blanks, every body cell, `empty` and `end`")
+@given(CELLS, st.lists(st.tuples(st.integers(1, 3), st.integers(0, 2)), min_size=1, max_size=2, unique=True))
+def test_reversing_every_row_swaps_left_and_right_for_empty_and_end(cells, holes):
+    """Writing every row of a table in the reverse order of its cells gives each cell the same `right`
+    verdict for `empty` and for `end` as its `left` verdict had, and the reverse. [M95]
+    Why it matters for a score: a right-to-left table written in reading order and its left-to-right mirror
+    are graded alike, as for M27."""
+    # Given a table with blank cells and the table with each row reversed
+    rows = [list(cells[i:i + 3]) for i in range(0, 12, 3)]
+    shown = [["" if (a, b) in holes else x for b, x in enumerate(r)] for a, r in enumerate(rows)]
+    page = lambda g: "<table>" + "".join("<tr>" + "".join(  # noqa: E731
+        f"<{'th' if a == 0 else 'td'}>{x}</{'th' if a == 0 else 'td'}>" for x in r) + "</tr>"
+        for a, r in enumerate(g)) + "</table>"
+    # When each cell is tested for each flag on each side; Then the verdicts swap with the mirror
+    for a, r in enumerate(rows):
+        for b, x in enumerate(r):
+            if (a, b) in holes: continue
+            for flag in (EMPTY, END):
+                for here, there in (("left", "right"), ("right", "left")):
+                    one = passes(shaped(x, **{here: flag}), page(shown))
+                    other = passes(shaped(x, **{there: flag}), page([r[::-1] for r in shown]))
+                    assert one == other, (x, here, flag)
+
+
+@relation(HOLDS, domain="4x3 tables of distinct cells; empty rows and columns, `<thead>`/`<tbody>`, a later "
+                        "table, a markdown table; row and column tails of 7 tokens")
+@given(CELLS, TOKENS, st.integers(0, 2))
+def test_end_ignores_blank_rows_and_columns_and_fails_on_any_text(cells, token, extra):
+    """The last body cell of a table passes `down: end` and `right: end` however many empty rows or columns
+    follow it, with a `<thead>` and `<tbody>`, with another table after it, and as a markdown table; it fails
+    with any token in a row below or a column beside it, in any cell of it; the first cell fails `up: end`
+    under a row of text. [M96]
+    Why it matters for a score: an invented row or column fails, and an empty one invents nothing."""
+    rows = [cells[i:i + 3] for i in range(0, 12, 3)]
+    last = rows[3][2]
+    both = shaped(last, down=END, right=END)
+    plain = grid_html(rows)
+    # Given the last cell passes on the plain table
+    assert passes(both, plain)
+    # When blank rows or columns follow, or the table is wrapped, or another table follows, or it's markdown
+    blank_row = "<tr>" + "<td></td>" * 3 + "</tr>"
+    for page in (plain.replace("</table>", blank_row * (extra + 1) + "</table>"),
+                 grid_html(rows, tail=["<td>&nbsp;</td>"] * (extra + 1)),
+                 plain.replace("<tr>", "<thead><tr>", 1).replace("</tr>", "</tr></thead><tbody>", 1)
+                      .replace("</table>", "</tbody></table>"),
+                 plain + "<table><tr><td>zz</td></tr></table>",
+                 views.html(markdown_html("\n".join(
+                     ["| " + " | ".join(rows[0]) + " |", "|---|---|---|",
+                      *("| " + " | ".join(r) + " |" for r in rows[1:])]))).html):
+        assert passes(both, page), page
+    # When any cell of a new row or column holds text; Then `end` fails on that side only
+    for k in range(3):
+        row = "<tr>" + "".join(f"<td>{token}</td>" if c == k else "<td></td>" for c in range(3)) + "</tr>"
+        page = plain.replace("</table>", blank_row + row + "</table>")
+        assert not passes(shaped(last, down=END), page) and passes(shaped(last, right=END), page)
+    for k in range(1, 4):
+        wide = [row + [token if n == k else ""] for n, row in enumerate(rows)]
+        html = grid_html(wide)
+        assert not passes(shaped(last, right=END), html) and passes(shaped(last, down=END), html)
+    # When a row of text is put above; Then `up: end` fails for the heading cell
+    assert passes(shaped(rows[0][0], up=END), plain)
+    above = plain.replace("<table>", f"<table><tr><td>{token}</td></tr>")
+    assert not passes(shaped(rows[0][0], up=END), above)
+
+
+SIDES = ("up", "down", "left", "right")
+
+
+def sided(t) -> list[str]:
+    """The sides of a real table_cell test that name a neighbour's text."""
+    return [k for k in SIDES if k in t.params.relations]
+
+
+def distinct(t) -> bool:
+    """Whether no neighbour's text reads like the cell (else the neighbour is a second place the cell matches,
+    and the test may pass there)."""
+    cell = runners._fold_cell(t.params.cell)
+    return all(runners._cell_ratio(cell, runners._fold_cell(x)) < 0.5
+               for k, x in t.params.relations.items() if k in SIDES)
+
+
+SIDED = [t for t in CELL if sided(t) and distinct(t)]
+
+
+@every_real_test("table sides", note="each on its own 3 x 3 table, passing first")
+def test_turning_a_real_neighbour_into_empty_or_end_fails_it():
+    """A real table_cell test with a neighbour (`up`, `down`, `left`, `right`) unlike its cell passes on a
+    3 x 3 table holding its cell in the middle and each neighbour's text beside it, and fails there once
+    any one side's text is replaced by `{"empty": true}` or `{"end": true}`. [M94]
+    Why it matters for a score: as for M94, over the dataset's own strings: a real neighbour is content the
+    page prints there, so a test that says it is empty or past the end fails on it."""
+    # Given each real test with a neighbour unlike its cell, and the 3 x 3 table its strings fill
+    bad = []
+    for t in SIDED:
+        # (its headings, section and row groups are not on the table, so they are left out)
+        p = t.params._replace(relations={k: t.params.relations[k] for k in sided(t)}, headings=(),
+                              section=None, row_groups=())
+        grid = [["", p.relations.get("up", ""), ""],
+                [p.relations.get("left", ""), p.cell, p.relations.get("right", "")],
+                ["", p.relations.get("down", ""), ""]]
+        page = "<table>" + "".join("<tr>" + "".join(f"<td>{escaped(x)}</td>" for x in r) + "</tr>"
+                                   for r in grid) + "</table>"
+        if not passes(p, page):
+            bad.append((t.id, "base"))
+            continue
+        # When a side's text becomes a flag; Then the test fails on the table, which holds that text there
+        for side in sided(t):
+            for flag in ("empty", "end"):
+                shape = p._replace(relations={k: v for k, v in p.relations.items() if k != side},
+                                   shapes={**p.shapes, side: flag})
+                if passes(shape, page):
+                    bad.append((t.id, side, flag))
+    assert not bad, f"{len(bad)} cases, e.g. {bad[:5]}"

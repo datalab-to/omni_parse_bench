@@ -315,6 +315,8 @@ class TableCell(NamedTuple):
     headings: tuple[str, ...] = ()      # the headings over its column, top to bottom
     section: str | None = None          # the section row nearest above it
     row_groups: tuple[str, ...] = ()    # the cells to its left that span its rows, left to right
+    # {"empty": true} or {"end": true} on a side: nothing beside it, nothing in that direction
+    shapes: dict[Literal["up", "down", "left", "right"], Literal["empty", "end"]] = {}
 
 
 def table_cell(t: TableCell, v: views.Html) -> Mark:
@@ -342,6 +344,7 @@ def table_cell(t: TableCell, v: views.Html) -> Mark:
         for rc in [rc for rc, x in table.text.items() if _one_of(cell, x, thr, t.cell)]:
             failed = [why for k, want in expected.items()
                       if (why := _relation(table, rc, k, want, t.max_diffs, t.relations[k]))]
+            failed += [why for k, shape in t.shapes.items() if (why := _shape(table, rc, k, shape))]
             failed += _structure(t, table, rc)
             if not failed:
                 return True, ""
@@ -930,6 +933,47 @@ def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_di
         return f"no {kind} cell"
     best = max(texts, key=lambda x: _cell_ratio(want, x))
     return f"{kind} {best!r} doesn't match {want!r} ({_cell_ratio(want, best):.2f})"
+
+
+def _blank(table: tables.Table, c: tables.Cell | None) -> bool:
+    """Whether a slot shows nothing: no cell (a short row's missing `<td>`), or a cell whose folded text is
+    empty (`&nbsp;`, `<br>`, invisible characters and leaders fold away)."""
+    return c is None or not _fold_cell(table.text[c]).strip()
+
+
+def _shape(table: tables.Table, rc: tables.Cell, kind: str, shape: str) -> str:
+    """Why the cell at `rc` fails `{"empty": true}` or `{"end": true}` on one side, or "" when it holds.
+
+    `empty`: every slot touching that side of the cell is blank, read raw (no stand-in, unlike a text arg:
+    a copy of the value above or beside must not pass); a missing trailing cell counts as blank, the table's
+    edge does not (`no right cell`). `end`: no cell in any row below (any column to the right, ...) has
+    text."""
+    rows, cols = table.covers[rc]
+    dr, dc = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}[kind]
+    height, width = len(table.grid), len(table.grid[0])
+    if shape == "empty":
+        r0, c0 = (min(rows) if dr < 0 else max(rows)) + dr, (min(cols) if dc < 0 else max(cols)) + dc
+        slots = [(r0, c) for c in cols] if dr else [(r, c0) for r in rows]
+        if not all(0 <= r < height and 0 <= c < width for r, c in slots):
+            return f"no {kind} cell"
+        for r, c in slots:
+            if not _blank(table, x := table.grid[r][c]):
+                return f"{kind} {_fold_cell(table.text[x])!r} isn't empty"
+        return ""
+    if dr:
+        lines = range(max(rows) + 1, height) if dr > 0 else range(min(rows) - 1, -1, -1)
+        found = [(r, [x for x in dict.fromkeys(table.grid[r]) if not _blank(table, x)]) for r in lines]
+        word = "row"
+    else:
+        lines = range(max(cols) + 1, width) if dc > 0 else range(min(cols) - 1, -1, -1)
+        found = [(c, [x for x in dict.fromkeys(row[c] for row in table.grid) if not _blank(table, x)])
+                 for c in lines]
+        word = "column"
+    for n, cells in found:
+        if cells:
+            held = ", ".join(repr(_fold_cell(table.text[x])) for x in cells[:3])
+            return f"{kind}: {word} {n + 1} holds {held}{', ...' if len(cells) > 3 else ''}"
+    return ""
 
 
 def _one_of(want: str, got: str, thr: float, raw: str = "") -> bool:
