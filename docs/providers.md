@@ -253,7 +253,7 @@ that is missing stops a run before any call and says which `export` to type.
 | `llamaparse` | /api/v2/parse/upload, poll, expand=markdown,items,usage | html, blocks | header and footer fields beside the markdown, put back | LLAMA_CLOUD_API_KEY |
 | `azure` | Content Understanding, prebuilt-layout | html, blocks | comments in its markdown, unwrapped | AZURE_CU_KEY, and the `endpoint` option |
 | `mistral` | /v1/ocr (mistral-ocr-4-1) | html, blocks | header and footer fields beside the markdown, put back | MISTRAL_API_KEY |
-| a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2, OCRia-1, OvisOCR, OvisOCR2: html) | kept: vendor defaults that leave them out turned off | none; OPB_ENDPOINT_KEY, when the server has one |
+| a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2, OvisOCR, OvisOCR2: html; OCRia-1: blocks with `layout`) | kept: vendor defaults that leave them out turned off | none; OPB_ENDPOINT_KEY, when the server has one |
 | `tesseract` | the local `tesseract` binary, no model of the page | html | kept: it has no notion of them | none |
 | `pdftotext` | the local poppler `pdftotext` binary, the PDF's text layer | html | kept: it has no notion of them | none |
 | `pdftext` | the `pdftext` package (pdfium): the PDF's text layer, no OCR | html | kept: it has no notion of them | none |
@@ -528,7 +528,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
 | Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
 | Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets-ocr` | html |
-| OCRia-1 | `ocria-1` | `ocria-1` | html |
+| OCRia-1 | `ocria-1` | `ocria-1` | html, blocks (with `layout`) |
 | Nemotron 3.5 Parse | `nemotron-parse` | `nemotron-parse` | html, blocks |
 | MiniCPM-OCR 1.0 | `minicpm-ocr` | `minicpm-ocr` | html, markdown, blocks |
 | OXR-1.0 | `oxr` | `oxr` | html, markdown, blocks |
@@ -539,7 +539,8 @@ which enables math by default; optional word boxes are off because OPB consumes 
 are unchanged. It runs on CPU (ONNX Runtime), without `--gpus`; its server reads pages in one worker process per core.
 Full public run: 2,937/2,937 pages, 0 failures; 78.8 headline (68.0 text, 75.8 tables, 92.6 layout), graded with
 released OPB 1.7.0 on dataset revision `d70182b9`; the blog reports 78.9 / 68.0 / 75.9 / 92.7.
-olmOCR-2, Nanonets-OCR2, OCRia-1, OvisOCR and OvisOCR2 return no layout, so they have no blocks. OvisOCR3 gets html
+olmOCR-2, Nanonets-OCR2, OvisOCR and OvisOCR2 return no layout, so they have no blocks. OCRia-1 has blocks only
+with its `layout` option, from the box server beside its vLLM (see OCRia-1 below). OvisOCR3 gets html
 from its markdown prompt and blocks from its structured one: two calls a page. Indra OCR uses `indra-ocr==1.2.0`,
 which enables math by default; optional word boxes are off because OPB consumes block boxes. Its ten block classes
 are unchanged. It runs on CPU (ONNX Runtime), without `--gpus`; its server reads pages in one worker process per core.
@@ -855,10 +856,46 @@ off, temperature 0, at most 24,576 tokens. The reply is Markdown with tables in 
 tags: `<page_header>`, `<page_footer>`, `<watermark>` and `<page_number>` stay in the page as text, in
 place, and `![label: description]` becomes an image whose alt text is `label: description`.
 
-The adapter produces `html` only, so it has no layout score. The card's layout boxes are experimental
-and not part of the model: a separate package of the model repository, `ocria_grounding`, reads a second
-pass of the weights under Transformers 5.22.2 and Docling's Heron detector, and on an image its word
-positions are rougher. Running it means a second GPU server and its licensed code; it is not run here.
+By default the adapter produces `html` only. With `--set system.ocria-1.layout=true` it also produces
+`blocks` from the card's layout boxes ("Layout boxes (experimental)"). The model writes no layout: a
+separate package of the model repository, `ocria_grounding`, places the answer on the page after
+generation. Docling's Heron detector
+([docling-project/docling-layout-heron](https://huggingface.co/docling-project/docling-layout-heron),
+Apache-2.0, pinned at `8f39ad3`) finds the regions, and each word of the answer goes to the region holding
+it. On a PDF page with a text layer the word's position is its box in that layer; on an image, or a PDF
+without one, it comes from a second, teacher-forced pass of the same weights under Transformers 5.22.2,
+from where the model looked while writing the word, and is rougher. The second pass needs its own GPU
+process. `serve/ocria-1/boxes.sh` runs it in the same image, on port 8100:
+
+    docker run --gpus all -p 8100:8100 -v ~/.cache/huggingface:/root/.cache/huggingface \
+        --entrypoint bash opb-ocria-1 /srv/boxes.sh
+    opb run --config config.yaml --set system.ocria-1.layout=true \
+        --set system.ocria-1.grounding_url=http://localhost:8100
+
+After the chat call, opb sends the box server the exact page image the answer was generated from, the raw
+answer and, for a PDF, the page itself. The server reads the text-layer words with the package's own
+`page_words` at 300 DPI and scales them by the 4.1-megapixel resize, then runs `ground_layout` with the
+default ("accurate-layout") method, as the card's `examples/serve_boxes.py` does. The server loads the weights,
+the package and `prompt.txt` from the pinned revision, and Heron from its own pinned revision. Every answer
+names them, and a server that loaded others stops the run. Each item becomes a block: its box divided
+by the image's size, its markdown as plain text, and its type mapped as Docling's labels are:
+
+| OCRia-1 layout item type | label |
+| --- | --- |
+| Text, Document Index | text |
+| Title, Section-header | heading |
+| Page-header, Page-footer | page_furniture |
+| List-item | list |
+| Caption | caption |
+| Footnote | footnote |
+| Formula | equation |
+| Code | code |
+| Table | table |
+| Form, Key-Value Region | form |
+| Picture | figure |
+
+The package drops Heron's checkboxes. Items with no area are left out. One box server runs one page at
+a time; for throughput, run several, one port each.
 
 License: the OCRia-1 Model and Code License, a modified OpenRAIL-M, not open source. Its Research
 Purposes include "evaluating or benchmarking the Model, by any person or organization, including

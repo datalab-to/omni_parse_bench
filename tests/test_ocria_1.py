@@ -6,6 +6,7 @@ images as `![label: description]`, diagrams as a ```mermaid block). They are not
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import io
 
@@ -77,16 +78,28 @@ def test_the_expected_prompt_hash_is_the_cards_at_the_pinned_revision():
     assert len(ocria_1.PROMPT_SHA256) == 64
 
 
-def test_it_has_html_only_and_is_never_asked_for_blocks():
+def test_it_has_blocks_only_with_layout_on():
     api = harness.system("ocria-1")
-    assert api.SUPPORTS == frozenset({"html"}) and api.SERVE == "ocria-1"
+    assert api.SUPPORTS == frozenset({"html", "blocks"}) and api.SERVE == "ocria-1"
     assert api.requests(frozenset({"blocks"})) == []
     (request,) = api.requests(frozenset({"html", "blocks"}))
-    assert request.outputs == frozenset({"html"})
+    assert request.outputs == frozenset({"html"}) and "layout" not in request.sent
     assert request.sent["weights"] == "llamaindex/OCRia-1"
     assert request.sent["prompt_sha256"] == ocria_1.PROMPT_SHA256
+    # the box server's options are the adapter's own, not the model's: the html call is sent as before
     assert request.sent["settings"] == {"temperature": 0.0, "max_tokens": 24576, "dpi": 300,
                                         "pixels": 4_100_000}
+    boxed = harness.system("ocria-1", {"layout": True})
+    (request,) = boxed.requests(frozenset({"html", "blocks"}))
+    assert request.outputs == frozenset({"html", "blocks"})
+    assert request.sent["settings"] == {"temperature": 0.0, "max_tokens": 24576, "dpi": 300,
+                                        "pixels": 4_100_000}
+    assert request.sent["layout"]["grounding"] == f"llamaindex/OCRia-1@{ocria_1.REVISION}"
+    assert request.sent["layout"]["detector"] == f"{ocria_1.DETECTOR}@{ocria_1.DETECTOR_REVISION}"
+    # a page that wants blocks alone still gets its one chat call: the boxes place its answer
+    (request,) = boxed.requests(frozenset({"blocks"}))
+    assert request.outputs == frozenset({"blocks"})
+    assert boxed.requests(frozenset({"markdown"})) == []
 
 
 def test_the_request_is_the_model_cards(downloaded, tmp_path, monkeypatch):
@@ -172,7 +185,7 @@ def test_a_reply_cut_at_the_token_limit_is_read_as_it_is_and_another_stop_fails(
         ocria_1.parse(reply("  "), request)
 
 
-def test_a_page_that_wants_blocks_is_asked_for_html_alone(downloaded, tmp_path, monkeypatch):
+def test_a_page_that_wants_blocks_is_asked_for_html_alone_without_layout(downloaded, tmp_path, monkeypatch):
     from PIL import Image
 
     monkeypatch.setattr(http, "served", lambda *a: ("llamaindex/OCRia-1@x", SERVED))
@@ -190,3 +203,180 @@ def test_the_options_that_shape_the_image_name_the_run():
         return runs.identity(harness.system("ocria-1", options), {"dataset": "d", "task": "parse"})
 
     assert folder() != folder(dpi=200) and folder() != folder(pixels=2_000_000)
+    assert folder() != folder(layout=True)
+    # where the box server is, like where vLLM is, is not part of the question
+    assert folder(layout=True) == folder(layout=True, grounding_url="http://gpu:9100")
+
+
+# --- layout boxes: a stand-in box server, answering as the card's serve_boxes.py does (items in pixels of the
+# image it was sent), plus what serve/ocria-1/boxes.py adds (`served`)
+
+BOX_SERVED = {"weights": "llamaindex/OCRia-1", "revision": ocria_1.REVISION, "detector": ocria_1.DETECTOR,
+              "detector_revision": ocria_1.DETECTOR_REVISION, "transformers": "5.22.2"}
+
+
+def items(width, height):
+    return [
+        {"type": "Page-header", "label": "header", "md": "Annual Report 2025", "box": [10, 5, 190, 20],
+         "start": 0},
+        {"type": "Section-header", "label": "paragraph_title", "md": "# Results", "box": [10, 30, 100, 45],
+         "start": 30},
+        {"type": "Text", "label": "text", "md": "Revenue grew by **12%** in H<sub>2</sub>.",
+         "box": [10, 50, width, 70], "start": 40},
+        {"type": "Table", "label": "table", "md": "<table><tr><td>2024</td><td>12</td></tr></table>",
+         "box": [10, 80, 190, 150], "start": 90},
+        {"type": "Picture", "label": "image", "md": "![chart: sales by year]", "box": [10, 160, 100, 250],
+         "start": 120},
+        {"type": "Key-Value Region", "label": "text", "md": "Total: $5", "box": [110, 160, 190, 170],
+         "start": 150},
+        {"type": "Page-footer", "label": "footer", "md": "Confidential 7", "box": [10, 280, 190, 290],
+         "start": 160},
+        {"type": "Text", "label": "text", "md": "no area", "box": [50, 50, 50, 60], "start": 170},
+    ]
+
+
+@pytest.fixture
+def box_server():
+    """A box server on a free port: records each request, answers with `items` (or `said` overrides)."""
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    from PIL import Image
+
+    state = {"asked": [], "served": dict(BOX_SERVED), "status": 200}
+
+    class H(BaseHTTPRequestHandler):
+        def do_POST(self):
+            req = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            state["asked"].append((self.path, req))
+            w, h = Image.open(io.BytesIO(base64.b64decode(req["image_png_b64"]))).size
+            # the prompt the server loaded is the one the adapter checks (a test's stand-in, when patched)
+            served = {"prompt_sha256": ocria_1.PROMPT_SHA256, **state["served"]}
+            body = json.dumps({"width": w, "height": h, "items": items(w, h), "served": served}
+                              if state["status"] == 200 else {"error": "RuntimeError('boom')"}).encode()
+            self.send_response(state["status"])
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    state["url"] = f"http://127.0.0.1:{srv.server_address[1]}"
+    yield state
+    srv.shutdown()
+
+
+def boxed(box_server, **options):
+    return harness.system("ocria-1", {"layout": True, "grounding_url": box_server["url"], **options})
+
+
+def test_the_box_server_is_sent_the_image_the_answer_came_from_the_raw_answer_and_the_pdf(
+        downloaded, box_server, tmp_path, monkeypatch):
+    import pypdfium2 as pdfium
+    from PIL import Image
+
+    doc = pdfium.PdfDocument.new()
+    doc.new_page(612, 792)
+    doc.save(pdf := tmp_path / "p.pdf")
+    doc.close()
+    sent = {}
+    monkeypatch.setattr(http, "served", lambda *a: ("llamaindex/OCRia-1@" + ocria_1.REVISION, SERVED))
+    monkeypatch.setattr(llm, "chat", lambda url, body, *a, **k: sent.update(body) or reply(ANSWER))
+    config = boxed(box_server)
+    call = ocria_1.call(pdf, config.requests(frozenset({"html", "blocks"}))[0], config=config)
+    [(path, req)] = box_server["asked"]
+    assert path == "/ground"
+    # the exact PNG vLLM was sent, the raw answer (fence and tags as the model wrote them), the page itself
+    url = sent["messages"][1]["content"][0]["image_url"]["url"]
+    assert url == "data:image/png;base64," + req["image_png_b64"]
+    assert req["answer"] == ANSWER
+    assert base64.b64decode(req["pdf_b64"]) == pdf.read_bytes()
+    # its words are read at 300 DPI, in the frame of the render before the 4.1 MP scale-down
+    assert req["dpi"] == 300
+    assert abs(req["render_size"][0] - 2550) <= 1 and abs(req["render_size"][1] - 3300) <= 1
+    w, h = Image.open(io.BytesIO(base64.b64decode(req["image_png_b64"]))).size
+    assert w * h <= 4_100_000 * 1.001
+    assert call.raw["layout"]["width"] == w and call.raw["layout"]["served"]["detector"] == ocria_1.DETECTOR
+    # an image has no text layer: its words come from attention
+    Image.new("RGB", (200, 300), "white").save(png := tmp_path / "p.png")
+    ocria_1.call(png, config.requests(frozenset({"blocks"}))[0], config=config)
+    req = box_server["asked"][-1][1]
+    assert req["pdf_b64"] is None and req["render_size"] is None
+
+
+def test_the_items_are_read_as_blocks(downloaded, box_server, tmp_path, monkeypatch):
+    from PIL import Image
+
+    monkeypatch.setattr(http, "served", lambda *a: ("llamaindex/OCRia-1@x", SERVED))
+    monkeypatch.setattr(llm, "chat", lambda *a, **k: reply(ANSWER))
+    Image.new("RGB", (200, 300), "white").save(page := tmp_path / "p.png")
+    record = core.predict(boxed(box_server), harness.Input(page, frozenset({"html", "blocks"})))
+    [out] = record["output"]["pages"]
+    assert record["error"] is None and set(out) == {"html", "blocks"}
+    assert "Results" in views.text(out["html"])
+    got = out["blocks"]
+    assert [b["label"] for b in got] == ["page_furniture", "heading", "text", "table", "figure", "form",
+                                         "page_furniture"]   # the item with no area is left out
+    assert got[0]["bbox"] == [10 / 200, 5 / 300, 190 / 200, 20 / 300]
+    assert got[2]["bbox"][2] == 1.0
+    # each block's text is what a reader sees of its markdown
+    assert got[1]["text"] == "Results" and got[2]["text"] == "Revenue grew by 12% in H2."
+    assert got[3]["text"] == "2024 12"
+    assert views.blocks(got)   # well formed for the scorer
+
+
+def test_an_item_type_not_in_labels_fails_the_blocks_alone():
+    raw = {**reply(ANSWER), "layout": {"width": 100, "height": 100, "served": BOX_SERVED,
+                                         "items": [{"type": "Chart", "md": "x", "box": [0, 0, 10, 10]}]}}
+    (request,) = harness.system("ocria-1", {"layout": True}).requests(frozenset({"html", "blocks"}))
+    outs, errs = ocria_1.parse(raw, request)
+    assert "Results" in views.text(outs["html"]) and "blocks" not in outs
+    assert "Chart" in errs["blocks"]
+    for heron in ("Text", "Document Index", "Title", "Section-header", "Page-header", "Page-footer",
+                  "List-item", "Caption", "Footnote", "Formula", "Code", "Table", "Form",
+                  "Key-Value Region", "Picture"):
+        assert ocria_1.LABELS[heron] in views.LABELS
+
+
+def test_a_box_server_with_other_weights_or_detector_stops_the_run(downloaded, box_server, tmp_path,
+                                                                    monkeypatch):
+    from PIL import Image
+
+    monkeypatch.setattr(http, "served", lambda *a: ("llamaindex/OCRia-1@x", SERVED))
+    monkeypatch.setattr(llm, "chat", lambda *a, **k: reply(ANSWER))
+    Image.new("RGB", (64, 64), "white").save(page := tmp_path / "p.png")
+    config = boxed(box_server)
+    (request,) = config.requests(frozenset({"blocks"}))
+    box_server["served"] = {**BOX_SERVED, "detector_revision": "main"}
+    with pytest.raises(ValueError, match="box server"):
+        ocria_1.call(page, request, config=config)
+    box_server["served"] = {**BOX_SERVED, "prompt_sha256": "0" * 64}
+    with pytest.raises(ValueError, match="box server"):
+        ocria_1.call(page, request, config=config)
+    box_server["served"] = BOX_SERVED
+    box_server["status"] = 500
+    with pytest.raises(errors.SystemFailed, match="HTTP 500"):
+        ocria_1.call(page, request, config=config)
+
+
+def test_no_box_server_stops_the_run_and_says_how_to_start_it(downloaded, tmp_path, monkeypatch):
+    import socket
+
+    from PIL import Image
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    monkeypatch.setattr(http, "served", lambda *a: ("llamaindex/OCRia-1@x", SERVED))
+    monkeypatch.setattr(llm, "chat", lambda *a, **k: reply(ANSWER))
+    Image.new("RGB", (64, 64), "white").save(page := tmp_path / "p.png")
+    api = harness.system("ocria-1", {"layout": True, "grounding_url": f"http://127.0.0.1:{port}"})
+    with pytest.raises(Exception) as e:
+        core.predict(api, harness.Input(page, frozenset({"html", "blocks"})))
+    note = "\n".join(getattr(e.value, "__notes__", []))
+    assert f"no box server at http://127.0.0.1:{port}" in note and "boxes.sh" in note, note
