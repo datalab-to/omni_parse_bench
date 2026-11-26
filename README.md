@@ -19,7 +19,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | Gemini 3.8 Flash * | closed |  | 92.5 | ≈$37.08 | 92.0 | 95.3 | 90.3 | 4 |
 | GPT-6.1 Sol § | closed |  | 91.5 | $30.95 | 89.8 | 95.6 | 89.1 | 17 |
 | Reducto | closed |  | 91.1 | $10.00 | 86.0 | 91.4 | 95.8 | — |
-| LlamaParse | closed |  | 90.8 | ≈$56.25 | 89.4 | 92.9 | 90.0 | — |
+| LlamaParse | closed |  | 90.8 | ≈$31.25¶ | 89.4 | 92.9 | 90.0 | — |
 | chandra-ocr-2 (Datalab) | open | 4.5B | 90.4 | — | 87.9 | 88.0 | 95.4 | — |
 | Claude Opus 5.5 * § | closed |  | 90.0 | $68.45 | 93.9 | 93.4 | 82.6 | 40 |
 | Mistral OCR | closed |  | 89.9 | $4.00 | 83.6 | 92.2 | 93.8 | — |
@@ -77,6 +77,10 @@ Gemini 3.8 Flash's and GPT-5.6 Sol's layout scores use a separate run that asked
 † Gemini 4 results combine one full pass with one rerun of every page that pass failed, made with the reader that accepts `bbox` (omni-parse-bench 1.6.0 and later); the full pass's other pages are unchanged. Carbon also has four pages that hit the output-token limit. See [the run notes](docs/gemini4-2026-11-10.md) for the first measurement.
 
 ‡ Gemini 4 costs include the original full pass **and** all failed-page reruns, divided by 2,937 pages; separate validation probes are excluded. These cumulative experiment costs are not fresh single-pass prices.
+
+Vendor list prices are per 1,000 pages and were read on 2026-10-08. Datalab balanced ($3.00) and accurate ($7.50) are the data-sharing rates (25% off); Reducto is standard r-1 Parse; Mistral is OCR page processing (not annotated pages); Extend is Parse Performance at pay-as-you-go rates; Azure is Content Understanding `prebuilt-layout` at the Document Standard meter. See [Datalab pricing](https://www.datalab.to/pricing), [Reducto pricing](https://reducto.ai/pricing/), [Mistral OCR pricing](https://docs.mistral.ai/models/ocr-4-0), [Extend pricing](https://docs.extend.ai/general/how-credits-work), and [Azure pricing](https://learn.microsoft.com/en-us/azure/ai-services/content-understanding/pricing-explainer).
+
+¶ LlamaParse's [list price](https://developers.llamaindex.ai/llamaparse/general/pricing) as of 2026-11-26 is Agentic Plus at 25 credits/page: ≈$31.25 per 1,000 pages at the Pro rate ($1.25 per 1,000 credits), or $37.50 at the pay-as-you-go rate ($1.50 per 1,000 credits). The score uses saved predictions from runs dated 2026-09-30 and 2026-10-06; it has not been re-measured since the price change.
 
 ## About the benchmark
 
