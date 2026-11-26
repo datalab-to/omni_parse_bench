@@ -71,10 +71,8 @@ What it does not look at, so a wrong output passes:
 | B | a letter glued to a number | `4.8` | `a4.8` | pass | `text-letter-beside` |
 | B | a currency sign the gold lacks | `5.00` | `$5.00` | pass | `text-currency-extra` |
 | B | the string only in an image description | `Total` | `<img alt='Total'>` | pass | `text-alt` |
-| B | an exponent read as a digit | `12` | `<p>1<sup>2</sup></p>` | pass | `text-exponent` |
 | B | a superscript digit after a letter read as a footnote marker | `area in m is` | `<p>area in m<sup>2</sup> is</p>` | pass | `text-sup-unit` |
 | B | two adjacent cells read as one string | `1 2` | `<table><tr><td>1</td><td>2</td></tr></table>` | pass | `text-table-flat` |
-| B | with an edit to spend, a different number | `Total: 41` (md 1) | `Total: 400` | pass | `text-fuzzy-wrong-gold` |
 | B | a short gold with an edit to spend | `ab` (md 1) | `a` | pass | `text-short-fuzzy` |
 <!-- /cases -->
 
@@ -100,6 +98,7 @@ What it penalizes:
 | P | a look-alike character | `l` | `1` | fail | `text-homoglyph` |
 | P | markdown stars printed in html | `Total Due` | `**Total** Due` | fail | `text-literal-stars` |
 | P | a `^` the gold writes as text | `x^2` | `$x^2$` | fail | `text-caret` |
+| P | an exponent is not a digit of the number before it | `12` | `<p>1<sup>2</sup></p>` | fail | `text-exponent` |
 | P | a superscript after a digit is an exponent, not a marker | `10 cells` | `<p>10<sup>5</sup> cells</p>` | fail | `text-sup-exponent` |
 | P | a sign after leaders | `Revenue 4.8` | `Revenue ....... -4.8` | fail | `text-sign-after-leaders` |
 | P | with `exact_case`, a changed letter case | `iPhone` (exact case) | `I bought an iphone` | fail | `text-exact-case` |
@@ -130,14 +129,38 @@ glued to it. One clean copy anywhere is enough.
 | P | a gold ending in a digit is guarded at that end | `x1` | `x12` | fail | `edge-end-digit` |
 | B | a gold ending in a letter is not | `x1` | `x1y` | pass | `edge-end-letter` |
 | P | spacing removed, then judged on the spaced text | `1 2` | `123` | fail | `edge-squeeze-glued` |
-| I | a space is not a digit | `1 2` | `12 3` | pass | `edge-squeeze-spaced` |
-| I | a spaced copy counts beside a glued one | `40` | `400 4 0` | pass | `edge-glued-and-spaced` |
-| I | digits spaced out | `305357` | `3 0 5 3 5 7` | pass | `edge-squeeze-digits` |
+| P | a space splits a number, so the squeeze never joins two | `1 2` | `12 3` | fail | `edge-squeeze-spaced` |
+| P | a spaced copy is two numbers | `40` | `400 4 0` | fail | `edge-glued-and-spaced` |
+| P | digits spaced out | `305357` | `3 0 5 3 5 7` | fail | `edge-squeeze-digits` |
+| I | spacing between a word and a number stays free | `Total 40` | `Total40` | pass | `edge-squeeze-word` |
 | P | with `max_diffs` 1, an exact match is still guarded | `Total: 40` (md 1) | `Total: 400` | fail: `'Total: 40' found only inside a longer number` | `edge-fuzzy` |
 <!-- /cases -->
 
-A fuzzy match (one that spends an edit) is not checked. So with `max_diffs` 1, the wrong gold `Total: 41` passes
-on `Total: 400` while the right gold `Total: 40` fails (cases text-fuzzy-wrong-gold, edge-fuzzy).
+A fuzzy match (one that spends an edit) is not checked here; a gold with a digit keeps its numbers
+exact instead ([Numbers are exact](#numbers-are-exact)).
+
+## Numbers are exact
+
+A gold that holds a digit must match with each of its numbers (a maximal run of digits, after fold) whole and
+unchanged, at any `max_diffs`: an edit may not change, add, drop, split or join a number, the squeezed retry
+never joins two, and the matched text may not end inside one. Every other character still costs one edit, and
+a gold without a digit is matched as above.
+
+<!-- cases:text-numbers -->
+| | difference | gold | output | verdict | case |
+|---|---|---|---|---|---|
+| P | with an edit to spend, a different number | `Total: 41` (md 1) | `Total: 400` | fail: `'Total: 41' not found with its numbers exact (a number differs, or one was added, split or joined)` | `text-fuzzy-wrong-gold` |
+| P | a changed digit | `Total: 41` (md 3) | `Total: 40` | fail | `num-fuzzy-digit` |
+| P | a number split by a space | `Total: 41` (md 1) | `Total: 4 1` | fail | `num-fuzzy-split` |
+| P | a number split by a point | `Total: 41` (md 3) | `Total 4.1` | fail | `num-fuzzy-point` |
+| P | a letter read as a digit adds a number | `Total 41` (md 1) | `Tota1 41` | fail | `num-fuzzy-added` |
+| P | two numbers joined | `Pages 1 to 2` (md 3) | `Pages 12` | fail | `num-fuzzy-joined` |
+| P | a dropped thousands separator joins two numbers | `1,000` (md 1) | `1000` | fail | `num-fuzzy-thousands` |
+| P | a digit of another script is another number | `3.` (md 1) | `๓.` | fail | `num-fuzzy-script` |
+| I | a letter edit beside a number | `Total: 41` (md 1) | `Totel: 41` | pass | `num-fuzzy-letter` |
+| I | full-width digits fold first | `Room 3` (md 1) | `Room ３` | pass | `num-fuzzy-fullwidth` |
+| I | a number after the matched text is outside it | `Figure 3` (md 1) | `Figure 3 2019 data` | pass | `num-fuzzy-after` |
+<!-- /cases -->
 
 ## Footnote markers
 
@@ -160,14 +183,14 @@ that leaves out a unit's exponent passes (case text-sup-unit).
 - **No word edges.** `Total` is found in `Totally` (case text-longer-word). Use `repeat` for whole words.
 - **Letters beside a number are free.** `4.8` is found in `a4.8` (case text-letter-beside). Use a number arg
   ([present-number.md](present-number.md)) when sign and percent matter.
-- **Spacing is free, so an exponent is a digit.** `12` is found in `1<sup>2</sup>` (case text-exponent).
 - **Image descriptions pay.** A description that contains the string passes the test (case text-alt).
 - **Most budgets are real.** 1,370 of the 3,684 real present text tests allow 1 to 4 edits; the others allow none.
 - **Short golds and edit budgets are loose.** With one edit, `ab` is found in a page holding `a` (case
   text-short-fuzzy). How edits are counted is in [internals.md](internals.md#the-edit-budget).
 - **A table is flat text here.** A gold that spans two adjacent cells passes (case text-table-flat).
 
-A failure's why reads `'gold' found only inside a longer number` when the digit edge rejected every exact
+A failure's why reads `'gold' not found with its numbers exact (...)` when the edits fit the budget only by
+changing a number, `'gold' found only inside a longer number` when the digit edge rejected every exact
 match, and otherwise `'gold' not found (best r < threshold); closest '...'`: the best match ratio, the ratio
 needed (`1 - max_diffs / length of the folded gold`), and the closest part of the page. The ratio is
 rapidfuzz's partial ratio, a first pass that a page within budget always clears; when that passes with edits to

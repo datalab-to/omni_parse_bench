@@ -9,6 +9,7 @@ constants (a threshold, a fill ratio) are module constants here, never parameter
 from __future__ import annotations
 
 import functools
+import itertools
 import re
 import unicodedata
 from collections.abc import Callable, Sequence
@@ -79,16 +80,28 @@ def found(a: Arg, v: views.Html) -> Mark:
     # Note: `exact_case` runs every path below on the case-kept fold (fold_cased); nothing else changes.
     fold_one, fold_marks = (normalize.fold_cased, normalize.unmarked_cased) if a.exact_case else (
         normalize.fold, normalize.unmarked)
+    # Note: a gold that holds a digit must match with its numbers exact (`_numbers_kept`), at any budget, so
+    # no retry without spaces joins "2 1" into "21". `_contains` passing is necessary for that, so the rule
+    # runs only on what it passes.
+    strict = any(c.isdigit() for c in fold_one(a.text))
     ok, r, thr, window = _contains(a.text, v.text, a.max_diffs, fold_one, fold_one)
+    lost = strict and ok and not _numbers_kept(a.text, v.text, a.max_diffs, fold_one, fold_one)
+    ok = ok and not lost
     # Note: fold reads a bracketed footnote marker as a spaced number (so a number test still sees it, and
     # a gold that writes the marker finds it), and the text view a mark set as a superscript the same way,
     # which leaves either free only at the end of the gold: "Smith[1] and Jones" and
     # "Smith<sup>1</sup> and Jones" missed "Smith and Jones". Retry with the page's markers dropped.
-    if not ok and ((page := views.unmarked(v.html)) is not None or "[" in v.text) and _contains(
-            a.text, v.text if page is None else page, a.max_diffs, fold_marks, fold_one)[0]:
+    if not ok and ((page := views.unmarked(v.html)) is not None or "[" in v.text):
+        page = v.text if page is None else page
+        if _contains(a.text, page, a.max_diffs, fold_marks, fold_one)[0] and (
+                not strict or _numbers_kept(a.text, page, a.max_diffs, fold_marks, fold_one)):
+            return True, ""
+    if not ok and hyphenation.matches(a.text, v.text, _cut_before, _cut_after, cased=a.exact_case,
+                                      numbers=strict):
         return True, ""
-    if not ok and hyphenation.matches(a.text, v.text, _cut_before, _cut_after, cased=a.exact_case):
-        return True, ""
+    if lost:
+        return False, (f"{a.text[:60]!r} not found with its numbers exact (a number differs, or one was "
+                       "added, split or joined)")
     if not ok and _only_glued(a.text, v.text, fold_one):
         return False, f"{a.text[:60]!r} found only inside a longer number"
     near = f"; closest {_excerpt(window)!r}" if window else ""
@@ -772,6 +785,114 @@ def _contains(needle: str, text: str, max_diffs: int, fold_page: Callable[[str],
         ok = _ratio(squeezed[0], _unglue(*squeezed, hay, kept), max_diffs)[0]
     window = "" if ok or not want else _window(*(squeezed if r2 > r else (want, hay)))[1]
     return ok, max(r, r2), thr, window
+
+
+# Note: `_tokens` writes a number as one character from plane 15's private use area. Fold keeps those (it
+# drops only the BMP's), so it first replaces any the text holds; `_within` reads a character from
+# `_NUMBER_CHAR` up as a number.
+_NUMBER_CHAR = "\U000F0000"
+_PLANE_15_16 = re.compile("[\U000F0000-\U0010FFFF]")
+
+
+def _tokens(want: str, hay: str) -> tuple[str, str] | None:
+    """`want` and `hay` with each maximal run of digits (`str.isdigit`) made one character: a private-use
+    code point of its own for each distinct run of `want`, and one shared by every run of `hay` that `want`
+    lacks (no edit may touch a number, so those never need telling apart). None when a number of `want`
+    is missing from `hay`, which no stretch can then match."""
+    codes: dict[str, str] = {}
+
+    def encode(s: str, gold: bool) -> str:
+        out = []
+        for digits, run in itertools.groupby(_PLANE_15_16.sub("\ufffd", s), str.isdigit):
+            run = "".join(run)
+            if digits and gold:
+                codes.setdefault(run, chr(ord(_NUMBER_CHAR) + 1 + len(codes)))
+            out.append(codes.get(run, _NUMBER_CHAR) if digits else run)
+        return "".join(out)
+
+    want = encode(want, True)
+    hay = encode(hay, False)
+    return None if any(c not in hay for c in codes.values()) else (want, hay)
+
+
+def _numbers_kept(needle: str, text: str, max_diffs: int, fold_page: Callable[[str], str] = normalize.fold,
+                  fold_needle: Callable[[str], str] = normalize.fold) -> bool:
+    """Whether some stretch of the folded `text` is within `max_diffs` edits of the folded `needle` with every
+    number (a maximal run of digits) kept whole and exact: as `_contains` counts edits, but an edit that
+    changes, adds or drops a number costs more than the budget (`_within`). Tried on the folded strings,
+    then on the squeezed ones, squeezed after the numbers are made one character each, so a squeeze never
+    joins two numbers. An exact copy cut out of a longer number, in either, is blanked out first (`_unglue`),
+    as `_contains` does, so the rule and `_contains` never pass on two different stretches of one glued
+    copy and one other."""
+    want, hay = fold_needle(needle), fold_page(text)
+    if not want.replace(" ", ""):
+        return False
+    encoded = _tokens(want, _unglued_both(want, hay))
+    if encoded is None:
+        return False
+    want, hay = encoded
+    return (_within(want, hay, max_diffs)
+            or _within(want.replace(" ", ""), hay.replace(" ", ""), max_diffs))
+
+
+def _unglued_both(want: str, hay: str) -> str:
+    """`hay` with each exact copy of `want` cut out of a longer number blanked out, in it and in its squeezed
+    form (`_unglue`), the squeezed copies blanked at their places in `hay`."""
+    kept = [i for i, c in enumerate(hay) if c != " "]
+    blanked = list(_unglue(want, hay))
+    for i, c in enumerate(_unglue(want.replace(" ", ""), hay.replace(" ", ""), hay, kept)):
+        if c == "\0":
+            blanked[kept[i]] = "\0"
+    return "".join(blanked)
+
+
+def _within(want: str, hay: str, k: int) -> bool:
+    """Whether at most k edits turn `want` into some stretch of `hay`, both encoded by `_tokens`. An edit is
+    a character substituted, inserted or deleted, or two adjacent ones swapped (as `_edits` counts), and
+    costs 1, except one that touches a number character, which costs k + 1; a number matched to the same
+    number costs 0. A stretch starts and ends anywhere in `hay`, so never inside a number (one character).
+
+    Note: a dynamic program over `hay` one column at a time, each column a list of the costs of matching each
+    prefix of `want` ending there, cut after its last row within k (Ukkonen's cutoff): a row beyond holds
+    more than k, and a cost above k is stored as k + 1. Time O(len(hay) * rows within k); memory
+    O(len(want))."""
+    over = k + 1
+
+    def number(c: str) -> bool:
+        return c >= _NUMBER_CHAR
+
+    drop = [over if number(c) else 1 for c in want]
+    col = [0]
+    for d in drop:      # the empty stretch: every character of `want` deleted
+        if col[-1] + d > k:
+            break
+        col.append(col[-1] + d)
+    if len(col) > len(want):
+        return True
+    before: list[int] = []
+    for j, h in enumerate(hay):
+        add = over if number(h) else 1
+        last = max(len(col), len(before) + 1)     # no row from here on can come within k from a column before
+        cur = [0]
+        for i in range(1, len(want) + 1):
+            g = want[i - 1]
+            best = cur[i - 1] + drop[i - 1]
+            if i - 1 < len(col):
+                best = min(best, col[i - 1] + (0 if g == h else over if number(g) or number(h) else 1))
+            if i < len(col):
+                best = min(best, col[i] + add)
+            if (i >= 2 and i - 2 < len(before) and g == hay[j - 1] and want[i - 2] == h and g != h
+                    and not number(g) and not number(h)):
+                best = min(best, before[i - 2] + 1)
+            if best > k and i >= last:
+                break
+            cur.append(min(best, over))
+        while cur[-1] > k:
+            cur.pop()
+        if len(cur) > len(want):
+            return True
+        before, col = col, cur
+    return False
 
 
 def _fold_cell(s: str) -> str:

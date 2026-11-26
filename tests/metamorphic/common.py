@@ -173,6 +173,9 @@ REAL = {
     "text strings": ("text strings of the real text, order, repeat and table_cell tests", 24_682),
     "text tests": ("real text, order, repeat and table_cell tests", 10_294),
     "latex tests": ("real equation tests (present with a latex arg)", 3_268),
+    "fuzzy numbered text": ("real text tests with edits to spend and a digit", 467),
+    "numbered text": ("real text tests with a digit", 1_375),
+    "fraction text": ("real text, order, repeat and table_cell tests with a vulgar fraction", 5),
 }
 
 # --------------------------------------------------------------------------------------------- helpers

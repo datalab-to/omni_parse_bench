@@ -6,7 +6,8 @@ tests/fixtures/invariants/, and on the published dataset's when OPB_DATASET is s
     symmetry      text folds the same as a test's string and as an output's text view, however the
                   output splits it into blocks (but a block break stops a leader run)
     digits        a number is found as written, and never with one digit changed
-    edits         text within its `max_diffs` edits (substituted, inserted or dropped characters) is found
+    edits         text within its `max_diffs` edits (substituted, inserted or dropped characters) is found,
+                  unless an edit touches one of its numbers
     no error      no HTML built from tags, entities, math, markdown and page marks is graded `error`
 
     HYPOTHESIS_PROFILE=deep pytest tests/test_properties.py    # 5,000 examples each, not 300
@@ -16,6 +17,7 @@ from __future__ import annotations
 import html as _html
 import itertools
 import os
+import re
 
 import pytest
 from hypothesis import assume, given
@@ -232,7 +234,9 @@ def test_text_within_its_edits_is_found(text, data):
             out.insert(i, "#")
         else:
             del out[i]
-    assert runners.found(runners.Text(text, k), views.html(f"<p>{''.join(out)}</p>"))[0]
+    # Note: an edit that changes, splits or drops a number (a run of digits) is beyond any budget.
+    kept = re.findall(r"\d+", text) == re.findall(r"\d+", "".join(out))
+    assert runners.found(runners.Text(text, k), views.html(f"<p>{''.join(out)}</p>"))[0] is kept
 
 
 TAG = st.sampled_from([

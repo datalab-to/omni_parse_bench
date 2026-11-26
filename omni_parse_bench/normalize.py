@@ -71,6 +71,7 @@ _ARROWS = (
 )
 _WHITESPACE = re.compile(r"\s+")
 _SUPERSCRIPT_DIGITS = re.compile("(?<=\\d)([⁰¹²³⁴⁵⁶⁷⁸⁹]+)")
+_VULGAR_FRACTION = re.compile("(?<=\\d)([\u00bc-\u00be\u2150-\u215e\u2189])")
 _CJK_PUNCT = str.maketrans({
     "。": ".", "，": ",", "．": ".", "：": ":", "；": ";", "！": "!",
     "？": "?", "（": "(", "）": ")", "、": ",", "％": "%", "＝": "=",
@@ -134,6 +135,7 @@ def fold(s: str) -> str:
                          line end
         superscripts     superscript digits after a digit set apart ("1,240¹" -> "1,240 1"), as views.text
                          sets apart a <sup>, so a footnote marker never joins the number it follows
+        fractions        a vulgar fraction after a digit set apart ("1½" -> "1 1/2", not "11/2")
         NFKC             compatibility forms -> canonical ("ﬁ" -> "fi"); just before it, ″ ‴ -> ",
                          〜 ∗ -> ~ *, CJK middle dots (not between digits) -> "·", spacing accents
                          after a letter -> combining ones
@@ -200,6 +202,9 @@ def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool
     if not preserve_line_hyphens:
         s = _LINE_HYPHEN.sub(lambda m: m[1] if _joins(m.string, m.start(), m.start(1)) else m[0], s)
     s = _SUPERSCRIPT_DIGITS.sub(r" \1", s)
+    # Note: NFKC writes "½" as "1⁄2", so "1½" would read "11/2"; a space keeps the whole number apart, as
+    # "1 1/2" is written.
+    s = _VULGAR_FRACTION.sub(r" \1", s)
     s = _INVISIBLE.sub("", unicodedata.normalize("NFKC", _primes(s)))
     s = boxes(s)
     # Note: a space before the marker, so "12.3%[1]" isn't read as "12.3%1"; `squeeze` still

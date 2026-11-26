@@ -32,13 +32,14 @@ Cut = Callable[[str, int], bool]
 
 
 def matches(needle: str, text: str, cut_before: Cut | None = None, cut_after: Cut | None = None,
-            cased: bool = False) -> bool:
+            cased: bool = False, numbers: bool = False) -> bool:
     """An exact substring match that uses an evidenced continuation hyphen inside the match.
     `cut_before(s, i)` and `cut_after(s, j)`, if given, reject a match starting at i or ending at j
-    of the text with its spaces. With `cased` both sides keep their case."""
+    of the text with its spaces. With `cased` both sides keep their case. With `numbers`, a space between
+    two digits must be on both sides or on neither, so no number is split or joined."""
     if not optional(needle, text, cased=cased):
         return False
-    return any(c.continued for c in copies(needle, text, cut_before, cut_after, cased))
+    return any(c.continued for c in copies(needle, text, cut_before, cut_after, cased, numbers))
 
 
 def optional(*strings: str, cased: bool = False) -> bool:
@@ -47,10 +48,10 @@ def optional(*strings: str, cased: bool = False) -> bool:
 
 
 def copies(needle: str, text: str, cut_before: Cut | None = None, cut_after: Cut | None = None,
-           cased: bool = False) -> list[Copy]:
+           cased: bool = False, numbers: bool = False) -> list[Copy]:
     """Every exact match of `needle` in `text`, each hyphen of either side that a line broke after read kept
     or dropped, one `Copy` for each place a match ends and for each of: with or without such a hyphen.
-    `cut_before`, `cut_after` and `cased` are as for `matches`.
+    `cut_before`, `cut_after`, `cased` and `numbers` are as for `matches`.
 
     A small nondeterministic automaton consumes equal characters, or skips optional
     hyphens on either side. Equivalent states are merged at each text position: at
@@ -68,8 +69,18 @@ def copies(needle: str, text: str, cut_before: Cut | None = None, cut_after: Cut
         return []
     optional_at = sorted(want_optional)
     # Note: the main path judges a match's edges, so this exact match must too (a space is not glued).
-    spaced = normalize.continuations(text, spaced=True, cased=cased)[0] if cut_before or cut_after else ""
+    spaced = normalize.continuations(text, spaced=True, cased=cased)[0] if (
+        cut_before or cut_after or numbers) else ""
     kept = [k for k, c in enumerate(spaced) if c != " "]
+    # Note: a continuation hyphen follows a letter, so two digits matched in a row sit side by side in both
+    # strings read without spaces; `apart` says whether a space parted them before.
+    gold = normalize.continuations(needle, spaced=True, cased=cased)[0] if numbers else ""
+    gold_kept = [k for k, c in enumerate(gold) if c != " "]
+
+    def apart(i: int, j: int) -> bool:
+        """Whether want[i - 1:i + 1] are two digits a space parts on one side only (hay[j] is want[i])."""
+        return (numbers and 0 < i and want[i].isdigit() and want[i - 1].isdigit()
+                and (gold_kept[i] - gold_kept[i - 1] > 1) != (kept[j] - kept[j - 1] > 1))
     found: list[Copy] = []
     # (state, continued) -> (earliest start, latest start)
     active: dict[tuple[int, bool], tuple[int, int]] = {}
@@ -83,7 +94,7 @@ def copies(needle: str, text: str, cut_before: Cut | None = None, cut_after: Cut
             reach(active, (0, False), (j, j))  # A substring may start at each character.
         following: dict[tuple[int, bool], tuple[int, int]] = {}
         for (i, continued), span in active.items():
-            if i < len(want) and want[i] == c:
+            if i < len(want) and want[i] == c and not apart(i, j):
                 inner = 0 < i < len(want) - 1 and (i in want_optional or j in hay_optional)
                 reach(following, (i + 1, continued or inner), span)
             if j in hay_optional and 0 < i < len(want):
