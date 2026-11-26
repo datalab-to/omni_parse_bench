@@ -420,7 +420,7 @@ def test_a_cell_never_matches_below_a_ratio_of_one_half_whatever_the_edit_budget
 @relation(HOLDS, domain="all 11 x 11 pairs of a block's label and a test's kind, the block alone on the page, "
                         "and the same with a larger block of another label around it")
 def test_a_list_or_form_block_is_text_for_a_text_test_and_nothing_else_is():
-    """A layout_kind test of kind `text` passes when the block that holds its place is labelled `text`, `list`
+    """A layout_kind test of kind `text` passes when the block that holds its place is labeled `text`, `list`
     or `form`; every other kind passes only on its own label, so a `list` or `form` block fails a test for any
     other kind and a `text` block fails a `list` or `form` test. [M137]
     Why it matters for a score: vendors differ in whether they give a list item or a form field a block of its

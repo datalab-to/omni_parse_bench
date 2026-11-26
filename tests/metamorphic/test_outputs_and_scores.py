@@ -114,12 +114,13 @@ def test_an_output_of_the_wrong_shape_fails_only_the_tests_that_read_it():
                 assert got[bad_test.id].why.startswith(f"malformed {bad} output"), (bad, got[bad_test.id])
 
 
-@relation(HOLDS, domain="every loaded test; html '' and blocks [], and 40 random strings of markup characters")
+@relation(HOLDS, domain="every loaded test; html '' and blocks []; 3 fixed table cases (a table that fails a field test, the same cells without a `<tr>`, a value beside the label); and 40 random strings of markup characters")
 def test_an_empty_output_fails_with_its_documented_reason_and_markup_noise_never_raises():
     """An empty html (`""`) fails every loaded test except a `page_near_empty` test, which it passes; a
     `table_cell` test then reads `no tables found`; an empty blocks list fails every layout test with `no block
     covers 50% of its place`; a table the cell reader cannot parse (`<td>` outside a `<tr>`) is read as text by a form-field test, so
-    the cells of a table that fail it pass it and a value beside the label fails as text (present-text.md); and html
+    the same cells that fail it as a table (a value under the label) pass it, and a value beside the label fails
+    as text (present-text.md); and html
     made of unclosed, stray or nested tag characters never raises, giving a verdict for every test. [M140]
     Why it matters for a score: an empty answer costs its tests and a garbled one is graded, never a
     scorer crash (docs/scoring/layout_kind.md; docs/scoring/table_cell.md, case cell-no-table)."""
