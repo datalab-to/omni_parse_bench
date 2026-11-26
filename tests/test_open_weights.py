@@ -184,6 +184,20 @@ def test_a_nemotron_picture_or_chart_is_alt_text_not_page_text():
         assert kept in views.text(outs["html"]) and kept not in views.text(outs["html"], alt=False)
 
 
+def test_nemotron_defaults_to_triple_but_single_remains_available():
+    from omni_parse_bench.harness.providers import nemotron_parse
+
+    default = nemotron_parse.NemotronParse()
+    single = nemotron_parse.NemotronParse(mode="single")
+    double = nemotron_parse.NemotronParse(mode="double")
+    assert default.mode == "triple"
+    assert nemotron_parse.requests(nemotron_parse.SUPPORTS, default)[0].sent["settings"]["mode"] == "triple"
+    assert single.mode == "single"
+    assert nemotron_parse.requests(nemotron_parse.SUPPORTS, single)[0].sent["settings"]["mode"] == "single"
+    assert double.mode == "double"
+    assert nemotron_parse.requests(nemotron_parse.SUPPORTS, double)[0].sent["settings"]["mode"] == "double"
+
+
 def test_a_nemotron_reply_cut_at_the_token_limit_has_no_document_and_keeps_its_answer(tmp_path, monkeypatch):
     """The client raises on a reply cut at its token limit and returns no document; the page has none."""
     from PIL import Image
