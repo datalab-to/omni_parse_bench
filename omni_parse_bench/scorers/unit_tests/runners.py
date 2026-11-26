@@ -1116,22 +1116,27 @@ def _hyphened(s: str) -> set[str]:
     return {s[a:b] for a, b, number in _number_pieces(s) if number and s[a - 1:a] == "-" and s[a] != "-"}
 
 
+# What may stand before the leading point of `.5`: white space, a bracket, an operator or a sign.
+_BEFORE_POINT = frozenset(" \t\n\xa0([{<>=:;|/±+-")
+
+
 def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
     """`s` as spans (start, end, is_number) that tile it. A number is digit runs (`str.isdigit`) joined by a
-    single `.` or `,` between digits (`1.2`, `1,240`, `12.05.2021`: its separators are part of it, so a
-    `,` for a `.` is another number, as is `1000` for `1,000`), with a leading `.` (`.5`) when no letter or
-    digit comes before it, and with its sign: a `-`, `+` or `±` directly before it (`-5`, `+1.55`, `x = -5`,
-    `(-5)`, `3 -5`) unless a letter or a digit comes before the sign, so `A-12`, `2026-11-26` and `1-2` hold
-    a hyphen (as `_number_pattern` reads one), and `1e-3` has the exponent's sign. A `-` before a number after
-    white space, as in `3 -5`, is a sign; `3 - 5` has none. A `- ` at the start of the string or after an
-    opening bracket is a sign too when `spaced` (a table cell `− 0.756`; a page that starts a list item `- 12`
-    is not a negative number)."""
+    single `.` between digits, or a single `,` before one to three digits (`1.2`, `1,240`, `12.05.2021`, but
+    not `7,2016`): its separators are part of it, so a `,` for a `.` is another number, as is `1000` for
+    `1,000`. A leading `.` (`.5`) after white space, a bracket or an operator is part of it, and so is its
+    sign: a `-`, `+` or `±` directly before it (`-5`, `+1.55`, `x = -5`, `(-5)`, `3 -5`) unless a letter or a
+    digit comes before the sign, so `A-12`, `2026-11-26` and `1-2` hold a hyphen (as `_number_pattern` reads
+    one), and `1e-3` has the exponent's sign. A `-` before a number after white space, as in `3 -5`, is a
+    sign; `3 - 5` has none. A `- ` at the start of the string or after an opening bracket is a sign too when
+    `spaced` (a table cell `− 0.756`; a page that starts a list item `- 12` is not a negative number)."""
     nums: list[list[int]] = []
     pos = 0
     for digits, run in itertools.groupby(s, str.isdigit):
         end = pos + len(list(run))
         if digits:
-            if nums and nums[-1][1] == pos - 1 and s[pos - 1] in ".,":
+            sep = s[pos - 1] if nums and nums[-1][1] == pos - 1 else ""
+            if sep == "." or sep == "," and end - pos <= 3:
                 nums[-1][1] = end
             else:
                 nums.append([pos, end])
@@ -1139,7 +1144,7 @@ def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
     spans: list[tuple[int, int, bool]] = []
     last = 0
     for a, b in nums:
-        if s[a - 1:a] == "." and a > last and not s[a - 2:a - 1].isalnum():
+        if s[a - 1:a] == "." and a > last and (a == 1 or s[a - 2] in _BEFORE_POINT):
             a -= 1
         if s[a - 1:a] in ("-", "+", "±") and a - 1 >= last and (
                 not _joins_hyphen(s[a - 2:a - 1]) or _exponent(s, a - 1)):

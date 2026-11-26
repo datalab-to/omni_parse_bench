@@ -202,3 +202,12 @@ def test_a_plus_after_a_letter_or_digit_is_no_sign(gold, page):
                                         ("A.5 here", "A.5 here")])
 def test_a_leading_point_number_matches_itself(gold, page):
     assert all(all_types(gold, page, 0))
+
+
+@pytest.mark.parametrize("gold, page", [
+    ("december 7, 2016 here", "december 7,2016 here"),       # a comma that is no thousands mark
+    ("said 'ok'. 2 men", "said 'ok'.2 men"),                  # a full stop before a digit is no leading point
+    ("end of it. 5 more", "end of it.5 more"),
+])
+def test_a_missing_space_after_a_comma_or_full_stop_is_not_a_number_change(gold, page):
+    assert all(all_types(gold, page, 1)), (gold, page)
