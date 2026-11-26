@@ -143,6 +143,10 @@ def blocks(raw: dict) -> list[dict]:
 
 
 def parse(raw: dict, request: contract.Request, config: Docling | None = None) -> tuple[dict, dict]:
+    status = raw.get("status")
+    if (status is not None and str(status).lower().rsplit(".", 1)[-1] != "success") or raw.get("errors"):
+        message = f"Docling conversion failed: status={status!r}, errors={raw.get('errors')!r}"
+        raise errors.SystemFailed(message, status=200, body=raw)
     if "html" not in raw:
         raise errors.SystemFailed(f"no html in the answer: {str(raw)[:300]}", status=200)
     outputs, errs = {}, {}

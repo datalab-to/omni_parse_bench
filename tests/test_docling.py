@@ -65,6 +65,15 @@ def test_html_only_asks_for_no_blocks():
     assert errs == {} and set(outs) == {"html"}
 
 
+def test_partial_success_with_errors_fails_the_page_and_keeps_the_raw_reply():
+    raw = {**_raw(), "status": "PARTIAL_SUCCESS",
+           "errors": [{"component_type": "ocr", "error_message": "stage failed"}]}
+    with pytest.raises(docling.errors.SystemFailed) as exc:
+        _parse(raw)
+    assert exc.value.body == raw
+    assert "stage failed" in str(exc.value)
+
+
 def test_the_furniture_option_is_sent_to_the_server():
     sent = docling.Docling(furniture=False).requests(frozenset({"html"}))[0].sent
     assert sent["settings"] == {"furniture": False} and sent["package"].startswith("docling==")
@@ -72,10 +81,11 @@ def test_the_furniture_option_is_sent_to_the_server():
 
 @pytest.mark.skipif(not all(importlib.util.find_spec(m) for m in ("docling_core", "fastapi")),
                     reason="docling and fastapi are the server's, not opb's")
-def test_the_server_reads_a_documents_boxes_from_the_top_left_and_its_tables_cells():
+def test_the_server_reads_a_documents_boxes_from_the_top_left_and_its_tables_cells(monkeypatch):
     from docling_core.types.doc import (BoundingBox, CoordOrigin, ContentLayer, DocItemLabel, DoclingDocument,
                                         ProvenanceItem, Size, TableCell, TableData)
 
+    monkeypatch.setattr("importlib.metadata.version", lambda package: f"{package}==test")
     spec = importlib.util.spec_from_file_location("docling_server", SERVER)
     server = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(server)
@@ -95,6 +105,15 @@ def test_the_server_reads_a_documents_boxes_from_the_top_left_and_its_tables_cel
     assert body[0]["bbox"] == [10, 10, 60, 50] and body[1]["text"] == "a b"
     assert [i["label"] for i in server.items(doc, {ContentLayer.BODY, ContentLayer.FURNITURE})] == [
         "text", "page_footer", "table"]
+    import json
+    from types import SimpleNamespace
+
+    result = SimpleNamespace(document=doc, status=SimpleNamespace(value="success"), errors=[])
+    raw = server.result_payload(result, {ContentLayer.BODY, ContentLayer.FURNITURE})
+    reread = DoclingDocument.model_validate(json.loads(json.dumps(raw["docling_document"])))
+    labels = [item.label.value for item, _ in reread.iterate_items(
+        included_content_layers={ContentLayer.BODY, ContentLayer.FURNITURE})]
+    assert labels == ["text", "page_footer", "table"]
 
 
 def _start(tmp_path: Path, monkeypatch, *, cuda: bool, **env) -> list[str]:

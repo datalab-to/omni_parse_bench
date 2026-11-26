@@ -12,6 +12,7 @@ import tempfile
 import threading
 
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, ConfigDict
 
 KEY = os.environ.get("OPB_ENDPOINT_KEY")
@@ -99,6 +100,21 @@ def items(doc, layers: set) -> list[dict]:
     return out
 
 
+def result_payload(result, layers: set) -> dict:
+    """The server's raw answer, including Docling's serializable document and any conversion errors."""
+    doc = result.document
+    first = doc.pages[min(doc.pages)]
+    return {"html": doc.export_to_html(included_content_layers=layers),
+            "markdown": doc.export_to_markdown(included_content_layers=layers),
+            "items": items(doc, layers), "page": {"width": first.size.width, "height": first.size.height},
+            "status": result.status.value, "errors": jsonable_encoder(result.errors),
+            "docling_document": doc.export_to_dict(),
+            "vendor": {p: importlib.metadata.version(p) for p in ("docling", "docling-core",
+                                                                  "docling-ibm-models", "docling-parse",
+                                                                  "rapidocr")},
+            "served": SERVED}
+
+
 @app.get("/health")
 def health() -> dict:
     return {"ready": _converter is not None}
@@ -120,9 +136,9 @@ def parse(page: Page, authorization: str | None = Header(default=None)) -> dict:
         POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's, "settings": {"furniture"}}
                         -> the document's "html" (its HTML export) and "markdown", its "items" (each one's
                         label, text, and box from the top left in the units of "page", the first page's
-                        {"width", "height"}), and "vendor": the package versions
+                        {"width", "height"}), its status/errors and `docling_document` export, and "vendor"
+                        package versions
     """
-    from docling.datamodel.base_models import ConversionStatus
     from docling_core.types.doc import ContentLayer
 
     if KEY and authorization != f"Bearer {KEY}":
@@ -134,15 +150,4 @@ def parse(page: Page, authorization: str | None = Header(default=None)) -> dict:
         f.flush()
         with _LOCK:
             result = _converter.convert(f.name, page_range=(1, 1), raises_on_error=False)
-    if result.status not in (ConversionStatus.SUCCESS, ConversionStatus.PARTIAL_SUCCESS):
-        raise HTTPException(500, f"docling failed: {result.status.value}: {result.errors}"[:500])
-    doc = result.document
-    first = doc.pages[min(doc.pages)]
-    return {"html": doc.export_to_html(included_content_layers=layers),
-            "markdown": doc.export_to_markdown(included_content_layers=layers),
-            "items": items(doc, layers), "page": {"width": first.size.width, "height": first.size.height},
-            "status": result.status.value,
-            "vendor": {p: importlib.metadata.version(p) for p in ("docling", "docling-core",
-                                                                  "docling-ibm-models", "docling-parse",
-                                                                  "rapidocr")},
-            "served": SERVED}
+    return result_payload(result, layers)
