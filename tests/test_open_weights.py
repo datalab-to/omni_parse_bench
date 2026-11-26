@@ -189,10 +189,13 @@ def test_nemotron_defaults_to_triple_but_single_remains_available():
 
     default = nemotron_parse.NemotronParse()
     single = nemotron_parse.NemotronParse(mode="single")
+    double = nemotron_parse.NemotronParse(mode="double")
     assert default.mode == "triple"
     assert nemotron_parse.requests(nemotron_parse.SUPPORTS, default)[0].sent["settings"]["mode"] == "triple"
     assert single.mode == "single"
     assert nemotron_parse.requests(nemotron_parse.SUPPORTS, single)[0].sent["settings"]["mode"] == "single"
+    assert double.mode == "double"
+    assert nemotron_parse.requests(nemotron_parse.SUPPORTS, double)[0].sent["settings"]["mode"] == "double"
 
 
 def test_a_nemotron_reply_cut_at_the_token_limit_has_no_document_and_keeps_its_answer(tmp_path, monkeypatch):
