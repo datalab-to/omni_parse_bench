@@ -27,6 +27,8 @@ from hypothesis import settings  # noqa: E402
 from metamorphic.common import (CHECKS, DATASET_REVISION, DEVIATIONS, HOLDS, MANIFEST_SHA256, POOLS,  # noqa: E402
                                REAL, RELATIONS, RUN_IN_CI, manifest_sha256)
 
+from metamorphic.mutation_check import MUTATIONS  # noqa: E402
+
 COMMAND = "PYTHONPATH=. uv run python tests/metamorphic/render_certificate.py --write"
 MODULES = sorted(p.stem for p in HERE.glob("test_*.py") if p.stem != "test_certificate")
 
@@ -114,6 +116,8 @@ def evidence(label: str) -> str:
             extra = (f", {own} listed as deviating" if own else f": {c['note']}" if c["note"] else
                      ", none deviates")
             parts.append(f"all {size:,} {name}{extra}")
+    if killers := sum(m[0] == label for m in MUTATIONS):
+        parts.append(f"fails on each of {killers} mutations of the scorer's rule (mutation_check.py)")
     return "; ".join(dict.fromkeys(parts))
 
 
@@ -168,6 +172,9 @@ def render() -> str:
         "- Effects on scores marked 'Measured on cached leaderboard re-runs' cannot "
         "be re-run from this package.",
         "- A deviation whose effect is 'unknown' is one that could change a score: treat it as open.",
+        "- A relation that says it 'fails on each of N mutations' was run against N copies of the scorer, "
+        "each with the rule it pins removed or changed, and failed on every one (`mutation_check.py`; CI "
+        "does not run it).",
         "- M104 to M120 are taken from the perturbation catalogue of ParseBench-2 (arXiv 2611.17400, "
         "Appendix A.2, "
         "CC BY 4.0), written as relations from this scorer's documented rules.",
@@ -224,7 +231,8 @@ CERTIFICATE_TESTS = ("test_the_certificate_is_current", "test_each_status_matche
                      "test_the_certificate_pools_are_the_loaded_tests",
                      "test_the_certificate_counts_the_examples_it_says_ran_in_ci",
                      "test_every_deviation_cites_files_that_exist",
-                     "test_the_run_report_flags_a_mismatch")
+                     "test_the_run_report_flags_a_mismatch",
+                     "test_every_mutation_names_a_relation_and_a_scorer_text_that_exists")
 
 
 def dataset_revision() -> tuple[str, bool]:

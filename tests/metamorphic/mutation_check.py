@@ -1,0 +1,338 @@
+# ruff: noqa: E501
+"""Mutation check: each relation of M126 to M144 must FAIL when the scorer rule it pins is removed or changed.
+
+Not a test file (pytest does not collect it). From the repository root:
+
+    PYTHONPATH=. uv run python tests/metamorphic/mutation_check.py            # every mutation
+    PYTHONPATH=. uv run python tests/metamorphic/mutation_check.py M131 M137  # some relations
+
+For each mutation it copies `omni_parse_bench` to a temporary folder, replaces `old` with `new` in one file,
+and runs that relation's test against the copy (the copy first on `sys.path`; the run asserts the package it
+imported is the copy). It first runs every relation against an unchanged copy, which must pass: otherwise
+the run would prove nothing. A mutation is *killed* when the relation fails. It exits non-zero when a mutation
+survives or its `old` text is no longer in the file. `test_certificate.py` checks the `old` text of each is
+still in the scorer, and the certificate counts the mutations that kill each relation.
+"""
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path[:0] = [str(ROOT / "tests")]    # as pytest puts it: conftest, test_invariants, metamorphic
+# (relation label, file under omni_parse_bench, text to find, text to put there)
+MUTATIONS: list[tuple[str, str, str, str]] = [
+    ('M126', 'normalize.py',
+     's = _SUPERSCRIPT_DIGITS.sub(r" \\1", s)',
+     'pass'),
+    ('M126', 'normalize.py',
+     '_SUPERSCRIPT_DIGITS = re.compile("(?<=\\\\d)',
+     '_SUPERSCRIPT_DIGITS = re.compile("(?<=\\\\D)'),
+    ('M127', 'normalize.py',
+     '_INVISIBLE = re.compile(',
+     '_INVISIBLE = re.compile("(?!)")\n_UNUSED = re.compile('),
+    ('M127', 'normalize.py',
+     '"[\\ue000-\\uf8ff" + ',
+     '"[" + '),
+    ('M127', 'normalize.py',
+     '_VISIBLE_FORMAT = frozenset("',
+     '_VISIBLE_FORMAT = frozenset("" and "'),
+    ('M127', 'normalize.py',
+     '== "Cf" and c not in',
+     '== "Zz" and c not in'),
+    ('M128', 'normalize.py',
+     '_SQUOTE = re.compile("[‘’‚‛ʼ`´′ꞌꞋˈ]")',
+     '_SQUOTE = re.compile("[‘’‚‛ʼ`´′]")'),
+    ('M128', 'normalize.py',
+     '_SQUOTE = re.compile("[‘’‚‛ʼ`´′ꞌꞋˈ]")',
+     '_SQUOTE = re.compile("[‘’‚‛ʼ`´′ˈ]")'),
+    ('M133', 'scorers/unit_tests/runners.py',
+     'groups = [table.text[c] for c in tables.beside(table, rc) if tables.spanning_rows(table, c)]',
+     'groups = []'),
+    ('M140', 'scorers/unit_tests/runners.py',
+     'wholes.append(bool(tables.parse(html[begun:m.end()])))',
+     'wholes.append(True)'),
+    ('M139', 'scorers/unit_tests/compare.py',
+     'built[t.output_type] = _view(t.output_type, pred[t.output_type])',
+     'built[t.output_type] = next((b for b in built.values() if isinstance(b, Verdict)), _view(t.output_type, pred[t.output_type]))'),
+    ('M135', 'tables.py',
+     'in_thead = tr.find_parent("thead") is not None',
+     'in_thead = False'),
+    ('M141', 'scorers/unit_tests/unit_tests.py',
+     'raise errors.SystemFailed(',
+     'raise ValueError('),
+    ('M128', 'normalize.py',
+     '_SQUOTE = re.compile("[‘’‚‛ʼ`´′ꞌꞋˈ]")',
+     '_SQUOTE = re.compile("[’]")'),
+    ('M128', 'normalize.py',
+     '.replace(_TEX_QUOTE, \'"\')',
+     ''),
+    ('M128', 'normalize.py',
+     '_DQUOTE = re.compile("[“”„‟«»]")',
+     '_DQUOTE = re.compile("[“”„‟]")'),
+    ('M128', 'normalize.py',
+     '_DQUOTE = re.compile("[“”„‟«»]")',
+     '_DQUOTE = re.compile("[“”„‟«»]")\n_SQUOTE = re.compile("[‘’‚‛ʼ`´′ꞌꞋˈ\\"]")'),
+    ('M129', 'normalize.py',
+     'for pattern, arrow in _ARROWS:',
+     'for pattern, arrow in ():'),
+    ('M129', 'normalize.py',
+     '\\u21c9\\u21d2',
+     '\\u21c9'),
+    ('M129', 'normalize.py',
+     '"\\u2b05\\u2b60',
+     '"\\u2b60'),
+    ('M129', 'normalize.py',
+     '"\\u2b06\\u2b61',
+     '"\\u2b61'),
+    ('M130', 'normalize.py',
+     '.translate(_CJK_PUNCT)',
+     ''),
+    ('M130', 'normalize.py',
+     '"。": ".", "，"',
+     '"。": ",", "，"'),
+    ('M130', 'normalize.py',
+     '"、": ","',
+     '"、": "."'),
+    ('M131', 'normalize.py',
+     's = _DECIMAL_MIDDOT.sub(".", s)',
+     's = s'),
+    ('M131', 'normalize.py',
+     '(?:(?<=\\d)|(?<![^\\W_])(?<![)\\]}]))[·∙](?=\\d)',
+     '[·∙](?=\\d)'),
+    ('M131', 'normalize.py',
+     'if _digit_at(s, m.start() - 1, -1) and _digit_at(s, m.end(), 1):',
+     'if False:'),
+    ('M132', 'normalize.py',
+     '{_IN_BLOCK_SPACE}*){{3,}}"\n',
+     '{_IN_BLOCK_SPACE}*){{2,}}"\n'),
+    ('M132', 'normalize.py',
+     '{_IN_BLOCK_SPACE}*){{3,}}"\n',
+     '{_IN_BLOCK_SPACE}*){{4,}}"\n'),
+    ('M132', 'normalize.py',
+     '(?:={_IN_BLOCK_SPACE}*){{3,}}',
+     '(?:={_IN_BLOCK_SPACE}*){{2,}}'),
+    ('M132', 'normalize.py',
+     '(?:={_IN_BLOCK_SPACE}*){{3,}}',
+     '(?:={_IN_BLOCK_SPACE}*){{4,}}'),
+    ('M132', 'normalize.py',
+     '(?:\\*{_IN_BLOCK_SPACE}*){{3,}}',
+     '(?:\\*{_IN_BLOCK_SPACE}*){{2,}}'),
+    ('M132', 'normalize.py',
+     '(?:\\*{_IN_BLOCK_SPACE}*){{3,}}',
+     '(?:\\*{_IN_BLOCK_SPACE}*){{4,}}'),
+    ('M136', 'scorers/unit_tests/runners.py',
+     'TABLE_MIN_RATIO = 0.5',
+     'TABLE_MIN_RATIO = 0.0'),
+    ('M136', 'scorers/unit_tests/runners.py',
+     'TABLE_MIN_RATIO = 0.5',
+     'TABLE_MIN_RATIO = 0.4'),
+    ('M136', 'scorers/unit_tests/runners.py',
+     'TABLE_MIN_RATIO = 0.5',
+     'TABLE_MIN_RATIO = 0.6'),
+    ('M137', 'scorers/unit_tests/runners.py',
+     'AS_TEXT = frozenset({"text", "list", "form"})',
+     'AS_TEXT = frozenset({"text", "list"})'),
+    ('M137', 'scorers/unit_tests/runners.py',
+     'AS_TEXT = frozenset({"text", "list", "form"})',
+     'AS_TEXT = frozenset({"text", "form"})'),
+    ('M137', 'scorers/unit_tests/runners.py',
+     'AS_TEXT = frozenset({"text", "list", "form"})',
+     'AS_TEXT = frozenset({"text"})'),
+    ('M137', 'scorers/unit_tests/runners.py',
+     'AS_TEXT = frozenset({"text", "list", "form"})',
+     'AS_TEXT = frozenset({"text", "list", "form", "caption"})'),
+    ('M137', 'scorers/unit_tests/runners.py',
+     'ok = b.label in AS_TEXT if t.kind == "text" else b.label == t.kind',
+     'ok = b.label in AS_TEXT if t.kind in ("text", "heading") else b.label == t.kind'),
+    ('M137', 'scorers/unit_tests/runners.py',
+     'ok = b.label in AS_TEXT if t.kind == "text" else b.label == t.kind',
+     'ok = b.label == t.kind'),
+    ('M133', 'tables.py',
+     'run.insert(0, table.text[label])',
+     'run = [table.text[label]]'),
+    ('M133', 'tables.py',
+     'if run and any(x is not None and table.text[x].strip() for x in table.grid[r]): break',
+     'continue'),
+    ('M133', 'scorers/unit_tests/runners.py',
+     'groups += [table.text[first]] if first is not None and first != rc else []',
+     'pass'),
+    ('M133', 'scorers/unit_tests/runners.py',
+     'runs = [run, tables.section(table, rc, repeated=lambda x: _one_of(want, x, thr, t.section))]',
+     'runs = [run]'),
+    ('M133', 'scorers/unit_tests/runners.py',
+     'if not in_run and not any(_one_of(want, g, thr, t.section) for g in groups):',
+     'if not in_run and not any(_one_of(want, g, thr, t.section) for g in groups) and False:'),
+    ('M133', 'tables.py',
+     'if len(across) == 1 and (x := next(iter(across)))[0] == r and table.text[x].strip() and width > 1:',
+     'if False:'),
+    ('M134', 'scorers/unit_tests/runners.py',
+     'if t.row_groups and not _in_order(t.row_groups, left, t.max_diffs):',
+     'if False:'),
+    ('M134', 'scorers/unit_tests/runners.py',
+     'return _greedy(want, got, max_diffs, False) or _greedy(want, got, max_diffs, True)',
+     'return all(any(_one_of(_fold_cell(w), g, _cell_threshold(_fold_cell(w), max_diffs)) for g in got) for w in want)'),
+    ('M134', 'tables.py',
+     'x = _filled(table, ((i, c) for i in range(r - 1, -1, -1)), stop=table.headings)',
+     'x = None'),
+    ('M134', 'tables.py',
+     'if x is not None and x not in out: out.append(x)\n    return out\n\n\ndef _empty',
+     'if x is not None and x not in out: out.insert(0, x)\n    return out\n\n\ndef _empty'),
+    ('M135', 'tables.py',
+     'if c != cell and c in table.headings and table.text.get(c, "").strip(): headings.add(c)',
+     'if c != cell and table.text.get(c, "").strip(): headings.add(c)'),
+    ('M135', 'tables.py',
+     'return frozenset((headings or ends) - {cell})',
+     'return frozenset(ends - {cell})'),
+    ('M135', 'scorers/unit_tests/runners.py',
+     'walk = {"top_heading": "up", "left_heading": "left", "right_heading": "right"}',
+     'walk = {"top_heading": "up", "left_heading": "up", "right_heading": "right"}'),
+    ('M135', 'scorers/unit_tests/runners.py',
+     'walk = {"top_heading": "up", "left_heading": "left", "right_heading": "right"}',
+     'walk = {"top_heading": "up", "left_heading": "right", "right_heading": "right"}'),
+    ('M138', 'scorers/unit_tests/compare.py',
+     'if pred.get(t.output_type) is None:',
+     'if t.output_type not in pred:'),
+    ('M138', 'scorers/unit_tests/compare.py',
+     'if pred.get(t.output_type) is None:',
+     'if (pred.get(t.output_type) or pred.get("html")) is None:'),
+    ('M138', 'scorers/unit_tests/compare.py',
+     'f"no {t.output_type} output"',
+     'f"missing {t.output_type}"'),
+    ('M138', 'scorers/unit_tests/compare.py',
+     'if pred.get(t.output_type) is None:',
+     'if False:'),
+    ('M139', 'scorers/unit_tests/compare.py',
+     'f"malformed {output_type} output: {e}"',
+     'f"bad {output_type}: {e}"'),
+    ('M139', 'scorers/unit_tests/compare.py',
+     'except views.MalformedOutput as e:\n        return',
+     'except views.MalformedOutput as e:\n        raise\n        return'),
+    ('M139', 'views.py',
+     '    if not isinstance(s, str):\n        raise MalformedOutput',
+     '    if False:\n        raise MalformedOutput'),
+    ('M139', 'views.py',
+     'if not isinstance(raw, list):',
+     'if False:'),
+    ('M139', 'views.py',
+     'if not (isinstance(b, dict) and {"label", "bbox"} <= set(b) <= {"label", "bbox", "text"}):',
+     'if not isinstance(b, dict):'),
+    ('M139', 'views.py',
+     'if not (isinstance(label, str) and label in LABELS):',
+     'if not isinstance(label, str):'),
+    ('M139', 'views.py',
+     'all(\n                isinstance(x, (int, float)) and not isinstance(x, bool) and 0 <= x <= 1 for x in bbox)',
+     'all(\n                isinstance(x, (int, float)) and 0 <= x <= 1 for x in bbox)'),
+    ('M139', 'views.py',
+     'isinstance(x, (int, float)) and not isinstance(x, bool) and 0 <= x <= 1 for x in bbox',
+     'isinstance(x, (int, float)) and not isinstance(x, bool) for x in bbox'),
+    ('M139', 'views.py',
+     'isinstance(bbox, (list, tuple)) and len(bbox) == 4 and',
+     'isinstance(bbox, (list, tuple)) and'),
+    ('M139', 'views.py',
+     'if not (text is None or isinstance(text, str)):',
+     'if False:'),
+    ('M140', 'scorers/unit_tests/runners.py',
+     'return False, "no tables found"',
+     'return False, "no table"'),
+    ('M140', 'scorers/unit_tests/runners.py',
+     'if b is None: return _mark(False, f"no block covers {MIN_PLACE_COVER:.0%} of its place")',
+     'if b is None: return _mark(False, "no block")'),
+    ('M141', 'scorers/unit_tests/unit_tests.py',
+     'return self.score({}, tests)',
+     'return self.score({"html": "", "blocks": []}, tests)'),
+    ('M141', 'scorers/unit_tests/unit_tests.py',
+     'len(pages) == 1 and',
+     'len(pages) >= 1 and'),
+    ('M141', 'scorers/unit_tests/unit_tests.py',
+     'isinstance(pages, list) and',
+     'True and'),
+    ('M142', 'scorers/unit_tests/unit_tests.py',
+     'float(statistics.fmean(head))',
+     'float(statistics.median(head))'),
+    ('M142', 'scorers/unit_tests/unit_tests.py',
+     'float(statistics.fmean(head))',
+     'float(max(head))'),
+    ('M142', 'vocab.py',
+     'HEADLINE_FAMILIES = ("text", "tables", "layout")',
+     'HEADLINE_FAMILIES = ("text", "tables", "layout", "format")'),
+    ('M142', 'vocab.py',
+     'HEADLINE_FAMILIES = ("text", "tables", "layout")',
+     'HEADLINE_FAMILIES = ("text", "tables")'),
+    ('M142', 'scorers/unit_tests/unit_tests.py',
+     'or [x["score"] for x in families.values()])',
+     'or [0.0])'),
+    ('M142', 'scorers/unit_tests/unit_tests.py',
+     'c["passed"] += ok',
+     'c["passed"] += 1'),
+    ('M142', 'vocab.py',
+     '"page_near_empty": "text",',
+     '"page_near_empty": "layout",'),
+    ('M143', 'scorers/unit_tests/unit_tests.py',
+     'c["tests"] += 1',
+     'c["tests"] += 1 if c["tests"] < 3 else 0'),
+    ('M143', 'scorers/unit_tests/unit_tests.py',
+     '"score": passed[k] / n,',
+     '"score": passed[k] / n if n < 6 else passed[k] / (n + 1),'),
+    ('M144', 'scorers/unit_tests/unit_tests.py',
+     '"result": v.result, "why": v.why}\n            for v in verdicts]',
+     '"result": "pass", "why": v.why}\n            for v in verdicts]'),
+    ('M144', 'scorers/unit_tests/unit_tests.py',
+     'result |= _count((v.result == "pass",',
+     'result |= _count((True,'),
+]
+
+
+
+def node(label: str) -> str:
+    """The pytest id of the test that states relation `label`."""
+    from metamorphic.render_certificate import load_every_test_file
+    from metamorphic.common import RELATIONS
+    load_every_test_file()
+    fn = RELATIONS[label]["fn"]
+    return f"{Path(sys.modules[fn.__module__].__file__).relative_to(ROOT)}::{fn.__name__}"
+
+
+def run(node_id: str, edit: tuple[str, str, str] | None) -> int:
+    """pytest's exit code for `node_id` against a copy of the scorer with `edit` = (file, old, new) applied."""
+    with tempfile.TemporaryDirectory() as tmp:
+        copy = Path(tmp) / "omni_parse_bench"
+        shutil.copytree(ROOT / "omni_parse_bench", copy, ignore=shutil.ignore_patterns("__pycache__"))
+        if edit:
+            path, old, new = edit
+            text = (copy / path).read_text()
+            if old not in text:
+                return 99
+            (copy / path).write_text(text.replace(old, new))
+        code = (f"import sys; sys.path.insert(0, {tmp!r}); import omni_parse_bench; "
+                f"assert omni_parse_bench.__file__.startswith({tmp!r}); import pytest; "
+                f"sys.exit(pytest.main(['-q', '-x', '-p', 'no:cacheprovider', '--no-header', '-rN', {node_id!r}]))")
+        done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True,
+                              env={**os.environ, "PYTHONPATH": str(ROOT / "tests") + os.pathsep + str(ROOT)})
+        return done.returncode
+
+
+def main(labels: list[str]) -> int:
+    if unknown := set(labels) - {m[0] for m in MUTATIONS}:
+        print(f"no mutations for {sorted(unknown)}")
+        return 2
+    chosen = [m for m in MUTATIONS if not labels or m[0] in labels]
+    bad = 0
+    for label in dict.fromkeys(m[0] for m in chosen):
+        if (code := run(node(label), None)) != 0:
+            print(f"{label}: the control run on an unchanged copy failed (exit {code})")
+            bad += 1
+    for label, path, old, new in chosen:
+        code = run(node(label), (path, old, new))
+        verdict = {1: "killed", 0: "SURVIVED", 99: "TARGET NOT FOUND"}.get(code, f"ERROR (exit {code})")
+        bad += verdict != "killed"
+        print(f"{label:5} {path:30} {old[:50]!r} -> {new[:30]!r}: {verdict}")
+    return 1 if bad else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
