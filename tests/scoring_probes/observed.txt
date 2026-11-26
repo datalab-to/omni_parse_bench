@@ -131,6 +131,12 @@ blank-checkbox	fail	'Date of birth:' is followed by '☐' to the end of the page
 blank-markdown-mask	pass
 invent-repeated-one-filled	fail	'Date of birth:' is followed by '01/02/1990' before the next field
 invent-repeated-cell-paragraph	fail	'Date of birth:' is followed by '01/02/1990' before the next field
+blank-repeated-line	pass
+blank-repeated-row	pass
+invent-repeated-row	fail	'Date of birth:' cell's value cell (right) holds '01/02/1990'
+invent-table-right-column-below	fail	'Date of birth:' cell's value cell (below) holds '01/02/1990'
+invent-slashes-html	fail	'Date of birth:' is followed by '//' to the end of the page
+invent-after-one-column	fail	'Date of birth:' is followed by '01/02/1990' after its table, to the end of the page
 invent-before-label	fail	'Date of birth:' has '01/02/1990' before it
 invent-table-before-label	fail	'Date of birth:' has '01/02/1990' before it
 invent-table-left	fail	'Date of birth:' cell's value cell (left) holds '01/02/1990'
@@ -547,7 +553,9 @@ cell-empty-twice	fail	cells matching '100' found, but: right '200' isn't empty
 cell-empty-twice-blank	pass
 cell-empty-second-line	fail	cells matching '100' found, but: the cell holds more than '100': '100 200'
 cell-end-next-table	fail	cells matching '70' found, but: down: a table continuing this one holds 'tax', '9', '8'
-cell-end-repeated-header	fail	cells matching '70' found, but: down: a table continuing this one holds 'tax', '9', '8'
+cell-end-repeated-header	pass
+cell-end-twice	pass
+cell-end-wrapped	fail	cells matching '70' found, but: down: a table continuing this one holds 'tax', '9', '8'
 cell-end-other-header	pass
 cell-end-text-between	pass
 cell-end-up	fail	cells matching 'Item' found, but: up: row 1 holds 'report'

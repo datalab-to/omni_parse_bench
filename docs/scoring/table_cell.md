@@ -144,12 +144,13 @@ beside it, so a copy of that value passes. Two args say it, on `up`, `down`, `le
   the why is `no right cell`. A `colspan` that covers the slot fails.
 - `{"end": true}`: no cell in any row below (`down`), column to the right (`right`), row above (`up`) or column
   to the left (`left`) of the cell has text. Empty rows and columns pass: they invent nothing. The why names the
-  first row or column that holds text (`down: row 3 holds '9', '8'`). A table written right after the anchor's table
-  (nothing but white space between) that goes on from it counts too: below, one with as many columns and no heading,
-  or one that prints the same first row again (the header of a table split over pages; that row is left out); to the
-  right, one with as many rows and no heading. For `up` and `left` it is the table written right before. A table with a
-  heading of its own, another width, or text between is another table (cases cell-end-next-table,
-  cell-end-repeated-header, cell-end-other-header, cell-end-text-between).
+  first row or column that holds text (`down: row 3 holds '9', '8'`). A table written right after the anchor's table (nothing visible between them: white space, a comment, an empty
+  element, or wrapper `<div>`s do not count) that goes on from it counts too: below, one with as many columns and no
+  heading; to the right, one with as many rows and no heading. For `up` and `left` it is the table written right
+  before. A table with a heading of its own, another width, text before it, or the anchor again (a copy, judged as
+  the anchor's table is) is another table (cases cell-end-next-table, cell-end-wrapped, cell-end-other-header,
+  cell-end-text-between, cell-end-twice). A second table that prints the header again is not told from an
+  independent table of the same shape, so its rows are not read (case cell-end-repeated-header).
 
 **Every cell that matches.** With `empty` or `end`, every cell that matches `cell` and holds the test's other relations,
 headings, section and row groups, in every table, must have the shape, and must hold nothing but `cell`: a second line in
@@ -202,7 +203,9 @@ Fixture T, used by the cases below:
 | I | the table written twice, empty in both | `100`, right `empty` | T + T | pass | `cell-empty-twice-blank` |
 | P | a second line in the anchor's cell | `100`, right `empty` | T[`<td>100</td>` → `<td>100<br>200</td>`] | fail: `cells matching '100' found, but: the cell holds more than '100': '100 200'` | `cell-empty-second-line` |
 | P | a headerless table of the same width right after the table goes on from it | `70`, down `end` | T + a table `Tax 9 8` | fail: `cells matching '70' found, but: down: a table continuing this one holds 'tax', '9', '8'` | `cell-end-next-table` |
-| P | a table right after it that prints the header again goes on from it | `70`, down `end` | T + a table with T's header and a row `Tax 9 8` | fail: `cells matching '70' found, but: down: a table continuing this one holds 'tax', '9', '8'` | `cell-end-repeated-header` |
+| B | a table right after it that prints the header again is read as a second table: its rows are not read (a limit) | `70`, down `end` | T + a table with T's header and a row `Tax 9 8` | pass | `cell-end-repeated-header` |
+| I | the table written twice: each copy ends | `70`, down `end` | T + T | pass | `cell-end-twice` |
+| P | a headerless table in the next `<div>`: nothing visible between | `70`, down `end` | T in a div + a div with a table `Tax 9 8` | fail: `cells matching '70' found, but: down: a table continuing this one holds 'tax', '9', '8'` | `cell-end-wrapped` |
 | I | a table with a header of its own is another table | `70`, down `end` | T + a table with another header | pass | `cell-end-other-header` |
 | I | text between the tables: another table | `70`, down `end` | T + a paragraph + a table `Tax 9 8` | pass | `cell-end-text-between` |
 | P | an invented header row above | `Item`, up `end` | `<table><tr><td>Report</td><td></td><td></td></tr><tr><th>Item</th><th>Q1</th><th>Q2</th></tr></table>` | fail: `cells matching 'Item' found, but: up: row 1 holds 'report'` | `cell-end-up` |
@@ -225,8 +228,10 @@ Fixture T, used by the cases below:
 - **Footnote markers cost here** and not in `present` (cases cell-sup, text-sup-marker).
 - **`empty` and `end` read the markup.** A note printed under a table but moved into its last row fails `down: end`
   without any invention, so the gold must not use `end` on a table with something printed below. A table the output
-  splits in two, a second table right after the first, goes on from it only as described above: a paragraph written
-  after the table, a caption, or a column table with a header beside it is not read. In a right-to-left
+  splits in two, a second table right after the first, goes on from it only as described above. Not read: a row
+  written as a paragraph after the table (`<p>Tax 9 8</p>`, or the markdown row `Tax | 9 | 8` after a blank line), a
+  caption (`<caption>Table 9. Invented</caption>`), a column written as a table with its own header beside it
+  (`<table><tr><th>Q3</th></tr><tr><td>5</td></tr></table>`), and a split table that repeats its header. In a right-to-left
   table `right` is the html's last cell, the visual left. `...` and other leaders fold to blank, so a cell holding
   only dots reads as empty.
 - **A cell is not its own edge heading**: the last cell of a row fails a `right_heading` test for itself (case

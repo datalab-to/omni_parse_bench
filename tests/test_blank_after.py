@@ -400,3 +400,35 @@ def test_a_printed_mask_of_underscores_survives_markdown():
     assert passes(page)
     assert not passes(markdown.to_html(f"{DOB} {MASK} 1990\n\nPlace of birth: Paris"))
     assert not passes(markdown.to_html(f"{DOB} 1990\n\nPlace of birth: Paris"))
+
+
+def test_a_label_printed_twice_blank_is_faithful_in_every_layout_and_one_filled_copy_fails():
+    two = f"{DOB} {MASK} {DOB} {MASK}"
+    assert passes(f"<p>{two} Place of birth: Paris</p>")
+    assert not passes(f"<p>{DOB} {MASK} {DOB} {MASK} 1990 Place of birth: Paris</p>")
+    assert not passes(f"<p>{DOB} {MASK} 1990 {DOB} {MASK} Place of birth: Paris</p>")
+    assert passes(rows(f"<td>{DOB}</td><td></td><td>{DOB}</td><td></td>"))
+    assert passes(rows(f"<td>{DOB}</td><td></td><td></td><td>{DOB}</td><td></td>"))
+    assert not passes(rows(f"<td>{DOB}</td><td></td><td>{DOB}</td><td>1990</td>"))
+    assert not passes(rows(f"<td>{DOB}</td><td></td><td>1990</td><td>{DOB}</td><td></td>"))
+
+
+def test_the_value_may_be_in_the_blank_right_cells_column_below():
+    value = rows(f"<td>{DOB}</td><td></td>", "<td></td><td>12/03/1985</td>", "<td>Name:</td><td>Ann Lee</td>")
+    assert not passes(value)
+    assert passes(value.replace("12/03/1985", ""))
+    assert passes(rows(f"<td>{DOB}</td><td></td>", "<td>Name:</td><td>Ann Lee</td>"))
+    assert passes(rows(f"<td>{DOB}</td><td>Place of birth:</td>", "<td></td><td>Paris</td>"))
+
+
+def test_a_one_column_table_does_not_read_below_but_its_tail_is_the_region():
+    assert not passes(rows(f"<td>{DOB}</td>") + "<p>1990</p>")
+    assert passes(rows(f"<td>{DOB}</td>") + "<p>Place of birth: Paris</p>")
+    assert passes(rows(f"<td>{DOB}</td>", "<td>Name:</td>") + "<p>1990</p>")    # a label below: not the end
+
+
+def test_a_literal_slash_pair_is_not_the_markdown_mask():
+    assert not passes(f"<p>{DOB} //</p>")
+    assert passes(f"<p>{DOB} {MASK}</p>")
+    assert passes(markdown.to_html(f"{DOB} {MASK}"))
+    assert not passes(markdown.to_html(f"{DOB} {MASK}") .replace("</p>", " //</p>"))

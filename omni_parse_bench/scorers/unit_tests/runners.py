@@ -20,7 +20,7 @@ from fuzzysearch.common import group_matches
 from fuzzysearch.levenshtein import find_near_matches_levenshtein
 from rapidfuzz import fuzz
 
-from omni_parse_bench import marks, normalize, tables, views
+from omni_parse_bench import markdown, marks, normalize, tables, views
 from omni_parse_bench.scorers.unit_tests import hyphenation
 
 # Note: a ratio test (table_cell, or present's first pass) allowing k edits in an n-character string
@@ -114,6 +114,7 @@ class Present(NamedTuple):
     blank_after: bool = False
     printed: Text | None = None     # the field's printed placeholder (`__/__/____`), allowed once
     stops: tuple[Text, ...] = ()    # every other field label on the page: where a field's region ends
+    md_mask: str | None = None      # `printed` as markdown writes it (set by the scorer)
 
 
 def present(t: Present, v: views.Html) -> Mark:
@@ -144,6 +145,7 @@ def blank_after(t: Present, v: views.Html) -> Mark:
     if not ok:
         return False, why
     label = t.content.text
+    t = t._replace(md_mask=_md_mask(t, v.html))
     flow, spans, loose, chunks = _flow(v.html)
     reasons: list[str] = []
     copies = 0
@@ -186,7 +188,7 @@ def _before(label: str, t: Present, hay: str, start: int) -> str:
     prior = hay[:start]
     if _PLACEHOLDER.fullmatch(prior):
         return ""
-    for x in t.stops:
+    for x in [*t.stops, t.content]:    # an earlier copy of the label is judged by its own region
         if (f := normalize.fold(x.text)) and any(b <= start for _, b in _copies(f, hay, False)):
             return ""
     return f"{label[:60]!r} has {prior.strip()[:60]!r} before it"
@@ -291,14 +293,27 @@ def _regions(t: Present, hay: str) -> list[tuple[int, str, bool]]:
     return out
 
 
+def _md_mask(t: Present, html: str) -> str | None:
+    """The printed placeholder as the markdown converter writes it (`__/__/____` is read as bold and comes out
+    as `//`), folded, when the page holds the converter's html for it: a page written in markdown. A literal
+    `//` in html is not that mask."""
+    if t.printed is None or "_" not in t.printed.text:
+        return None
+    converted = markdown.to_html(t.printed.text).strip()
+    inner = re.sub(r"^<p>|</p>$", "", converted)
+    if inner == t.printed.text or inner not in html:
+        return None
+    return normalize.fold(views.text(converted, alt=False)).strip() or None
+
+
 def _rest(t: Present, region: str) -> str:
     """What a field's region shows besides one copy of its printed placeholder and the characters a blank
-    shows; "" when it is blank. A mask of underscores that markdown read as bold (`__/__/____` written as
-    `//`, its underscores gone) is the printed placeholder too."""
+    shows; "" when it is blank. A mask of underscores that a markdown page lost to bold (`_md_mask`) is the
+    printed placeholder too."""
     if t.printed is not None:
         printed = normalize.fold(t.printed.text)
-        for mask in (printed, printed.replace(" ", ""), re.sub(r"_+", "", printed)):
-            if mask.strip() and mask in region:
+        for mask in (printed, printed.replace(" ", ""), t.md_mask):
+            if mask and mask.strip() and mask in region:
                 region = region.replace(mask, "", 1)
                 break
     return "" if _PLACEHOLDER.fullmatch(region) else region.strip()
@@ -313,39 +328,42 @@ def _value_cell(t: Present, table: tables.Table, rc: tables.Cell) -> tuple[str, 
     to another field's label (a header-row layout, a label in the last column, a blank cell to the right);
     and the cells to its left, back to another field's label (the value of that field, not this one's). An
     image is a value. Neighbors are read raw (no stand-in)."""
-    stops = [f for x in t.stops if (f := normalize.fold(x.text))]
+    # another field's label, or another copy of this one, ends a region
+    stops = [f for x in [*t.stops, t.content] if (f := normalize.fold(x.text))]
     def is_label(x: tables.Cell) -> bool:
-        """Whether the cell's whole text is another field's label."""
+        """Whether the cell's whole text is a field's label."""
         return _fold_cell(table.text[x]) in stops
     def has_label(x: tables.Cell) -> bool:
-        """Whether another field's label is written in the cell."""
+        """Whether a field's label is written in the cell."""
         hay = _fold_cell(table.text[x])
         return any(_copies(f, hay, False) for f in stops)
     def value(x: tables.Cell | None) -> str:
-        """What the cell shows: "" for a blank one or another field's label."""
+        """What the cell shows: "" for a blank one or a field's label."""
         if x is None or is_label(x):
             return ""
         return _rest(t, _fold_cell(table.text[x])) or ("an image" if x in table.figures else "")
     rows, cols = table.covers[rc]
     width = len(table.grid[0])
-    for r in rows:    # to the left, back to another field's label
+    for r in rows:    # to the left, back to a field's label
         seen = list(dict.fromkeys(x for x in reversed(table.grid[r][:min(cols)]) if x is not None))
         held = [v for x in seen if (v := value(x))]
         if held and not any(has_label(x) for x in seen):
             return f"value cell (left) holds {held[0][:60]!r}", False
-    for r in rows:    # to the right, up to another field's label
-        for x in dict.fromkeys(x for x in table.grid[r][max(cols) + 1:] if x is not None):
+    value_cols: set[int] = set(cols)    # the columns the value may be written in, below
+    for r in rows:    # to the right, up to a field's label
+        for c in range(max(cols) + 1, width):
+            if (x := table.grid[r][c]) is None:
+                continue
             if is_label(x):
                 break
             if v := value(x):
                 return f"value cell (right) holds {v[:60]!r}", False
-    if width == 1:
-        return "", False
-    for r in range(max(rows) + 1, len(table.grid)):    # below, up to another field's label
-        slots = [x for x in dict.fromkeys(table.grid[r][c] for c in cols) if x is not None]
-        if any(is_label(x) for x in slots):
+            value_cols.add(c)
+    for r in range(max(rows) + 1, len(table.grid)):    # below, down to a field's label in the label's columns
+        if any(x is not None and is_label(x) for x in (table.grid[r][c] for c in cols)):
             return "", False
-        if held := [v for x in slots if (v := value(x))]:
+        if width > 1 and (held := [v for x in dict.fromkeys(table.grid[r][c] for c in sorted(value_cols))
+                                   if (v := value(x))]):
             return f"value cell (below) holds {held[0][:60]!r}", False
     return "", True
 
@@ -575,6 +593,9 @@ def table_cell(t: TableCell, v: views.Html) -> Mark:
     cell = _fold_cell(t.cell)
     thr = _cell_threshold(cell, t.max_diffs)
     expected = {k: _fold_cell(x) for k, x in t.relations.items() if x}
+    def again(other: tables.Table) -> bool:
+        """Whether a table holds the anchor cell too."""
+        return any(_one_of(cell, x, thr, t.cell) for x in other.text.values())
     reasons: list[str] = []    # why a cell is not the anchor
     held: list[str] = []       # why an anchor has something beside it
     anchors = 0
@@ -592,7 +613,7 @@ def table_cell(t: TableCell, v: views.Html) -> Mark:
             # a shape guard says nothing was invented beside the cell, so every such cell must hold it
             if not _one_of(cell, table.text[rc], thr, t.cell, lines=False):
                 held.append(f"the cell holds more than {t.cell!r}: {_fold_cell(table.text[rc])!r}")
-            held += [why for k, shape in t.shapes.items() if (why := _shape(ts, i, rc, k, shape))]
+            held += [why for k, shape in t.shapes.items() if (why := _shape(ts, i, rc, k, shape, again))]
     if anchors and not held:
         return True, ""
     if not (reasons or held):
@@ -1200,7 +1221,8 @@ def _slots(table: tables.Table, rc: tables.Cell, kind: str) -> list[tables.Cell 
     return [table.grid[r][c] for r, c in slots]
 
 
-def _shape(ts: tuple[tables.Table, ...], i: int, rc: tables.Cell, kind: str, shape: str) -> str:
+def _shape(ts: tuple[tables.Table, ...], i: int, rc: tables.Cell, kind: str, shape: str,
+           again: Callable[[tables.Table], bool] = lambda _: False) -> str:
     """Why the cell at `rc` of table `ts[i]` fails `{"empty": true}` or `{"end": true}` on one side, or ""
     when it holds.
 
@@ -1232,7 +1254,7 @@ def _shape(ts: tuple[tables.Table, ...], i: int, rc: tables.Cell, kind: str, sha
         if cells:
             held = ", ".join(repr(_fold_cell(table.text[x]) or "an image") for x in cells[:3])
             return f"{kind}: {word} {n + 1} holds {held}{', ...' if len(cells) > 3 else ''}"
-    for other in _continuations(ts, i, kind):
+    for other in _continuations(ts, i, kind, again):
         for row in other.grid:
             if cells := [x for x in dict.fromkeys(row) if not _blank(other, x)]:
                 held = ", ".join(repr(_fold_cell(other.text[x]) or "an image") for x in cells[:3])
@@ -1240,43 +1262,34 @@ def _shape(ts: tuple[tables.Table, ...], i: int, rc: tables.Cell, kind: str, sha
     return ""
 
 
-def _continuations(ts: tuple[tables.Table, ...], i: int, kind: str) -> list[tables.Table]:
-    """The tables that go on from `ts[i]` past the side `kind`, with the rows (or columns) a continuation
-    repeats left out: a table written right after it (`Table.follower`) that has as many columns (`down`) or
-    rows (`right`) and has no heading, or, below, repeats its first row. One written right before it, with
+def _continuations(ts: tuple[tables.Table, ...], i: int, kind: str,
+                   again: Callable[[tables.Table], bool]) -> list[tables.Table]:
+    """The tables that go on from `ts[i]` past the side `kind`: a table written right after it
+    (`Table.follower`) that has as many columns (`down`) or rows (`right`) and no heading, and does not hold
+    the anchor again (then it is a copy, judged as the anchor's table is). One written right before it, with
     this table as the continuation, serves `up` and `left`. A continuation may be continued."""
     out: list[tables.Table] = []
     if kind in ("down", "right"):
         cur = ts[i]
-        while cur.follower is not None and _goes_on(cur, nxt := ts[cur.follower], kind):
-            out.append(_without_repeat(nxt, cur, kind))
+        while cur.follower is not None and _goes_on(cur, nxt := ts[cur.follower], kind) and not again(nxt):
+            out.append(nxt)
             cur = nxt
     else:
         before = {t.follower: k for k, t in enumerate(ts) if t.follower is not None}
         cur, k = ts[i], i
-        while (j := before.get(k)) is not None and _goes_on(ts[j], cur, "down" if kind == "up" else "right"):
+        while ((j := before.get(k)) is not None and _goes_on(ts[j], cur, "down" if kind == "up" else "right")
+               and not again(ts[j])):
             out.append(ts[j])
             cur, k = ts[j], j
     return out
 
 
 def _goes_on(a: tables.Table, b: tables.Table, kind: str) -> bool:
-    """Whether `b`, written right after `a`, goes on from it below (`down`) or to its right."""
-    if kind == "down":
-        same = len(a.grid[0]) == len(b.grid[0])
-        return same and (not b.headings or _first_row(a) == _first_row(b))
-    return len(a.grid) == len(b.grid) and not b.headings
-
-
-def _first_row(t: tables.Table) -> list[str]:
-    return [_fold_cell(t.text[x]) for x in dict.fromkeys(t.grid[0]) if x is not None]
-
-
-def _without_repeat(b: tables.Table, a: tables.Table, kind: str) -> tables.Table:
-    """`b` with its first row left out when it repeats `a`'s (a header printed again), for `down`."""
-    if kind == "down" and b.headings and _first_row(a) == _first_row(b):
-        return b._replace(grid=b.grid[1:])
-    return b
+    """Whether `b`, written right after `a`, goes on from it below (`down`, as many columns) or to its right
+    (as many rows), with no heading of its own. A table that prints its header again is not told from a
+    second table of the same shape, so it is read as one."""
+    same = len(a.grid[0]) == len(b.grid[0]) if kind == "down" else len(a.grid) == len(b.grid)
+    return same and not b.headings
 
 
 def _one_of(want: str, got: str, thr: float, raw: str = "", lines: bool = True) -> bool:

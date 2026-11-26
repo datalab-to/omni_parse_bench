@@ -305,8 +305,12 @@ def test_end_reads_a_table_that_goes_on_from_the_anchors():
     args = {"cell": text("70"), "down": END}
     assert verdict(args, TWO)
     assert not verdict(args, TWO + cont) and not verdict(args, TWO + "\n" + cont)
-    assert not verdict(args, TWO + f"<table>{HEAD}<tr><td>Tax</td><td>9</td><td>8</td></tr></table>")
-    assert verdict(args, TWO + f"<table>{HEAD}</table>")    # a repeated header only
+    assert verdict(args, TWO + f"<table><tr>{HEAD}</tr><tr><td>Tax</td><td>9</td><td>8</td></tr></table>")    # a limit: a second table with a header
+    assert verdict(args, TWO + TWO) and verdict(args, TWO + TWO.replace("100", "110").replace("70", "71"))
+    assert not verdict(args, TWO + TWO.replace("<td>80</td>", "<td>80</td></tr><tr><td>Tax</td><td>9</td><td>8</td>"))
+    assert not verdict(args, TWO + f"<div>{cont}</div>") and not verdict(args, TWO + f"<!-- x -->{cont}")
+    assert not verdict(args, f"<div>{TWO}</div><div>{cont}</div>") and not verdict(args, TWO + f"<p></p>\n{cont}")
+    assert verdict(args, TWO + "<p>Note</p>" + cont) and verdict(args, TWO + f"<div><p>Note</p>{cont}</div>")
     assert verdict(args, TWO + "<p>Note</p>" + cont)
     assert verdict(args, TWO + "<table><tr><th>Cost</th><th>Q3</th><th>Q4</th></tr><tr><td>Tax</td><td>9</td><td>8</td></tr></table>")
     assert verdict(args, TWO + "<table><tr><td>Tax</td><td>9</td></tr></table>")

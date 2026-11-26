@@ -207,7 +207,7 @@ view writes for an empty element (as `page_near_empty`). A copy inside a longer 
 stop, not the label. It also needs a plain `present` pass, so a `blank_after` pass is always a `present` pass.
 
 - **A label printed twice** is two fields, and both must be blank: a clean copy next to a filled one (a duplicated form
-  block, a table written twice) fails. A copy's region also ends at the next copy of the label. The price: a page that
+  block, a table written twice) fails. A copy's region also ends at the next copy of the label, and an earlier copy in the same line or row is that copy's, not a value before this one. The price: a page that
   prints one label twice with a real value beside one of them fails a faithful output, so a gold uses a label that is
   unique on the page, or one long enough to be (`Signature of the applicant:` for the second `Signature:`).
 - **Before the label,** the text before it in its paragraph, line (`<br>`) or cell must be blank, unless another stop comes
@@ -218,11 +218,13 @@ stop, not the label. It also needs a plain `present` pass, so a `blank_after` pa
   page. Remove one copy of `printed`; the field is blank when only white space and the characters `_`, `.`, `·` and `…`
   remain. Three or more of `_`, `.` or `-` already fold away as a leader; `__` and `..` stay, and are blank here; a lone
   `-`, `N/A`, `[blank]` and a checkbox are values. A mask of underscores that markdown read as bold (`__/__/____` written
-  in markdown, left as `//`) is the printed mask too.
+  in markdown, left as `//`) is the printed mask too, only when the page holds the converter's own html for it
+  (`<strong>/</strong>/____`); `//` written in html is a value.
 - **In a table cell,** the rest of the label's own cell (up to a stop) is the first region. If it is blank, the value
   cells are read in three directions, and each must show nothing but the same characters (an image is not blank):
-  every cell to its right, up to another field's label (its whole text is a stop); in a table of several columns, the cells
-  below it in its column, down to another field's label (a header-row layout, a label in the last column or a blank cell to
+  every cell to its right, up to another field's label (its whole text is a stop) or another copy of this one; in a table
+  of several columns, the cells below it, in its columns and in those of the blank cells to its right, down to a label in
+  its own columns (a header-row layout, a label in the last column or a blank cell to
   its right: the value is below); and the cells to its left, back to another field's label (the value of that field is
   not this one's). A cell whose whole text is a stop is a label, not a value; a cell that holds a stop and more
   (`Name: Ann`) is a value. A label that spans rows or columns needs every cell beside it blank. Cells are read as
@@ -232,8 +234,8 @@ stop, not the label. It also needs a plain `present` pass, so a `blank_after` pa
   goes on after `</table>`, up to the next stop or copy of the label: a value in a table or a paragraph written after
   it fails. The price: text printed after a form's last table that is no field's label (a footer, a note) counts as a
   value, so a gold lists every field label, and a note too, as a stop.
-- A label in one cell of a one-column table has no value column: the cells below are not read and the region does not go
-  on past the table.
+- A label in one cell of a one-column table has no value column: the cells below are not read, but when no label comes
+  below it the region goes on past the table, as above.
 
 Failure reasons: `'Date of birth:' not found ...` (plain `present`'s), `'Date of birth:' not found whole, at a word
 edge, in one paragraph or one table cell`, `'Date of birth:' is followed by '01/02/1990' before the next field` (or
@@ -271,6 +273,12 @@ edge, in one paragraph or one table cell`, `'Date of birth:' is followed by '01/
 | I | a mask of underscores in markdown: the converter reads `__` as bold, and the mask without its underscores is still the mask | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `Date of birth: __/__/____\n\nPlace of birth: Paris` | pass | `blank-markdown-mask` |
 | P | the label printed twice, one copy filled | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: 01/02/1990</p><p>Date of birth:</p>` | fail: `'Date of birth:' is followed by '01/02/1990' before the next field` | `invent-repeated-one-filled` |
 | P | the label in a table cell and in a paragraph: the paragraph's copy is filled | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: 01/02/1990</p><table><tr><td>Date of birth:</td><td></td></tr></table>` | fail | `invent-repeated-cell-paragraph` |
+| I | the label printed twice in one line, blank both times | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: __/__/____ Date of birth: __/__/____ Place of birth: Paris</p>` | pass | `blank-repeated-line` |
+| I | the label in two cells of one row, blank both times | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth:</td><td></td><td>Date of birth:</td><td></td></tr></table>` | pass | `blank-repeated-row` |
+| P | the label in two cells of one row, the second copy filled | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth:</td><td></td><td>Date of birth:</td><td>01/02/1990</td></tr></table>` | fail: `'Date of birth:' cell's value cell (right) holds '01/02/1990'` | `invent-repeated-row` |
+| P | a value below the blank right cell, in its column | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth:</td><td></td></tr><tr><td></td><td>01/02/1990</td></tr></table>` | fail: `'Date of birth:' cell's value cell (below) holds '01/02/1990'` | `invent-table-right-column-below` |
+| P | two slashes in html are not the markdown mask | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: //</p>` | fail | `invent-slashes-html` |
+| P | a value in a paragraph after a one-column table | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth:</td></tr></table><p>01/02/1990</p>` | fail: `'Date of birth:' is followed by '01/02/1990' after its table, to the end of the page` | `invent-after-one-column` |
 | P | a value written before the label | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Name: Ann</p><p>01/02/1990 Date of birth: __/__/____</p>` | fail: `'Date of birth:' has '01/02/1990' before it` | `invent-before-label` |
 | P | a value written before the label in its cell | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>01/02/1990 Date of birth:</td><td></td></tr></table>` | fail: `'Date of birth:' has '01/02/1990' before it` | `invent-table-before-label` |
 | P | a value in the cell left of the label | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>01/02/1990</td><td>Date of birth:</td><td></td></tr></table>` | fail: `'Date of birth:' cell's value cell (left) holds '01/02/1990'` | `invent-table-left` |

@@ -9,6 +9,8 @@ import functools
 from collections.abc import Callable
 from typing import Literal, NamedTuple
 
+from bs4 import Comment, Declaration, Doctype, ProcessingInstruction
+
 from omni_parse_bench import normalize, views
 
 Cell = tuple[int, int]
@@ -76,17 +78,22 @@ def parse(html: str) -> tuple[Table, ...]:
 
 
 def _next_table(tag):
-    """The table written right after `tag`, with nothing but white space, line breaks and empty elements
-    between them, or None."""
-    for sib in tag.next_siblings:
-        if isinstance(sib, str):
-            if sib.strip():
-                return None
-        elif sib.name == "table":
-            return sib
-        elif sib.name == "br" or not (sib.get_text(strip=True) or sib.find(FIGURES)):
+    """The table that comes next in the page as it reads, in the same table or outside any: nothing visible
+    (text, an image) between them, however the markup nests them (a wrapper `<div>`, a comment, an empty
+    element), or None."""
+    owner = tag.find_parent("table")
+    last = tag
+    while getattr(last, "contents", None):
+        last = last.contents[-1]
+    for el in last.next_elements:
+        if isinstance(el, Comment | Doctype | ProcessingInstruction | Declaration):
             continue
-        else:
+        if isinstance(el, str):
+            if el.strip():
+                return None
+        elif el.name == "table":
+            return el if el.find_parent("table") is owner else None
+        elif el.name in FIGURES:
             return None
     return None
 
