@@ -7,6 +7,7 @@ import hashlib
 import io
 import itertools
 import re
+import threading
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -24,6 +25,8 @@ REVISION = "489f5fa8f63858545368b9aff44256bbea6e46bc"
 # box server (serve/ocria-1/boxes.py) pins.
 DETECTOR = "docling-project/docling-layout-heron"
 DETECTOR_REVISION = "8f39ad3c0b4c58e9c2d2c84a38465abf757272d8"
+# Seconds of a page's budget kept back from the box server, so its failure fails the blocks, not the page.
+BOX_MARGIN_S = 10.0
 # The item types of `ocria_grounding`'s layout (its layout.py: the Heron region labels, as Docling names them,
 # and the types of items placed from attention alone) onto views.LABELS, as Docling's own labels map
 # (the docling adapter's table). Heron's checkboxes are dropped by `ocria_grounding` before items are made.
@@ -240,18 +243,27 @@ def boxes(page: Path, png: bytes, size: tuple[int, int], answer: str, config: Oc
             "pdf_b64": base64.b64encode(page.read_bytes()).decode("ascii") if pdf else None,
             "dpi": config.dpi, "render_size": list(size) if pdf else None}
     url = server(config)
-    try:
-        got = http.post(f"{url}/ground", body, deadline)
-    except errors.SystemFailed as exc:
-        # Note: the chat answer is paid for and its html stands; a box server that fails (an error status, a
-        # timeout) fails the page's blocks alone, as an unreadable layout does.
-        return {"error": f"{type(exc).__name__}: {exc}"[:2000], "url": url}
-    except Exception as exc:
-        if errors.refused(exc):
-            exc.add_note(f"no box server at {url}: the connection was refused. Start it (how: "
-                         "serve/ocria-1/boxes.sh), or give its address with --set "
-                         "system.ocria-1.grounding_url=<its address>; then run the same command again")
-        raise
+    # Note: the chat answer is paid for and its html stands, so a box server that fails (a timeout, a 5xx)
+    # fails the page's blocks alone, as an unreadable layout does: it is asked twice, within what the page's
+    # budget leaves less a margin, so the page itself never runs out of time. A 4xx is a setup mistake (an
+    # address that is no box server) and stops the run.
+    clock = budget.Budget(max(1.0, deadline.remaining() - BOX_MARGIN_S))
+    for attempt in (1, 2):
+        try:
+            got = http.post(f"{url}/ground", body, clock)
+            break
+        except errors.SystemFailed as exc:
+            if exc.status is not None and 400 <= exc.status < 500:
+                raise ValueError(f"the box server at {url} refused the request ({exc}); is it a box "
+                                 "server (serve/ocria-1/boxes.sh)?") from exc
+            if attempt == 2 or clock.remaining() < 2 * BOX_MARGIN_S:
+                return {"error": f"{type(exc).__name__}: {exc}"[:2000], "url": url, "attempts": attempt}
+        except Exception as exc:
+            if errors.refused(exc):
+                exc.add_note(f"no box server at {url}: the connection was refused. Start it (how: "
+                             "serve/ocria-1/boxes.sh), or give its address with --set "
+                             "system.ocria-1.grounding_url=<its address>; then run the same command again")
+            raise
     # Note: what drew the boxes is what the server says it loaded; other weights or another detector are
     # another question, so they stop the run rather than fail the page.
     said = got.get("served") or {}
@@ -295,14 +307,16 @@ def parse(raw: dict, request: contract.Request, config: Ocria1 | None = None) ->
     return outputs, errs
 
 
-_TURN = itertools.count()
+_TURN, _TURN_LOCK = itertools.count(), threading.Lock()
 
 
 def server(config: Ocria1) -> str:
     """The box server for the next page: `grounding_url` may name several, comma-separated, each running one
     page at a time; pages take them in turn."""
     urls = [u.strip().rstrip("/") for u in config.grounding_url.split(",") if u.strip()]
-    return urls[next(_TURN) % len(urls)]
+    if not urls: raise ValueError("layout is on but grounding_url names no box server")
+    with _TURN_LOCK:
+        return urls[next(_TURN) % len(urls)]
 
 
 def blocks(lay: dict) -> list[dict]:

@@ -363,7 +363,7 @@ def test_a_box_server_with_other_weights_stops_the_run_and_a_failing_one_fails_t
     # a box server that fails fails the blocks alone: the html of the paid answer stands
     box_server["status"] = 500
     call = ocria_1.call(page, request, config=config)
-    assert "HTTP 500" in call.raw["layout"]["error"]
+    assert "HTTP 500" in call.raw["layout"]["error"] and call.raw["layout"]["attempts"] == 2
     (both,) = config.requests(frozenset({"html", "blocks"}))
     outs, errs = ocria_1.parse(call.raw, both)
     assert "Results" in views.text(outs["html"]) and "blocks" not in outs and "HTTP 500" in errs["blocks"]
@@ -425,3 +425,37 @@ def test_the_box_server_scales_text_layer_words_to_the_image_it_was_sent(tmp_pat
     assert asked == [300] and w["text"] == "Total" and w["box"] == [50.0, 100.0, 150.0, 125.0]
     # an image has no text layer: the card's words as sent, or none
     assert boxes.words({"pdf_b64": None}, (10, 10)) is None
+
+
+def test_a_box_server_that_hangs_fails_the_blocks_within_the_pages_budget(downloaded, tmp_path, monkeypatch):
+    import socket
+    import time
+
+    from PIL import Image
+
+    hold = socket.socket()
+    hold.bind(("127.0.0.1", 0))
+    hold.listen(8)   # accepts, never answers
+    monkeypatch.setattr(http, "served", lambda *a: ("llamaindex/OCRia-1@x", SERVED))
+    monkeypatch.setattr(llm, "chat", lambda *a, **k: reply(ANSWER))
+    monkeypatch.setattr(ocria_1, "BOX_MARGIN_S", 0.5)
+    Image.new("RGB", (64, 64), "white").save(page := tmp_path / "p.png")
+    api = harness.system("ocria-1", {"layout": True, "grounding_url": f"http://127.0.0.1:{hold.getsockname()[1]}"})
+    t0 = time.time()
+    record = core.predict(api, harness.Input(page, frozenset({"html", "blocks"})), timeout=3.0)
+    hold.close()
+    assert time.time() - t0 < 3.0 and record["error"] is None
+    [out] = record["output"]["pages"]
+    assert "Results" in views.text(out["html"]) and out["blocks"] is None
+
+
+def test_an_address_that_is_no_box_server_stops_the_run(downloaded, box_server, tmp_path, monkeypatch):
+    from PIL import Image
+
+    monkeypatch.setattr(http, "served", lambda *a: ("llamaindex/OCRia-1@x", SERVED))
+    monkeypatch.setattr(llm, "chat", lambda *a, **k: reply(ANSWER))
+    Image.new("RGB", (64, 64), "white").save(page := tmp_path / "p.png")
+    box_server["status"] = 404
+    config = boxed(box_server)
+    with pytest.raises(ValueError, match="is it a box server"):
+        ocria_1.call(page, config.requests(frozenset({"blocks"}))[0], config=config)

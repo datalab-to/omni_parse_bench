@@ -894,8 +894,9 @@ by the image's size, its markdown as plain text, and its type mapped as Docling'
 | Form, Key-Value Region | form |
 | Picture | figure |
 
-The package drops Heron's checkboxes. Items with no area are left out. A box server that fails (an
-error status or a timeout) fails the page's blocks alone; its html stands. One box server runs one page
+The package drops Heron's checkboxes. Items with no area are left out. A box server that fails (a 5xx or a
+timeout, asked twice within the page's budget) fails the page's blocks alone; its html stands. An
+address that answers 4xx is no box server and stops the run. One box server runs one page
 at a time; for throughput, run several, one port each, and give them all, comma-separated, in
 `grounding_url`: pages take them in turn.
 
