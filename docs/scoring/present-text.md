@@ -150,7 +150,7 @@ never joins two, and the matched text may not end inside one. Every other charac
 a gold without a digit is matched as above.
 
 A minus sign belongs to its number: a `-` (or `−`, or an en dash, which fold to one) directly before a digit run is
-a sign unless the character before it is a letter or a digit (a Chinese, Japanese or Korean character does not
+a sign unless the character before it is a letter or a digit (but an exponent's `1e-3` is signed; a Chinese, Japanese or Korean character does not
 count: such a text puts no space before its minus). So `-5`, `x = -5`, `(-5)`, `3 -5` and `变化-5` are signed, and a
 gold's sign must be written and cannot be added. In a `table_cell` cell, a `- ` with a space (`− 0.756`, `(− 5)`) is a sign
 too at the start of the cell or after an opening bracket (not in a page text, where `- 12` may start a list item). A `-` after a Latin letter or a digit is a hyphen:

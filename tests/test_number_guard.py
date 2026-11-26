@@ -157,3 +157,9 @@ def test_a_list_marker_before_a_number_is_no_sign_in_a_page_text():
 def test_a_signed_number_that_shares_digits_with_a_hyphenated_one_is_kept(gold, lost):
     assert all(all_types(gold, gold, 0)) and all(all_types(gold, gold, 2))
     assert not any(all_types(gold, lost, 1)), gold
+
+
+@pytest.mark.parametrize("gold, lost", [("rate 1e-3 per", "rate 1e3 per"), ("p 2.5E-4 ok", "p 2.5E4 ok")])
+def test_the_sign_of_an_exponent_is_kept(gold, lost):
+    assert all(all_types(gold, gold, 0))
+    assert not any(all_types(gold, lost, 1)), gold

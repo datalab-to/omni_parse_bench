@@ -1105,6 +1105,11 @@ def _joins_hyphen(c: str) -> bool:
     return c.isalnum() and not cjk
 
 
+def _exponent(s: str, i: int) -> bool:
+    """Whether the `-` at `s[i]` is the sign of an exponent: `1e-3`, `2.5E-4`."""
+    return s[i - 1:i] in ("e", "E") and s[i - 2:i - 1].isdigit()
+
+
 def _hyphened(s: str) -> set[str]:
     """The numbers of the folded `s` that have a hyphen directly before them (`A-12`, `kg-1`): spaced, as in
     `kg -1`, that hyphen reads as a sign, and a text that spaces it is not holding a different number."""
@@ -1123,7 +1128,8 @@ def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
     for digits, run in itertools.groupby(s, str.isdigit):
         j = i + len(list(run))
         # a sign: `-` right before the digits, or (`spaced`) `- ` at the start or after a bracket
-        sign = i - 1 if s[i - 1:i] == "-" and not _joins_hyphen(s[i - 2:i - 1]) else (
+        hyphen = s[i - 1:i] == "-" and (not _joins_hyphen(s[i - 2:i - 1]) or _exponent(s, i - 1))
+        sign = i - 1 if hyphen else (
             i - 2 if spaced and s[i - 2:i] == "- " and (i == 2 or s[i - 3] in "([{") else None)
         if digits and sign is not None:
             a, _, _ = spans.pop()
