@@ -597,11 +597,13 @@ def table_cell(t: TableCell, v: views.Html) -> Mark:
                 and not _structure(t, table, rc))
     def again(other: tables.Table) -> bool:
         """Whether a table holds a second full anchor candidate: a cell that is the anchor."""
-        return any(is_anchor(other, rc) for rc in other.text)
+        return not other.hidden and any(is_anchor(other, rc) for rc in other.text)
     reasons: list[str] = []    # why a cell is not the anchor
     held: list[str] = []       # why an anchor has something beside it
     anchors = 0
     for i, table in enumerate(ts):
+        if t.shapes and table.hidden:
+            continue    # a shape guard reads what the page draws
         for rc in [rc for rc, x in table.text.items() if _one_of(cell, x, thr, t.cell)]:
             failed = [why for k, want in expected.items()
                       if (why := _relation(table, rc, k, want, t.max_diffs, t.relations[k]))]

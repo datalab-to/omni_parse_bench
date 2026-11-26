@@ -360,3 +360,12 @@ def test_what_a_page_does_not_draw_is_not_between_tables():
         assert not verdict(args, TWO + hidden + cont), hidden
     assert verdict(args, TWO + "<template><table><tr><td>a</td><td>b</td><td>c</td></tr></table></template>")
     assert not verdict(args, TWO + "<template><table><tr><td>a</td><td>b</td><td>c</td></tr></table></template>" + cont)
+
+
+def test_a_table_the_page_does_not_draw_is_not_an_anchor_of_a_shape_guard():
+    args = {"cell": text("70"), "left": text("Fuel"), "down": END}
+    hidden = "<template>" + TWO.replace("</table>", "<tr><td>Tax</td><td>9</td><td>8</td></tr></table>") + "</template>"
+    assert verdict(args, TWO + hidden)
+    assert not verdict(args, hidden)    # its anchor is not drawn
+    assert not verdict({"cell": text("100"), "right": EMPTY}, hidden)
+    assert verdict({"cell": text("70")}, hidden)    # a plain cell test keeps reading it

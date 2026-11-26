@@ -144,7 +144,7 @@ beside it, so a copy of that value passes. Two args say it, on `up`, `down`, `le
   the why is `no right cell`. A `colspan` that covers the slot fails.
 - `{"end": true}`: no cell in any row below (`down`), column to the right (`right`), row above (`up`) or column
   to the left (`left`) of the cell has text. Empty rows and columns pass: they invent nothing. The why names the
-  first row or column that holds text (`down: row 3 holds '9', '8'`). A table written right after the anchor's table (nothing visible between them: white space, a comment, `<script>`, `<style>`, `<template>` and what is in them, an empty
+  first row or column that holds text (`down: row 3 holds '9', '8'`). A table written right after the anchor's table (nothing visible between them: white space, a comment, `<script>`, `<style>`, `<template>` and what is in them (a table there is no anchor of a shape guard either), an empty
   element, or wrapper `<div>`s do not count) that goes on from it counts too: below, one with as many columns and no
   column heading (a first row of `<th>` headings, perhaps after a blank corner cell; a body row led by a row header, `<th scope=row>` or a `<th>` beside data, is not one); to the right, one with as many rows and no heading. For `up` and `left` it is the table written right
   before. A table with a heading of its own, another width, text before it, or a second full anchor candidate (a cell that matches `cell` and holds the test's relations: a copy, judged as the

@@ -45,6 +45,7 @@ class Table(NamedTuple):
     labels: dict[int, Cell]   # the section rows (`label_rows`), by row
     figures: frozenset[Cell] = frozenset()   # cells holding an image or other figure, whatever its alt text
     column_headed: bool = False   # the first row is a row of column headings (a blank corner cell allowed)
+    hidden: bool = False   # the table sits in an element the page does not draw (`<template>`)
     follower: int | None = None   # the index (in `parse`'s result) of the table written right after this one
 
 
@@ -74,7 +75,8 @@ def parse(html: str) -> tuple[Table, ...]:
             out.append(table)
             tags.append(tag)
     where = {id(tag): i for i, tag in enumerate(tags)}
-    return tuple(t._replace(follower=where.get(id(_next_table(tag))), column_headed=_column_headed(tag))
+    return tuple(t._replace(follower=where.get(id(_next_table(tag))), column_headed=_column_headed(tag),
+                            hidden=_hidden(tag))
                  for t, tag in zip(out, tags, strict=True))
 
 
