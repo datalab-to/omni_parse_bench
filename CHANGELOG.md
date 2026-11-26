@@ -28,6 +28,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 ### Added
 
 - Providers: `pdftotext` (poppler-utils), a local CPU text-layer parser at its documented default: html only, no OCR, so image pages are empty (#109).
+- Provider: pdftext (`pdftext`), the PDF text layer with no OCR, html only. No verdict changes (#110).
 
 ### Fixed
 
