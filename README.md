@@ -19,7 +19,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | Gemini 3.8 Flash * | closed |  | 92.5 | ≈$37.08 | 92.0 | 95.3 | 90.3 | 4 |
 | GPT-6.1 Sol § | closed |  | 91.5 | $30.95 | 89.8 | 95.6 | 89.1 | 17 |
 | Reducto | closed |  | 91.1 | $10.00 | 86.0 | 91.4 | 95.8 | — |
-| LlamaParse | closed |  | 90.8 | ≈$56.25 | 89.4 | 92.9 | 90.0 | — |
+| LlamaParse | closed |  | 90.8 | ≈$31.25¶ | 89.4 | 92.9 | 90.0 | — |
 | chandra-ocr-2 (Datalab) | open | 4.5B | 90.4 | — | 87.9 | 88.0 | 95.4 | — |
 | Claude Opus 5.5 * § | closed |  | 90.0 | $68.45 | 93.9 | 93.4 | 82.6 | 40 |
 | Mistral OCR | closed |  | 89.9 | $4.00 | 83.6 | 92.2 | 93.8 | — |
@@ -57,7 +57,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | OvisOCR | open | 1.4B | none | — | 72.2 | 78.2 | unsupported | — |
 | olmOCR-2 | open | 8.3B | none | — | 71.8 | 56.6 | unsupported | — |
 | Nanonets-OCR2-3B | open | 3.8B | none | — | 69.0 | 62.6 | unsupported | — |
-| pdf-inspector (OCR) | open | n/a | none | — | 41.3 | 17.7 | unsupported | — |
+| pdf-inspector (OCR) | open | n/a | none | — | 41.4 | 17.7 | unsupported | — |
 | pdf-inspector | open | n/a | none | — | 20.6 | 17.0 | unsupported | — |
 | pdftext | open | n/a | none | — | 20.6 | 0.0 | unsupported | — |
 | pdftotext | open | n/a | none | — | 20.4 | 0.0 | unsupported | — |
@@ -77,6 +77,10 @@ Gemini 3.8 Flash's and GPT-5.6 Sol's layout scores use a separate run that asked
 † Gemini 4 results combine one full pass with one rerun of every page that pass failed, made with the reader that accepts `bbox` (omni-parse-bench 1.6.0 and later); the full pass's other pages are unchanged. Carbon also has four pages that hit the output-token limit. See [the run notes](docs/gemini4-2026-11-10.md) for the first measurement.
 
 ‡ Gemini 4 costs include the original full pass **and** all failed-page reruns, divided by 2,937 pages; separate validation probes are excluded. These cumulative experiment costs are not fresh single-pass prices.
+
+Other vendor prices are historical estimates from the original chart; their dates and tiers have not been re-verified.
+
+¶ As of 2026-11-26, LlamaParse's [pricing page](https://developers.llamaindex.ai/llamaparse/general/pricing) lists Agentic Plus at 25 credits/page. The saved run setting was `tier=agentic_plus`, `version=latest`, with no `layout_extraction` setting; layout blocks were derived from returned `items` retrieved with `expand=markdown,items,usage`. The listed price is therefore ≈$31.25 per 1,000 pages at the Pro rate ($1.25 per 1,000 credits), or $37.50 at the pay-as-you-go rate ($1.50 per 1,000 credits). The score uses saved predictions from runs dated 2026-09-30 and 2026-10-06; it has not been re-measured.
 
 ## About the benchmark
 
