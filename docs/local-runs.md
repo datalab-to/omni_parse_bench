@@ -28,14 +28,14 @@ These full runs use the public dataset (2,937 pages) and released omni-parse-ben
 
 ## pdf-inspector
 
-- Dataset: Public dataset at commit `24e3ef4d2aa1718e622d357db7f6d0d10742c93`; 2,937 pages.
+- Dataset: Public dataset at commit `24e3ef4d2aa1718e622d357db7f6d0d10742c93d`; 2,937 pages.
 - Runs: Text `pdf-inspector-20261126-014930-77ac`; OCR `pdf-inspector-ocr-20261126-014924-02a9`. Two image-conversion failures in each full run were retried after Pillow decoded and losslessly rewrote the pages as canonical PNGs: text `pdf-inspector-20261126-015509-6e6d`; OCR `pdf-inspector-ocr-20261126-020636-7886` and `pdf-inspector-ocr-20261126-020705-a3dc`.
 - Settings: Text and OCR modes. OCR used PDFium `native-v7988`, ONNX Runtime 1.27.0 and the documented PP-OCRv6 Small model set (~31 MB), with `PDFIUM_LIB_PATH` and `ORT_DYLIB_PATH` set.
 - Outcome: Merged full-run outputs: 0 failed pages; 100% coverage. No additional retries reported.
 
 ## PyMuPDF4LLM
 
-- Dataset: Public dataset at commit `24e3ef4d2aa1718e622d357db7f6d0d10742c93`; 2,937 pages.
+- Dataset: Public dataset at commit `24e3ef4d2aa1718e622d357db7f6d0d10742c93d`; 2,937 pages.
 - Runs: Text `pymupdf4llm-20261126-041521-4291`; OCR `pymupdf4llm-ocr-20261126-044854-b1b7`.
 - Settings: Default mode and OCR mode. OCR used Tesseract (available); RapidOCR was not installed.
 - Outcome: Both saved runs were reread with `opb reread` (0 changed records) and graded with released 1.7.0. Each had 17 system failures and 2,920/2,937 scored pages (99.42% coverage); 14 image pages failed with `FzErrorFormat: unknown image file format`, and 3 pages failed when PyMuPDF's layout model read form widgets.

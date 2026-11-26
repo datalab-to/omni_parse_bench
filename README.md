@@ -60,7 +60,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | Tesseract | open | n/a | none | — | 17.7 | 0.0 | unsupported | — |
 | MarkItDown | open | n/a | none | — | 16.0 | 13.9 | unsupported | — |
 
-Scores use omni-parse-bench 1.7.0. Saved predictions are regraded with 1.7.0 unless the provenance below identifies a new local run; rows marked § retain their published 1.5.0 grades.
+Scores use omni-parse-bench 1.7.0: saved predictions are regraded with it, and locally run open tools are fresh full runs (see the next paragraph); rows marked § keep their published 1.5.0 grades.
 
 Rows for open tools run locally (pdftotext, pdftext, MarkItDown, pdf-inspector and PyMuPDF4LLM) are full runs graded with released omni-parse-bench 1.7.0, with failed pages counted; [run notes](docs/local-runs.md).
 
