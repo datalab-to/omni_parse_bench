@@ -543,7 +543,7 @@ Docling (the `docling` package's standard PDF pipeline) is not one model but a p
 Docling's default device, the GPU when there is one (`docker run --gpus all`) and the CPU without `--gpus`; its html
 is the document's own `export_to_html` (headers and footers kept), and its picture and formula items are not read
 by default (a formula is exported as "Formula not decoded").
-Full public run: Docling, 2,937/2,937 pages; 0 failures; GPU, B200, `auto` device; released OPB 1.7.0.
+Full public run: 2,937/2,937 pages, 0 failures; 64.5 headline (39.1 text, 63.8 tables, 90.6 layout); GPU, B200, `auto` device; released OPB 1.7.0.
 
 Their labels (LightOn's table is above):
 

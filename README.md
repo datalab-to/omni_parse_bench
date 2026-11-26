@@ -47,6 +47,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | DeepSeek-OCR-2 | open | 3.4B | 75.4 | — | 64.6 | 70.2 | 91.4 | — |
 | LiteParse (ocria-nano) | open | n/a | 74.8 | — | 59.4 | 74.1 | 90.9 | — |
 | HunyuanOCR-1.5 | open | 1.0B | 68.8 | — | 62.3 | 62.6 | 81.4 | — |
+| Docling | open | ~0.1B | 64.5 | — | 39.1 | 63.8 | 90.6 | — |
 | PyMuPDF4LLM (OCR) | open | n/a | 51.5 | — | 26.5 | 42.1 | 86.0 | — |
 | LiteParse (Tesseract) | open | n/a | 42.3 | — | 43.6 | 14.5 | 68.8 | — |
 | PyMuPDF4LLM | open | n/a | 41.2 | — | 17.7 | 42.0 | 64.0 | — |
@@ -432,6 +433,7 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | DeepSeek-OCR-2 | 28.5 | 82.0 | 68.9 | 59.6 | 64.3 | 50.6 | 9.6 | 37.0 | 43.0 |
 | LiteParse (ocria-nano) | 8.5 | 55.4 | 74.7 | 63.9 | 61.4 | 72.9 | 55.8 | 30.2 | 52.9 |
 | HunyuanOCR-1.5 | 40.2 | 67.4 | 63.3 | 58.1 | 65.1 | 53.7 | 45.3 | 50.5 | 42.6 |
+| Docling | 18.6 | 5.1 | 65.3 | 63.2 | 55.7 | 68.5 | 26.4 | 26.6 | 47.0 |
 | PyMuPDF4LLM (OCR) | 3.2 | 5.8 | 43.9 | 40.0 | 36.6 | 53.8 | 8.7 | 9.1 | 24.3 |
 | LiteParse (Tesseract) | 2.0 | 54.0 | 18.9 | 35.2 | 32.2 | 47.1 | 15.6 | 5.9 | 31.5 |
 | PyMuPDF4LLM | 0.1 | 5.7 | 41.9 | 19.2 | 30.0 | 34.3 | 8.7 | 0.5 | 22.0 |
