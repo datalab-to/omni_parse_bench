@@ -339,3 +339,24 @@ def test_invisible_text_and_row_headers_do_not_change_what_goes_on():
     assert not verdict(args, TWO + "<script>void 0;</script><style>p{}</style><template>x</template>" + cont)
     assert not verdict(args, TWO + "<table><tr><th scope=row>Tax</th><td>9</td><td>8</td></tr></table>")
     assert verdict(args, TWO + "<p>Note</p>" + cont)
+
+
+def test_a_blank_corner_before_column_headers_is_a_header_row_and_row_headers_are_not():
+    args = {"cell": text("70"), "down": END}
+    corner = "<table><tr><td></td><th scope=col>Plan</th><th scope=col>Actual</th></tr><tr><td>Tax</td><td>9</td><td>8</td></tr></table>"
+    assert verdict(args, TWO + corner)    # an independent table with a header row
+    assert verdict(args, TWO + corner.replace("<td></td>", "<td><br></td>"))
+    rowhead = "<table><tr><th scope=row>Tax</th><th scope=row>9</th><th scope=row>8</th></tr></table>"
+    assert not verdict(args, TWO + rowhead)
+    assert not verdict(args, TWO + "<table><tr><th scope=row>Tax</th><td>9</td><td>8</td></tr></table>")
+    assert not verdict(args, TWO + "<table><tr><th>Tax</th><td>9</td><td>8</td></tr></table>")
+
+
+def test_what_a_page_does_not_draw_is_not_between_tables():
+    cont = "<table><tr><td>Tax</td><td>9</td><td>8</td></tr></table>"
+    args = {"cell": text("70"), "down": END}
+    for hidden in ("<template><span>Hidden</span></template>", "<template><img src=x></template>",
+                   "<script>1</script>", "<style>p{}</style>", "<template><div><p>deep</p></div></template>"):
+        assert not verdict(args, TWO + hidden + cont), hidden
+    assert verdict(args, TWO + "<template><table><tr><td>a</td><td>b</td><td>c</td></tr></table></template>")
+    assert not verdict(args, TWO + "<template><table><tr><td>a</td><td>b</td><td>c</td></tr></table></template>" + cont)

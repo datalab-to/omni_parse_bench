@@ -1291,12 +1291,7 @@ def _goes_on(a: tables.Table, b: tables.Table, kind: str) -> bool:
     (as many rows), with no heading of its own. A table that prints its header again is not told from a
     second table of the same shape, so it is read as one."""
     same = len(a.grid[0]) == len(b.grid[0]) if kind == "down" else len(a.grid) == len(b.grid)
-    return same and not _column_headed(b)
-
-
-def _column_headed(t: tables.Table) -> bool:
-    """Whether the table's first row is a row of headings (a body row led by a `<th scope=row>` is not)."""
-    return all(x in t.headings for x in t.grid[0] if x is not None)
+    return same and not b.column_headed
 
 
 def _one_of(want: str, got: str, thr: float, raw: str = "", lines: bool = True) -> bool:
