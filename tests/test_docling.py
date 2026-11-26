@@ -22,6 +22,15 @@ def _raw() -> dict:
     return json.loads(FIXTURE.read_text())["raw"]
 
 
+def _server():
+    """The server module, loaded from its file (its imports of docling are inside its functions)."""
+    pytest.importorskip("fastapi")
+    spec = importlib.util.spec_from_file_location("docling_server", SERVER)
+    server = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(server)
+    return server
+
+
 def _parse(raw: dict, outputs=frozenset({"html", "blocks"}), **options):
     config = docling.Docling(**options)
     (asked,) = config.requests(outputs)
@@ -74,9 +83,45 @@ def test_partial_success_with_errors_fails_the_page_and_keeps_the_raw_reply():
     assert "stage failed" in str(exc.value)
 
 
-def test_the_furniture_option_is_sent_to_the_server():
+def test_the_furniture_and_formula_options_are_sent_to_the_server():
     sent = docling.Docling(furniture=False).requests(frozenset({"html"}))[0].sent
-    assert sent["settings"] == {"furniture": False} and sent["package"].startswith("docling==")
+    assert sent["settings"] == {"furniture": False, "formula": False}
+    assert sent["package"].startswith("docling==")
+    sent = docling.Docling(formula=True).requests(frozenset({"html"}))[0].sent
+    assert sent["settings"] == {"furniture": True, "formula": True}
+    assert "do_formula_enrichment=True" in sent["pipeline"]
+
+
+def test_one_adapter_files_two_rows_the_defaults_and_formula_enrichment():
+    assert docling.Docling().provider == "docling" and not docling.Docling().formula
+    assert docling.Docling(formula=True).provider == "docling-formula"
+
+
+def test_codeformula_is_pinned_and_served_names_what_the_server_says(monkeypatch):
+    sha = docling.CODE_FORMULA_WEIGHTS.split("@")[1]
+    assert docling.CODE_FORMULA_WEIGHTS.startswith("docling-project/CodeFormulaV2@") and len(sha) == 40
+    monkeypatch.setattr("importlib.metadata.version", lambda package: "2.153.0")
+    server = _server()
+    assert server.CODE_FORMULA == ("docling-project/CodeFormulaV2", sha)
+    for row in (docling.Docling(), docling.Docling(formula=True)):
+        assert row.served == server.SERVED
+    assert set(server.SETTINGS) == set(docling.http.settings(docling.Docling()))
+
+
+def test_a_formulas_tex_annotation_is_read_as_its_latex_and_the_rest_of_the_html_is_kept():
+    mathml = ('<div><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><mrow><mi>E</mi>'
+              '<mo>=</mo><mi>m</mi><msup><mi>c</mi><mn>2</mn></msup></mrow>'
+              '<annotation encoding="TeX">E = mc^2</annotation></math></div>')
+    raw = {**_raw(), "html": _raw()["html"].replace("</body>", mathml + "</body>")}
+    outs, errs = _parse(raw, frozenset({"html"}), formula=True)
+    assert errs == {}
+    assert outs["html"] == raw["html"].replace('encoding="TeX"', 'encoding="application/x-tex"')
+    assert "$$E = mc^2$$" in views.text(outs["html"])
+    assert "Em" not in views.text(outs["html"])    # the MathML's own text is not read as well
+    # Docling's other formula output, "Formula not decoded", and html with no formula are left as they are.
+    undecoded = '<div class="formula-not-decoded">Formula not decoded</div>'
+    assert _parse({**raw, "html": undecoded}, frozenset({"html"}))[0]["html"] == undecoded
+    assert _parse(_raw(), frozenset({"html"}))[0]["html"] == _raw()["html"]
 
 
 @pytest.mark.skipif(not all(importlib.util.find_spec(m) for m in ("docling_core", "fastapi")),
@@ -153,9 +198,9 @@ def test_parse_route_returns_failure_status_and_errors_before_document_export(
         def convert(self, *args, **kwargs):
             return result
 
-    monkeypatch.setattr(server, "_converter", FakeConverter())
+    monkeypatch.setattr(server, "_converters", {False: FakeConverter()})
     response = TestClient(server.app).post("/parse", json={"page": "eA==", "suffix": ".pdf",
-                                                           "settings": {"furniture": True}})
+                                                           "settings": {"furniture": True, "formula": False}})
     assert response.status_code == 200
     raw = response.json()
     assert raw["status"] == status
@@ -212,3 +257,60 @@ def test_the_servers_converter_is_on_doclings_default_device_auto(monkeypatch):
     assert AcceleratorOptions().device == "auto"
     options = server.make_converter().format_to_options[InputFormat.PDF].pipeline_options
     assert options.accelerator_options.device == "auto"
+
+
+@pytest.mark.skipif(not all(importlib.util.find_spec(m) for m in ("docling_core", "fastapi")),
+                    reason="docling and fastapi are the server's, not opb's")
+def test_the_server_makes_one_converter_per_mode_when_a_request_first_asks_for_it(monkeypatch):
+    from fastapi.testclient import TestClient
+    import sys
+    from types import SimpleNamespace
+
+    monkeypatch.setattr("importlib.metadata.version", lambda package: f"{package}==test")
+    spec = importlib.util.spec_from_file_location("docling_server", SERVER)
+    server = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, server)
+    spec.loader.exec_module(server)
+    made, used = [], []
+
+    class FakeConverter:
+        def __init__(self, formula):
+            self.formula = formula
+
+        def convert(self, *args, **kwargs):
+            used.append(self.formula)
+            return SimpleNamespace(status=SimpleNamespace(value="failure"), errors=[{"e": "stop here"}])
+
+    monkeypatch.setattr(server, "_converters", {False: FakeConverter(False)})
+    monkeypatch.setattr(server, "make_converter",
+                        lambda formula=False: made.append(formula) or FakeConverter(formula))
+    client = TestClient(server.app)
+    for formula in (False, True, True, False):
+        body = {"page": "eA==", "suffix": ".pdf", "settings": {"furniture": True, "formula": formula}}
+        assert client.post("/parse", json=body).status_code == 200
+    assert made == [True] and used == [False, True, True, False]
+    # A request must say its mode, as it says its furniture.
+    body = {"page": "eA==", "suffix": ".pdf", "settings": {"furniture": True}}
+    assert client.post("/parse", json=body).status_code == 422
+
+
+def test_the_formula_row_turns_on_formula_enrichment_alone_with_codeformula_pinned():
+    pytest.importorskip("docling")
+    from docling.datamodel.base_models import InputFormat
+    from docling.datamodel.pipeline_options import ThreadedPdfPipelineOptions
+
+    server = _server()
+    default, formula = (server.make_converter(f).format_to_options[InputFormat.PDF].pipeline_options
+                        for f in (False, True))
+    assert not default.do_formula_enrichment and formula.do_formula_enrichment
+    assert not default.do_code_enrichment and not formula.do_code_enrichment
+    assert formula.code_formula_options.model_spec.default_repo_id == server.CODE_FORMULA[0]
+    assert formula.code_formula_options.model_spec.revision == server.CODE_FORMULA[1]
+    # The default row's options are Docling's own but the layout revision, as before.
+    assert default.code_formula_options == ThreadedPdfPipelineOptions().code_formula_options
+    # Nothing else differs between the two rows.
+    a, b = default.model_dump(), formula.model_dump()
+    assert {k for k in a if a[k] != b[k]} == {"do_formula_enrichment", "code_formula_options"}
+    a_cf, b_cf = a["code_formula_options"], b["code_formula_options"]
+    assert {k for k in a_cf if a_cf[k] != b_cf[k]} == {"model_spec"}
+    assert {k for k in a_cf["model_spec"] if a_cf["model_spec"][k] != b_cf["model_spec"][k]} == {"revision"}

@@ -17,23 +17,33 @@ from pydantic import BaseModel, ConfigDict
 
 KEY = os.environ.get("OPB_ENDPOINT_KEY")
 # Note: every request sets these, from the adapter's options (the vendor's values by default).
-SETTINGS = ("furniture",)
+SETTINGS = ("furniture", "formula")
 _LOCK = threading.Lock()
-_converter = None
-# The two Hugging Face models the pipeline loads, at exact commits. The layout model's default is `main`, so
+# One converter per mode (False: Docling's defaults; True: formula enrichment on), each made when a request
+# first asks for its mode; the default one is made at start.
+_converters: dict[bool, object] = {}
+# The Hugging Face models the pipeline loads, at exact commits. The layout model's default is `main`, so
 # it is pinned here; TableFormer's is the tag v2.3.0 in the package's own code (table_structure_model.py),
 # which is this commit. OCR is RapidOCR's torch backend (adapter docstring), whose models the pinned
 # `rapidocr` names by its own version (ModelScope RapidAI/RapidOCR at v3.10.0), downloaded when the image is
 # built.
 LAYOUT = ("docling-project/docling-layout-heron", "8f39ad3c0b4c58e9c2d2c84a38465abf757272d8")
 TABLES = ("docling-project/docling-models", "fc0f2d45e2218ea24bce5045f58a389aed16dc23")
-# What it serves, in every reply: those models and the package whose version names the rest.
-SERVED = {"weights": ", ".join(f"{repo}@{sha}" for repo, sha in (LAYOUT, TABLES)),
+# Formula enrichment's model (the `formula` setting): CodeFormulaV2, the `codeformulav2` preset that
+# `PdfPipelineOptions().code_formula_options` defaults to (docling/datamodel/pipeline_options.py), whose
+# revision is `main` (VlmModelSpec in docling/datamodel/stage_model_specs.py), so it is pinned here. It runs
+# on transformers (`auto_inline` takes vLLM only with `prefer_vllm`, default False, and vLLM installed; the
+# image has neither).
+CODE_FORMULA = ("docling-project/CodeFormulaV2", "ecedbe111d15c2dc60bfd4a823cbe80127b58af4")
+# What it serves, in every reply: those models and the package whose version names the rest. The image holds
+# all three for both modes; the default mode never loads CodeFormulaV2.
+SERVED = {"weights": ", ".join(f"{repo}@{sha}" for repo, sha in (LAYOUT, TABLES, CODE_FORMULA)),
           "revision": f"docling=={importlib.metadata.version('docling')}"}
 
 
-def make_converter():
-    """Docling's converter, as the server runs it (the Dockerfile builds it once to download the models)."""
+def make_converter(formula: bool = False):
+    """Docling's converter, as the server runs it (the Dockerfile builds both modes once to download the
+    models). `formula` turns on Docling's formula enrichment and nothing else."""
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import ThreadedPdfPipelineOptions
     from docling.document_converter import DocumentConverter, ImageFormatOption, PdfFormatOption
@@ -44,17 +54,24 @@ def make_converter():
     options = ThreadedPdfPipelineOptions()
     options.layout_options.model_spec = options.layout_options.model_spec.model_copy(
         update={"revision": LAYOUT[1]})
+    if formula:
+        # Note: Docling's documented option (docs/usage/enrichments.md, "Formula understanding"), with its
+        # model at the commit in CODE_FORMULA. Code enrichment (`do_code_enrichment`, the same model) is its
+        # own documented option and stays at its default, off: the pipeline sets the model's extract_code from
+        # that flag alone (standard_pdf_pipeline.py), so only formulas are read again.
+        options.do_formula_enrichment = True
+        spec = options.code_formula_options.model_spec.model_copy(update={"revision": CODE_FORMULA[1]})
+        options.code_formula_options = options.code_formula_options.model_copy(update={"model_spec": spec})
     return DocumentConverter(format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options),
                                              InputFormat.IMAGE: ImageFormatOption(pipeline_options=options)})
 
 
 @contextlib.asynccontextmanager
 async def lifespan(_: FastAPI):
-    global _converter
     from docling.datamodel.accelerator_options import AcceleratorOptions
     from docling.utils.accelerator_utils import decide_device
 
-    _converter = make_converter()
+    _converters[False] = make_converter()
     print(f"docling device: {decide_device(AcceleratorOptions().device)}", flush=True)
     yield
 
@@ -67,6 +84,7 @@ class Settings(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     furniture: bool
+    formula: bool
 
 
 class Page(BaseModel):
@@ -124,7 +142,7 @@ def result_payload(result, layers: set) -> dict:
 
 @app.get("/health")
 def health() -> dict:
-    return {"ready": _converter is not None}
+    return {"ready": False in _converters}
 
 
 @app.get("/served")
@@ -136,11 +154,12 @@ def served() -> dict:
 def parse(page: Page, authorization: str | None = Header(default=None)) -> dict:
     """Docling's `DocumentConverter` (its standard PDF pipeline at its defaults) on the file's first page;
     how a page is processed is set out step by step in the adapter's docstring.
-    One converter per uvicorn worker, reading one page at a time.
+    One converter per mode per uvicorn worker, reading one page at a time.
 
-        GET  /health    {"ready": true} once the converter is made
+        GET  /health    {"ready": true} once the default converter is made
         GET  /served    what it serves: {weights, revision}, as each answer says
-        POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's, "settings": {"furniture"}}
+        POST /parse     {"page": base64 file, "suffix": ".pdf" or the image's,
+                         "settings": {"furniture", "formula"}}
                         -> the document's "html" (its HTML export) and "markdown", its "items" (each one's
                         label, text, and box from the top left in the units of "page", the first page's
                         {"width", "height"}), its status/errors and `docling_document` export, and "vendor"
@@ -156,5 +175,7 @@ def parse(page: Page, authorization: str | None = Header(default=None)) -> dict:
         f.write(base64.b64decode(page.page))
         f.flush()
         with _LOCK:
-            result = _converter.convert(f.name, page_range=(1, 1), raises_on_error=False)
+            mode = page.settings.formula
+            if mode not in _converters: _converters[mode] = make_converter(mode)
+            result = _converters[mode].convert(f.name, page_range=(1, 1), raises_on_error=False)
     return result_payload(result, layers)
