@@ -7,8 +7,8 @@ Each promise is a *relation*: change a page, or a test, in a way that should not
 known way), and the verdict should follow. Example: putting a passing answer in bold must not make its test
 fail.
 
-- The certificate lists the 154 relations its authors selected: 144 hold and 10 deviate. It is not every
-  relation of the scorer (see [Not covered](#not-covered)). Four of the 10 (M1a to M1c and M1e) are about
+- The certificate lists the 154 relations its authors selected: 145 hold and 9 deviate. It is not every
+  relation of the scorer (see [Not covered](#not-covered)). Four of the 9 (M1a to M1c and M1e) are about
   folding a string twice, which the scorer never does and no document promises, so they change no score.
 - It is generated from the tests. CI fails if it is out of date, or if a status disagrees with its test.
 - This page is enough to read it. Links to `docs/scoring` add detail only.
@@ -38,10 +38,10 @@ A healthy run gives:
 
 | | passed | skipped | xfailed |
 |---|---|---|---|
-| this folder, no dataset | 627 | 22 | 10 |
-| this folder, with dataset | 647 | 2 | 10 |
-| whole suite, no dataset | 2746 | 37 | 10 |
-| whole suite, with dataset | 2773 | 10 | 10 |
+| this folder, no dataset | 627 | 22 | 9 |
+| this folder, with dataset | 647 | 2 | 9 |
+| whole suite, no dataset | 2796 | 37 | 9 |
+| whole suite, with dataset | 2823 | 10 | 9 |
 
 All four rows come from runs of this version.
 
@@ -150,7 +150,7 @@ Other commands:
 M104 to M120 come from outside: they are the benign variations and error types of the perturbation catalogue of
 ParseBench-2 (arXiv 2611.17400, Appendix A.2, CC BY 4.0) that apply to OPB, written as relations by reading
 this scorer's documented rules, so that the scorer is tested by relations its authors did not choose. Each
-relation's docstring credits it. M120 is the one that deviates.
+relation's docstring credits it.
 
 ## Not covered
 
@@ -315,4 +315,4 @@ Reference only; the sections above do not need it until a term is unfamiliar.
   - CI tries at most 300 examples per test, the same ones every run.
   - `HYPOTHESIS_PROFILE=deep` tries 5,000 new ones. CI never runs it.
 - **strict xfail**: a test marked as expected to fail. If it passes, pytest reports a failure.
-  Each of the 10 deviations gives one expected failure.
+  Each of the 9 deviations gives one expected failure.

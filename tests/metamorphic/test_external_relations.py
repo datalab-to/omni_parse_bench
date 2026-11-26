@@ -9,7 +9,7 @@ from __future__ import annotations
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
-from metamorphic.common import HOLDS, LIMITATION, deviation, escaped, more_evidence, passes, relation
+from metamorphic.common import HOLDS, escaped, passes, relation
 from omni_parse_bench import markdown, views
 from omni_parse_bench.scorers.unit_tests import runners
 from omni_parse_bench.scorers.unit_tests.runners import _area as area
@@ -247,7 +247,7 @@ def td_table(rows) -> str:
 
 
 def cell_passes(cell, relations, page, **kwargs) -> bool:
-    return passes(runners.TableCell(cell, relations, 0, **kwargs), page)
+    return passes(runners.TableCell(cell, relations, kwargs.pop("max_diffs", 0), **kwargs), page)
 
 
 GRID = st.tuples(st.integers(2, 4), st.integers(1, 3), st.integers(0, 4))
@@ -323,9 +323,16 @@ SPANS = [
      "<table><tr><td rowspan=2>Male</td><td>5</td></tr><tr><td>6</td></tr></table>",
      "<table><tr><td>Male</td><td>5</td></tr><tr><td>Male</td><td>6</td></tr></table>"),
 ]
-SECTION = ("6", {"section": "Cohort 1"},
-           "<table><tr><th>A</th><th>B</th></tr><tr><td colspan=2>Cohort 1</td></tr><tr><td>5</td><td>6</td></tr></table>",
-           "<table><tr><th>A</th><th>B</th></tr><tr><td>Cohort 1</td><td>Cohort 1</td></tr><tr><td>5</td><td>6</td></tr></table>")
+SECTIONS = [("Cohort 1", ["Cohort 1", "COHORT  1", "cohort 1"]), ("1982", ["1982", "1982", "1982"]),
+            ("Total \u2013 men", ["Total - men", "Total \u2013 men", "total\u00a0\u2013 men"])]
+
+
+def section_pages(label: str, spellings: list[str]) -> tuple[str, str]:
+    """A table whose section row is `label` in one merged cell, and the same table with a spelling in each cell."""
+    head, body = "<tr><th>A</th><th>B</th><th>C</th></tr>", "<tr><td>5</td><td>6</td><td>7</td></tr>"
+    cells = "".join(f"<td>{x}</td>" for x in spellings)
+    return (f"<table>{head}<tr><td colspan=3>{label}</td></tr>{body}</table>",
+            f"<table>{head}<tr>{cells}</tr>{body}</table>")
 
 
 @relation(HOLDS, domain=f"{len(SPANS)} tables: a merged heading and a row-spanning group; each written "
@@ -347,30 +354,40 @@ def test_repeating_a_spanned_cell_keeps_heading_and_row_group_verdicts():
             assert not cell_passes(cell, {}, page, **{key: wrong}), (key, page)
 
 
-@relation(LIMITATION, domain="a section row written as one cell across the table, and as its label in every cell; "
-                             "the right label and a wrong one")
-@deviation("M120")
+@relation(HOLDS, domain="3 section labels (a phrase, a number, a phrase with a dash and a no-break space), each "
+                        "merged and written in every cell, in spellings differing by case, spacing and dash; "
+                        "the right label and a wrong one")
 def test_repeating_a_section_row_cell_keeps_the_section_verdict():
     """Writing a section row's label in every cell it covers, instead of once across the table, keeps the
-    `section` verdict of a `table_cell` test. [M120]
-    Why it matters for a score: a converter that repeats a spanned section label in each column is not read as
-    having a section row: a section row is one label in the first column, so the cell has no section
-    (tables.py: 'a row of one label, in its first column'). Credit: ParseBench-2 (arXiv 2611.17400, A.2,
-    CC BY 4.0): merged cells repeated, group labels."""
-    cell, args, _, repeated = SECTION
-    assert cell_passes(cell, {}, repeated, **args), repeated
-
-
-@more_evidence()
-def test_the_section_controls_of_a_repeated_section_row_hold():
-    """The controls of M120 hold: a section label written once across the table passes, and a wrong section fails
-    on that page and on the one that repeats the label in every cell. [M120]
-    Why it matters for a score: M120 stops at its first failing assertion; these show that only the repeated
-    label's positive verdict is what deviates."""
-    cell, args, merged, repeated = SECTION
-    assert cell_passes(cell, {}, merged, **args), merged
-    for page in (merged, repeated):
-        assert not cell_passes(cell, {}, page, section="Other"), page
+    `section` verdict of a `table_cell` test, for the right label and for a wrong one; the copies need only
+    fold to one string that matches the test's section within its `max_diffs`, as a merged label does, also
+    when a row of repeated data follows; copies that do not fold to one string are data; a repeated row that is not the named
+    section stays data. The price: a test that names `Yes` passes on a `Yes | Yes` row (docs/scoring/
+    table_cell.md, case cell-section-repeated-value). [M120]
+    Why it matters for a score: a converter may merge a section label or repeat it in each column; both are the
+    same section row (`tables._repeated_label`), as a repeated heading is the same heading. Credit: ParseBench-2
+    (arXiv 2611.17400, A.2, CC BY 4.0): merged cells repeated, group labels."""
+    for label, spellings in SECTIONS:
+        for page in section_pages(label, spellings):
+            assert cell_passes("6", {}, page, section=label), (label, page)
+            assert not cell_passes("6", {}, page, section="Other"), (label, page)
+    # And copies that each match the gold within its edits but differ from each other are data, not a section
+    page = ("<table><tr><th>A</th><th>B</th></tr><tr><td>Cohort 1</td><td>Cohort 3</td></tr>"
+            "<tr><td>5</td><td>6</td></tr></table>")
+    assert not cell_passes("6", {}, page, section="Cohort 2", max_diffs=1), page
+    # And the section is matched within the edits a test allows, merged or repeated
+    for first in ("<td colspan=2>Cohort 1</td>", "<td>Cohort 1</td><td>Cohort 1</td>"):
+        page = f"<table><tr><th>A</th><th>B</th></tr><tr>{first}</tr><tr><td>5</td><td>6</td></tr></table>"
+        assert cell_passes("6", {}, page, section="Cohort 2", max_diffs=1), page
+        assert not cell_passes("6", {}, page, section="Cohort 2"), page
+    # And a section followed by a row of repeated data keeps it, merged or repeated, and the data row is never
+    # credited as a section for a test naming another one
+    for first in ("<td colspan=2>Cohort</td>", "<td>Cohort</td><td>Cohort</td>"):
+        for data in ("Yes", "0"):
+            page = (f"<table><tr><th>A</th><th>B</th></tr><tr>{first}</tr><tr><td>{data}</td><td>{data}</td></tr>"
+                    "<tr><td>5</td><td>6</td></tr></table>")
+            assert cell_passes("6", {}, page, section="Cohort"), page
+            assert not cell_passes("6", {}, page, section="Other"), page
 
 
 # -------------------------------------------------------------------------- 8. Paragraph-break invariance

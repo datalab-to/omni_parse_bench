@@ -46,6 +46,8 @@ TABLES = [
         cell("cell-headings-merged", "I", "a merged heading over the column", "5", B, headings=["Group", "A"], show=show("B")),
         cell("cell-headings-beside", "I", "a heading written once beside an empty cell", "6", B.replace("<th colspan=2>Group</th>", "<th>Group</th><th></th>"), headings=["Group", "B"], show=show("B", "<th colspan=2>Group</th>", "<th>Group</th><th></th>")),
         cell("cell-section", "I", "the section row above", "6", C, section="Cohort 1", show=show("C")),
+        cell("cell-section-then-data", "I", "a data row that repeats a value does not hide the section above it", "6", C.replace("<td colspan=2>Cohort 1</td>", "<td colspan=2>Cohort 1</td></tr><tr><td>Yes</td><td>Yes</td>"), section="Cohort 1", show=show("C", "<td colspan=2>Cohort 1</td>", "<td colspan=2>Cohort 1</td></tr><tr><td>Yes</td><td>Yes</td>")),
+        cell("cell-section-repeated", "I", "a section label written in each cell of its row, not merged", "6", C.replace("<td colspan=2>Cohort 1</td>", "<td>Cohort 1</td><td>Cohort 1</td>"), section="Cohort 1", show=show("C", "<td colspan=2>Cohort 1</td>", "<td>Cohort 1</td><td>Cohort 1</td>")),
         cell("cell-row-group", "I", "a row-spanning cell to the left", "6", C, row_groups=["Male"], show=show("C")),
     ),
     table(
@@ -54,6 +56,7 @@ TABLES = [
         cell("cell-short", "B", "a short gold with an edit to spend", "ab", "<table><tr><td>abcd</td></tr></table>", md=1),
         cell("cell-dir-rtl", "B", "`dir=rtl` changes nothing: roles follow the html's order", "5", "<table dir='rtl'><tr><th>A</th><td>5</td></tr></table>", left_heading="A"),
         cell("cell-any-table", "B", "a gold with no relations: any cell of any table", "2024", A, show=show("A")),
+        cell("cell-section-repeated-value", "B", "a test naming the repeated value reads its row as the section: `Yes` passes", "6", C.replace("<td colspan=2>Cohort 1</td>", "<td>Yes</td><td>Yes</td>"), section="Yes", show=show("C", "<td colspan=2>Cohort 1</td>", "<td>Yes</td><td>Yes</td>")),
         cell("cell-headings-td", "B", "`headings` read any cell above, `<td>` too", "1,240", "<table><tr><td>Year</td><td>Total</td></tr><tr><td>2024</td><td>1,240</td></tr></table>", headings=["Total"]),
     ),
     table(
@@ -76,6 +79,7 @@ TABLES = [
         cell("cell-top-heading-wrong", "P", "a wrong heading", "1,240", A, top_heading="Year", show=show("A"), why=True),
         cell("cell-headings-swapped", "P", "headings in the wrong order", "5", B, headings=["A", "Group"], show=show("B"), why=True),
         cell("cell-section-wrong", "P", "a wrong section", "6", C, section="Cohort 2", show=show("C"), why=True),
+        cell("cell-section-data-row", "P", "a row that repeats a value is data for a test naming another section", "6", C.replace("<td colspan=2>Cohort 1</td>", "<td>Yes</td><td>Yes</td>"), section="Cohort 1", show=show("C", "<td colspan=2>Cohort 1</td>", "<td>Yes</td><td>Yes</td>"), why=True),
         cell("cell-row-group-wrong", "P", "a wrong row group", "6", C, row_groups=["Female"], show=show("C"), why=True),
         cell("cell-no-table", "P", "pipes in a paragraph are not a table", "1,240", "<p>| 2024 | 1,240 |</p>", why=True),
         cell("cell-compound", "I", "hyphenated compound broken at a line end", "self-aware", "<table><tr><td>self- aware</td></tr></table>"),
