@@ -36,6 +36,8 @@ system wrote it.
 | P | with an edit to spend, a decimal point inserted | `Total 12` before `ZZZ` (md 2) | `<p>Total 1.2</p><p>ZZZ</p>` | fail | `ord-digit-point` |
 | P | a lost minus sign | `Net -5 total` before `ZZZ` (md 2) | `<p>Net 5 total</p><p>ZZZ</p>` | fail | `ord-sign-lost` |
 | P | a minus sign added | `Net 5 total` before `ZZZ` (md 2) | `<p>Net -5 total</p><p>ZZZ</p>` | fail | `ord-sign-added` |
+| P | a comma for the decimal point | `Rate 1.2 per` before `ZZZ` (md 1) | `<p>Rate 1,2 per</p><p>ZZZ</p>` | fail | `ord-decimal-comma` |
+| P | a lost plus sign | `Dose +1.55 mg` before `ZZZ` (md 2) | `<p>Dose 1.55 mg</p><p>ZZZ</p>` | fail | `ord-plus-lost` |
 | I | a letter edit beside a number | `Total: 41` before `ZZZ` (md 1) | `<p>Totel: 41</p><p>ZZZ</p>` | pass | `ord-digit-letter` |
 | P | a digit continues a number | `Total: 40` before `ZZZ` | `<p>Total: 400</p><p>ZZZ</p>` | fail: `'before' text 'Total: 40' found only inside a longer number` | `ord-digit-edge` |
 | P | a footnote marker inside the phrase | `Smith and Jones` before `ZZZ` | `<p>Smith[1] and Jones</p><p>ZZZ</p>` | fail | `ord-footnote` |

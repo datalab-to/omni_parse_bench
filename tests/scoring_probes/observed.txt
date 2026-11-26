@@ -101,6 +101,11 @@ num-fuzzy-point	fail	'Total: 41' not found with its numbers exact (a number diff
 num-fuzzy-added	fail	'Total 41' not found with its numbers exact (a number differs, or one was added, split or joined)
 num-fuzzy-joined	fail	'Pages 1 to 2' not found with its numbers exact (a number differs, or one was added, split or joined)
 num-fuzzy-thousands	fail	'1,000' not found with its numbers exact (a number differs, or one was added, split or joined)
+txt-decimal-comma	fail	'Rate 1.2 per' not found with its numbers exact (a number differs, or one was added, split or joined)
+txt-decimal-dropped	fail	'Rate 1.2 per' not found with its numbers exact (a number differs, or one was added, split or joined)
+txt-plus-lost	fail	'Dose +1.55 mg' not found with its numbers exact (a number differs, or one was added, split or joined)
+txt-plus-minus-lost	fail	'Dose ±0.3 mg' not found with its numbers exact (a number differs, or one was added, split or joined)
+txt-leading-point	fail	'Area .5 ha' not found with its numbers exact (a number differs, or one was added, split or joined)
 num-fuzzy-script	fail	'3.' not found with its numbers exact (a number differs, or one was added, split or joined)
 txt-sign-lost	fail	'Net -5 total' not found with its numbers exact (a number differs, or one was added, split or joined)
 txt-sign-added	fail	'Net 5 total' not found with its numbers exact (a number differs, or one was added, split or joined)
@@ -331,6 +336,8 @@ ord-digit-exact	fail	'before' text 'Total: 41' not found
 ord-digit-point	fail	'before' text 'Total 12' not found
 ord-sign-lost	fail	'before' text 'Net -5 total' not found
 ord-sign-added	fail	'before' text 'Net 5 total' not found
+ord-decimal-comma	fail	'before' text 'Rate 1.2 per' not found
+ord-plus-lost	fail	'before' text 'Dose +1.55 mg' not found
 ord-digit-letter	pass
 ord-digit-edge	fail	'before' text 'Total: 40' found only inside a longer number
 ord-footnote	fail	'before' text 'Smith and Jones' not found
@@ -539,6 +546,8 @@ cell-digit-moved	fail	no cell matching '1,240' in any table
 cell-digit-neighbor	fail	cells matching '1,300' found, but: up '1,241' has other numbers than '1,240'
 cell-sign-lost	fail	no cell matching '-4.8' in any table
 cell-sign-added	fail	no cell matching '4.8' in any table
+cell-decimal-comma	fail	no cell matching '1.2' in any table
+cell-plus-lost	fail	no cell matching '+1.55' in any table
 cell-section-wrong	fail	cells matching '6' found, but: not in the section 'Cohort 2' (nearest above: 'Cohort 1')
 cell-section-data-row	fail	cells matching '6' found, but: not in the section 'Cohort 1' (nearest above: 'none')
 cell-row-group-wrong	fail	cells matching '6' found, but: not in the row groups 'Female'

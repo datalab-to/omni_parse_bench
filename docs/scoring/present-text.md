@@ -144,22 +144,28 @@ exact instead ([Numbers are exact](#numbers-are-exact)).
 
 ## Numbers are exact
 
-A gold that holds a digit must match with each of its numbers (a maximal run of digits, after fold) whole and
-unchanged, at any `max_diffs`: an edit may not change, add, drop, split or join a number, the squeezed retry
-never joins two, and the matched text may not end inside one. Every other character still costs one edit, and
-a gold without a digit is matched as above.
+A gold that holds a digit must match with each of its numbers whole and unchanged, after fold, at any
+`max_diffs`: an edit may not change, add, drop, split or join a number, the squeezed retry never joins two, and
+the matched text may not end inside one. A number is digit runs joined by a single `.` or `,` between digits
+(`1.2`, `1,240`, `12.05.2021`), with a leading `.` (`.5`) when no letter or digit comes before it. Its separators
+are part of it: `1,2` or `12` for `1.2`, `1240` for `1,240` and `5` for `.5` are other numbers. Every other
+character still costs one edit, and a gold without a digit is matched as above.
 
-A minus sign belongs to its number: a `-` (or `−`, or an en dash, which fold to one) directly before a digit run is
-a sign unless the character before it is a letter or a digit (but an exponent's `1e-3` is signed; a Chinese, Japanese or Korean character does not
-count: such a text puts no space before its minus). So `-5`, `x = -5`, `(-5)`, `3 -5` and `变化-5` are signed, and a
-gold's sign must be written and cannot be added. In a `table_cell` cell, a `- ` with a space (`− 0.756`, `(− 5)`) is a sign
-too at the start of the cell or after an opening bracket (not in a page text, where `- 12` may start a list item). A `-` after a Latin letter or a digit is a hyphen:
-`A-12`, `2026-11-26`, `1-2` and `COVID-19` keep costing one edit to drop, as do a list dash (`- 5` in the middle
-of a text) and a space-dash-space (`3 - 2`). Spacing the page adds or drops does not change what a number is: a
-gold's hyphen before a number (`kg-1`) is matched by the page's spaced `kg -1`. The cost of this narrow rule: a
-minus written right after a Latin letter (`x-5`) reads as a hyphen, so a budget can still drop it, and a spaced
-minus in the middle of a text (`was − 5`) is not guarded.
-`order` and `table_cell` apply the same rule ([order.md](order.md#how-it-differs-from-present),
+A sign belongs to its number: a `-` (or `−`, or an en dash, which fold to one), `+` or `±` directly before a
+number is a sign unless the character before it is a letter or a digit. So `-5`, `+1.55`, `x = -5`, `(-5)` and
+`3 -5` are signed, and so are an exponent's sign (`1e-3`) and a sign after a Chinese, Japanese or Korean
+character (such a text puts no space before it). A gold's sign must be written and cannot be added: `+1.55` is
+not `1.55`. In a `table_cell` cell, a `- ` with a space (`− 0.756`, `(− 5)`) is a sign too at the start of the
+cell or after an opening bracket (in a page text `- 12` may start a list item).
+
+A `-` after a Latin letter or a digit is a hyphen: `A-12`, `2026-11-26`, `1-2` and `COVID-19` keep costing one
+edit to drop, as do a list dash (`- 5` in the middle of a text) and a space-dash-space (`3 - 2`). This differs
+on purpose from the number reader of `region`, which reads a sign after a letter too (`A-12`): a page often
+writes such an id as `COVID 19` or `A12`, and a budget exists for that kind of noise. Spacing the page adds or
+drops does not change what a number is: a gold's hyphen before a number (`kg-1`) is matched by the page's spaced
+`kg -1`. The cost of this narrow rule: a minus written right after a Latin letter (`x-5`) reads as a hyphen, so
+a budget can still drop it, and a spaced minus in the middle of a text (`was − 5`) is not guarded. `order` and
+`table_cell` apply the same rule ([order.md](order.md#how-it-differs-from-present),
 [table_cell.md](table_cell.md#blind-spots)).
 
 <!-- cases:text-numbers -->
@@ -172,6 +178,11 @@ minus in the middle of a text (`was − 5`) is not guarded.
 | P | a letter read as a digit adds a number | `Total 41` (md 1) | `Tota1 41` | fail | `num-fuzzy-added` |
 | P | two numbers joined | `Pages 1 to 2` (md 3) | `Pages 12` | fail | `num-fuzzy-joined` |
 | P | a dropped thousands separator joins two numbers | `1,000` (md 1) | `1000` | fail | `num-fuzzy-thousands` |
+| P | a comma for the decimal point | `Rate 1.2 per` (md 1) | `Rate 1,2 per` | fail | `txt-decimal-comma` |
+| P | a decimal point dropped | `Rate 1.2 per` (md 2) | `Rate 12 per` | fail | `txt-decimal-dropped` |
+| P | a lost plus sign | `Dose +1.55 mg` (md 2) | `Dose 1.55 mg` | fail | `txt-plus-lost` |
+| P | a lost plus-minus sign | `Dose ±0.3 mg` (md 2) | `Dose 0.3 mg` | fail | `txt-plus-minus-lost` |
+| P | a leading point is part of the number | `Area .5 ha` (md 2) | `Area 5 ha` | fail | `txt-leading-point` |
 | P | a digit of another script is another number | `3.` (md 1) | `๓.` | fail | `num-fuzzy-script` |
 | P | a lost minus sign | `Net -5 total` (md 2) | `Net 5 total` | fail | `txt-sign-lost` |
 | P | a minus sign added | `Net 5 total` (md 2) | `Net -5 total` | fail | `txt-sign-added` |

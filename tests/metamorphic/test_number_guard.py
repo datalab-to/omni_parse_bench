@@ -132,3 +132,41 @@ def test_a_letter_edit_within_the_budget_keeps_the_verdict_and_a_digit_edit_does
                 assert all(verdicts(gold, edited, md)), (gold, edited, md)
                 digit = one_digit_changed(edited, 0)
                 assert not any(verdicts(gold, digit, md)), (gold, digit, md)
+
+
+SEPARATORS = [("rate 1.2 per", "rate 1,2 per"), ("rate 1,2 per", "rate 1.2 per"), ("rate 1.2 per", "rate 12 per"),
+              ("rate 12 per", "rate 1.2 per"), ("rate 1.2 per", "rate 1 2 per"), ("rate 1.25 per", "rate 12.5 per"),
+              ("sum 1,240 here", "sum 1.240 here"), ("sum 1,240 here", "sum 1240 here"), ("area .5 ha", "area 5 ha"),
+              ("area 5 ha", "area .5 ha")]
+
+
+@relation(HOLDS, domain="10 golds and pages that differ in one separator inside a number (`.` for `,`, dropped, "
+                        "inserted, replaced by a space, moved, a leading point) x 4 budgets x 3 test types")
+def test_a_budget_never_pays_for_a_separator_inside_a_number():
+    """A number's `.` or `,` between its digits (and a leading `.`) is part of the number: a gold passes on the
+    page that writes it, and fails when the page replaces, drops, inserts or moves one separator, at budgets 0
+    to 3, in `present`, `order` and `table_cell`; `1,240` is not `1240`, as in `present`'s digit rule. [M180]
+    Why it matters for a score: `1.2` read as `1,2` (a different quantity) cost one edit, which a budget paid.
+    Credit: found in review of this change."""
+    for gold, page in SEPARATORS:
+        for md in BUDGETS:
+            assert all(verdicts(gold, gold, md)), (gold, md)
+            assert not any(verdicts(gold, page, md)), (gold, page, md)
+
+
+PLUS = [("dose +1.55 mg", "dose 1.55 mg"), ("dose ±0.3 mg", "dose 0.3 mg"), ("(+5) and", "(5) and"),
+        ("x = +5 ok", "x = 5 ok")]
+
+
+@relation(HOLDS, domain="4 golds with a `+` or `±` sign x 4 budgets x 3 test types: the sign lost, or added to the "
+                        "unsigned gold")
+def test_a_lost_or_added_plus_or_plus_minus_sign_fails_at_any_budget():
+    """A `+` or `±` directly before a number, after white space, a bracket or the start of the string (not after
+    a letter or a digit: `1+1`), must be written and cannot be added, at budgets 0 to 3, in `present`, `order`
+    and `table_cell`. [M181]
+    Why it matters for a score: dropping a plus sign (`+1.55` read `1.55`) is a misreading, as a lost minus is."""
+    for gold, lost in PLUS:
+        for md in BUDGETS:
+            assert all(verdicts(gold, gold, md)), (gold, md)
+            assert not any(verdicts(gold, lost, md)), (gold, lost, md)
+            assert not any(verdicts(lost, gold, md)), (lost, gold, md)

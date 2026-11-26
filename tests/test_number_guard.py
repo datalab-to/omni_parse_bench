@@ -163,3 +163,42 @@ def test_a_signed_number_that_shares_digits_with_a_hyphenated_one_is_kept(gold, 
 def test_the_sign_of_an_exponent_is_kept(gold, lost):
     assert all(all_types(gold, gold, 0))
     assert not any(all_types(gold, lost, 1)), gold
+
+
+@pytest.mark.parametrize("gold, page", [
+    ("rate 1.2 per", "rate 1,2 per"),          # a comma for the decimal point
+    ("rate 1,2 per", "rate 1.2 per"),
+    ("rate 1.2 per", "rate 12 per"),            # the point dropped
+    ("rate 12 per", "rate 1.2 per"),            # a point inserted
+    ("rate 1.2 per", "rate 1 2 per"),           # replaced by a space
+    ("rate 1.25 per", "rate 12.5 per"),         # the point moved
+    ("rate 1,240 per", "rate 1.240 per"),       # a thousands comma for a point
+    ("rate 1,240 per", "rate 1240 per"),        # separators stay as written
+    ("area .5 ha", "area 5 ha"), ("area 5 ha", "area .5 ha"), ("area .5 ha", "area 0.5 ha"),
+])
+@pytest.mark.parametrize("md", [1, 2, 3])
+def test_a_budget_never_pays_for_a_decimal_separator(gold, page, md):
+    assert all(all_types(gold, gold, md))
+    assert not any(all_types(gold, page, md)), (gold, page, md)
+
+
+@pytest.mark.parametrize("gold, lost", [
+    ("dose +1.55 mg", "dose 1.55 mg"), ("dose ±0.3 mg", "dose 0.3 mg"), ("(+5) and", "(5) and"),
+    ("+1.55", "1.55"), ("x = +5 ok", "x = 5 ok"),
+])
+@pytest.mark.parametrize("md", [1, 2, 3])
+def test_a_plus_or_plus_minus_sign_is_kept_and_not_added(gold, lost, md):
+    assert all(all_types(gold, gold, md))
+    assert not any(all_types(gold, lost, md)), (gold, lost, md)
+    assert not any(all_types(lost, gold, md)), (lost, gold, md)
+
+
+@pytest.mark.parametrize("gold, page", [("A+5 here", "A5 here"), ("n=1+ x", "n=1 x")])
+def test_a_plus_after_a_letter_or_digit_is_no_sign(gold, page):
+    assert all(all_types(gold, page, 1))
+
+
+@pytest.mark.parametrize("gold, page", [("area .5 ha", "area .5 ha"), ("total, .5", "total, .5"),
+                                        ("A.5 here", "A.5 here")])
+def test_a_leading_point_number_matches_itself(gold, page):
+    assert all(all_types(gold, page, 0))

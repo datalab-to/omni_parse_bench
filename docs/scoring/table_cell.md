@@ -130,6 +130,8 @@ What it penalizes:
 | P | a changed digit in a neighbor | `1,300` (md 1), up `1,240` | A[`1,240` → `1,241`] | fail: `cells matching '1,300' found, but: up '1,241' has other numbers than '1,240'` | `cell-digit-neighbor` |
 | P | a lost minus sign | `-4.8` (md 1) | `<table><tr><td>4.8</td></tr></table>` | fail | `cell-sign-lost` |
 | P | a minus sign added | `4.8` (md 1) | `<table><tr><td>-4.8</td></tr></table>` | fail | `cell-sign-added` |
+| P | a comma for the decimal point | `1.2` (md 1) | `<table><tr><td>1,2</td></tr></table>` | fail | `cell-decimal-comma` |
+| P | a lost plus sign | `+1.55` (md 1) | `<table><tr><td>1.55</td></tr></table>` | fail | `cell-plus-lost` |
 | P | a wrong section | `6`, section `Cohort 2` | C | fail: `cells matching '6' found, but: not in the section 'Cohort 2' (nearest above: 'Cohort 1')` | `cell-section-wrong` |
 | P | a row that repeats a value is data for a test naming another section | `6`, section `Cohort 1` | C[`<td colspan=2>Cohort 1</td>` → `<td>Yes</td><td>Yes</td>`] | fail: `cells matching '6' found, but: not in the section 'Cohort 1' (nearest above: 'none')` | `cell-section-data-row` |
 | P | a wrong row group | `6`, row groups `Female` | C | fail: `cells matching '6' found, but: not in the row groups 'Female'` | `cell-row-group-wrong` |

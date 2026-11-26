@@ -84,6 +84,8 @@ TABLES = [
         cell("cell-digit-neighbor", "P", "a changed digit in a neighbor", "1,300", A.replace("1,240", "1,241"), md=1, up="1,240", show=show("A", "1,240", "1,241"), why=True),
         cell("cell-sign-lost", "P", "a lost minus sign", "-4.8", "<table><tr><td>4.8</td></tr></table>", md=1),
         cell("cell-sign-added", "P", "a minus sign added", "4.8", "<table><tr><td>-4.8</td></tr></table>", md=1),
+        cell("cell-decimal-comma", "P", "a comma for the decimal point", "1.2", "<table><tr><td>1,2</td></tr></table>", md=1),
+        cell("cell-plus-lost", "P", "a lost plus sign", "+1.55", "<table><tr><td>1.55</td></tr></table>", md=1),
         cell("cell-section-wrong", "P", "a wrong section", "6", C, section="Cohort 2", show=show("C"), why=True),
         cell("cell-section-data-row", "P", "a row that repeats a value is data for a test naming another section", "6", C.replace("<td colspan=2>Cohort 1</td>", "<td>Yes</td><td>Yes</td>"), section="Cohort 1", show=show("C", "<td colspan=2>Cohort 1</td>", "<td>Yes</td><td>Yes</td>"), why=True),
         cell("cell-row-group-wrong", "P", "a wrong row group", "6", C, row_groups=["Female"], show=show("C"), why=True),
