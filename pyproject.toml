@@ -35,9 +35,16 @@ benchmark = [
     "omni-parse-bench[harness]",
     "omni-bench-core[hub]>=0.14,<0.15",
 ]
+# The local pdf-inspector adapter; its OCR mode also needs PDFium and ONNX Runtime libraries (docs/providers.md).
+pdf-inspector = [
+    "omni-parse-bench[harness]",
+    "pdf-inspector==1.27.1",
+    "img2pdf==0.6.3",
+]
 dev = [
     "omni-parse-bench[benchmark]",
     "hypothesis>=6.100",
+    "img2pdf==0.6.3",  # tests the optional adapter's lossless image-to-PDF conversion
     "pytest>=8.0",
     "ruff>=0.6",
 ]

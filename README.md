@@ -51,12 +51,25 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | OvisOCR | open | 1.4B | none | — | 72.2 | 78.2 | unsupported | — |
 | olmOCR-2 | open | 8.3B | none | — | 71.8 | 56.6 | unsupported | — |
 | Nanonets-OCR2-3B | open | 3.8B | none | — | 69.0 | 62.6 | unsupported | — |
+| pdf-inspector (OCR) | open | n/a | none | — | 41.3 | 17.7 | unsupported | — |
+| pdf-inspector | open | n/a | none | — | 20.6 | 17.0 | unsupported | — |
 | pdftext | open | n/a | none | — | 20.6 | 0.0 | unsupported | — |
 | pdftotext | open | n/a | none | — | 20.4 | 0.0 | unsupported | — |
 | Tesseract | open | n/a | none | — | 17.7 | 0.0 | unsupported | — |
 | MarkItDown | open | n/a | none | — | 16.0 | 13.9 | unsupported | — |
 
-Scores use omni-parse-bench 1.7.0, regraded from each system's saved predictions with no new model calls, except rows marked §.
+Scores use omni-parse-bench 1.7.0. Saved predictions are regraded with 1.7.0 unless the provenance below identifies a new local run; rows marked § retain their published 1.5.0 grades.
+
+`pdf-inspector` and `pdf-inspector (OCR)` were run locally on the full public dataset at commit
+`24e3ef4d2aa1718e622d357db7f6d0d10742c93d`. Full runs `pdf-inspector-20261126-014930-77ac` (text mode) and
+`pdf-inspector-ocr-20261126-014924-02a9` (OCR mode) each had two image conversion failures. The affected pages,
+`realdoc_pages-images_6f691809_images_34870cc9-ee12-4d20-a346-397eeb18c763-p1` and
+`realdoc_pages-images_4e23786c_images_16a79f1e-e633-4fa9-9425-a6b58c273ff2-p1`, were retried in the respective
+modes after Pillow decoded and losslessly rewrote them as canonical PNGs: text run `pdf-inspector-20261126-015509-6e6d`,
+OCR runs `pdf-inspector-ocr-20261126-020636-7886` and `pdf-inspector-ocr-20261126-020705-a3dc`. Merged full-run
+outputs were regraded with released 1.7.0 and no `--partial`; both rows have 2,937/2,937 pages, zero failures and
+100% coverage. OCR used PDFium `native-v7988`, ONNX Runtime 1.27.0 and the documented PP-OCRv6 Small model set
+(about 31 MB, fetched on the first routed page) with `PDFIUM_LIB_PATH` and `ORT_DYLIB_PATH` set.
 
 \* Used in creating and verifying at least some tests.
 
@@ -422,6 +435,8 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | OvisOCR | 36.0 | 92.8 | 77.0 | 70.0 | 73.2 | 63.6 | 35.3 | 50.4 | 27.1 |
 | olmOCR-2 | 61.2 | 84.9 | 58.7 | 70.3 | 68.6 | 57.5 | 57.7 | 65.5 | 39.5 |
 | Nanonets-OCR2-3B | 54.6 | 77.6 | 64.1 | 74.2 | 63.8 | 46.2 | 29.3 | 59.6 | 44.4 |
+| pdf-inspector (OCR) | 19.3 | 16.8 | 23.6 | 59.3 | 40.9 | 72.5 | 19.3 | 29.1 | 43.4 |
+| pdf-inspector | 0.0 | 12.8 | 19.9 | 17.0 | 22.7 | 33.1 | 19.0 | 0.0 | 26.9 |
 | pdftext | 0.0 | 4.5 | 6.0 | 21.1 | 22.2 | 34.6 | 13.4 | 0.9 | 31.5 |
 | pdftotext | 0.0 | 4.4 | 6.0 | 20.0 | 21.4 | 33.9 | 14.3 | 0.9 | 33.2 |
 | Tesseract | 1.7 | 1.4 | 3.1 | 27.1 | 23.3 | 43.3 | 3.7 | 5.2 | 25.0 |

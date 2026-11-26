@@ -47,6 +47,7 @@ try:
         paddleocr_vl,
         pdftotext,
         pdftext_plain,
+        pdf_inspector,
         reducto,
         surya_ocr,
         surya_ocr25,
@@ -70,6 +71,7 @@ ENTRY_POINT_GROUP = "omni_parse_bench.adapters"
 ADAPTERS: dict[str, type[Parser]] = {a.name: a for a in (
     datalab.Datalab, reducto.Reducto, extend.Extend, llamaparse.LlamaParse, azure.Azure, mistral.Mistral,
     tesseract.Tesseract, pdftotext.Pdftotext, pdftext_plain.PdfText, markitdown.MarkItDown,
+    pdf_inspector.PdfInspector,
     # Open models, each served from its folder in providers/serve/: the vendor's own code on a server of ours,
     # or vLLM alone where the vendor offers only the model.
     chandra_ocr.ChandraOcr, deepseek_ocr.DeepseekOcr, dots.Dots, glm_ocr.GlmOcr, hunyuan.Hunyuan,
