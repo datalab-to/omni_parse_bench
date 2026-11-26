@@ -1,6 +1,6 @@
 # ruff: noqa: E501
 """Relations of missing, empty and malformed outputs (M138 to M141) and of how verdicts add up to family scores
-and the headline (M142 to M145)."""
+and the headline (M142 to M144)."""
 from __future__ import annotations
 
 import statistics
@@ -13,8 +13,10 @@ from test_invariants import answer
 from test_properties import TESTS
 
 from metamorphic.common import HOLDS, relation
+from omni_bench_core.errors import SystemFailed
+from omni_parse_bench import views
 from omni_parse_bench.scorers import unit_tests as scorer
-from omni_parse_bench.scorers.unit_tests import compare
+from omni_parse_bench.scorers.unit_tests import compare, runners
 
 OUTPUTS = ("html", "blocks")
 BAD_HTML = [0, 1.5, True, [], {}, b"<p>x</p>", ["<p>x</p>"], {"html": "<p>x</p>"}]
@@ -103,8 +105,9 @@ def test_an_output_of_the_wrong_shape_fails_only_the_tests_that_read_it():
 def test_an_empty_output_fails_with_its_documented_reason_and_markup_noise_never_raises():
     """An empty html (`""`) fails every loaded test except a `page_near_empty` test, which it passes; a
     `table_cell` test then reads `no tables found`; an empty blocks list fails every layout test with `no block
-    covers 50% of its place`; and html made of unclosed, stray or nested tag characters never raises, giving a
-    verdict for every test. [M140]
+    covers 50% of its place`; a table the cell reader cannot parse (`<td>` outside a `<tr>`) is read as text by a form-field test, so
+    the cells of a table that fail it pass it and a value beside the label fails as text (present-text.md); and html
+    made of unclosed, stray or nested tag characters never raises, giving a verdict for every test. [M140]
     Why it matters for a score: an empty answer costs its tests and a garbled one is graded, never a
     scorer crash (docs/scoring/layout_kind.md; docs/scoring/table_cell.md, case cell-no-table)."""
     for t in TESTS:
@@ -116,6 +119,17 @@ def test_an_empty_output_fails_with_its_documented_reason_and_markup_noise_never
         else:
             got = verdict({"blocks": []}, t)
             assert (got.result, got.why) == ("fail", "no block covers 50% of its place"), (t.id, got)
+    # And a table the cell reader cannot parse (`<td>` outside a `<tr>`) is read as text (present-text.md): the
+    # same cells that fail a field test as a table (a value under the label) pass it, and a value beside the
+    # label fails as text
+    field = runners.Present(runners.Text("Date of birth:", 0), True, runners.Text("__/__/____", 0),
+                            (runners.Text("Name:", 0), runners.Text("Place of birth:", 0)))
+    rows = "<table><tr><td>Date of birth:</td><td>Place of birth:</td></tr><tr><td>01/02/1990</td><td></td></tr></table>"
+    flat = "<table><td>Date of birth:</td><td>Place of birth:</td><td>01/02/1990</td><td></td></table>"
+    beside = "<table><td>Date of birth:</td><td>01/02/1990</td></table>"
+    assert runners.present(field, views.html(rows)) == (False, "'Date of birth:' cell's value cell (below) holds '01/02/1990'")
+    assert runners.present(field, views.html(flat)) == (True, "")
+    assert runners.present(field, views.html(beside)) == (False, "'Date of birth:' is followed by '01/02/1990' to the end of the page")
     noise = st.text("<>/=\"'&;!-ptdrbhx\n 5$\\_[]", max_size=60)
 
     @settings(max_examples=40)
@@ -141,8 +155,9 @@ def test_a_failed_page_fails_every_one_of_its_tests_and_costs_no_more():
     assert failed.result["passed"] == 0 and failed.result["tests"] == len(tests)
     assert [d["result"] for d in failed.details] == ["fail"] * len(tests)
     assert [d["why"] for d in failed.details] == [f"no {t.output_type} output" for t in tests]
+    assert unit.prediction({"pages": [{"html": "<p>x</p>"}]}) == {"html": "<p>x</p>"}    # a valid envelope
     for bad in [None, [], {}, {"pages": []}, {"pages": [{}, {}]}, {"pages": "x"}, {"pages": [3]}]:
-        with pytest.raises(Exception, match="a row is one page"):
+        with pytest.raises(SystemFailed, match="a row is one page"):
             unit.prediction(bad)
     # Given a page answered right and a page failed; When both are summarized; Then the failed page adds tests only
     ok = [unit.score(merged([answer(t) for t in ts]), ts) for ts in SAMPLE.values()]

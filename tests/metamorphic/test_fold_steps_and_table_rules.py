@@ -1,6 +1,6 @@
 # ruff: noqa: E501
 """Relations of the fold steps no relation checked, of table_cell's `section`, `row_groups`, `left_heading` and
-floor ratio, and of layout_kind's list-or-form-as-text rule (M126 to M139)."""
+floor ratio, and of layout_kind's list-or-form-as-text rule (M126 to M137)."""
 from __future__ import annotations
 
 import string
@@ -77,15 +77,15 @@ def test_invisible_and_private_use_characters_inside_a_word_change_no_text_verdi
     assert not reads("\u0600123", "123")
 
 
-SINGLE = ["‘", "’", "‚", "‛", "ʼ", "`", "´", "′"]
+SINGLE = ["‘", "’", "‚", "‛", "ʼ", "`", "´", "′", "ꞌ", "Ꞌ", "ˈ"]
 DOUBLE = ["“", "”", "„", "‟", "«", "»", "″"]
 
 
-@relation(HOLDS, domain="8 single (the acute accent only inside a word) and 7 double quote glyphs x 2 words x both directions, TeX's two-glyph "
+@relation(HOLDS, domain="11 single (the acute accent only inside a word; the saltillo and the IPA stress mark included) and 7 double quote glyphs x 2 words x both directions, TeX's two-glyph "
                         "quotes, and the two families set against each other")
 def test_quote_glyphs_of_a_family_read_as_one_quote():
     """A `present` text test with an ASCII `'` or `"` passes on a page that writes any glyph of its family
-    (curly, low, reversed, prime, grave, and the acute accent between two letters, for `'`; guillemets and the
+    (curly, low, reversed, prime, grave, saltillo, the IPA stress mark, and the acute accent between two letters, for `'`; guillemets and the
     double prime for `"`), and a test written with the glyph passes on the ASCII page; two of the single quotes in a row (`''`,
     ``` `` ```) read as the double quote; the single and the double family do not read as each other. [M128]
     Why it matters for a score: a system may print typographic quotes where the gold has plain ones, or the
@@ -153,8 +153,8 @@ def test_full_width_punctuation_reads_as_its_ascii_mark():
             assert not reads(f"{a}{other}{b}", f"{a}{wide}{b}"), (wide, a, b)
 
 
-@relation(HOLDS, domain="4 raised-decimal pages and 4 pages where the dot separates or multiplies, both "
-                        "directions, and 2 CJK dots between digits")
+@relation(HOLDS, domain="4 raised-decimal pages, and 5 pages where the dot separates or multiplies (3) or is a CJK dot "
+                        "between digits (2), both directions")
 def test_a_raised_decimal_point_reads_as_a_point_and_other_middle_dots_stay():
     """A middle dot or bullet operator that starts a decimal (`·79`, `p<·05`) or follows a digit and precedes
     one (`3·14`) reads as a decimal point, so a text test with `.79`, `p<.05` or `3.14` passes on it and the
@@ -223,19 +223,21 @@ def th(text: str) -> str:
     return f"<th>{escaped(text)}</th>"
 
 
-LABELS = st.lists(st.text(string.ascii_uppercase, min_size=4, max_size=6), min_size=4, max_size=4, unique=True)
+LABELS = st.lists(st.text(string.ascii_uppercase, min_size=4, max_size=6), min_size=3, max_size=3, unique=True)
+LABELS4 = st.lists(st.text(string.ascii_uppercase, min_size=4, max_size=6), min_size=4, max_size=4, unique=True)
 VALUES = st.lists(st.integers(100, 999).map(str), min_size=4, max_size=4, unique=True)
 
 
-@relation(HOLDS, domain="4 distinct labels and 4 values: 2 section rows over 2 body rows each, 4 ways to "
-                        "write a section row, 3 ways to name a section, every body cell")
+@relation(HOLDS, domain="3 distinct labels and 4 values: 2 section rows over 2 body rows each, 3 ways to "
+                        "write a section row, every body cell; and a row-spanning cell, not in the first column")
 def test_a_section_is_the_nearest_section_row_above_the_cell():
     """In a table of section rows each followed by body rows, a body cell's `section` is the nearest section
     row above it: its test passes for that row's label and fails for another section's; moving a body row
     across a section row flips both verdicts; a section row written once across the table, once in the first
     cell beside blank ones, or in every cell reads the same (a test naming the label of an earlier row written in
-    every cell is read as that row, M120); two section rows in a row are read together; and
-    the first cell of the cell's own row is a section too. [M133]
+    every cell is read as that row, M120); two section rows in a row are read together; a
+    row-spanning cell to the left is a section for the rows it spans; and the first cell of the cell's own row is a
+    section too. [M133]
     Why it matters for a score: tables of the dataset group their rows under printed section labels; a
     system that lays out one group's rows under another's section must fail."""
     def build(first, second, a_rows, b_rows, style):
@@ -248,7 +250,7 @@ def test_a_section_is_the_nearest_section_row_above_the_cell():
 
     @given(LABELS, VALUES)
     def check(labels, values):
-        first, second, wrong, _ = labels
+        first, second, wrong = labels
         a_rows, b_rows = values[:2], values[2:]
         for style in ["merged", "blank", "repeated"]:
             page = build(first, second, a_rows, b_rows, style)
@@ -274,6 +276,14 @@ def test_a_section_is_the_nearest_section_row_above_the_cell():
     assert cell_passes(cell_test("5", section="Males"), page)
     assert cell_passes(cell_test("5", section="Cohort Males"), page)
     assert not cell_passes(cell_test("5", section="Cohort"), page)
+    # And a row-spanning cell to the left, not in the first column, is a section for the rows it spans only
+    page = rows_html([[td("Alpha"), td("Group", rowspan=2), td("x"), td("1")], [td("Beta"), td("y"), td("2")],
+                      [td("Gamma"), td("Plain"), td("z"), td("3")]])
+    for v in ("1", "2"):
+        assert cell_passes(cell_test(v, section="Group"), page), v
+        assert not cell_passes(cell_test(v, section="Plain"), page), v
+    assert not cell_passes(cell_test("3", section="Group"), page)
+    assert not cell_passes(cell_test("3", section="Plain"), page)   # a cell that spans no rows is no section
     # And a section above no row at all, or the first cell of the cell's own row, is its own case
     assert not cell_passes(cell_test("5", section="Cohort"), rows_html([[td("row"), td("5")]]))
     assert cell_passes(cell_test("5", section="row"), rows_html([[td("row"), td("5")]]))
@@ -333,7 +343,7 @@ def test_a_cells_left_heading_is_the_label_of_its_own_row():
     rows flips both verdicts. [M135]
     Why it matters for a score: row labels are what a reader reads a figure against; a figure under another
     row's label is a wrong figure."""
-    @given(LABELS, VALUES, st.integers(2, 4), st.booleans())
+    @given(LABELS4, VALUES, st.integers(2, 4), st.booleans())
     def check(labels, values, width, header):
         def page(order):
             rows = []
@@ -368,7 +378,7 @@ FLOOR_GOLD = ["abcd", "abcdef", "abcdefgh", "abcdefghij"]
 
 
 @relation(HOLDS, domain="4 golds of 4 to 10 distinct letters x every number of substitutions up to the whole "
-                        "cell x 3 edit budgets (0, half, the whole length and more)")
+                        "cell x 4 edit budgets (0, half, the whole length, three times it)")
 def test_a_cell_never_matches_below_a_ratio_of_one_half_whatever_the_edit_budget():
     """A `table_cell` test with a gold cell of n characters and any edit budget matches a cell with j characters
     substituted when j is within the budget and at most n/2, and never when j is more than n/2, however large
@@ -392,7 +402,7 @@ def test_a_cell_never_matches_below_a_ratio_of_one_half_whatever_the_edit_budget
 
 
 @relation(HOLDS, domain="all 11 x 11 pairs of a block's label and a test's kind, the block alone on the page, "
-                        "and the same with a smaller `text` block inside")
+                        "and the same with a larger block of another label around it")
 def test_a_list_or_form_block_is_text_for_a_text_test_and_nothing_else_is():
     """A layout_kind test of kind `text` passes when the block that holds its place is labelled `text`, `list`
     or `form`; every other kind passes only on its own label, so a `list` or `form` block fails a test for any

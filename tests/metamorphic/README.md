@@ -84,7 +84,7 @@ lists as deviating).
 - *bug*: the scorer contradicts its own docs in a way that can change a verdict.
 - *known limitation*: the docs do not promise it either way. It may still cost a correct answer.
 
-The label says what the docs say, not whether the behaviour is good. Each entry's `why_this_status` cites the
+The label says what the docs say, not whether the behavior is good. Each entry's `why_this_status` cites the
 lines it rests on.
 
 **`enumerated_over_real_tests`** is true when a test checks every real test for that relation, and the deviating
