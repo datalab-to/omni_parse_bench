@@ -7,7 +7,7 @@ Each promise is a *relation*: change a page, or a test, in a way that should not
 known way), and the verdict should follow. Example: putting a passing answer in bold must not make its test
 fail.
 
-- The certificate lists the 137 relations its authors selected: 128 hold and 9 deviate. It is not every
+- The certificate lists the 154 relations its authors selected: 144 hold and 10 deviate. It is not every
   relation of the scorer (see [Not covered](#not-covered)). Four of the 9 (M1a to M1c and M1e) are about
   folding a string twice, which the scorer never does and no document promises, so they change no score.
 - It is generated from the tests. CI fails if it is out of date, or if a status disagrees with its test.
@@ -38,10 +38,10 @@ A healthy run gives:
 
 | | passed | skipped | xfailed |
 |---|---|---|---|
-| this folder, no dataset | 611 | 22 | 9 |
-| this folder, with dataset | 630 | 2 | 9 |
-| whole suite, no dataset | 2713 | 37 | 9 |
-| whole suite, with dataset | 2740 | 10 | 9 |
+| this folder, no dataset | 626 | 22 | 10 |
+| this folder, with dataset | 646 | 2 | 10 |
+| whole suite, no dataset | 2745 | 37 | 10 |
+| whole suite, with dataset | 2772 | 10 | 10 |
 
 All four rows come from runs of this version.
 
@@ -145,21 +145,26 @@ Other commands:
 - **A check over every real test reports new ids, or ids that no longer deviate.** Fix the scorer, or update that
   entry's `real_ids` and regenerate.
 
+## External relations
+
+M104 to M120 come from outside: they are the benign variations and error types of the perturbation catalogue of
+ParseBench-2 (arXiv 2611.17400, Appendix A.2, CC BY 4.0) that apply to OPB, written as relations by reading
+this scorer's documented rules, so that the scorer is tested by relations its authors did not choose. Each
+relation's docstring credits it. M120 is the one that deviates.
+
 ## Not covered
 
 - score aggregation: family scores and the headline;
 - equation tests on real golds beyond the folds M76 to M79 name: M17 uses 8 handmade equations, M78 and M79 rewrite the
   real equations by those folds only, and M10 compares readings, not real equations;
-- table_cell relations `section`, `row_groups` and `left_heading` beyond M27's mirror check (`down` only inside M6a's agreement check);
-- number tests' sign and percent rules (M12 and M20 cover digits, separators and tails only);
+- table_cell relations `section`, `row_groups` and `left_heading` beyond M27's mirror check, M114 (transpose) and M115 and M120 (spanned cells) (`down` only inside M6a's agreement check and M113);
 - repeat's reading without image descriptions, and the equation test's plain-text fallback;
-- markdown beyond pipe tables and paragraphs;
+- markdown beyond pipe tables, paragraphs and the dialects M104 and M105 name (headings, emphasis, bullets, numbering, a fence);
 - missing or malformed outputs;
 - a batch where some test fails: M19 draws only pages where every test passes;
 - layout_kind's list-or-form-as-text rule;
 - these steps of fold: no relation fails when one is removed or changed (each was tried on a copy of the
   scorer):
-  - compatibility forms (NFKC: ligatures, full width, sub- and superscripts);
   - a superscript digit after a digit set apart (`1,240¹`);
   - invisible and private-use characters removed;
   - the quote and arrow families;
@@ -167,9 +172,8 @@ Other commands:
   - a decimal middle dot made a point;
   - the minimum run of 3 for dots, dashes, `=` and `*` (the one for `_` is pinned by M22a's check);
 - these rules of the tests, tried the same way:
-  - present's retry without spaces (squeeze);
   - table_cell's floor ratio (`TABLE_MIN_RATIO`, 0.5);
-  - a number test's sign, and layout_kind's list-or-form-as-text rule (both named above);
+  - layout_kind's list-or-form-as-text rule (named above);
 - M14 restates fold's rules in its own code, to skip deletions that cannot count; it does not call the
   scorer's rules, so it does not check them;
 - edges the sweep found that no row states:

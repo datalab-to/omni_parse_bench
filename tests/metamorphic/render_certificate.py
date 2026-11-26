@@ -168,6 +168,8 @@ def render() -> str:
         "- Effects on scores marked 'Measured on cached leaderboard re-runs' cannot "
         "be re-run from this package.",
         "- A deviation whose effect is 'unknown' is one that could change a score: treat it as open.",
+        "- M104 to M120 are taken from the perturbation catalogue of ParseBench-2 (arXiv 2611.17400, Appendix A.2, "
+        "CC BY 4.0), written as relations from this scorer's documented rules.",
         "",
         "| label | promise | status | evidence | tests |",
         "|---|---|---|---|---|",
