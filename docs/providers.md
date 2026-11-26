@@ -232,6 +232,7 @@ that is missing stops a run before any call and says which `export` to type.
 | `mistral` | /v1/ocr (mistral-ocr-4-1) | html, blocks | header and footer fields beside the markdown, put back | MISTRAL_API_KEY |
 | a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2, OvisOCR, OvisOCR2: html) | kept: vendor defaults that leave them out turned off | none; OPB_ENDPOINT_KEY, when the server has one |
 | `tesseract` | the local `tesseract` binary, no model of the page | html | kept: it has no notion of them | none |
+| `pdftotext` | the local poppler `pdftotext` binary, the PDF's text layer | html | kept: it has no notion of them | none |
 
 A vendor's tiers are runs of their own, one config each (or one config and `--set`), with the same pages:
 
@@ -290,7 +291,14 @@ Per vendor:
   for, so it is told nothing about the page. Its text is written as html inside `<pre>`, escaped,
   and it gives no layout blocks. It is free, so its cost is recorded as `usd` 0.0. A tesseract that
   exits with an error fails the page as a `SystemFailed` with its stderr. Needs `brew install tesseract tesseract-lang` (or the
-  distribution's tesseract and its script models).
+  distribution's tesseract and its script models); and
+- pdftotext: the text-layer floor, poppler's `pdftotext page.pdf -` run locally at no cost, at its
+  documented default (reading order, no `-layout`). It reads the PDF's text layer and does no OCR, so
+  an image page, which has none, is an empty page with no call, and so is a scanned PDF page without
+  a text layer (a scan with an embedded OCR layer gives that layer's text).
+  Its text is written as html inside `<pre>`, escaped, and it gives no layout blocks. It is free
+  (`usd` 0.0). License: GPL-2.0-or-later, run as a subprocess. Needs `brew install poppler` (or
+  `apt install poppler-utils`).
 
 ## Serving an open model
 
