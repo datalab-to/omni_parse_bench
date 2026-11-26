@@ -46,7 +46,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 - Providers: `pymupdf4llm` and `pymupdf4llm-ocr` (PyMuPDF4LLM 2.1, AGPL-3.0), local CPU rows with html and layout blocks; the OCR row uses RapidOCR or tesseract only when available (#113).
 - Provider: `opendataloader` (OpenDataLoader PDF 2.5.24, Apache-2.0), local Java engine; html and blocks, no OCR (#114).
 - Providers: `liteparse` (LiteParse 2.21.1, local; html and blocks), as a text-layer row and, with `ocr=true`, a Tesseract row (`liteparse-tesseract`) and, with `ocr_backend=ocria-nano`, a row for LiteParse's own OCR and table models (`liteparse-ocria-nano`; its weights are under their own license, which allows benchmarking). Replaces #80 (#115).
-- Providers: OCRia-1, with the model card's experimental vendor grounding (`ocria_grounding`) and Docling Heron boxes when `layout` is enabled; the OCRia-1 Model and Code License allows benchmarking (docs/providers.md).
+- Providers: OCRia-1, with the model card's experimental vendor grounding (`ocria_grounding`) and Docling Heron boxes when `layout` is enabled; the OCRia-1 Model and Code License allows benchmarking (docs/providers.md) (#132).
 
 ### Fixed
 
