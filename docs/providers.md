@@ -533,12 +533,6 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | MiniCPM-OCR 1.0 | `minicpm-ocr` | `minicpm-ocr` | html, markdown, blocks |
 | OXR-1.0 | `oxr` | `oxr` | html, markdown, blocks |
 
-olmOCR-2, Nanonets-OCR2, OvisOCR and OvisOCR2 return no layout, so they have no blocks. OvisOCR3 gets html
-from its markdown prompt and blocks from its structured one: two calls a page. Indra OCR uses `indra-ocr==1.2.0`,
-which enables math by default; optional word boxes are off because OPB consumes block boxes. Its ten block classes
-are unchanged. It runs on CPU (ONNX Runtime), without `--gpus`; its server reads pages in one worker process per core.
-Full public run: 2,937/2,937 pages, 0 failures; 78.8 headline (68.0 text, 75.8 tables, 92.6 layout), graded with
-released OPB 1.7.0 on dataset revision `d70182b9`; the blog reports 78.9 / 68.0 / 75.9 / 92.7.
 olmOCR-2, Nanonets-OCR2, OvisOCR and OvisOCR2 return no layout, so they have no blocks. OCRia-1 has blocks only
 with its `layout` option, from the box server beside its vLLM (see OCRia-1 below). OvisOCR3 gets html
 from its markdown prompt and blocks from its structured one: two calls a page. Indra OCR uses `indra-ocr==1.2.0`,
