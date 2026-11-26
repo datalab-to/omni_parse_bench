@@ -13,6 +13,7 @@ from omni_parse_bench import views
 Cell = tuple[int, int]
 Direction = Literal["up", "down", "left", "right"]
 
+FIGURES = ["img", "svg", "picture", "canvas", "object", "embed", "video"]   # tags that draw something
 MAX_SPAN = 1000   # a colspan or rowspan past this is read as this: no page's table is wider or longer
 
 
@@ -39,6 +40,7 @@ class Table(NamedTuple):
     grid: tuple[tuple[Cell | None, ...], ...]   # which cell covers each slot, row by row
     covers: dict[Cell, tuple[tuple[int, ...], tuple[int, ...]]]   # the rows and the columns each cell covers
     labels: dict[int, Cell]   # the section rows (`label_rows`), by row
+    figures: frozenset[Cell] = frozenset()   # cells holding an image or other figure, whatever its alt text
 
 
 @functools.lru_cache(maxsize=16)
@@ -59,7 +61,8 @@ def parse(html: str) -> tuple[Table, ...]:
                 # Note: rowspan="0" means "to the end of the table section".
                 to_end = isinstance(raw_rowspan, str) and raw_rowspan.strip() == "0"
                 rowspan = max(1, len(rows) - r) if to_end else _span(raw_rowspan)
-                row.append((_text(td), rowspan, _span(td.get("colspan")), td.name == "th" or in_thead))
+                row.append((_text(td), rowspan, _span(td.get("colspan")), td.name == "th" or in_thead,
+                            td.find(FIGURES) is not None))
             specs.append(row)
         if specs and (table := _grid(specs)):
             out.append(table)
@@ -184,10 +187,11 @@ def _covered(table: Table, cell: Cell) -> tuple[tuple[int, ...], tuple[int, ...]
     return table.covers[cell]
 
 
-def _grid(specs: list[list[tuple[str, int, int, bool]]]) -> Table | None:
+def _grid(specs: list[list[tuple]]) -> Table | None:
     """Places cells on a grid, carrying rowspans down, then links each cell to its neighbours."""
     text: dict[Cell, str] = {}
     headings: set[Cell] = set()
+    figures: set[Cell] = set()
     grid: list[list[Cell | None]] = []
     carried: list[tuple[Cell, int] | None] = []   # per column: a rowspan still running down
 
@@ -208,11 +212,12 @@ def _grid(specs: list[list[tuple[str, int, int, bool]]]) -> Table | None:
                 slots.append(None)
                 col += 1
                 continue
-            t, rowspan, colspan, is_heading = row[i]
+            t, rowspan, colspan, is_heading, *rest = row[i]
             i += 1
             cell = (r, col)
             text[cell] = t
             if is_heading: headings.add(cell)
+            if rest and rest[0]: figures.add(cell)
             carried.extend([None] * max(0, col + colspan - len(carried)))
             for c in range(col, col + colspan):
                 slots.append(cell)
@@ -258,7 +263,7 @@ def _grid(specs: list[list[tuple[str, int, int, bool]]]) -> Table | None:
     covers = {x: (tuple(sorted(rows_of[x])), tuple(sorted(cols_of[x]))) for x in rows_of}
     return Table(text, frozenset(headings), *({c: frozenset(v) for c, v in rel[d].items()}
                                               for d in ("up", "down", "left", "right")),
-                 tuple(tuple(row) for row in grid), covers, _labels(text))
+                 tuple(tuple(row) for row in grid), covers, _labels(text), frozenset(figures))
 
 
 def _span(value: str | int | None) -> int:

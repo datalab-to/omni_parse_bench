@@ -100,6 +100,8 @@ TE = [
         cell("cell-empty-copy", "P", "a copy of the value beside it (a text arg would read the stand-in)", "100", TQ.replace("<td></td>", "<td>100</td>"), right=EMPTY, show="T[`<td></td>` → `<td>100</td>`]", why=True),
         cell("cell-empty-invented", "P", "an invented value", "100", TQ.replace("<td></td>", "<td>200</td>"), right=EMPTY, show="T[`<td></td>` → `<td>200</td>`]", why=True),
         cell("cell-empty-shifted", "P", "cells shifted: the value moved to the last column", "100", t("<th>Item</th><th>Q1</th><th>Q2</th>", "<td>Rent</td><td></td><td>100</td>", "<td>Fuel</td><td>70</td><td>80</td>"), right=EMPTY, why=True),
+        cell("cell-empty-image", "P", "an image with no alt text is not blank", "100", TQ.replace("<td></td>", "<td><img src='a.png'></td>"), right=EMPTY, show="T[`<td></td>` → `<td><img src='a.png'></td>`]", why=True),
+        cell("cell-end-image", "P", "an image in a row below is not blank", "70", TQ.replace("</table>", "<tr><td></td><td><img alt=''></td><td></td></tr></table>"), down=END, show="T + a row holding `<img alt=''>`", why=True),
         cell("cell-empty-left", "I", "the mirror: an empty cell to the left", "100", t("<th>Item</th><th>Q1</th><th>Q2</th>", "<td>Rent</td><td></td><td>100</td>"), left=EMPTY),
         cell("cell-empty-left-copy", "P", "the mirror, filled with a copy", "100", t("<th>Item</th><th>Q1</th><th>Q2</th>", "<td>Rent</td><td>100</td><td>100</td>"), left=EMPTY, why=True),
         cell("cell-empty-colspan", "P", "a colspan swallows the empty slot", "100", t("<th>Item</th><th>Q1</th><th>Q2</th>", "<td>Rent</td><td colspan=2>100</td>"), right=EMPTY, why=True),

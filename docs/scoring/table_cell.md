@@ -135,7 +135,7 @@ beside it, so a copy of that value passes. Two args say it, on `up`, `down`, `le
 
 - `{"empty": true}`: every slot touching that side of the cell is blank, read raw with no stand-in. A cell is
   blank when its folded text is empty (spaces, `&nbsp;`, `<br>`, invisible characters, leaders such as `...`);
-  a short row's missing trailing cell is blank too. An image-only cell is not. A cell that spans rows is checked
+  a short row's missing trailing cell is blank too. An image-only cell is not, with an alt text or without (cases cell-empty-image, cell-end-image). A cell that spans rows is checked
   at each row (`left`, `right`) or column (`up`, `down`) it covers. The edge of the table is not a blank cell:
   the why is `no right cell`. A `colspan` that covers the slot fails.
 - `{"end": true}`: no cell in any row below (`down`), column to the right (`right`), row above (`up`) or column
@@ -167,6 +167,8 @@ Fixture T, used by the cases below:
 | P | a copy of the value beside it (a text arg would read the stand-in) | `100`, right `empty` | T[`<td></td>` → `<td>100</td>`] | fail: `cells matching '100' found, but: right '100' isn't empty; no right cell` | `cell-empty-copy` |
 | P | an invented value | `100`, right `empty` | T[`<td></td>` → `<td>200</td>`] | fail: `cells matching '100' found, but: right '200' isn't empty` | `cell-empty-invented` |
 | P | cells shifted: the value moved to the last column | `100`, right `empty` | `<table><tr><th>Item</th><th>Q1</th><th>Q2</th></tr><tr><td>Rent</td><td></td><td>100</td></tr><tr><td>Fuel</td><td>70</td><td>80</td></tr></table>` | fail: `cells matching '100' found, but: no right cell` | `cell-empty-shifted` |
+| P | an image with no alt text is not blank | `100`, right `empty` | T[`<td></td>` → `<td><img src='a.png'></td>`] | fail: `cells matching '100' found, but: right 'an image' isn't empty` | `cell-empty-image` |
+| P | an image in a row below is not blank | `70`, down `end` | T + a row holding `<img alt=''>` | fail: `cells matching '70' found, but: down: row 4 holds 'an image'` | `cell-end-image` |
 | I | the mirror: an empty cell to the left | `100`, left `empty` | `<table><tr><th>Item</th><th>Q1</th><th>Q2</th></tr><tr><td>Rent</td><td></td><td>100</td></tr></table>` | pass | `cell-empty-left` |
 | P | the mirror, filled with a copy | `100`, left `empty` | `<table><tr><th>Item</th><th>Q1</th><th>Q2</th></tr><tr><td>Rent</td><td>100</td><td>100</td></tr></table>` | fail: `cells matching '100' found, but: left 'rent' isn't empty; left '100' isn't empty` | `cell-empty-left-copy` |
 | P | a colspan swallows the empty slot | `100`, right `empty` | `<table><tr><th>Item</th><th>Q1</th><th>Q2</th></tr><tr><td>Rent</td><td colspan=2>100</td></tr></table>` | fail: `cells matching '100' found, but: no right cell` | `cell-empty-colspan` |

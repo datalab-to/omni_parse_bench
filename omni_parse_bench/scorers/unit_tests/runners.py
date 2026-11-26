@@ -936,9 +936,10 @@ def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_di
 
 
 def _blank(table: tables.Table, c: tables.Cell | None) -> bool:
-    """Whether a slot shows nothing: no cell (a short row's missing `<td>`), or a cell whose folded text is
-    empty (`&nbsp;`, `<br>`, invisible characters and leaders fold away)."""
-    return c is None or not _fold_cell(table.text[c]).strip()
+    """Whether a slot shows nothing: no cell (a short row's missing `<td>`), or a cell with no figure whose
+    folded text is empty (`&nbsp;`, `<br>`, invisible characters and leaders fold away). An image draws
+    something, with an alt text or without."""
+    return c is None or (c not in table.figures and not _fold_cell(table.text[c]).strip())
 
 
 def _shape(table: tables.Table, rc: tables.Cell, kind: str, shape: str) -> str:
@@ -958,7 +959,7 @@ def _shape(table: tables.Table, rc: tables.Cell, kind: str, shape: str) -> str:
             return f"no {kind} cell"
         for r, c in slots:
             if not _blank(table, x := table.grid[r][c]):
-                return f"{kind} {_fold_cell(table.text[x])!r} isn't empty"
+                return f"{kind} {_fold_cell(table.text[x]) or 'an image'!r} isn't empty"
         return ""
     if dr:
         lines = range(max(rows) + 1, height) if dr > 0 else range(min(rows) - 1, -1, -1)
@@ -971,7 +972,7 @@ def _shape(table: tables.Table, rc: tables.Cell, kind: str, shape: str) -> str:
         word = "column"
     for n, cells in found:
         if cells:
-            held = ", ".join(repr(_fold_cell(table.text[x])) for x in cells[:3])
+            held = ", ".join(repr(_fold_cell(table.text[x]) or "an image") for x in cells[:3])
             return f"{kind}: {word} {n + 1} holds {held}{', ...' if len(cells) > 3 else ''}"
     return ""
 

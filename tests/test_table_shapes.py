@@ -254,3 +254,21 @@ def test_end_reasons_name_the_row_or_column():
     t = gold_of({"cell": text("70"), "right": END})[0].params
     ok, why = R.table_cell(t, views.html(rows("<td>Fuel</td><td>70</td><td>x</td>")))
     assert not ok and "right: column 3 holds 'x'" in why
+
+
+@pytest.mark.parametrize("figure", ["<img src=chart.png>", "<img alt=''>", "<img alt='chart'>", "<svg></svg>",
+                                    "<p><img src=a.png></p>", "<picture><img src=a.png></picture>"])
+def test_a_figure_is_not_empty_with_or_without_alt_text(figure):
+    assert not verdict(RIGHT, rows(HEAD, ROW.format(f"<td>{figure}</td>")))
+    below = rows("<td>Fuel</td><td>70</td>", f"<td></td><td>{figure}</td>")
+    assert not verdict({"cell": text("70"), "down": END}, below)
+    assert not verdict({"cell": text("70"), "right": END}, rows(f"<td>70</td><td>{figure}</td>"))
+    # the same table without the figure passes both
+    assert verdict({"cell": text("70"), "down": END}, rows("<td>Fuel</td><td>70</td>", "<td></td><td></td>"))
+
+
+def test_a_figure_does_not_change_a_text_verdict():
+    plain = rows(HEAD, ROW.format("<td></td>"))
+    drawn = rows(HEAD, ROW.format("<td><img src=a.png></td>"))
+    t = {"cell": text("100"), "right": text("Q2")}
+    assert verdict(t, plain) == verdict(t, drawn)

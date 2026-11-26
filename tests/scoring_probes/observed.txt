@@ -466,6 +466,8 @@ cell-empty-dropped	pass
 cell-empty-copy	fail	cells matching '100' found, but: right '100' isn't empty; no right cell
 cell-empty-invented	fail	cells matching '100' found, but: right '200' isn't empty
 cell-empty-shifted	fail	cells matching '100' found, but: no right cell
+cell-empty-image	fail	cells matching '100' found, but: right 'an image' isn't empty
+cell-end-image	fail	cells matching '70' found, but: down: row 4 holds 'an image'
 cell-empty-left	pass
 cell-empty-left-copy	fail	cells matching '100' found, but: left 'rent' isn't empty; left '100' isn't empty
 cell-empty-colspan	fail	cells matching '100' found, but: no right cell

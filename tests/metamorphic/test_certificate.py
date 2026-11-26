@@ -125,7 +125,7 @@ def test_the_certificate_counts_the_real_tests_it_says():
              "text strings": sum(len(text_strings(t.params)) for t in TESTS),
              "text tests": len([*TEXT, *ORDER, *REPEAT, *CELL]), "latex tests": len(LATEX),
              "fuzzy numbered text": len(FUZZY_NUMBERED), "numbered text": len(NUMBERED),
-             "table sides": len(SIDED),
+             "table sides": len(SIDED), "table tests": len(CELL),
              "fraction text": sum(any(VULGAR.search(x) for x in text_strings(t.params))
                                   for t in TEXT + ORDER + REPEAT + CELL)}
     assert sizes == {k: n for k, (_, n) in REAL.items()}, "update REAL in common.py, then " + COMMAND

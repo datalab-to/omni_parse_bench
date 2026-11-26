@@ -33,7 +33,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 
 ### Added
 
-- `table_cell`: the neighbor args `up`, `down`, `left` and `right` also take `{"empty": true}` (that side of the cell is blank, read without the stand-in a text arg uses, so a copied value fails; a short row's missing trailing cell is blank) and `{"end": true}` (no text in any row below, column to the right, row above or column to the left). They catch invented table content. Refused on any other role or test type. See docs/scoring/table_cell.md, "Empty cells and the end of a table", and relations M93 to M96 (plus a real-test check under M94).
+- `table_cell`: the neighbor args `up`, `down`, `left` and `right` also take `{"empty": true}` (that side of the cell is blank, read without the stand-in a text arg uses, so a copied value fails; a short row's missing trailing cell is blank) and `{"end": true}` (no text in any row below, column to the right, row above or column to the left). They catch invented table content. Refused on any other role or test type. See docs/scoring/table_cell.md, "Empty cells and the end of a table", and relations M93 to M97 (M97: a test without the new args keeps its old verdict, with a real-test check).
 - Providers: `pdftotext` (poppler-utils), a local CPU text-layer parser at its documented default: html only, no OCR, so image pages are empty (#109).
 - Provider: pdftext (`pdftext`), the PDF text layer with no OCR, html only. No verdict changes (#110).
 - Providers: `markitdown` (microsoft/markitdown 0.1.9, MIT), a local CPU text-layer parser at its defaults: html only, no OCR; scanned PDFs without a text layer are empty, and images may return EXIF metadata when `exiftool` is installed (#111).
