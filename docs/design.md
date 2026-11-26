@@ -101,6 +101,7 @@ existing rules.
 | `order` | `html` | A comes before B | `before`, `after` (text) | text | 1,189 |
 | `repeat` | `html` | this line, or this number, appears exactly N times | `content` (text or number); `expected_count` | text | 35 |
 | `page_near_empty` | `html` | a blank page yields at most N non-space characters (not invisible format characters, nor the marks the text view writes for an element that holds nothing) | no args; `max_chars` | text | 0 |
+| `region` | `html` | the text between two exact anchors (or the page start and end) is this content as a whole string, within an edit budget, for every copy of the start: nothing else is written there | optional `start`, `end` (text, `max_diffs` 0) and `content` (text); no settings | text | 0 |
 | `table_cell` | `html` | this cell exists with these neighbors, under these headings, in this section and in these row groups; the cell may be one line of a multi-line cell | `cell`, `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `headings`, `section`, `row_groups` (text) | tables | 5,386 |
 | `layout_kind` | `blocks` | the smallest block covering half of this line's place has this kind | `content` (text with a `place`); `kind` | layout | 2,403 |
 | `format` | `html` | this span of text carries these marks (bold, italic, underline, strikethrough, superscript, subscript) and the words around it do not; or carries none of them | `span`, optional `before`, `after` (text, `max_diffs` 0); `marks` or `absent` | format | 0 |
@@ -282,7 +283,7 @@ space and never spans a block break; a present text test also retries with a foo
 superscript, dropped where it falls inside a phrase (order, repeat and table_cell do not). [The scoring reference](scoring/internals.md) lists each rule with a case that
 shows it.
 
-The headline is the mean of the families' scores: text (present, order, repeat, page_near_empty), tables
+The headline is the mean of the families' scores: text (present, order, repeat, page_near_empty, region), tables
 (table_cell) and layout (layout_kind), each family's score the share of its tests passed
 (`vocab.FAMILIES` maps every test type to one). A fourth family, format (`format`), is reported beside
 the headline and excluded from it when a headline family is present (`vocab.HEADLINE_FAMILIES`): it asks whether the output keeps a page's
@@ -360,7 +361,7 @@ A test runs in four steps:
 - View: `score` builds each output's view once per page: `views.Html` (the HTML, its text view, and
   its seen view, the text without image alt text) for an HTML output, and the block list for
   `blocks`. Alt text holds an image's printed words or a description of it, so tests that credit
-  text read the text view and tests that fault extra text (`repeat`, `page_near_empty`) read the
+  text read the text view and tests that fault extra text (`repeat`, `page_near_empty`, `region`) read the
   seen view: printed words count wherever an output writes them, and a description never costs;
 - Mark: `runner(params, view)` returns `(passed, why)`. A runner is a pure function of its
   parameters and one output's value: it never reads a file, and never sees another output; and

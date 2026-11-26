@@ -20,6 +20,7 @@ import fuzzysearch
 from fuzzysearch.common import group_matches
 from fuzzysearch.levenshtein import find_near_matches_levenshtein
 from rapidfuzz import fuzz
+from rapidfuzz.distance import OSA
 
 from omni_parse_bench import markdown, marks, normalize, tables, views
 from omni_parse_bench.scorers.unit_tests import hyphenation
@@ -561,6 +562,107 @@ def page_near_empty(t: PageNearEmpty, v: views.Html) -> Mark:
     return _mark(n <= t.max_chars, f"{n} non-space characters (limit {t.max_chars})")
 
 
+# --------------------------------------------------------------------------- closed regions
+
+
+class Region(NamedTuple):
+    start: str | None       # the text the region follows, matched exactly; None: the page start
+    end: str | None         # the text that ends it, matched exactly; None: the page end
+    content: str | None     # everything the page prints between them; None: nothing
+    max_diffs: int          # edits allowed over the whole content; 0 when there is none
+
+
+# Note: a hyphen between two letters may be printed and dropped (a compound broken at a line end, which fold
+# joins: "self- aware" reads "selfaware"), so a region is also compared with every such hyphen removed.
+_WORD_HYPHEN = re.compile(r"(?<=[^\W\d_])-(?=[^\W\d_])")
+# Note: white space is no content, except between two digits, where it splits two numbers ("12 500"); nor
+# is an underscore, a line printed to write on, which fold keeps in a run of fewer than 3 and markdown may
+# read as emphasis ("__/__/____" -> "//"); nor a bullet glyph before a space, a list's mark, which fold drops
+# only at the start of a line, so a page that sets list items as paragraphs keeps it.
+_NO_CONTENT = re.compile(r"_+|[•‣◦▪▶∙●](?=\s|$)|\s+(?!\d)|(?<!\d)\s+")
+
+
+def region(t: Region, v: views.Html) -> Mark:
+    """The text between `start` and `end` is `content` as a whole, within `max_diffs` edits, for every copy
+    of `start` on the page: a closed world, so anything written there that the page does not print fails.
+    See docs/scoring/region.md.
+
+    The page is the text view without image descriptions, nothing for an element that holds nothing (as
+    `page_near_empty`), folded, in the html's order: a table is read cell by cell, row by row, and a region
+    runs on across it. An anchor is a whole copy of its folded text at a word edge (`_anchors`). Each copy of
+    `start` opens a region that runs to the first copy of `end` after it (or to the page end); without a
+    `start`, one region opens at the page start."""
+    page = normalize.fold(views.text(_NOTHING.sub("", v.html), alt=False))
+    if t.start is None:
+        opens = [0]
+    elif not (opens := [j for _, j in _anchors(t.start, page, t.end)]):
+        return False, f"start {t.start[:60]!r} not found whole, at a word edge"
+    ends = None if t.end is None else [i for i, _ in _anchors(t.end, page)]
+    if ends == []:
+        return False, f"end {t.end[:60]!r} not found whole, at a word edge"
+    reasons = []
+    for k, s in enumerate(opens):
+        e = len(page) if ends is None else next((i for i in ends if i >= s), None)
+        why = (f"no end {t.end[:60]!r} after start {t.start[:60]!r}" if e is None
+               else _closed(page[s:e], t))
+        if why:
+            reasons.append(f"copy {k + 1} of {len(opens)}: {why}" if len(opens) > 1 else why)
+    if not reasons:
+        return True, ""
+    return False, reasons[0] + (f" (and {len(reasons) - 1} more)" if len(reasons) > 1 else "")
+
+
+def _anchors(text: str, page: str, inside: str | None = None) -> list[tuple[int, int]]:
+    """The copies of the folded `text` in the folded `page` at a word edge (not inside a longer word, not cut
+    out of a longer number), as spans of `page`; when it has none, those found with the spaces removed, as
+    `present` searches a page that glues its words. A copy inside a copy of the longer text `inside` (the
+    start `Table 3` inside the end `Table 3 (continued)`) is that text's, not a copy."""
+    want = normalize.fold(text)
+    squeezed = not (spans := _copies(want, page, False))
+    if squeezed:
+        spans = _copies(want, page, True)
+    kept = [k for k, c in enumerate(page) if c != " "] if squeezed else None
+    spans = [_folded_span(i, j, kept) for i, j in spans]
+    if inside and len(other := normalize.fold(inside)) > len(want):
+        outer = _anchors(other, page)
+        spans = [(i, j) for i, j in spans if not any(a <= i and j <= b for a, b in outer)]
+    return spans
+
+
+def _closed(got: str, t: Region) -> str:
+    """Why the folded region `got` is not the test's content within its edits; "" when it is. Both are read
+    without white space (except a space between two digits), underscores and bullets, and compared as whole
+    strings (an edit is a character substituted, inserted or deleted, or two adjacent ones swapped); their
+    numbers (maximal runs of digits) must be equal, in order, at any budget. A second reading drops every
+    hyphen between two letters on both sides."""
+    want = normalize.fold(t.content or "")
+    a, b = _NO_CONTENT.sub("", want), _NO_CONTENT.sub("", got.strip())
+    numbers = re.findall(r"\d+", a) == re.findall(r"\d+", b)
+    edits = OSA.distance(a, b)
+    if edits > t.max_diffs and "-" in a + b:
+        edits = min(edits, OSA.distance(_WORD_HYPHEN.sub("", a), _WORD_HYPHEN.sub("", b)))
+    if numbers and edits <= t.max_diffs:
+        return ""
+    where = (f"between {t.start[:40]!r} and {t.end[:40]!r}" if t.start is not None and t.end is not None
+             else f"after {t.start[:40]!r} to the page end" if t.start is not None
+             else f"from the page start to {t.end[:40]!r}" if t.end is not None else "the page")
+    shown, gold = _difference(got.strip(), want)
+    how = (f"{edits} edit{'s' * (edits != 1)}, max_diffs {t.max_diffs}" if edits > t.max_diffs
+           else "a number differs")
+    return f"{where} holds {shown} where the gold has {gold} ({how})"
+
+
+def _difference(got: str, want: str, n: int = 60) -> tuple[str, str]:
+    """The two texts as a failure shows them: whole when short, else from a little before where they first
+    differ; "nothing" for an empty one."""
+    i = next((k for k, (x, y) in enumerate(zip(got, want, strict=False)) if x != y), min(len(got), len(want)))
+    a = max(0, i - 20) if max(len(got), len(want)) > n else 0
+    def show(s: str) -> str:
+        part = s[a:a + n]
+        return "nothing" if not s else repr(("…" if a else "") + part + ("…" if a + n < len(s) else ""))
+    return show(got), show(want)
+
+
 # --------------------------------------------------------------------------- tables
 
 
@@ -739,6 +841,7 @@ TYPES: dict[str, tuple[type, Runner]] = {
     "order": (Order, order),
     "repeat": (Repeat, repeat),
     "page_near_empty": (PageNearEmpty, page_near_empty),
+    "region": (Region, region),
     "table_cell": (TableCell, table_cell),
     "layout_kind": (LayoutKind, layout_kind),
     "format": (Format, format_mark),

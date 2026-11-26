@@ -28,13 +28,14 @@ ARG_ROLES = {
     "order": ("before", "after"),
     "repeat": ("content",),
     "page_near_empty": (),
+    "region": ("start", "end", "content"),
     "table_cell": ("cell", "headings", "section", "row_groups", *RELATIONS),
     "layout_kind": ("content",),
     "format": ("before", "span", "after"),
 }
 LISTS = frozenset({"headings", "row_groups", "stops"})   # roles that take a list of args
 REQUIRED = {"present": ("content",), "order": ("before", "after"), "repeat": ("content",),
-            "page_near_empty": (), "table_cell": ("cell",), "layout_kind": ("content",),
+            "page_near_empty": (), "region": (), "table_cell": ("cell",), "layout_kind": ("content",),
             "format": ("span",)}
 assert set(ARG_ROLES) == set(REQUIRED) == set(runners.TYPES) == set(vocab.READS) == set(vocab.FAMILIES)
 
@@ -229,6 +230,8 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
                 if set(settings) != {"max_chars"}:
                     raise ValueError(f"{where}: page_near_empty's settings are exactly {{max_chars}}")
                 return runners.PageNearEmpty(settings["max_chars"])
+            case "region":
+                return _region(where, args, settings)
             case "layout_kind":
                 if set(settings) != {"kind"}:
                     raise ValueError(f"{where}: layout_kind's settings are exactly {{kind}}")
@@ -296,6 +299,30 @@ def _blank_after(where: str, args: Mapping[str, Any], settings: Mapping[str, Any
     if len(set(stops)) != len(stops):
         raise ValueError(f"{where}: blank_after's stops repeat a label")
     return True
+
+
+def _region(where: str, args: Mapping[str, Any], settings: Mapping[str, Any]) -> runners.Region:
+    """A region test's parameters, checked: text args only, with no place and no exact_case; `start` and `end`
+    matched exactly (max_diffs 0, as an anchor needs an exact boundary), distinct, and neither found in the
+    content, which would cut the region short or open another; no settings."""
+    _no(where, settings)
+    for r, a in args.items():
+        if not (isinstance(a, dict) and set(a) == {"text", "max_diffs"}):
+            raise ValueError(f"{where}: region's {r} is a text arg {{text, max_diffs}} (no place, no "
+                             f"exact_case, no number or latex), not {a!r:.80}")
+        if r != "content" and a["max_diffs"] != 0:
+            raise ValueError(f"{where}: region's {r} is matched exactly: max_diffs must be 0, since a fuzzy "
+                             "match has no exact boundary")
+    start, end = (args[r]["text"] if r in args else None for r in ("start", "end"))
+    if start is not None and end is not None and normalize.fold(start) == normalize.fold(end):
+        raise ValueError(f"{where}: region's start and end must differ, not both {start!r:.80}")
+    content = args.get("content")
+    for r, x in (("start", start), ("end", end)):
+        if x is not None and content is not None and runners._anchors(x, normalize.fold(content["text"])):
+            raise ValueError(f"{where}: region's content holds its {r} {x!r:.80}, which would cut the region "
+                             "there; choose another anchor")
+    return runners.Region(start, end, content["text"] if content else None,
+                          content["max_diffs"] if content else 0)
 
 
 def arg_kinds(test_type: str, args: Mapping[str, Any]) -> tuple[str, ...]:
