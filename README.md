@@ -46,40 +46,23 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | DeepSeek-OCR-2 | open | 3.4B | 75.4 | — | 64.6 | 70.2 | 91.4 | — |
 | Indra OCR (Datalab) | open | about 12M | 71.4 | — | 62.5 | 59.6 | 92.0 | — |
 | HunyuanOCR-1.5 | open | 1.0B | 68.8 | — | 62.3 | 62.6 | 81.4 | — |
+| PyMuPDF4LLM (OCR) | open | n/a | 51.5 | — | 26.5 | 42.1 | 86.0 | — |
+| PyMuPDF4LLM | open | n/a | 41.2 | — | 17.7 | 42.0 | 64.0 | — |
 | OvisOCR2 | open | 0.85B | none | — | 74.2 | 79.9 | unsupported | — |
 | Xiaomi-OCR-0 | open | 0.87B | none | — | 73.7 | 90.6 | unsupported | — |
 | OvisOCR | open | 1.4B | none | — | 72.2 | 78.2 | unsupported | — |
 | olmOCR-2 | open | 8.3B | none | — | 71.8 | 56.6 | unsupported | — |
 | Nanonets-OCR2-3B | open | 3.8B | none | — | 69.0 | 62.6 | unsupported | — |
-| PyMuPDF4LLM (OCR) | open | n/a | 51.5 | — | 26.5 | 42.1 | 86.0 | — |
 | pdf-inspector (OCR) | open | n/a | none | — | 41.3 | 17.7 | unsupported | — |
-| PyMuPDF4LLM | open | n/a | 41.2 | — | 17.7 | 42.0 | 64.0 | — |
 | pdf-inspector | open | n/a | none | — | 20.6 | 17.0 | unsupported | — |
 | pdftext | open | n/a | none | — | 20.6 | 0.0 | unsupported | — |
 | pdftotext | open | n/a | none | — | 20.4 | 0.0 | unsupported | — |
 | Tesseract | open | n/a | none | — | 17.7 | 0.0 | unsupported | — |
 | MarkItDown | open | n/a | none | — | 16.0 | 13.9 | unsupported | — |
 
-Scores use omni-parse-bench 1.7.0. Saved predictions are regraded with 1.7.0 unless the provenance below identifies a new local run; rows marked § retain their published 1.5.0 grades.
+Scores use omni-parse-bench 1.7.0: saved predictions are regraded with it, and locally run open tools are fresh full runs (see the next paragraph); rows marked § keep their published 1.5.0 grades.
 
-`pdf-inspector` and `pdf-inspector (OCR)` were run locally on the full public dataset at commit
-`24e3ef4d2aa1718e622d357db7f6d0d10742c93d`. Full runs `pdf-inspector-20261126-014930-77ac` (text mode) and
-`pdf-inspector-ocr-20261126-014924-02a9` (OCR mode) each had two image conversion failures. The affected pages,
-`realdoc_pages-images_6f691809_images_34870cc9-ee12-4d20-a346-397eeb18c763-p1` and
-`realdoc_pages-images_4e23786c_images_16a79f1e-e633-4fa9-9425-a6b58c273ff2-p1`, were retried in the respective
-modes after Pillow decoded and losslessly rewrote them as canonical PNGs: text run `pdf-inspector-20261126-015509-6e6d`,
-OCR runs `pdf-inspector-ocr-20261126-020636-7886` and `pdf-inspector-ocr-20261126-020705-a3dc`. Merged full-run
-outputs were regraded with released 1.7.0 and no `--partial`; both rows have 2,937/2,937 pages, zero failures and
-100% coverage. OCR used PDFium `native-v7988`, ONNX Runtime 1.27.0 and the documented PP-OCRv6 Small model set
-(about 31 MB, fetched on the first routed page) with `PDFIUM_LIB_PATH` and `ORT_DYLIB_PATH` set.
-
-`PyMuPDF4LLM` and `PyMuPDF4LLM (OCR)` were run locally on the full public dataset at commit
-`24e3ef4d2aa1718e622d357db7f6d0d10742c93d`: runs `pymupdf4llm-20261126-041521-4291` and
-`pymupdf4llm-ocr-20261126-044854-b1b7`. Both saved runs were reread with `opb reread` (zero changed records),
-then graded with released omni-parse-bench 1.7.0 and no `--partial`. Both rows have 2,920/2,937 scored pages,
-17 system failures and 99.42% coverage. Failures were 14 image pages rejected with `FzErrorFormat: unknown image
-file format` and 3 pages where PyMuPDF's layout model failed while reading form widgets. The OCR row used
-Tesseract (available); RapidOCR was not installed.
+Rows for open tools run locally are full runs graded with released omni-parse-bench 1.7.0, failed pages counted; settings and failures per tool are in [docs/providers.md](docs/providers.md).
 
 \* Used in creating and verifying at least some tests.
 
@@ -109,7 +92,7 @@ Contents:
 5. [Grade](#grade): a run again, or predictions of your own;
 6. [Score on your own](#score-on-your-own): the scorer on its own, in code or from the command line;
 7. [Predict one page](#predict-one-page): one page through one system;
-8. [Results details](#results-details): run notes, latency and price charts;
+8. [Results details](#results-details): latency and price charts;
 9. [License](#license); and
 10. [Citation](#citation).
 
@@ -440,20 +423,19 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | DeepSeek-OCR-2 | 28.5 | 82.0 | 68.9 | 59.6 | 64.3 | 50.6 | 9.6 | 37.0 | 43.0 |
 | Indra OCR (Datalab) | 25.2 | 55.2 | 60.9 | 60.4 | 61.9 | 73.2 | 49.3 | 28.6 | 67.8 |
 | HunyuanOCR-1.5 | 40.2 | 67.4 | 63.3 | 58.1 | 65.1 | 53.7 | 45.3 | 50.5 | 42.6 |
+| PyMuPDF4LLM (OCR) | 3.2 | 5.8 | 43.9 | 40.0 | 36.6 | 53.8 | 8.7 | 9.1 | 24.3 |
+| PyMuPDF4LLM | 0.1 | 5.7 | 41.9 | 19.2 | 30.0 | 34.3 | 8.7 | 0.5 | 22.0 |
 | OvisOCR2 | 36.6 | 94.0 | 79.9 | 78.9 | 72.5 | 58.2 | 49.9 | 52.5 | 31.0 |
 | Xiaomi-OCR-0 | 47.9 | 95.3 | 89.0 | 65.4 | 79.2 | 68.5 | 76.0 | 56.2 | 31.1 |
 | OvisOCR | 36.0 | 92.8 | 77.0 | 70.0 | 73.2 | 63.6 | 35.3 | 50.4 | 27.1 |
 | olmOCR-2 | 61.2 | 84.9 | 58.7 | 70.3 | 68.6 | 57.5 | 57.7 | 65.5 | 39.5 |
 | Nanonets-OCR2-3B | 54.6 | 77.6 | 64.1 | 74.2 | 63.8 | 46.2 | 29.3 | 59.6 | 44.4 |
-| PyMuPDF4LLM (OCR) | 3.2 | 5.8 | 43.9 | 40.0 | 36.6 | 53.8 | 8.7 | 9.1 | 24.3 |
 | pdf-inspector (OCR) | 19.3 | 16.8 | 23.6 | 59.3 | 40.9 | 72.5 | 19.3 | 29.1 | 43.4 |
-| PyMuPDF4LLM | 0.1 | 5.7 | 41.9 | 19.2 | 30.0 | 34.3 | 8.7 | 0.5 | 22.0 |
 | pdf-inspector | 0.0 | 12.8 | 19.9 | 17.0 | 22.7 | 33.1 | 19.0 | 0.0 | 26.9 |
 | pdftext | 0.0 | 4.5 | 6.0 | 21.1 | 22.2 | 34.6 | 13.4 | 0.9 | 31.5 |
 | pdftotext | 0.0 | 4.4 | 6.0 | 20.0 | 21.4 | 33.9 | 14.3 | 0.9 | 33.2 |
 | Tesseract | 1.7 | 1.4 | 3.1 | 27.1 | 23.3 | 43.3 | 3.7 | 5.2 | 25.0 |
 | MarkItDown | 0.0 | 3.5 | 16.4 | 18.6 | 19.4 | 33.1 | 4.5 | 0.7 | 19.6 |
-
 
 ## License
 
