@@ -47,15 +47,20 @@ class NemotronParse(Served):
                               rendered as for every model without a renderer of its own.
       2. Image preprocessing  the model's own image processor, in vLLM (NaViT packing, at most 1664 x 2048).
       3. Model inference      vLLM 0.26.0 (the reference serving contract) with the model card's flags and
-                              its plugin's one-token MTP; the client's `parse` at its default mode, `single`
-                              (one full-page request), with its default prompt
+                              its plugin's one-token MTP; the client's `parse` in mode `triple` with
+                              `triple_regions="union"` (full page, a separate detection request, then the
+                              union of their Table/Chart regions parsed as crops): NVIDIA's published
+                              ParseBench configuration, as described by the model README at revision
+                              62cb1e4 and its `nemotron_parse_3_5_sdk` pipeline. The client's own default is
+                              `single`, its fastest mode. The default prompt is
                               `</s><s><predict_bbox><predict_classes><output_markdown><predict_text_in_pic>`
-                              and its default sampling: temperature 0.2, top_k 50, top_p 1.0, repetition
-                              penalty 1.05, seed 0, at most 8744 tokens (the settings of NVIDIA's own
-                              ParseBench pipeline). `mode` `double` or `triple` adds the client's Table/Chart
-                              crop passes, at its crop and detection settings. A reply cut at the token limit,
-                              empty, or failed raises the client's `GenerationError`, and the page has no
-                              output, as the client returns none (its default, strict).
+                              and sampling uses the client's defaults: full-page and detection temperature
+                              0.2, crop temperature 0.1, top_k 50, top_p 1.0, repetition penalty 1.05 for
+                              full page/detection and 1.0 for crops, seed 0, at most 8744 tokens (4096 for
+                              detection). NVIDIA's ParseBench run used seed 20261012. `single` and `double`
+                              remain available; single sends only the full-page request. A reply cut at the
+                              token limit, empty, or failed raises the client's `GenerationError`, and the
+                              page has no output, as the client returns none (its default, strict).
       4. Vendor output parsing  the client's `postprocess_document` at its default options: blocks in
                               model order, each with its class, a box normalized to the image, its text and
                               its rendered content (tables as HTML, header rows inferred), and the page's
@@ -85,9 +90,10 @@ class NemotronParse(Served):
         default_factory=lambda: {"weights": "nvidia/Nemotron-3.5-Parse",
                                  "revision": "62cb1e4ba153d113ff64aaf2be6e068c377cf53c"},
         metadata={"help": "the weights its server serves and their revision; by default its start.sh's"})
-    mode: str = dataclasses.field(default="single", metadata={
+    mode: str = dataclasses.field(default="triple", metadata={
         "choices": list(MODES),
-        "help": "single: one full-page request; double or triple: the client's Table/Chart crop passes too"})
+        "help": "triple (NVIDIA's ParseBench setting): full page, detection, and Table/Chart crops; double: "
+                "full page and its own Table/Chart crops; single: one full-page request"})
     temperature: float = 0.2
     top_k: int = dataclasses.field(default=50, metadata={"help": "sample from the k likeliest tokens only"})
     top_p: float = 1.0

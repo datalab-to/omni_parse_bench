@@ -745,6 +745,10 @@ Nemotron 3.5 Parse (`providers/nemotron_parse.py`; its class tokens, and Chart):
 | Table | table |
 | Picture, Chart | figure |
 
+Full public run: 2,937 pages, 31 failed with the client's `GenerationError` at the token limit; 82.3 headline
+(73.7 text, 82.7 tables, 90.5 layout), released OPB 1.7.0, H100 job 5675, run
+`nemotron-parse-20261126-200314-b310`, dataset revision `24e3ef4d2aa1718e622d357db7f6d0d10742c93d`.
+
 MiniCPM-OCR 1.0 (`providers/minicpm_ocr.py`):
 
 | MiniCPM-OCR 1.0 label | label |
