@@ -236,6 +236,7 @@ that is missing stops a run before any call and says which `export` to type.
 | `pdftext` | the `pdftext` package (pdfium): the PDF's text layer, no OCR | html | kept: it has no notion of them | none |
 | `markitdown` | the local `markitdown` 0.1.9 package, a PDF's text layer as Markdown | html | kept: it has no notion of them | none |
 | `pdf-inspector` | the local pdf-inspector package: its text mode, or with `ocr` its PP-OCRv6 Small mode | html | kept: it filters page numbers only | none |
+| `pymupdf4llm` (+ `-ocr`) | the local `pymupdf4llm` 2.1 package (AGPL-3.0), text layer plus a layout model | html, blocks | kept (`header=True, footer=True`) | none |
 
 A vendor's tiers are runs of their own, one config each (or one config and `--set`), with the same pages:
 
@@ -331,6 +332,32 @@ Per vendor:
   that differs from passing the vendor a PDF directly. The
   package returns no labeled regions, so html only. html is the Markdown through `markdown.to_html`. Free
   (`usd` 0.0). Needs `pip install 'omni-parse-bench[pdf-inspector]'`.
+
+- pymupdf4llm: PyMuPDF4LLM 2.1 (PyMuPDF is AGPL-3.0 or Artifex commercial), run locally at no cost at
+  the package's defaults, one page at a time (PyMuPDF isn't thread-safe), as two rows: `pymupdf4llm`
+  (text layer only, `use_ocr=False`) and `pymupdf4llm-ocr` (`use_ocr=True`). Calls `to_markdown(page)` for
+  html and `to_json(page)` for layout boxes. Headers and footers are kept, tables are Markdown, and images
+  are neither written nor embedded. OCR is environment-dependent: RapidOCR is used when installed, else
+  the `tesseract` binary when available, else OCR is disabled. This adapter installs neither OCR engine;
+  each answer records whether each engine was available. Pages without text layers are empty in the text
+  row; the OCR row reads them only when an engine is available. The returned `class_list` maps to
+  `LABELS` in the adapter as follows. The complete JSON string returned by `to_json` is retained in the page's
+  raw call record; the blocks output is derived from the first page's boxes, with table cell text joined by spaces:
+
+  | PyMuPDF4LLM class | OPB label |
+  |---|---|
+  | `text` | `text` |
+  | `title`, `section-header` | `heading` |
+  | `list-item` | `list` |
+  | `page-header`, `page-footer` | `page_furniture` |
+  | `footnote` | `footnote` |
+  | `caption` | `caption` |
+  | `formula` | `equation` |
+  | `table` | `table` |
+  | `picture` | `figure` |
+
+  The layout model defines no code, form or key-value class. Layout boxes are normalized to the page frame;
+  table cell text is joined with spaces. Needs `pip install 'omni-parse-bench[pymupdf4llm]'`.
 
 ## Serving an open model
 

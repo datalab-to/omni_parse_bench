@@ -51,7 +51,9 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | OvisOCR | open | 1.4B | none | — | 72.2 | 78.2 | unsupported | — |
 | olmOCR-2 | open | 8.3B | none | — | 71.8 | 56.6 | unsupported | — |
 | Nanonets-OCR2-3B | open | 3.8B | none | — | 69.0 | 62.6 | unsupported | — |
+| PyMuPDF4LLM (OCR) | open | n/a | 51.5 | — | 26.5 | 42.1 | 86.0 | — |
 | pdf-inspector (OCR) | open | n/a | none | — | 41.3 | 17.7 | unsupported | — |
+| PyMuPDF4LLM | open | n/a | 41.2 | — | 17.7 | 42.0 | 64.0 | — |
 | pdf-inspector | open | n/a | none | — | 20.6 | 17.0 | unsupported | — |
 | pdftext | open | n/a | none | — | 20.6 | 0.0 | unsupported | — |
 | pdftotext | open | n/a | none | — | 20.4 | 0.0 | unsupported | — |
@@ -70,6 +72,14 @@ OCR runs `pdf-inspector-ocr-20261126-020636-7886` and `pdf-inspector-ocr-2026112
 outputs were regraded with released 1.7.0 and no `--partial`; both rows have 2,937/2,937 pages, zero failures and
 100% coverage. OCR used PDFium `native-v7988`, ONNX Runtime 1.27.0 and the documented PP-OCRv6 Small model set
 (about 31 MB, fetched on the first routed page) with `PDFIUM_LIB_PATH` and `ORT_DYLIB_PATH` set.
+
+`PyMuPDF4LLM` and `PyMuPDF4LLM (OCR)` were run locally on the full public dataset at commit
+`24e3ef4d2aa1718e622d357db7f6d0d10742c93d`: runs `pymupdf4llm-20261126-041521-4291` and
+`pymupdf4llm-ocr-20261126-044854-b1b7`. Both saved runs were reread with `opb reread` (zero changed records),
+then graded with released omni-parse-bench 1.7.0 and no `--partial`. Both rows have 2,920/2,937 scored pages,
+17 system failures and 99.42% coverage. Failures were 14 image pages rejected with `FzErrorFormat: unknown image
+file format` and 3 pages where PyMuPDF's layout model failed while reading form widgets. The OCR row used
+Tesseract (available); RapidOCR was not installed.
 
 \* Used in creating and verifying at least some tests.
 
@@ -435,7 +445,9 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | OvisOCR | 36.0 | 92.8 | 77.0 | 70.0 | 73.2 | 63.6 | 35.3 | 50.4 | 27.1 |
 | olmOCR-2 | 61.2 | 84.9 | 58.7 | 70.3 | 68.6 | 57.5 | 57.7 | 65.5 | 39.5 |
 | Nanonets-OCR2-3B | 54.6 | 77.6 | 64.1 | 74.2 | 63.8 | 46.2 | 29.3 | 59.6 | 44.4 |
+| PyMuPDF4LLM (OCR) | 3.2 | 5.8 | 43.9 | 40.0 | 36.6 | 53.8 | 8.7 | 9.1 | 24.3 |
 | pdf-inspector (OCR) | 19.3 | 16.8 | 23.6 | 59.3 | 40.9 | 72.5 | 19.3 | 29.1 | 43.4 |
+| PyMuPDF4LLM | 0.1 | 5.7 | 41.9 | 19.2 | 30.0 | 34.3 | 8.7 | 0.5 | 22.0 |
 | pdf-inspector | 0.0 | 12.8 | 19.9 | 17.0 | 22.7 | 33.1 | 19.0 | 0.0 | 26.9 |
 | pdftext | 0.0 | 4.5 | 6.0 | 21.1 | 22.2 | 34.6 | 13.4 | 0.9 | 31.5 |
 | pdftotext | 0.0 | 4.4 | 6.0 | 20.0 | 21.4 | 33.9 | 14.3 | 0.9 | 33.2 |
