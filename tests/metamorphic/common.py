@@ -177,6 +177,7 @@ REAL = {
     "numbered text": ("real text tests with a digit", 1_375),
     "table sides": ("real table_cell tests with an up, down, left or right neighbour unlike the cell", 306),
     "table tests": ("real table_cell tests", 5_386),
+    "present tests": ("real present tests (text, number and equation)", 7_275),
     "fraction text": ("real text, order, repeat and table_cell tests with a vulgar fraction", 5),
 }
 

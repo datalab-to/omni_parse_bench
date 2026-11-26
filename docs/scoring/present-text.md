@@ -5,7 +5,7 @@ closing bracket: `·79` matches `.79`, as do `p<·05`, `≈·5`, `(·5)`, `-·25
 closing bracket or a CJK character the dot separates or multiplies and stays: `A·1`, `太原·2020`, `(a)·1` and `x)·2`
 stay distinct from `A.1`, `太原.2020`, `(a).1` and `x).2`.
 
-**Asks:** this string appears somewhere in the page's text. 3,684 tests; family text; reads `html`.
+**Asks:** this string appears somewhere in the page's text (or, with `blank_after`, that a form label is followed by nothing: [Blank fields](#blank-fields-blank_after)). 3,684 tests; family text; reads `html`.
 
 The test folds the gold and the page text ([README](README.md#two-words-used-everywhere)) and looks for the gold
 as a substring, allowing up to `max_diffs` character edits (a character substituted, inserted or deleted, or
@@ -177,6 +177,121 @@ inside the gold's span costs nothing (case text-sup-inside). A marker is:
 A superscript holding letters (`1<sup>st</sup>`, `H<sup>+</sup>`) is never a marker, nor is an exponent in math
 (`$x^2$`, `<math>`) or a superscript character (`x²`). A superscript digit after a letter is a marker, so a gold
 that leaves out a unit's exponent passes (case text-sup-unit).
+
+## Blank fields (`blank_after`)
+
+`present` with `"settings": {"blank_after": true}` asks the opposite of a plain `present`: the content is a form
+field's label, and **nothing is written after it**. It catches a system that fills a field the page leaves blank
+(`Date of birth: 01/02/1990`, `N/A`, a copy of the printed mask). Two optional roles say where the field ends and
+what it prints:
+
+```json
+{"test_type": "present", "derivation": "authored", "tags": ["form"],
+ "args": {"content": {"text": "Date of birth:", "max_diffs": 0},
+          "printed": {"text": "__/__/____", "max_diffs": 0},
+          "stops": [{"text": "Name:", "max_diffs": 0}, {"text": "Place of birth:", "max_diffs": 0}]},
+ "settings": {"blank_after": true}}
+```
+
+- `content`: the label. Every text arg of the test has `max_diffs` 0 (a fuzzy match has no exact boundary), no
+  `exact_case`, no `place`; the loader refuses anything else, and `printed` or `stops` without the setting.
+- `stops`: every other field label on the page, where this field's region ends. A stop equal to the label is refused.
+  Without stops the region runs to the end of the page, so the next field's value counts against the field.
+- `printed`: the placeholder the page prints in the field (`__/__/____`, `DD / MM / YYYY`). One copy of it may follow
+  the label.
+
+**The test passes when some occurrence of the label is blank.** An occurrence is a copy of the folded label at a
+word edge (not inside a longer word, not cut out of a longer number; a page that glues its words is searched with
+the spaces removed, as `present` does), in the text view without image descriptions and without the marks the text
+view writes for an empty element (as `page_near_empty`). A copy inside a longer stop (`Name:` in `Last Name:`) is that
+stop, not the label. It also needs a plain `present` pass, so a `blank_after` pass is always a `present` pass.
+
+- **In running text,** the region runs from the label to the first later stop, or to the end of the page. Remove one
+  copy of `printed`; the field is blank when only white space and the characters `_`, `.`, `·` and `…` remain. Three or
+  more of `_`, `.` or `-` already fold away as a leader; `__` and `..` stay, and are blank here; a lone `-`, `N/A`,
+  `[blank]` and a checkbox are values.
+- **In a table cell,** the rest of the label's own cell (up to a stop) is the first region. If it is blank, the cell
+  to its right is the value: blank when it shows nothing but the same characters, an image is not. When the right
+  cell is another field's label (its text starts with a stop: a header-row layout), or there is none (a label in the last
+  column), the cell below is read instead on the same condition; a cell below that starts with a stop is a label, not a
+  value. A label that spans rows or columns needs every cell beside
+  it blank. Cells are read as written, with no stand-in for an empty one (unlike a `table_cell` text arg), so a copy of
+  the value beside or above it fails. A label with no cell beside it and none below has no value cell, and passes.
+- A table is judged by its cells, not by the text that follows it in reading order, so a table after the label in
+  reading order is not the label's region, and a label in a table is never read through the next row.
+
+Failure reasons: `'Date of birth:' not found ...` (plain `present`'s), `'Date of birth:' not found whole, at a word
+edge, in one paragraph or one table cell`, `'Date of birth:' is followed by '01/02/1990' before the next field` (or
+`to the end of the page`, or `in its cell`) and `'Date of birth:' cell's value cell (right) holds '01/02/1990'` (or
+`(below)`). Several failing occurrences are joined, the first two shown.
+
+<!-- cases:blank-after -->
+| | difference | gold | output | verdict | case |
+|---|---|---|---|---|---|
+| I | nothing after the label, then the next field | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Name: Ann</p><p>Date of birth:</p><p>Place of birth: Paris</p>` | pass | `blank-nothing` |
+| I | the last field on the page, nothing after it | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Name: Ann</p><p>Date of birth:</p>` | pass | `blank-last` |
+| I | a run of underscores (a leader) | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: ____</p><p>Place of birth: Paris</p>` | pass | `blank-underscores` |
+| I | a run of dots | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: ........</p><p>Place of birth: Paris</p>` | pass | `blank-dots` |
+| I | two underscores (not a leader, still a placeholder) | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: __</p><p>Place of birth: Paris</p>` | pass | `blank-two-underscores` |
+| I | leaders glued to the next label | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: _____Place of birth: ____</p>` | pass | `blank-leader-glued` |
+| I | the printed mask copied once | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: __/__/____</p><p>Place of birth: Paris</p>` | pass | `blank-printed` |
+| I | white space, `<br>` and an empty element | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: <br>  <span></span></p><p>Place of birth: Paris</p>` | pass | `blank-white-space` |
+| I | the label in another case | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>DATE OF BIRTH:</p><p>Place of birth: Paris</p>` | pass | `blank-case` |
+| I | another field written before it | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Place of birth: Paris</p><p>Date of birth:</p><p>Name: Ann</p>` | pass | `blank-moved-field` |
+| I | an image description in the region is not text | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: <img alt='box'></p><p>Place of birth: Paris</p>` | pass | `blank-image-alt` |
+| I | a text layer that glues words, found with its spaces removed | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Dateofbirth:____Placeofbirth:Paris</p>` | pass | `blank-glued-words` |
+| I | markdown, as the harness converts it | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `Name: Ann\n\nDate of birth: \n\nPlace of birth: Paris` | pass | `blank-markdown` |
+| I | a two-column label and value table, the value cell empty | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth:</td><td></td></tr><tr><td>Place of birth:</td><td>Paris</td></tr></table>` | pass | `blank-table-2col` |
+| I | the value cell holds the printed mask | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth:</td><td>__/__/____</td></tr></table>` | pass | `blank-table-2col-mask` |
+| I | the rest of the label's own cell is blank | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth: ____</td><td></td></tr></table>` | pass | `blank-table-rest-of-cell` |
+| I | a header-row table: the cell below the label is empty | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth:</td><td>Place of birth:</td></tr><tr><td></td><td>Paris</td></tr></table>` | pass | `blank-table-header-row` |
+| I | a header-row table: no row below | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Name:</td><td>Date of birth:</td></tr></table>` | pass | `blank-table-header-row-end` |
+| I | the label in the last column: the cell below is empty | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Name: Ann</td><td>Date of birth:</td></tr><tr><td>x</td><td></td></tr></table>` | pass | `blank-table-last-column` |
+| I | the cell below is another field's label, not a value | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth:</td><td>Place of birth:</td></tr><tr><td>Name:</td><td></td></tr></table>` | pass | `blank-table-label-below` |
+| B | a second copy of the label followed by nothing passes, even if the first holds a value | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: 01/02/1990</p><p>Date of birth:</p>` | pass | `blank-repeated-one-blank` |
+| I | a copy inside a longer stop is that stop, not the label | `Name:`, stops `Last Name:` | `<p>Last Name: ____</p><p>Name: ____</p>` | pass | `blank-inside-label` |
+| P | a checkbox is out of scope: it reads as text, so a box beside the label fails | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: <input type=checkbox></p>` | fail: `'Date of birth:' is followed by '☐' to the end of the page` | `blank-checkbox` |
+| P | a mask of underscores in markdown: the converter reads `__` as bold and the mask is mangled | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `Date of birth: __/__/____\n\nPlace of birth: Paris` | fail | `blank-markdown-mask` |
+| P | an invented value | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: 01/02/1990</p><p>Place of birth: Paris</p>` | fail: `'Date of birth:' is followed by '01/02/1990' before the next field` | `invent-value` |
+| P | `N/A` is a value the page does not print | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: N/A</p><p>Place of birth: Paris</p>` | fail: `'Date of birth:' is followed by 'n/a' before the next field` | `invent-na` |
+| P | a lone dash (not a leader) is a value | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: -</p><p>Place of birth: Paris</p>` | fail | `invent-dash` |
+| P | `[blank]` is a value | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: [blank]</p>` | fail | `invent-blank-word` |
+| P | the printed mask copied twice | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: __/__/____ __/__/____</p>` | fail | `invent-mask-twice` |
+| P | the mask written but the gold names none | `Date of birth:`, stops `Name:`, `Place of birth:` | `<p>Date of birth: __/__/____</p>` | fail | `invent-mask-without` |
+| P | an invented value after the last field | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Name: Ann</p><p>Date of birth: 5 May</p>` | fail: `'Date of birth:' is followed by '5 may' to the end of the page` | `invent-last` |
+| P | a value glued to the label | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth:1990</p>` | fail | `invent-glued` |
+| P | without stops the region runs to the page's end: the next field's value is in it | `Date of birth:`, printed `__/__/____` | `<p>Date of birth:</p><p>Place of birth: Paris</p>` | fail | `invent-no-stop` |
+| P | a value in the value cell to the right | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth:</td><td>01/02/1990</td></tr></table>` | fail: `'Date of birth:' cell's value cell (right) holds '01/02/1990'` | `invent-table-right` |
+| P | a value under the label in a header-row table | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth:</td><td>Place of birth:</td></tr><tr><td>01/02/1990</td><td></td></tr></table>` | fail: `'Date of birth:' cell's value cell (below) holds '01/02/1990'` | `invent-table-below` |
+| P | the next field's value shifted into the cell | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth:</td><td>Paris</td></tr><tr><td>Place of birth:</td><td></td></tr></table>` | fail | `invent-table-shifted` |
+| P | a value in the label's own cell | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth: 5</td><td></td></tr></table>` | fail: `'Date of birth:' is followed by '5' in its cell` | `invent-table-rest` |
+| P | a value under a label in the last column | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Name: Ann</td><td>Date of birth:</td></tr><tr><td>x</td><td>1990</td></tr></table>` | fail | `invent-table-last-column` |
+| P | an image in the value cell | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of birth:</td><td><img src='a.png'></td></tr></table>` | fail | `invent-table-image` |
+| P | a merged label cell: every cell beside it must be blank | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td rowspan=2>Date of birth:</td><td></td></tr><tr><td>1990</td></tr></table>` | fail | `invent-table-merged` |
+| P | an invented value in markdown | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `Date of birth: 01/02/1990\n\nPlace of birth: Paris` | fail | `invent-markdown` |
+| P | the label missing: a plain `present` failure | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Name: Ann</p>` | fail: `'Date of birth:' not found (best 0.300 < 1.000); closest 'name:ann'` | `invent-missing` |
+| P | the label inside a longer word | `Name` | `<p>Surnames: Ann</p>` | fail: `'Name' not found whole, at a word edge, in one paragraph or one table cell` | `invent-word-edge` |
+| P | the label split over two cells | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<table><tr><td>Date of</td><td>birth:</td></tr></table>` | fail: `'Date of birth:' not found whole, at a word edge, in one paragraph or one table cell` | `invent-split-label` |
+| P | a two-column form read across, the next field's label not a stop | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:` | `<p>Date of birth: Sex: F</p>` | fail | `invent-read-across` |
+| I | a two-column form read across with the other field's label a stop | `Date of birth:`, printed `__/__/____`, stops `Name:`, `Place of birth:`, `Sex:` | `<p>Date of birth: ____ Sex: F</p>` | pass | `blank-read-across` |
+<!-- /cases -->
+
+Blind spots of `blank_after`, besides those of `present`:
+
+- **A repeated label.** The test passes when any copy is blank, so a second copy of the label followed by nothing
+  passes however the first is filled (case blank-repeated-one-blank). A gold should use only labels unique on the page.
+- **Right-to-left pages** are read in the html's order, as `table_cell` does: an output in visual order is not
+  checked. A value printed to the left of its label is not read.
+- **Reading order.** A value moved far from its label but in front of the next stop is caught only if it lies between
+  them; a value moved before the label, or after the next stop, is not this field's.
+- **A mask of underscores in markdown.** The converter reads `__` as bold, so the mask is mangled and fails even when
+  copied once (case blank-markdown-mask); use `printed` placeholders without paired underscores for systems that answer
+  in markdown, or accept the failure.
+- **Fields the output drops** fail by `not found`, which is right for transcription and counts twice with a `present`
+  test of the same label; a label that is itself mistranscribed fails the same way.
+- **A label cell** is a cell that starts with a stop; one that holds a stop later (`Value: Place of birth:`) is read as a
+  value. Image descriptions in the region are ignored (case blank-image-alt) but an image in a
+  value cell is a value; a checkbox, a footnote mark or math in the region reads as text (case blank-checkbox).
 
 ## Blind spots
 

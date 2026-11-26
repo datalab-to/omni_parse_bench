@@ -22,6 +22,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 - Fold: a vulgar fraction after a digit is set apart before NFKC (`1½` reads `1 1/2`, not `11/2`). This moves verdicts both ways, in every test that folds text, number args and repeat counts included: `present` `1½` passes on `1 1/2`, `½` on `1½` and `1` on `a 1½` (fail to pass), while `11/2` on `1½` fails (pass to fail); a number arg `11` no longer matches `1½` and `1` now does; a repeat of the number `1` counts 2 on `1½`, not 0.
 - LLM harness (#108): no effect on grading; it changes how a run handles two provider replies, not how answers are scored. A page that used to fail as "no usable html" or stop the run now gets a prediction or a refusal instead, so a rerun can score pages that earlier runs lost.
 - `table_cell` args `{"empty": true}` and `{"end": true}` (below): no verdict moves, because no published test uses them. Regraded on saved predictions of the 27 published systems (unlimited-ocr-2 with `--partial`), old main 416c17b against this change: 439,776 verdicts, none changed, no headline changed.
+- `present` setting `{"blank_after": true}` (below): no verdict moves, because no published test uses it. Regraded on saved predictions of the 27 published systems (unlimited-ocr-2 with `--partial`), old main 222f0cd against this change: 439,776 verdicts, none changed.
 
 ### Changed
 
@@ -33,6 +34,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 
 ### Added
 
+- `present`: the setting `{"blank_after": true}` makes the content a form field's label and passes when nothing is written after it (white space and `_ . · …` only, one copy of an optional `printed` placeholder allowed), up to the next of the optional `stops` (the page's other labels). A label in a table cell reads the rest of its cell, then the cell to its right, or below when that is another field's label or missing. It catches invented values in fields the page leaves blank, and passes only where plain `present` does. See docs/scoring/present-text.md, "Blank fields", and relations M98 to M103 (M103: a test without the setting keeps its old verdict, with a real-test check).
 - `table_cell`: the neighbor args `up`, `down`, `left` and `right` also take `{"empty": true}` (that side of the cell is blank, read without the stand-in a text arg uses, so a copied value fails; a short row's missing trailing cell is blank) and `{"end": true}` (no text in any row below, column to the right, row above or column to the left). They catch invented table content. Refused on any other role or test type. See docs/scoring/table_cell.md, "Empty cells and the end of a table", and relations M93 to M97 (M97: a test without the new args keeps its old verdict, with a real-test check).
 - Providers: `pdftotext` (poppler-utils), a local CPU text-layer parser at its documented default: html only, no OCR, so image pages are empty (#109).
 - Provider: pdftext (`pdftext`), the PDF text layer with no OCR, html only. No verdict changes (#110).
