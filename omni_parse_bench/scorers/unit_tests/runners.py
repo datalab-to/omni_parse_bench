@@ -143,16 +143,14 @@ def blank_after(t: Present, v: views.Html) -> Mark:
     label = t.content.text
     flow, spans = _flow(v.html)
     reasons: list[str] = []
-    walled = []    # occurrences in a table: its cells judge them
     for start, region, cut in _regions(t, flow):
-        if any(a <= start < b for a, b in spans):
-            walled.append((region, cut))
+        if any(a <= start < b and parsed for a, b, parsed in spans):
+            continue    # in a table the cell reader parses: its cells judge it
         elif why := _in_text(label, t, region, cut):
             reasons.append(why)
         else:
             return True, ""
-    grids = tables.parse(v.html)
-    for table in grids:
+    for table in tables.parse(v.html):
         for rc, text in table.text.items():
             for _, region, _cut in _regions(t, _fold_cell(text)):
                 if rest := _rest(t, region):
@@ -161,11 +159,6 @@ def blank_after(t: Present, v: views.Html) -> Mark:
                     return True, ""
                 else:
                     reasons.append(f"{label[:60]!r} cell's {why}")
-    for region, cut in [] if grids else walled:    # a table the cell reader cannot parse: read it as text
-        if why := _in_text(label, t, region, cut):
-            reasons.append(why)
-        else:
-            return True, ""
     if not reasons:
         return False, f"{label[:60]!r} not found whole, at a word edge, in one paragraph or one table cell"
     return False, "; ".join(reasons[:2]) + (f" (and {len(reasons) - 2} more)" if len(reasons) > 2 else "")
@@ -179,28 +172,32 @@ def _in_text(label: str, t: Present, region: str, cut: bool) -> str:
             f"{'before the next field' if cut else 'to the end of the page'}")
 
 
-def _flow(html: str) -> tuple[str, list[tuple[int, int]]]:
+def _flow(html: str) -> tuple[str, list[tuple[int, int, bool]]]:
     """The folded text view of a page for `blank_after`, with a mark round each outermost table, and the
-    stretches the tables take in it."""
-    parts, last, depth = [], 0, 0
+    stretches the tables take in it, each with whether the cell reader parses it (`tables.parse`): one it
+    cannot parse (`<td>` outside a `<tr>`) is read as text."""
+    parts, last, depth, begun, wholes = [], 0, 0, 0, []
     for m in _TABLE_TAG.finditer(html):
         if m[1]:
             if depth:
                 depth -= 1
                 if depth == 0:
                     parts += [html[last:m.end()], f"<p>{_TABLE_CLOSE}</p>"]
+                    wholes.append(bool(tables.parse(html[begun:m.end()])))
                     last = m.end()
         else:
             if depth == 0:
                 parts += [html[last:m.start()], f"<p>{_TABLE_OPEN}</p>"]
-                last = m.start()
+                last = begun = m.start()
             depth += 1
     parts.append(html[last:])
+    if depth:
+        wholes.append(bool(tables.parse(html[begun:])))
     flow = normalize.fold(views.text(_NOTHING.sub("", "".join(parts)), alt=False))
     opens = [m.start() for m in re.finditer(re.escape(_TABLE_OPEN), flow)]
     closes = [m.end() for m in re.finditer(re.escape(_TABLE_CLOSE), flow)]
     closes += [len(flow)] * (len(opens) - len(closes))
-    return flow, list(zip(opens, closes, strict=True))
+    return flow, [(a, b, ok) for (a, b), ok in zip(zip(opens, closes, strict=True), wholes, strict=True)]
 
 
 def _edge(want: str, hay: str, i: int, j: int) -> bool:
@@ -257,12 +254,12 @@ def _rest(t: Present, region: str) -> str:
 def _value_cell(t: Present, table: tables.Table, rc: tables.Cell) -> str:
     """Why the cell right of the label cell `rc` (or, in a header-row layout, the cell below) holds a value:
     "" when it is blank or there is none. The cell below is read when the right one is another field's label
-    or is missing (a label in the last column). Neighbors are read raw (no stand-in)."""
+    (its whole text) or is missing in a table of several columns (a label in the last column).
+    Neighbors are read raw (no stand-in)."""
     stops = [f for x in t.stops if (f := normalize.fold(x.text))]
     def is_label(x: tables.Cell) -> bool:
-        """Whether the cell starts with another field's label."""
-        text = _fold_cell(table.text[x])
-        return any(i == 0 for f in stops for i, _ in _copies(f, text, False))
+        """Whether the cell's whole text is another field's label."""
+        return _fold_cell(table.text[x]) in stops
     def held(slots: list[tables.Cell | None]) -> tuple[list[str], bool]:
         """What the slots show besides another field's label, and whether one is such a label."""
         shown = [x for x in dict.fromkeys(slots) if x is not None]
@@ -270,7 +267,8 @@ def _value_cell(t: Present, table: tables.Table, rc: tables.Cell) -> str:
                   if not is_label(x) and (x in table.figures or _rest(t, _fold_cell(table.text[x])))]
         return values, any(is_label(x) for x in shown)
     right = _slots(table, rc, "right")
-    values, labels = held(right) if right is not None else ([], True)
+    # with no cell to the right (a label in the last column) the value is below, in a table of more columns
+    values, labels = held(right) if right is not None else ([], len(table.grid[0]) > 1)
     if values:
         return f"value cell (right) holds {values[0][:60]!r}"
     if not labels:    # a blank value cell; with no cell to the right, or a label there, the value is below

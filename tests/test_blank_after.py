@@ -287,10 +287,21 @@ def test_a_label_in_the_last_column_reads_the_cell_below_and_passes_with_none():
     assert passes(rows(f"<td>Name: Ann</td><td>{DOB}</td>"))
 
 
-def test_a_cell_that_starts_with_another_label_is_not_a_value():
+def test_only_a_cell_that_is_a_whole_label_is_not_a_value():
+    # right: a label alone reads the cell below; a label with text after it is a value
+    assert passes(rows(f"<td>{DOB}</td><td>Name:</td>", "<td></td><td></td>"))
+    assert not passes(rows(f"<td>{DOB}</td><td>Name: Ann</td>"))
+    assert not passes(rows(f"<td>{DOB}</td><td>Name: Ann</td>", "<td></td><td></td>"))
+    # below: a whole label is no value, a label with text after it is
+    assert passes(rows(f"<td>{DOB}</td><td>Place of birth:</td>", "<td>Name:</td><td></td>"))
+    assert not passes(rows(f"<td>{DOB}</td><td>Place of birth:</td>", "<td>Name: Ann</td><td></td>"))
+    assert not passes(rows(f"<td>{DOB}</td><td>Place of birth:</td>", "<td>1990</td><td></td>"))
+
+
+def test_a_one_column_table_has_no_value_column():
     assert passes(rows(f"<td>{DOB}</td>", "<td>Name: Ann</td>"))
-    assert passes(rows(f"<td>{DOB}</td><td>Place of birth: Paris</td>", "<td></td><td></td>"))
-    assert not passes(rows(f"<td>{DOB}</td>", "<td>1990</td>"))
+    assert passes(rows(f"<td>{DOB}</td>", "<td>1990</td>"))    # a blind spot: the next row is not read
+    assert not passes(rows(f"<td>{DOB} 1990</td>", "<td>Name: Ann</td>"))
 
 
 def test_a_table_is_judged_by_its_cells_not_by_reading_order():
@@ -332,3 +343,14 @@ def test_a_table_the_cell_reader_cannot_parse_is_read_as_text():
     assert not R.tables.parse(odd)
     assert passes(odd)
     assert not passes(f"<table><td>{DOB}</td><td>1990</td></table>")
+
+
+@pytest.mark.parametrize("valid", ["", "<table><tr><td>Name:</td><td>Ann</td></tr></table>", "<p>Name: Ann</p>"])
+@pytest.mark.parametrize("before", [False, True])
+def test_an_unparseable_table_is_read_as_text_whatever_else_is_on_the_page(valid, before):
+    def page(inner: str) -> str:
+        odd = f"<table><td>{inner}</td><td></td></table>"
+        return valid + odd if before else odd + valid
+    assert passes(page(DOB))
+    assert not passes(f"<table><td>{DOB}</td><td>1990</td></table>" if not before else
+                      "<table><tr><td>other</td></tr></table><table><td>" + DOB + "</td><td>1990</td></table>")

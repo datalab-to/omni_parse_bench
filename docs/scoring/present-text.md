@@ -212,11 +212,11 @@ stop, not the label. It also needs a plain `present` pass, so a `blank_after` pa
   `[blank]` and a checkbox are values.
 - **In a table cell,** the rest of the label's own cell (up to a stop) is the first region. If it is blank, the cell
   to its right is the value: blank when it shows nothing but the same characters, an image is not. When the right
-  cell is another field's label (its text starts with a stop: a header-row layout), or there is none (a label in the last
-  column), the cell below is read instead on the same condition; a cell below that starts with a stop is a label, not a
-  value. A label that spans rows or columns needs every cell beside
+  cell is another field's label (its whole text is a stop: a header-row layout), or there is none in a table of several
+  columns (a label in the last column), the cell below is read instead on the same condition; a cell below whose whole
+  text is a stop is a label, not a value. A cell that holds a stop and more (`Name: Ann`) is a value. A label that spans rows or columns needs every cell beside
   it blank. Cells are read as written, with no stand-in for an empty one (unlike a `table_cell` text arg), so a copy of
-  the value beside or above it fails. A label with no cell beside it and none below has no value cell, and passes.
+  the value beside or above it fails. A label with no cell beside it and none below, or in a one-column table, has no value cell, and passes.
 - A table is judged by its cells, not by the text that follows it in reading order, so a table after the label in
   reading order is not the label's region, and a label in a table is never read through the next row.
 
@@ -289,8 +289,8 @@ Blind spots of `blank_after`, besides those of `present`:
   in markdown, or accept the failure.
 - **Fields the output drops** fail by `not found`, which is right for transcription and counts twice with a `present`
   test of the same label; a label that is itself mistranscribed fails the same way.
-- **A label cell** is a cell that starts with a stop; one that holds a stop later (`Value: Place of birth:`) is read as a
-  value. Image descriptions in the region are ignored (case blank-image-alt) but an image in a
+- **A one-column table** has no value column, so the row after a label is not read; a value there passes. A table the cell
+  reader cannot parse (`<td>` outside a `<tr>`) is read as text. Image descriptions in the region are ignored (case blank-image-alt) but an image in a
   value cell is a value; a checkbox, a footnote mark or math in the region reads as text (case blank-checkbox).
 
 ## Blind spots
