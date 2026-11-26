@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Mutation check: each relation of M126 to M144 and M150 to M159 must FAIL when the scorer rule it pins is removed or changed.
+"""Mutation check: each relation of M126 to M144, M150 to M159 and M160 to M167 must FAIL when the scorer rule it pins is removed or changed.
 
 Not a test file (pytest does not collect it). From the repository root:
 
@@ -332,6 +332,39 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
     ('M158', 'scorers/unit_tests/runners.py',
      'return _mark(ok, f"{a.text[:60]!r} not found (best {r:.3f} < {thr:.3f}){near}")',
      'return _mark(ok, f"{a.text[:60]!r} not found (best {r:.2f} < {thr:.3f}){near}")'),
+    ('M161', 'scorers/unit_tests/runners.py',
+     'REPEAT_RUN = 16',
+     'REPEAT_RUN = 12'),
+    ('M161', 'scorers/unit_tests/runners.py',
+     'if not (twice := [r for r, n in runs.items() if n >= 2]):',
+     'if not (twice := [r for r, n in runs.items() if n >= 3]):'),
+    ('M162', 'scorers/unit_tests/runners.py',
+     'for el in soup.find_all("math"):',
+     'for el in soup.find_all("mathx"):'),
+    ('M167', 'scorers/unit_tests/runners.py',
+     'for el in soup.find_all("math"):',
+     'for el in soup.find_all(["table", "math"]):'),
+    ('M162', 'scorers/unit_tests/runners.py',
+     'for m in reversed(mathspans.find(s)):',
+     'for m in reversed([]):'),
+    ('M162', 'scorers/unit_tests/runners.py',
+     's = _MATH_DELIMITED.sub(" ", views.text(str(soup), alt=False))',
+     's = _MATH_DELIMITED.sub(" ", views.text(str(soup), alt=True))'),
+    ('M162', 'scorers/unit_tests/runners.py',
+     'for el in soup.find_all("figure"):',
+     'for el in soup.find_all("figurex"):'),
+    ('M166', 'scorers/unit_tests/runners.py',
+     'for c in _JOINED.sub("", normalize.fold(_JOINED.sub("", s))):',
+     'for c in normalize.fold(s):'),
+    ('M166', 'scorers/unit_tests/runners.py',
+     'soup = tables._fresh_soup(html)',
+     'soup = tables._fresh_soup(html.replace("<!--", "").replace("-->", "").replace("&lt;", "<").replace("&gt;", ">"))'),
+    ('M163', 'scorers/unit_tests/runners.py',
+     'gold, got = collections.Counter(_words(t.content)), collections.Counter(page)',
+     'gold, got = collections.Counter(set(_words(t.content))), collections.Counter(page)'),
+    ('M164', 'scorers/unit_tests/runners.py',
+     'if not (twice := [r for r, n in runs.items() if n >= 2]):',
+     'if not (twice := [r for r, n in runs.items() if n >= 50]):'),
 ]
 
 

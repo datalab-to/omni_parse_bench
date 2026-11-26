@@ -479,6 +479,37 @@ vb-decimal	fail	the page holds 'rate 1,25' where the gold has 'rate 1.25' (a num
 vb-longer-label	fail	copy 2 of 2: between 'Date of birth:' and 'Place of birth:' holds "1960 mother's" where the gold has nothing (13 edits, max_diffs 0)
 vb-footnote	fail	between 'Abstract' and 'Introduction' holds 'we study parsing. 1' where the gold has 'we study parsing.' (2 edits, max_diffs 0)
 vb-whole-page-extra	fail	the page holds 'page intentionally left blank this page is empty.' where the gold has 'page intentionally left blank' (20 edits, max_diffs 0)
+## repeats-ignored
+rx-faithful	pass
+rx-reordered	pass
+rx-markup	pass
+rx-printed-twice	pass
+rx-short-repeat	pass
+rx-dropped	pass
+rx-table	pass
+rx-table-pipe	pass
+rx-table-flat	pass
+rx-math	pass
+rx-alt	pass
+rx-figure	pass
+rx-wrapped	pass
+## repeats-blind
+rx-once-invented	pass
+rx-near-copy	pass
+rx-tail-restart	pass
+rx-common-words	pass
+rx-loop-hyphens	pass
+rx-loop-counter	pass
+rx-short-blocks	pass
+## repeats-penalized
+rx-duplicate	fail	'the committee met on monday to review the budget and the plans for the new libra' appears 2x, and its words more often than the page prints them (e.g. 'the' 9x, the page 5x)
+rx-loop	fail	'the plans and the plans and the plans and the plans and the plans and the' appears 7x, and its words more often than the page prints them (e.g. 'the' 17x, the page 5x)
+rx-loop-word	fail	'budget budget budget budget budget budget budget budget budget budget budget bud' appears 25x, and its words more often than the page prints them (e.g. 'budget' 40x, the page 1x)
+rx-page-twice	fail	'to review the budget and the plans for the new library downtown members asked fo' appears 2x, and its words more often than the page prints them (e.g. 'the' 10x, the page 5x)
+rx-printed-twice-three	fail	'the committee met on monday to review the budget and the plans for the new libra' appears 3x, and its words more often than the page prints them (e.g. 'the' 12x, the page 8x)
+rx-paragraph-split	fail	'the committee met on monday to review the budget and the plans for the new libra' appears 2x, and its words more often than the page prints them (e.g. 'the' 9x, the page 5x)
+rx-table-row-twice	fail	'see note one for the details of the lease terms and the fees listed in the' appears 2x, and its words more often than the page prints them (e.g. 'the' 13x, the page 9x)
+rx-short-blocks-across	fail	'one two three four five six seven eight nine ten eleven twelve thirteen fourteen' appears 2x, and its words more often than the page prints them (e.g. 'two' 2x, the page 1x)
 ## format-rules
 fm-bold	pass
 fm-strong	pass

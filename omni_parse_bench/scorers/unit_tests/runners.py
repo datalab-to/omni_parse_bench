@@ -8,6 +8,7 @@ constants (a threshold, a fill ratio) are module constants here, never parameter
 """
 from __future__ import annotations
 
+import collections
 import functools
 import html as html_lib
 import itertools
@@ -22,7 +23,7 @@ from fuzzysearch.levenshtein import find_near_matches_levenshtein
 from rapidfuzz import fuzz
 from rapidfuzz.distance import OSA
 
-from omni_parse_bench import markdown, marks, normalize, tables, views
+from omni_parse_bench import markdown, marks, mathspans, normalize, tables, views
 from omni_parse_bench.scorers.unit_tests import hyphenation
 
 # Note: a ratio test (table_cell, or present's first pass) allowing k edits in an n-character string
@@ -710,6 +711,92 @@ def _difference(got: str, want: str, n: int = 60) -> tuple[str, str]:
     return show(got), show(want)
 
 
+# --------------------------------------------------------------------------- repeated text
+
+# A run of this many words written twice is a repeat (`no_excess_repeats`). Measured on the saved public runs
+# of 27 systems against the text layers of 1,830 pages: shorter runs catch more phrases a page really prints
+# twice (a figure's ticks, a shared clause), longer ones miss a duplicated sentence (docs/scoring/
+# no_excess_repeats.md).
+REPEAT_RUN = 16
+
+
+class NoExcessRepeats(NamedTuple):
+    content: str    # the page's full text, in any order: what it prints, and how often
+
+
+# Note: a word is a run of letters, digits and marks; a character of a script written without spaces (Han,
+# kana) is a word of its own, so a run of them can repeat as words do.
+_SPACELESS = re.compile(r"[぀-ヿ㐀-䶿一-鿿豈-﫿]")
+# Scripts written without spaces between words (Thai, Lao, Tibetan, Myanmar, Khmer, kana, Han, Hangul): a gold
+# in one has no words to count without a segmenter, so the loader refuses one.
+UNSEGMENTED = re.compile("[\u0e00-\u0eff\u0f00-\u0fff\u1000-\u109f\u1780-\u17ff\u3040-\u30ff\u3400-\u4dbf"
+                         "\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]")
+# Note: math is read by the latex tests, and a page's own repeated symbols (x, i, =) are no loop. A dollar
+# span is math only where `mathspans` pairs it as math (never a price); the other delimiters carry their own.
+_MATH_DELIMITED = re.compile(r"\\\(.*?\\\)|\\\[.*?\\\]", re.S)
+# Note: a hyphen between two letters, in the word or at a line end with the line broken after it, joins
+# them ("self-aware", "self-<br>aware" and "selfaware" are one word), on the gold and the output alike.
+_JOINED = re.compile(r"(?<=[^\W\d_])[-\u2010\u2011]\s*(?=[^\W\d_])")
+
+
+def no_excess_repeats(t: NoExcessRepeats, v: views.Html) -> Mark:
+    """No run of `REPEAT_RUN` words is written twice where the page does not print its words that often: a
+    run that appears two or more times fails when each of its words appears more times in the output than in
+    the page's full text (`content`). It catches loops and duplicated passages without a list of them, and
+    the page's order does not matter, so a gold from a text layer read out of order serves. Reads the text
+    view, tables read as text, without image descriptions (as `repeat`), figures but their caption, and math.
+    See docs/scoring/no_excess_repeats.md."""
+    page = _words(_repeat_text(v.html))
+    runs = collections.Counter(tuple(page[i:i + REPEAT_RUN]) for i in range(len(page) - REPEAT_RUN + 1))
+    if not (twice := [r for r, n in runs.items() if n >= 2]):
+        return True, ""
+    gold, got = collections.Counter(_words(t.content)), collections.Counter(page)
+    excess = [(r, runs[r]) for r in twice if all(got[w] > gold[w] for w in set(r))]
+    if not excess:
+        return True, ""
+    run, n = max(excess, key=lambda x: (x[1], x[0]))
+    w = max(set(run), key=lambda x: (got[x] - gold[x], x))
+    return False, (f"{' '.join(run)[:80]!r} appears {n}x, and its words more often than the page prints them "
+                   f"(e.g. {w!r} {got[w]}x, the page {gold[w]}x)")
+
+
+def _words(s: str) -> list[str]:
+    """The words of `s` after `normalize.fold`, in order (`_SPACELESS`), a hyphen between two letters joining
+    them (`_JOINED`)."""
+    out, cur = [], []
+    for c in _JOINED.sub("", normalize.fold(_JOINED.sub("", s))):
+        if _SPACELESS.match(c):
+            if cur:
+                out.append("".join(cur))
+                cur = []
+            out.append(c)
+        elif unicodedata.category(c)[0] in "LNM":
+            cur.append(c)
+        elif cur:
+            out.append("".join(cur))
+            cur = []
+    if cur:
+        out.append("".join(cur))
+    return out
+
+
+def _repeat_text(html: str) -> str:
+    """The text `no_excess_repeats` reads: the text view, a table's cells as text, without image descriptions,
+    without `<math>` and figures but their caption (elements of the parsed html, so a tag in a comment or an
+    attribute is text), and without math spans (`\\(..\\)`, `\\[..\\]`,
+    and the dollar spans `mathspans` pairs as math)."""
+    soup = tables._fresh_soup(html)
+    for el in soup.find_all("math"):
+        el.decompose()
+    for el in soup.find_all("figure"):
+        caption = el.find("figcaption")
+        el.replace_with(caption.extract() if caption else "")
+    s = _MATH_DELIMITED.sub(" ", views.text(str(soup), alt=False))
+    for m in reversed(mathspans.find(s)):
+        s = s[:m.start] + " " + s[m.end:]
+    return s
+
+
 # --------------------------------------------------------------------------- tables
 
 
@@ -889,6 +976,7 @@ TYPES: dict[str, tuple[type, Runner]] = {
     "repeat": (Repeat, repeat),
     "page_near_empty": (PageNearEmpty, page_near_empty),
     "verbatim": (Verbatim, verbatim),
+    "no_excess_repeats": (NoExcessRepeats, no_excess_repeats),
     "table_cell": (TableCell, table_cell),
     "layout_kind": (LayoutKind, layout_kind),
     "format": (Format, format_mark),

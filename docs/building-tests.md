@@ -92,6 +92,7 @@ It reads as: "some table in the output has a cell `167.8`, under the column head
 | repeat | `content` | `expected_count` | the arg appears exactly that many times in the html, as whole words |
 | page_near_empty | none | `max_chars` | the html has at most `max_chars` non-space characters outside image alt text |
 | verbatim | optional `start`, `end`, `content` | | for every copy of `start`, the text up to the next `end` (or the page start and end) is `content` as a whole string, verbatim within the test's edit budget (its `max_diffs`), its numbers exact; without `content`, nothing ([verbatim.md](scoring/verbatim.md)) |
+| no_excess_repeats | `content` | | no run of 16 words is written twice or more while each of its words appears more often than in `content`, the page's full text ([no_excess_repeats.md](scoring/no_excess_repeats.md)) |
 | table_cell | `cell`; optional `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `section`; optional lists `headings`, `row_groups` | | some table in the html has the cell, with these neighbors and headings |
 | format | `span`; optional `before`, `after` | exactly one of `marks`, `absent` (lists of `bold`, `italic`, `underline`, `strike`, `sup`, `sub`) | every letter of the span carries every mark in `marks` (and no letter of the words around it does), or no letter of it carries a mark in `absent`; read from the html's markup, see [scoring/format.md](scoring/format.md) |
 | layout_kind | `content`, with its `place` | `kind` | the smallest block covering at least half of the place is labeled `kind` (one of `views.LABELS`); for `text`, a `list` or `form` block (a list item, or a form field or key-value pair) passes too |
@@ -109,6 +110,9 @@ and `content`, everything the page prints between them (absent: nothing). Every 
 opens a region, so pick anchors printed once, in one column, with no figure or page furniture between them, and
 take the content from a source that is exact by construction (a text layer, JATS, an authored page, a human
 review). See [verbatim.md](scoring/verbatim.md#building-a-verbatim-test).
+`no_excess_repeats` takes one role, `content`: the page's full text, in any order, with `max_diffs` 0. Its words
+are counted, so it must hold everything the page prints outside its figures, its tables' text included: a text layer serves only where it is complete. See
+[no_excess_repeats.md](scoring/no_excess_repeats.md#building-a-test).
 
 The table_cell roles mean:
 
@@ -138,6 +142,7 @@ Which kinds each type accepts (`scorers/unit_tests/tests.py`):
 
 - `page_near_empty`: no args;
 - `verbatim`: `text` only (`start` and `end` with `max_diffs` 0, no `place`, no `exact_case`);
+- `no_excess_repeats`: `text` only (`content`, the page's full text, `max_diffs` 0, no `place`, no `exact_case`);
 - `present`: `text`, `number` or `latex`;
 - `format`: `text` (`span`, `before`, `after`), each with `max_diffs` 0 (the context is found as written, no `place`, no `exact_case`);
 - `order`, `repeat` and `table_cell`: `text`; and
