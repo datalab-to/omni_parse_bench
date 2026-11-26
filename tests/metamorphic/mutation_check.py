@@ -56,6 +56,12 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
     ('M140', 'scorers/unit_tests/runners.py',
      'wholes.append(bool(tables.parse(html[begun:m.end()])))',
      'wholes.append(True)'),
+    ('M139', 'scorers/unit_tests/compare.py',
+     'built[t.output_type] = _view(t.output_type, pred[t.output_type])',
+     'built[t.output_type] = next((b for b in built.values() if isinstance(b, Verdict)), _view(t.output_type, pred[t.output_type]))'),
+    ('M135', 'tables.py',
+     'in_thead = tr.find_parent("thead") is not None',
+     'in_thead = False'),
     ('M141', 'scorers/unit_tests/unit_tests.py',
      'raise errors.SystemFailed(',
      'raise ValueError('),
@@ -311,6 +317,9 @@ def run(node_id: str, edit: tuple[str, str, str] | None) -> int:
 
 
 def main(labels: list[str]) -> int:
+    if unknown := set(labels) - {m[0] for m in MUTATIONS}:
+        print(f"no mutations for {sorted(unknown)}")
+        return 2
     chosen = [m for m in MUTATIONS if not labels or m[0] in labels]
     bad = 0
     for label in dict.fromkeys(m[0] for m in chosen):

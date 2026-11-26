@@ -231,7 +231,8 @@ CERTIFICATE_TESTS = ("test_the_certificate_is_current", "test_each_status_matche
                      "test_the_certificate_pools_are_the_loaded_tests",
                      "test_the_certificate_counts_the_examples_it_says_ran_in_ci",
                      "test_every_deviation_cites_files_that_exist",
-                     "test_the_run_report_flags_a_mismatch")
+                     "test_the_run_report_flags_a_mismatch",
+                     "test_every_mutation_names_a_relation_and_a_scorer_text_that_exists")
 
 
 def dataset_revision() -> tuple[str, bool]:

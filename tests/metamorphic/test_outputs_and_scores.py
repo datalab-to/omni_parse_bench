@@ -84,7 +84,7 @@ def test_an_output_of_the_wrong_shape_fails_only_the_tests_that_read_it():
     """A test whose `html` is not a string, or whose `blocks` are not a list of `{label, bbox[, text]}` objects
     with a label of the eleven, a box of four numbers from 0 to 1 and a text that is a string or null, fails
     with a reason starting `malformed html output` or `malformed blocks output`; the tests that read the
-    other output are not affected, and a scorer never raises on it. [M139]
+    other output are not affected, alone or in a batch of both kinds in either order, and a scorer never raises on it. [M139]
     Why it matters for a score: a system's malformed output is its failure, counted as failed tests, never as
     a crash that loses the run (docs/scoring/README.md, case score-malformed; docs/design.md)."""
     for t in TESTS:
@@ -99,6 +99,19 @@ def test_an_output_of_the_wrong_shape_fails_only_the_tests_that_read_it():
         other = "blocks" if t.output_type == "html" else "html"
         for value in BAD_BLOCKS[:3] if other == "blocks" else BAD_HTML[:3]:
             assert verdict({**right, other: value}, t).result == "pass", (t.id, other, value)
+    # And in one batch of html and layout tests, in either order, one output malformed and the other right, the
+    # malformed one fails its own tests and the right one passes its own, whichever way round
+    html_tests = [t for t in TESTS if t.output_type == "html"][:5]
+    layout_tests = [t for t in TESTS if t.output_type == "blocks"][:5]
+    for h, b in zip(html_tests, layout_tests, strict=False):
+        both = {**answer(h), **answer(b)}
+        for tests in ([h, b], [b, h]):
+            for bad, good in [("blocks", h), ("html", b)]:
+                bad_test = b if bad == "blocks" else h
+                value = BAD_BLOCKS[0] if bad == "blocks" else BAD_HTML[0]
+                got = {v.id: v for v in compare.score({**both, bad: value}, tests)}
+                assert got[good.id].result == "pass", (bad, good.id, got[good.id])
+                assert got[bad_test.id].why.startswith(f"malformed {bad} output"), (bad, got[bad_test.id])
 
 
 @relation(HOLDS, domain="every loaded test; html '' and blocks [], and 40 random strings of markup characters")

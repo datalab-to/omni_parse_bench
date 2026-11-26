@@ -47,6 +47,9 @@ def test_a_superscript_digit_after_a_digit_is_set_apart_from_it():
             # And the number, a space and the digit is found, but the digits glued are not
             assert reads(f"{n} {digit}", page), (n, sup)
             assert not reads(f"{n}{digit}", page), (n, sup)
+            # And the other way: a test written with the superscript passes on the spaced page, not the glued one
+            assert reads(page, f"{n} {digit}"), (n, sup)
+            assert not reads(page, f"{n}{digit}"), (n, sup)
 
 
 WRITTEN = ["​", "‍", "­", "⁠", "‎", "‪", "⁦", "﻿", "", ""]
@@ -68,6 +71,7 @@ def test_invisible_and_private_use_characters_inside_a_word_change_no_text_verdi
             # Given a word and an invisible character put inside it; When the word is asked for; Then it is found
             for hidden in WRITTEN:
                 assert reads(word, word[:i] + hidden + word[i:]), (word, i, hidden)
+                assert reads(word[:i] + hidden + word[i:], word), (word, i, hidden)    # and the other way
             # But a visible character in its place fails
             for shown in ["|", "x", "9", "~"]:
                 assert not reads(word, word[:i] + shown + word[i:]), (word, i, shown)
@@ -104,8 +108,10 @@ def test_quote_glyphs_of_a_family_read_as_one_quote():
     for page in ["``ship''", "''ship''", "`'ship'`", "‘’ship‘’"]:
         # Then it is read as a double quote
         assert reads('"ship"', page), page
+        assert reads(page, '"ship"'), page    # and the other way
     # But a single quote is not a double quote, and the families do not read as each other
     assert not reads('"ship"', "'ship'")
+    assert not reads("``ship''", "'ship'")
     assert not reads("'ship'", '"ship"')
     assert not reads("‘ship’", "“ship”")
 
@@ -193,9 +199,11 @@ def test_a_run_of_three_dots_dashes_equals_or_stars_is_a_leader_and_a_shorter_on
                 if n >= 3:
                     # Then three or more read as one space
                     assert reads("a b", page), (item, n, joiner)
+                    assert reads(page, "a b"), (item, n, joiner)    # and a gold with the leader, on a space
                 else:
                     # But fewer stay text: the two words alone fail, the run as written passes
                     assert not reads("a b", page), (item, n, joiner)
+                    assert not reads(page, "a b"), (item, n, joiner)    # and a gold with the run, on a space
                     assert reads(page, page), (item, n, joiner)
 
 
@@ -340,7 +348,7 @@ def test_a_cells_left_heading_is_the_label_of_its_own_row():
     """A cell's `left_heading` is the heading cell found walking left in the cell's own row (the first cell of
     the row when the walk meets no `<th>`, any `<th>` of the row to its left when it does): the test passes for its row's
     label, at any distance from the label, and fails for the label of another row; swapping the labels of two
-    rows flips both verdicts. [M135]
+    rows flips both verdicts; and in `top_heading`, the cells of a `<thead>` are headings of their column. [M135]
     Why it matters for a score: row labels are what a reader reads a figure against; a figure under another
     row's label is a wrong figure."""
     @given(LABELS4, VALUES, st.integers(2, 4), st.booleans())
@@ -365,6 +373,14 @@ def test_a_cells_left_heading_is_the_label_of_its_own_row():
             assert cell_passes(cell_test(t0, {"left_heading": labels[1]}), page(swapped))
             assert not cell_passes(cell_test(t0, {"left_heading": labels[0]}), page(swapped))
     check()
+    # And a column's headings include the cells of a `<thead>`, `<td>` or `<th>`, which the walk to the edge
+    # would not reach: only the top row of a table without one is read
+    head = "<thead><tr><td>Group</td><td>Group</td></tr><tr><td>Name</td><td>Head</td></tr></thead>"
+    for page, expected in [(f"<table>{head}<tr><td>Row</td><td>5</td></tr></table>", True),
+                           (f"<table>{head[7:-8]}<tr><td>Row</td><td>5</td></tr></table>", False)]:
+        assert cell_passes(cell_test("5", {"top_heading": "Head"}), page) == expected
+        assert cell_passes(cell_test("5", {"top_heading": "Group"}), page)
+        assert not cell_passes(cell_test("5", {"top_heading": "Row"}), page)
     # And with two headings in a row, each is a heading of the cell; a `<td>` beside a `<th>` is not
     page = rows_html([[th("Group"), th("Name"), td("5")]])
     assert cell_passes(cell_test("5", {"left_heading": "Name"}), page)
