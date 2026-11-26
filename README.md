@@ -78,9 +78,9 @@ Gemini 3.8 Flash's and GPT-5.6 Sol's layout scores use a separate run that asked
 
 ‡ Gemini 4 costs include the original full pass **and** all failed-page reruns, divided by 2,937 pages; separate validation probes are excluded. These cumulative experiment costs are not fresh single-pass prices.
 
-Vendor list prices are the historical rates used when each vendor run was made; they have not been re-checked for this update. The run modes were Datalab balanced and accurate, Reducto r-1, Mistral OCR, Extend `parse_performance`, and Azure Content Understanding `prebuilt-layout`.
+Other vendor prices are historical estimates from the original chart; their dates and tiers have not been re-verified.
 
-¶ As of 2026-11-26, LlamaParse's [pricing page](https://developers.llamaindex.ai/llamaparse/general/pricing) lists Agentic Plus at 25 credits/page and layout extraction at an additional 3 credits/page. Our run requested layout blocks, so the comparable price is 28 credits/page: ≈$35.00 per 1,000 pages at the Pro rate ($1.25 per 1,000 credits), or $42.00 at the pay-as-you-go rate ($1.50 per 1,000 credits). The score uses saved predictions from runs dated 2026-09-30 and 2026-10-06; it has not been re-measured.
+¶ As of 2026-11-26, LlamaParse's [pricing page](https://developers.llamaindex.ai/llamaparse/general/pricing) lists Agentic Plus at 25 credits/page. The saved run setting was `tier=agentic_plus`, `version=latest`, with no `layout_extraction` setting; layout blocks were derived from returned `items` retrieved with `expand=markdown,items,usage`. The listed price is therefore ≈$31.25 per 1,000 pages at the Pro rate ($1.25 per 1,000 credits), or $37.50 at the pay-as-you-go rate ($1.50 per 1,000 credits). The score uses saved predictions from runs dated 2026-09-30 and 2026-10-06; it has not been re-measured.
 
 ## About the benchmark
 
