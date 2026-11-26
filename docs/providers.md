@@ -253,7 +253,7 @@ that is missing stops a run before any call and says which `export` to type.
 | `llamaparse` | /api/v2/parse/upload, poll, expand=markdown,items,usage | html, blocks | header and footer fields beside the markdown, put back | LLAMA_CLOUD_API_KEY |
 | `azure` | Content Understanding, prebuilt-layout | html, blocks | comments in its markdown, unwrapped | AZURE_CU_KEY, and the `endpoint` option |
 | `mistral` | /v1/ocr (mistral-ocr-4-1) | html, blocks | header and footer fields beside the markdown, put back | MISTRAL_API_KEY |
-| a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2, OvisOCR, OvisOCR2: html) | kept: vendor defaults that leave them out turned off | none; OPB_ENDPOINT_KEY, when the server has one |
+| a served open-weight model (see Open-weight models) | its serve/ server: vLLM, or the vendor's code around it, on any GPU host | html, blocks (olmOCR-2, Nanonets-OCR2, OvisOCR, OvisOCR2: html; OCRia-1: blocks with `layout`) | kept: vendor defaults that leave them out turned off | none; OPB_ENDPOINT_KEY, when the server has one |
 | `tesseract` | the local `tesseract` binary, no model of the page | html | kept: it has no notion of them | none |
 | `pdftotext` | the local poppler `pdftotext` binary, the PDF's text layer | html | kept: it has no notion of them | none |
 | `pdftext` | the `pdftext` package (pdfium): the PDF's text layer, no OCR | html | kept: it has no notion of them | none |
@@ -491,7 +491,7 @@ A server.py takes exactly its `SETTINGS` and refuses any other. Its adapter send
 which its field marks `metadata={"local": True}` (hunyuan's `long_edge`, chandra-ocr's
 `headers_footers`). A test checks that each adapter sends exactly its server's `SETTINGS`.
 
-A model whose vendor offers only the model, with no code of its own around it (Nanonets-OCR2), has no
+A model whose vendor offers only the model, with no code of its own around it (Nanonets-OCR2, OCRia-1), has no
 server.py: its port is vLLM's `/v1`, and its adapter asks it directly, through `llm.chat`.
 
 OPB_ENDPOINT_KEY, when the server has it, is required as the bearer token, and opb sends it to any
@@ -528,11 +528,13 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
 | Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
 | Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets-ocr` | html |
+| OCRia-1 | `ocria-1` | `ocria-1` | html, blocks (with `layout`) |
 | Nemotron 3.5 Parse | `nemotron-parse` | `nemotron-parse` | html, blocks |
 | MiniCPM-OCR 1.0 | `minicpm-ocr` | `minicpm-ocr` | html, markdown, blocks |
 | OXR-1.0 | `oxr` | `oxr` | html, markdown, blocks |
 
-olmOCR-2, Nanonets-OCR2, OvisOCR and OvisOCR2 return no layout, so they have no blocks. OvisOCR3 gets html
+olmOCR-2, Nanonets-OCR2, OvisOCR and OvisOCR2 return no layout, so they have no blocks. OCRia-1 has blocks only
+with its `layout` option, from the box server beside its vLLM (see OCRia-1 below). OvisOCR3 gets html
 from its markdown prompt and blocks from its structured one: two calls a page. Indra OCR uses `indra-ocr==1.2.0`,
 which enables math by default; optional word boxes are off because OPB consumes block boxes. Its ten block classes
 are unchanged. It runs on CPU (ONNX Runtime), without `--gpus`; its server reads pages in one worker process per core.
@@ -831,3 +833,71 @@ Qwen3.5 providers. Input uses opb's RGB PNG at a 2048-pixel long edge (Pillow's 
 BICUBIC thumbnail rather than the vendor's LANCZOS; PDFs are rendered by opb).
 The server allows 900 seconds per inference request, versus the vendor CLI's default 600.
 No benchmark score has been measured for this provider yet.
+
+### OCRia-1
+
+`ocria-1` serves [OCRia-1](https://huggingface.co/llamaindex/OCRia-1) by LlamaIndex (a 4B model
+fine-tuned from Qwen3.5-4B; 5.17 billion parameters in BF16, about 10.3 GB of weights), pinned at
+revision `489f5fa`. Build and run `omni_parse_bench/harness/providers/serve/ocria-1/`, then
+`opb init ocria-1`. It is vLLM alone, as the model card runs it (`--max-model-len 32768`, one image per
+prompt); the card asks for vLLM 0.30 or later with `nvcc`, which the pinned `vllm/vllm-openai:v0.30.0`
+image has. Plan for one 24 GB GPU at least (weights, the 32,768-token context and the image tokens of a
+page at the model card's 4.1-megapixel image cap).
+
+Each page is one call: a PDF rendered at 300 DPI and scaled down to the model card's 4.1-megapixel image cap (an
+image file is only scaled down), the card's `prompt.txt` (downloaded from the pinned revision at run time, its sha256 checked, not stored in this repository) as the system message, no user text, thinking
+off, temperature 0, at most 24,576 tokens. The reply is Markdown with tables in HTML and the model's own
+tags: `<page_header>`, `<page_footer>`, `<watermark>` and `<page_number>` stay in the page as text, in
+place, and `![label: description]` becomes an image whose alt text is `label: description`.
+
+By default the adapter produces `html` only. With `--set system.ocria-1.layout=true` it also produces
+`blocks` from the card's layout boxes ("Layout boxes (experimental)"). The model writes no layout: a
+separate package of the model repository, `ocria_grounding`, places the answer on the page after
+generation. Docling's Heron detector
+([docling-project/docling-layout-heron](https://huggingface.co/docling-project/docling-layout-heron),
+Apache-2.0, pinned at `8f39ad3`) finds the regions, and each word of the answer goes to the region holding
+it. On a PDF page with a text layer the word's position is its box in that layer; on a scanned PDF without
+one or an image, it comes from a second, teacher-forced pass of the same weights under Transformers 5.22.2,
+from where the model looked while writing the word, and is rougher. The second pass needs its own GPU
+process. `serve/ocria-1/boxes.sh` runs it in the same image, on port 8100:
+
+    docker run --gpus all -p 8100:8100 -v ~/.cache/huggingface:/root/.cache/huggingface \
+        --entrypoint bash opb-ocria-1 /srv/boxes.sh
+    opb run --config config.yaml --set system.ocria-1.layout=true \
+        --set system.ocria-1.grounding_url=http://localhost:8100
+
+After the chat call, opb sends the box server the exact page image the answer was generated from, the raw
+answer and, for a PDF, the page itself. The server reads the text-layer words with the package's own
+`page_words` at 300 DPI and scales them by the 4.1-megapixel resize, then runs `ground_layout` with the
+default ("accurate-layout") method, as the card's `examples/serve_boxes.py` does. The server loads the weights,
+the package and `prompt.txt` from the pinned revision, and Heron from its own pinned revision. Every answer
+names them, and a server that loaded others stops the run. Each item becomes a block: its box divided
+by the image's size, its markdown as plain text, and its type mapped as Docling's labels are:
+
+| OCRia-1 layout item type | label |
+| --- | --- |
+| Text, Document Index | text |
+| Title, Section-header | heading |
+| Page-header, Page-footer | page_furniture |
+| List-item | list |
+| Caption | caption |
+| Footnote | footnote |
+| Formula | equation |
+| Code | code |
+| Table | table |
+| Form, Key-Value Region | form |
+| Picture | figure |
+
+The package drops Heron's checkboxes. Items with no area are left out. A box server that fails (a 5xx or a
+timeout, asked twice within the page's budget) fails the page's blocks alone; its html stands. An
+address that answers 4xx is no box server and stops the run. One box server runs one page
+at a time; for throughput, run several, one port each, and give them all, comma-separated, in
+`grounding_url`: pages take them in turn.
+
+License: the OCRia-1 Model and Code License, a modified OpenRAIL-M, not open source. Its Research
+Purposes include "evaluating or benchmarking the Model, by any person or organization, including
+publishing the results". Section 7 asks for credit to LlamaIndex, a link to the model and the license
+(huggingface.co/llamaindex/OCRia-1/blob/main/LICENSE); this repository holds no weights or model code.
+Other uses of the model or its output are restricted by revenue, funding and competing-service terms, and
+its output may not train another model except for Research Purposes.
+Full public run: 2,937/2,937 pages, 0 failures; 87.1 headline (82.7 text, 84.9 tables, 93.8 layout), graded with released OPB 1.7.0 from `ocria-1-grounded-20261126-150502` (B200; HTML-only text/table scores unchanged).

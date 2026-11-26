@@ -1,0 +1,2 @@
+torch; python_version < "0"
+torchvision; python_version < "0"

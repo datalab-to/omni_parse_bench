@@ -394,9 +394,9 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("provider", ["chandra-ocr", "deepseek-ocr", "dots-mocr", "glm-ocr", "hunyuan-ocr",
                                       "infinity-parser2", "lightonocr", "mineru", "nanonets-ocr",
-                                      "nemotron-parse", "olmocr", "ovisocr", "ovisocr2", "ovisocr3",
-                                      "paddleocr-vl", "surya-ocr", "surya-ocr-2.5", "unlimited-ocr",
-                                      "unlimited-ocr-2"])
+                                      "nemotron-parse", "ocria-1", "olmocr", "ovisocr", "ovisocr2",
+                                      "ovisocr3", "paddleocr-vl", "surya-ocr", "surya-ocr-2.5",
+                                      "unlimited-ocr", "unlimited-ocr-2"])
 def test_a_served_model_run_is_named_by_every_option(provider):
     """Every option names the run but the server's address: the same model at another address is the same
     question, and other weights another."""
@@ -406,7 +406,7 @@ def test_a_served_model_run_is_named_by_every_option(provider):
     if "max_tokens" in harness.system(provider).options(): assert folder(provider, max_tokens=7) != a
 
 
-@pytest.mark.parametrize("provider", ["chandra-ocr", "nanonets-ocr"])
+@pytest.mark.parametrize("provider", ["chandra-ocr", "nanonets-ocr", "ocria-1"])
 def test_a_server_that_refuses_the_connection_stops_the_run(provider, tmp_path):
     """Nothing listening at base_url is the same for every page: the run stops and says how to start the
     server, instead of recording each page as a failure."""
