@@ -40,6 +40,7 @@ try:
         nanonets,
         nemotron_parse,
         olmocr,
+        opendataloader,
         ovisocr,
         ovisocr2,
         ovisocr3,
@@ -72,6 +73,7 @@ ENTRY_POINT_GROUP = "omni_parse_bench.adapters"
 ADAPTERS: dict[str, type[Parser]] = {a.name: a for a in (
     datalab.Datalab, reducto.Reducto, extend.Extend, llamaparse.LlamaParse, azure.Azure, mistral.Mistral,
     tesseract.Tesseract, pdftotext.Pdftotext, pdftext_plain.PdfText, markitdown.MarkItDown,
+    opendataloader.OpenDataLoader,
     pdf_inspector.PdfInspector, pymupdf4llm.PyMuPDF4LLM,
     # Open models, each served from its folder in providers/serve/: the vendor's own code on a server of ours,
     # or vLLM alone where the vendor offers only the model.

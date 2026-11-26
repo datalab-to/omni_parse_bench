@@ -1088,6 +1088,15 @@ markitdown = [
     { name = "pillow" },
     { name = "pypdfium2" },
 ]
+opendataloader = [
+    { name = "httpx" },
+    { name = "img2pdf" },
+    { name = "markdown-it-py" },
+    { name = "openai" },
+    { name = "opendataloader-pdf" },
+    { name = "pillow" },
+    { name = "pypdfium2" },
+]
 pdf-inspector = [
     { name = "httpx" },
     { name = "img2pdf" },
@@ -1113,6 +1122,7 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'harness'", specifier = ">=0.27" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.100" },
     { name = "img2pdf", marker = "extra == 'dev'", specifier = "==0.6.3" },
+    { name = "img2pdf", marker = "extra == 'opendataloader'", specifier = "==0.6.3" },
     { name = "img2pdf", marker = "extra == 'pdf-inspector'", specifier = "==0.6.3" },
     { name = "markdown-it-py", marker = "extra == 'harness'", specifier = ">=3.0" },
     { name = "markitdown", extras = ["pdf"], marker = "extra == 'markitdown'", specifier = "==0.1.9" },
@@ -1122,9 +1132,11 @@ requires-dist = [
     { name = "omni-parse-bench", extras = ["benchmark"], marker = "extra == 'dev'" },
     { name = "omni-parse-bench", extras = ["harness"], marker = "extra == 'benchmark'" },
     { name = "omni-parse-bench", extras = ["harness"], marker = "extra == 'markitdown'" },
+    { name = "omni-parse-bench", extras = ["harness"], marker = "extra == 'opendataloader'" },
     { name = "omni-parse-bench", extras = ["harness"], marker = "extra == 'pdf-inspector'" },
     { name = "omni-parse-bench", extras = ["harness"], marker = "extra == 'pymupdf4llm'" },
     { name = "openai", marker = "extra == 'harness'", specifier = ">=1.0" },
+    { name = "opendataloader-pdf", marker = "extra == 'opendataloader'", specifier = "==2.5.24" },
     { name = "pdf-inspector", marker = "extra == 'pdf-inspector'", specifier = "==1.27.1" },
     { name = "pillow", marker = "extra == 'harness'", specifier = ">=10.0" },
     { name = "pylatexenc", specifier = ">=2.10" },
@@ -1134,7 +1146,7 @@ requires-dist = [
     { name = "rapidfuzz", specifier = ">=3.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
 ]
-provides-extras = ["harness", "markitdown", "pymupdf4llm", "benchmark", "pdf-inspector", "dev"]
+provides-extras = ["harness", "markitdown", "pymupdf4llm", "opendataloader", "benchmark", "pdf-inspector", "dev"]
 
 [[package]]
 name = "onnxruntime"
@@ -1183,6 +1195,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/99/9a/008ff67f5f39ff680b7c9adf38373779247c365c611b9c60302e2dc65eea/openai-3.20.0.tar.gz", hash = "sha256:5e5dc0a3c0a9362e69cd35a65d04580a73a66eb39d5abeb78881b6190ca5d98c", size = 1746517, upload-time = "2026-09-28T16:05:03.22Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ac/92/218ff62ff1ae4eb737bdd011a20ca2f0f48a313893cc45190819468ba4e1/openai-3.20.0-py3-none-any.whl", hash = "sha256:fb1b109e3423ed51c6ade96bbb0fffddae39c8e64bb9b6e501659bcbaa5ad30c", size = 2082957, upload-time = "2026-09-28T16:05:00.823Z" },
+]
+
+[[package]]
+name = "opendataloader-pdf"
+version = "2.5.24"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/27/88/bd7bd5f8854885cb1b18e7db32bdbc982fe447ee5171bda3baea17c220e2/opendataloader_pdf-2.5.24.tar.gz", hash = "sha256:2ac4f1445ab6ee64f5b4053e562de86063db8a4cf7e9b2db945cd6087ca6c668", size = 22905482, upload-time = "2026-11-23T01:18:05.594Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/19/7c/c5d311c23bcef242080cb65d3f129df1dd9991fc2bcdcbbc6c87528bdf8a/opendataloader_pdf-2.5.24-py3-none-any.whl", hash = "sha256:067a90605501d195cc4d0b012dba0acd5b55289a0d91cc2f8f69e125cf7d5034", size = 22916169, upload-time = "2026-11-23T01:18:02.673Z" },
 ]
 
 [[package]]

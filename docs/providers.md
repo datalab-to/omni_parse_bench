@@ -237,6 +237,7 @@ that is missing stops a run before any call and says which `export` to type.
 | `markitdown` | the local `markitdown` 0.1.9 package, a PDF's text layer as Markdown | html | kept: it has no notion of them | none |
 | `pdf-inspector` | the local pdf-inspector package: its text mode, or with `ocr` its PP-OCRv6 Small mode | html | kept: it filters page numbers only | none |
 | `pymupdf4llm` (+ `-ocr`) | the local `pymupdf4llm` 2.1 package (AGPL-3.0), text layer plus a layout model | html, blocks | kept (`header=True, footer=True`) | none |
+| `opendataloader` | OpenDataLoader PDF 2.5.24, local Java engine (Apache-2.0) | html, blocks | kept (`include_header_footer`) | none |
 
 A vendor's tiers are runs of their own, one config each (or one config and `--set`), with the same pages:
 
@@ -363,6 +364,35 @@ Per vendor:
   The layout model defines no code, form or key-value class. Layout boxes are normalized to the page frame;
   table cell text is joined with spaces. Needs `pip install 'omni-parse-bench[pymupdf4llm]'`.
   Full public run: each row scored 2,920/2,937 pages, with 17 failures (14 unsupported image formats, 3 form-widget errors); OCR used Tesseract.
+
+- opendataloader: OpenDataLoader PDF 2.5.24 (Apache-2.0, no model weights), run locally on the CPU in the
+  default Java engine without the hybrid backend, so it does no OCR. A scan without a text layer and an image
+  page are empty; a scan with an embedded OCR layer returns that text. Input PDFs are copied unchanged; image
+  inputs are decoded and rewritten as canonical PNGs,
+  then losslessly wrapped by `img2pdf` 0.6.3 (LGPL-3.0) in a one-page PDF at 72 DPI (one point per source pixel).
+  The image wrapper preserves decoded pixels, dimensions and RGBA alpha; it is an adapter input conversion
+  from the vendor's PDF-only input. One Java engine call writes both html and JSON; `html` is the body of the
+  vendor html. Blocks map the classes in the [2.5.24 JSON schema](https://github.com/opendataloader-project/opendataloader-pdf/blob/v2.5.24/schema.json)
+  to the page frame:
+
+  | OpenDataLoader JSON type | OPB label / handling |
+  |---|---|
+  | `paragraph` | `text` |
+  | `heading` | `heading` |
+  | `caption` | `caption` |
+  | `table` | `table` (cells joined with spaces) |
+  | `list` | `list` (items and nested children joined with spaces) |
+  | `image` | `figure` |
+  | `header`, `footer` | `page_furniture` (one block from children) |
+  | `form field` | `form` |
+  | `text block` | container; children become blocks in place |
+  | `list item`, `table row`, `table cell` | parts of a list or table; not blocks themselves |
+
+  Import, version lookup, image preparation,
+  Java startup and conversion run in a killable process group under the page time budget; a timeout is a
+  `SystemTimeout` and kills the JVM child too. Needs `pip install 'omni-parse-bench[opendataloader]'` and
+  Java 11 or later.
+  Full public run: 2,937/2,937 pages; 0 failures; no OCR (8 first-pass timeouts succeeded on retry).
 
 ## Serving an open model
 
