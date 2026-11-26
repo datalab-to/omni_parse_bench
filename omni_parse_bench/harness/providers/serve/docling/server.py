@@ -102,17 +102,24 @@ def items(doc, layers: set) -> list[dict]:
 
 def result_payload(result, layers: set) -> dict:
     """The server's raw answer, including Docling's serializable document and any conversion errors."""
-    doc = result.document
-    first = doc.pages[min(doc.pages)]
-    return {"html": doc.export_to_html(included_content_layers=layers),
-            "markdown": doc.export_to_markdown(included_content_layers=layers),
-            "items": items(doc, layers), "page": {"width": first.size.width, "height": first.size.height},
-            "status": result.status.value, "errors": jsonable_encoder(result.errors),
-            "docling_document": doc.export_to_dict(),
-            "vendor": {p: importlib.metadata.version(p) for p in ("docling", "docling-core",
-                                                                  "docling-ibm-models", "docling-parse",
-                                                                  "rapidocr")},
-            "served": SERVED}
+    status = result.status.value
+    raw_errors = jsonable_encoder(result.errors)
+    payload = {"status": status, "errors": raw_errors, "served": SERVED}
+    if str(status).lower().rsplit(".", 1)[-1] != "success" or raw_errors:
+        return payload
+    try:
+        doc = result.document
+        first = doc.pages[min(doc.pages)]
+        payload.update({"html": doc.export_to_html(included_content_layers=layers),
+                        "markdown": doc.export_to_markdown(included_content_layers=layers),
+                        "items": items(doc, layers), "page": {"width": first.size.width,
+                                                                  "height": first.size.height},
+                        "docling_document": doc.export_to_dict(),
+                        "vendor": {p: importlib.metadata.version(p) for p in (
+                            "docling", "docling-core", "docling-ibm-models", "docling-parse", "rapidocr")}})
+    except Exception as exc:
+        payload["errors"] = [*raw_errors, {"stage": "server_export", "error": str(exc)}]
+    return payload
 
 
 @app.get("/health")

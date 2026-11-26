@@ -116,6 +116,57 @@ def test_the_server_reads_a_documents_boxes_from_the_top_left_and_its_tables_cel
     assert labels == ["text", "page_footer", "table"]
 
 
+@pytest.mark.skipif(not all(importlib.util.find_spec(m) for m in ("docling_core", "fastapi")),
+                    reason="docling and fastapi are the server's, not opb's")
+@pytest.mark.parametrize(("status", "errors", "pages", "raise_export"), [
+    ("partial_success", [{"stage": "ocr", "error": "failed"}], {}, False),
+    ("success", [], {1: object()}, True),
+])
+def test_parse_route_returns_failure_status_and_errors_before_document_export(
+        monkeypatch, status, errors, pages, raise_export):
+    from fastapi.testclient import TestClient
+    import sys
+    from types import SimpleNamespace
+
+    monkeypatch.setattr("importlib.metadata.version", lambda package: f"{package}==test")
+    spec = importlib.util.spec_from_file_location("docling_server", SERVER)
+    server = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, server)
+    spec.loader.exec_module(server)
+
+    class FakeDocument:
+        def __init__(self):
+            self.pages = pages
+
+        def export_to_html(self, **kwargs):
+            if raise_export: raise RuntimeError("HTML export exploded")
+
+        def export_to_markdown(self, **kwargs):
+            return ""
+
+        def export_to_dict(self):
+            return {}
+
+    result = SimpleNamespace(document=FakeDocument(), status=SimpleNamespace(value=status), errors=errors)
+
+    class FakeConverter:
+        def convert(self, *args, **kwargs):
+            return result
+
+    monkeypatch.setattr(server, "_converter", FakeConverter())
+    response = TestClient(server.app).post("/parse", json={"page": "eA==", "suffix": ".pdf",
+                                                           "settings": {"furniture": True}})
+    assert response.status_code == 200
+    raw = response.json()
+    assert raw["status"] == status
+    if errors:
+        assert raw["errors"] == errors
+    else:
+        assert raw["errors"] == [{"stage": "server_export", "error": "HTML export exploded"}]
+    with pytest.raises(docling.errors.SystemFailed):
+        _parse(raw)
+
+
 def _start(tmp_path: Path, monkeypatch, *, cuda: bool, **env) -> list[str]:
     """start.sh's uvicorn arguments, with a `python` that says whether torch finds CUDA and a `uvicorn` that
     prints its arguments (no torch, docling or GPU needed)."""
