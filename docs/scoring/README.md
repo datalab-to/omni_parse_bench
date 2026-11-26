@@ -21,7 +21,7 @@ case that is run against the scorer in CI (see [Keeping the pages true](#keeping
 | `order` | this string comes before that one | text | 1,189 | [order.md](order.md) |
 | `repeat` | this line appears exactly N times | text | 35 | [repeat.md](repeat.md) |
 | `page_near_empty` | a blank page holds at most N characters | text | 0 | [page_near_empty.md](page_near_empty.md) |
-| `region` | the text between two anchors is exactly this | text | 0 | [region.md](region.md) |
+| `verbatim` | the text between two anchors is this, verbatim within the test's edit budget | text | 0 | [verbatim.md](verbatim.md) |
 | `table_cell` | a table has this cell, with these neighbours and headings | tables | 5,386 | [table_cell.md](table_cell.md) |
 | `layout_kind` | the layout block on this line has this label | layout | 2,403 | [layout_kind.md](layout_kind.md) |
 
@@ -91,13 +91,13 @@ and in the case files under [tests/scoring_probes](../../tests/scoring_probes/).
 | a marked copy elsewhere | a bold test passes on a page with one plain and one bold copy of its phrase | `format` | (case fm-a-copy) |
 | the text of a layout block | a block with the right label and box passes, whatever its text | `layout_kind` | (case lay-text-unread) |
 | one block for the whole page | a page-sized `table` block passes every `table` test | `layout_kind` | (case lay-page-block) |
-| extra content | a loop that repeats the string passes; only `repeat` caps a count, and `region` a closed stretch | all but `repeat` and `region` | (case text-loop) |
+| extra content | a loop that repeats the string passes; only `repeat` caps a count, and `verbatim` a closed stretch | all but `repeat` and `verbatim` | (case text-loop) |
 
 ## Pages
 
 - [present-text.md](present-text.md), [present-number.md](present-number.md),
   [present-latex.md](present-latex.md), [order.md](order.md), [repeat.md](repeat.md),
-  [page_near_empty.md](page_near_empty.md), [region.md](region.md), [format.md](format.md),
+  [page_near_empty.md](page_near_empty.md), [verbatim.md](verbatim.md), [format.md](format.md),
   [table_cell.md](table_cell.md), [layout_kind.md](layout_kind.md): one page per test, each with the same shape:
   what it asks, its rules table, its blind spots.
 - [internals.md](internals.md): how an output becomes the text the tests compare: markdown to html, the text

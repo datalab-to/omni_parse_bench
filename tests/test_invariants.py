@@ -51,7 +51,7 @@ def answer(t: gold.Test) -> dict[str, Any]:
         case runners.Repeat(content=runners.Text(text=x) | runners.Number(number=x)):
             html = "".join(f"<p>{e(x)}</p>" for _ in range(p.expected_count))
         case runners.PageNearEmpty(): html = f"<p>{'x' * p.max_chars}</p>"     # as much as it allows
-        case runners.Region():
+        case runners.Verbatim():
             html = "".join(f"<p>{e(x)}</p>" for x in (p.start, p.content, p.end) if x is not None)
         case runners.TableCell(): html = table(p)
         case runners.Format():
@@ -111,9 +111,9 @@ def failures(tests: Sequence[gold.Test], outputs, want: str) -> list[str]:
 def test_an_empty_output_passes_no_test(tests):
     # A page_near_empty test asks for a page with at most max_chars characters, so an empty output passes
     # it by definition; the next test checks that it fails one character over.
-    # A region test with no anchors and no content asks for an empty page too.
+    # A verbatim test with no anchors and no content asks for an empty page too.
     asked = [t for t in tests if not isinstance(t.params, runners.PageNearEmpty)
-             and t.params != runners.Region(None, None, None, 0)]
+             and t.params != runners.Verbatim(None, None, None, 0)]
     bad = failures(asked, lambda t: EMPTY, "fail")
     assert not bad, f"{len(bad)} tests pass on an empty output, e.g. {bad[:5]}"
 

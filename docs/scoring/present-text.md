@@ -165,8 +165,8 @@ spaced sign on the page (`− 0.756` for the gold's `−0.756`) in front of a nu
 the sign dropped (`12.20 13.20`) fails.
 
 A `-` after a Latin letter or a digit is a hyphen: `A-12`, `2026-11-26`, `1-2` and `COVID-19` keep costing one
-edit to drop, as do a list dash (`- 5` in the middle of a text) and a space-dash-space (`3 - 2`). This differs
-on purpose from the number reader of `region`, which reads a sign after a letter too (`A-12`): a page often
+edit to drop, as do a list dash (`- 5` in the middle of a text) and a space-dash-space (`3 - 2`), and
+`verbatim` reads it the same way (`COVID-19` against `COVID 19` costs one edit there too): a page often
 writes such an id as `COVID 19` or `A12`, and a budget exists for that kind of noise. Spacing a unit exponent either way does not change
 what a number is: a gold's `kg-1` is matched by the page's spaced `kg -1`, and a gold's `dm -3` by `dm-3` (after a
 letter only). A `+` or `±` between two values (`6% ± 2%`, `1 +2`) is an operator, not a sign. The cost of this narrow rule: a minus written right after a Latin letter (`x-5`) reads as a hyphen, so
@@ -371,7 +371,7 @@ Blind spots of `blank_after`, besides those of `present`:
 
 - **No word edges.** `Total` is found in `Totally` (case text-longer-word). Use `repeat` for whole words.
 - **Letters beside a number are free.** `4.8` is found in `a4.8` (case text-letter-beside). Use a number arg
-  ([present-number.md](present-number.md)) when sign and percent matter.
+  ([present-number.md](present-number.md)) when the percent sign matters.
 - **A budget still pays for anything that is not a digit or a sign.** A unit that reads as another (`5%` for
   `5‰`, case text-budget-unit), a letter change that makes another real word (`from` for `form`, case
   text-budget-real-word), and, on a long passage with a budget of 2 or more, a dropped `not` (case

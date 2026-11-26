@@ -145,15 +145,15 @@ def near_empty(label, mark, rule, max_chars, out, **kw) -> Case:
                    lambda: _v(R.page_near_empty(R.PageNearEmpty(max_chars), views.html(html(out)))), **kw)
 
 
-def region(label, mark, rule, start, end, content, out, md=0, from_markdown=False, **kw) -> Case:
-    """`region`: `start` and `end` (None for the page start or end) and `content` (None for nothing).
+def verbatim(label, mark, rule, start, end, content, out, md=0, from_markdown=False, **kw) -> Case:
+    """`verbatim`: `start` and `end` (None for the page start or end) and `content` (None for nothing).
     `from_markdown`: `out` is markdown, turned to html as the harness does."""
     from omni_parse_bench import markdown
     shown = [f"{code(start) if start else 'page start'} … {code(end) if end else 'page end'}",
              code(content) if content else "nothing"] + ([f"md {md}"] if md else [])
     page = markdown.to_html(out) if from_markdown else html(out)
     return verdict(label, mark, rule, ": ".join(shown[:2]) + (f" ({shown[2]})" if md else ""), out,
-                   lambda: _v(R.region(R.Region(start, end, content, md), views.html(page))), **kw)
+                   lambda: _v(R.verbatim(R.Verbatim(start, end, content, md), views.html(page))), **kw)
 
 
 def cell(label, mark, rule, gold, out, md=0, headings=(), section=None, row_groups=(), **rel) -> Case:

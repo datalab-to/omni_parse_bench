@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Relations of `region` tests (M150 to M159): a region the page leaves as printed passes however it is
+"""Relations of `verbatim` tests (M150 to M159): a region the page leaves as printed passes however it is
 written and wherever it sits, fails once anything is added to it or taken from it, and keeps its verdict
 when the page changes outside it."""
 from __future__ import annotations
@@ -23,9 +23,9 @@ TARGET, NEXT = "Date of birth:", "Place of birth:"
 OTHER_LABELS = [x for x in OTHERS if x != NEXT]        # the fields the target's region may follow
 
 
-def field_test(content: str | None = None, md: int = 0) -> runners.Region:
+def field_test(content: str | None = None, md: int = 0) -> runners.Verbatim:
     """The target field's region: from its label to the next field's label."""
-    return runners.Region(TARGET, NEXT, content, md)
+    return runners.Verbatim(TARGET, NEXT, content, md)
 
 
 def form(order, k, value, shown=None):
@@ -37,7 +37,7 @@ def form(order, k, value, shown=None):
 
 
 # Note: the layouts that write a field's label before its value in reading order. A header-row table writes
-# every label before any value, so it is no region (docs/scoring/region.md, case rg-header-row).
+# every label before any value, so it is no region (docs/scoring/verbatim.md, case vb-header-row).
 LAYOUTS = {"paragraphs": paragraphs, "one line": one_line, "two columns": two_columns,
            "two columns th": two_columns_th, "read across": read_across, "label and value in one cell": in_cell,
            **MARKDOWN}
@@ -120,7 +120,7 @@ def test_an_anchor_is_found_however_it_is_spaced_or_styled_and_not_when_its_word
     printed give: a blank field passes, a filled one fails. An anchor written with its words glued is not
     found. [M159]
     Why it matters for a score: an anchor is found under the one equivalence the page is read with, never under
-    a second, looser search, so a region's ends are where the page prints them."""
+    a second, looser search, so a verbatim test's ends are where the page prints them."""
     if layout in MARKDOWN:
         at_start, at_end = (x if x not in HTML_ONLY else "as printed" for x in (at_start, at_end))
     value = "1990" if filled else ""
@@ -144,7 +144,7 @@ def test_an_anchor_is_found_however_it_is_spaced_or_styled_and_not_when_its_word
 @given(LAYOUT, st.data(), st.sampled_from(TOKENS), st.sampled_from(["before", "after", "alone"]), FIELD, ORDER)
 def test_any_letter_or_digit_token_added_to_a_region_fails_it(layout, data, token, where, k, order):
     """A token with a letter or digit written in a blank region (before the blank, after it, or in its place:
-    `N/A`, a date, a word, a checkbox) fails the region's test, in every layout and at every position, while
+    `N/A`, a date, a word, a checkbox) fails the verbatim test, in every layout and at every position, while
     the blank form passes. [M151]
     Why it matters for a score: an output that writes anything the page does not print in a closed region
     does not pass for leaving it as printed."""
@@ -162,7 +162,7 @@ def test_any_letter_or_digit_token_added_to_a_region_fails_it(layout, data, toke
                         "nested table"]), st.sampled_from(TOKENS), st.sampled_from([None, "__/__/____"]))
 def test_a_value_written_anywhere_between_the_anchors_fails(where, token, content):
     """A value written two cells right of the label, in the cell below it, in a second `<table>`, in a
-    paragraph after `</table>` or in a nested table fails the region's test: the region runs in reading order
+    paragraph after `</table>` or in a nested table fails the verbatim test: the region runs in reading order
     across cells and tables, up to the end anchor. [M151]
     Why it matters for a score: the places a per-cell guard does not read are inside the region."""
     mask = content or ""
@@ -179,32 +179,33 @@ def test_a_value_written_anywhere_between_the_anchors_fails(where, token, conten
 
 
 CONTENTS = ["Results of the trial in 2019", "We study parsing. It is hard.", "Rent 100 Fuel 70",
-            "Concentration 1e-3 M", "Strain Δ-12 cells", "Set token____ now", "Call ____init now"]
+            "Concentration 1e-3 M", "Rate 2e5 per s", "Readings 10-12 mg", "Set token____ now", "Call ____init now"]
 
 
-@relation(HOLDS, domain="7 contents (two with a sign after a letter: an exponent's, a code's; two with an "
-                        "underscore run at one side of a word) x 6 edits (a word dropped, a character dropped, a "
-                        "word doubled, a number changed, the sign flipped, the underscores dropped; each where "
-                        "the content holds what it edits) x 2 budgets (0, 1)")
+@relation(HOLDS, domain="8 contents (two in scientific notation, one with a range; two with an underscore run "
+                        "at one side of a word) x 7 edits (a word dropped, a character dropped, a word doubled, a "
+                        "number changed, the sign flipped, the exponent's e written as a space, the underscores "
+                        "dropped; each where the content holds what it edits) x 2 budgets (0, 1)")
 def test_text_taken_from_a_region_or_a_number_changed_fails():
     """A region that loses a word, loses a character (with no edit to spend), doubles a word, changes a number
-    or flips a sign after a letter (an exponent's, a code's; at any budget), or drops an underscore run that
-    touches a letter on one side (with no edit to spend), fails, while the region as printed passes. [M152]
+    flips a sign (an exponent's, or a range's "-" written "+") or splits a number in scientific notation
+    ("2e5" written "2 5"; at any budget), or drops an underscore run that touches a letter on one side (with no
+    edit to spend), fails, while the region as printed passes. [M152]
     Why it matters for a score: a region is compared as a whole, so a missing or changed part costs as an added
-    one does, and a number is read with its sign wherever the sign stands."""
+    one does, and a number is read whole, with its sign and exponent."""
     page = "<p>Abstract</p><p>{}</p><h2>Introduction</h2>"
     n, bad = 0, []
     for content in CONTENTS:
         words = content.split(" ")
         for md in (0, 1):
-            test = runners.Region("Abstract", "Introduction", content, md)
+            test = runners.Verbatim("Abstract", "Introduction", content, md)
             if not passes(test, page.format(escaped(content))):
                 bad.append((content, md, "as printed"))
             changed = {"drop word": " ".join(words[1:]),
                        "drop char": content[1:] if md == 0 else content[2:] + "zz",
                        "double word": " ".join([words[0], *words]),
                        "number": re.sub(r"\d(?!.*\d)", lambda m: str((int(m[0]) + 1) % 10), content),
-                       "sign": content.replace("-", "+")}
+                       "sign": content.replace("-", "+"), "exponent": re.sub(r"(?<=\d)e", " ", content)}
             if md == 0:
                 changed["underscores"] = content.replace("_", "")
             for edit, x in changed.items():
@@ -222,7 +223,7 @@ def test_text_taken_from_a_region_or_a_number_changed_fails():
 @relation(HOLDS, domain="8 layouts x 4 pairs of copies (blank or filled, in either order) x 13 tokens")
 @given(LAYOUT, st.sampled_from([("", ""), ("", "x"), ("x", ""), ("x", "x")]), st.sampled_from(TOKENS))
 def test_a_page_written_twice_passes_only_when_both_copies_are_right(layout, pair, token):
-    """A form written twice passes the region's test when both copies leave the field blank, and fails when
+    """A form written twice passes the verbatim test when both copies leave the field blank, and fails when
     either copy fills it, whichever comes first. [M153]
     Why it matters for a score: a system cannot pass by writing one clean copy beside an invented one."""
     first, second = (token if x else "" for x in pair)
@@ -240,11 +241,11 @@ def test_splitting_a_table_in_two_keeps_the_verdict(at, which, added):
     """A table split into two `<table>`s at any row gives the verdict the whole table gives, for a region that
     runs across the table (from its caption to the next paragraph) and one that starts at its last cell; with a
     row added, both fail. [M154]
-    Why it matters for a score: how a system cuts a table into elements does not decide a region's verdict."""
+    Why it matters for a score: how a system cuts a table into elements does not decide a verbatim test's verdict."""
     rows = [*ROWS, ("Total", "429")] if added else ROWS
     cells = " ".join(f"{a} {b}" for a, b in ROWS)
-    test = (runners.Region("Table 2. Costs", "The costs fell", cells, 0) if which == "across"
-            else runners.Region("Food 250", "The costs fell", None, 0))
+    test = (runners.Verbatim("Table 2. Costs", "The costs fell", cells, 0) if which == "across"
+            else runners.Verbatim("Food 250", "The costs fell", None, 0))
     tr = lambda rs: "".join(f"<tr><td>{a}</td><td>{b}</td></tr>" for a, b in rs)  # noqa: E731
     whole = f"<p>Table 2. Costs</p><table>{tr(rows)}</table><p>The costs fell.</p>"
     split = f"<p>Table 2. Costs</p><table>{tr(rows[:at])}</table><table>{tr(rows[at:])}</table><p>The costs fell.</p>"
@@ -255,7 +256,7 @@ def test_splitting_a_table_in_two_keeps_the_verdict(at, which, added):
                         "field's value) x 2 states of the field")
 @given(LAYOUT, st.sampled_from(TOKENS), st.sampled_from(["before", "after"]), st.sampled_from(["", "1990"]))
 def test_text_added_outside_the_region_keeps_the_verdict(layout, token, where, value):
-    """A token added before the form or after the field that ends the region keeps the region's verdict: a
+    """A token added before the form or after the field that ends the region keeps the verbatim test's verdict: a
     blank field passes and a filled one fails, whatever is written outside it. [M156]
     Why it matters for a score: a region judges its own stretch of the page, so text elsewhere (another
     field's value, a footer) never decides it."""
@@ -283,7 +284,7 @@ ANCHORS = ("§ region start §", "§ region end §")
                         "with a digit inside, a word of letters inside, a letter inside a word, the word outside)",
           pool="text, order, repeat, table_cell")
 def test_every_loaded_text_string_as_a_region_passes_as_written_and_fails_with_a_token_added():
-    """Each text string of the loaded text, order, repeat and table_cell tests, made a region's content between
+    """Each text string of the loaded text, order, repeat and table_cell tests, made a verbatim test's content between
     two anchors, passes when written between them as a paragraph, inline, in a table cell or in a list item;
     fails with a word added inside the region (one with a digit, one of letters only) or a letter added in its
     middle; and passes with the word added outside it. [M157]
@@ -296,7 +297,7 @@ def test_every_loaded_text_string_as_a_region_passes_as_written_and_fails_with_a
             if not normalize.fold(x):
                 continue
             n += 1
-            test = runners.Region(start, end, x, 0)
+            test = runners.Verbatim(start, end, x, 0)
             for name, layout in STRING_LAYOUTS.items():
                 fill = lambda y, layout=layout: layout.format(s=start, x=y, e=end)  # noqa: E731
                 if not passes(test, fill(escaped(x))):
@@ -327,7 +328,7 @@ def test_the_helpers_build_the_regions_they_say():
 
 # ------------------------------------------------------------------- other test types are unchanged
 
-OLD_COMMIT = "52a8965"    # main before `region`
+OLD_COMMIT = "39dc6db"    # main before `verbatim`
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER = """
 import json, sys
@@ -342,7 +343,7 @@ json.dump(out, sys.stdout)
 """
 
 
-BASELINE = Path(__file__).parent / "region_old_verdicts.json"
+BASELINE = Path(__file__).parent / "verbatim_old_verdicts.json"
 
 
 @pytest.fixture(scope="module")
@@ -388,12 +389,12 @@ def _compare(old_package, cases) -> None:
     assert {n[0] for n in new} == {"pass", "fail"}, "the cases hold both verdicts"
 
 
-@relation(HOLDS, domain="136 frozen cases: the 34 html tests of tests/fixtures/invariants/ at 52a8965 x 4 pages "
+@relation(HOLDS, domain="136 frozen cases: the 34 html tests of tests/fixtures/invariants/ at 39dc6db x 4 pages "
                         "(its answer, a character dropped, a word added, an empty page)")
 def test_every_frozen_case_of_another_type_keeps_its_verdict():
-    """Each frozen case (a fixture test of a type older than `region`, on its answer, the answer with a character
-    dropped, the answer and a word, and an empty page) gets the verdict and the why that the package at 52a8965
-    gave it, recorded in region_old_verdicts.json. [M158]
+    """Each frozen case (a fixture test of a type older than `verbatim`, on its answer, the answer with a character
+    dropped, the answer and a word, and an empty page) gets the verdict and the why that the package at 39dc6db
+    gave it, recorded in verbatim_old_verdicts.json. [M158]
     Why it matters for a score: the new test type changes no existing test's verdict."""
     from omni_parse_bench import score
     from omni_parse_bench.scorers.unit_tests import tests as gold
@@ -411,8 +412,8 @@ def test_every_frozen_case_of_another_type_keeps_its_verdict():
 @every_real_test("text tests", note="each on its answer, the answer altered, the answer and a word, and an "
                                     "empty page; old package against new")
 def test_every_real_test_keeps_its_old_verdict(old_package):
-    """Every real text, order, repeat and table_cell test gets the verdict and the why that the package at 52a8965
-    gives on four pages, as in the check above, run from git in a subprocess; a checkout without 52a8965 fails
+    """Every real text, order, repeat and table_cell test gets the verdict and the why that the package at 39dc6db
+    gives on four pages, as in the check above, run from git in a subprocess; a checkout without 39dc6db fails
     rather than skips. [M158]
     Why it matters for a score: as for M158, over the dataset's own tests."""
     from metamorphic.common import CELL, ORDER, REPEAT, TEXT

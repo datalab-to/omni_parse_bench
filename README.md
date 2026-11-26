@@ -119,7 +119,7 @@ A test is a yes/no question about one page. Each test type belongs to one of fou
 | `order` | text A comes before text B | text |
 | `repeat` | this line appears exactly N times | text |
 | `page_near_empty` | a blank page yields at most N non-space characters | text |
-| `region` | the text between two anchors is exactly this, and nothing else | text |
+| `verbatim` | the text between two anchors is this, verbatim within the test's edit budget, and nothing else | text |
 | `table_cell` | this cell sits under these headings and beside these neighbors | tables |
 | `layout_kind` | the block holding this line is a heading, text or table | layout |
 | `format` | this span of text is bold, italic, underlined, struck through, superscript or subscript, and the words around it are not (reported beside the headline) | format |

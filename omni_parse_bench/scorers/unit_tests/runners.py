@@ -565,7 +565,7 @@ def page_near_empty(t: PageNearEmpty, v: views.Html) -> Mark:
 # --------------------------------------------------------------------------- closed regions
 
 
-class Region(NamedTuple):
+class Verbatim(NamedTuple):
     start: str | None       # the text the region follows, matched exactly; None: the page start
     end: str | None         # the text that ends it, matched exactly; None: the page end
     content: str | None     # everything the page prints between them; None: nothing
@@ -575,7 +575,7 @@ class Region(NamedTuple):
 # Note: where fold joins a hyphen a line broke after ("self-" then "aware"), a region writes this mark
 # instead, so that the hyphen can be read either way: kept ("self-aware") or joined ("selfaware"), never as a
 # space. A page's own NUL is read as U+FFFD, as an HTML parser reads it, and the loader refuses one in a
-# region's text, so the mark is only ever a joined hyphen.
+# verbatim test's text, so the mark is only ever a joined hyphen.
 _WRAP = "\x00"
 # A hyphen after a letter in a folded anchor: where a line breaks after it, fold joins the word
 # ("Self-<br>aware" reads "selfaware"), so an exact anchor holding one is not found on a faithful page. The
@@ -587,23 +587,25 @@ _WRAPS = re.compile(r"[^\W\d_]-")
 # An underscore that touches a letter or a digit ("foo_bar", "_token", "__init__") is text.
 _UNCOMPARED = re.compile(r"(?<!\w)_+(?!\w)|[•‣◦▪▶∙●](?=\s|$)")
 # A number as a region compares it: its sign, its digits and the separators between them (a leading decimal
-# point too, ".5"), and a percent sign. The sign is read wherever it stands before the digits, after a space,
-# a letter or a symbol: an exponent's ("1e-3" reads 1 and -3) and a code's ("Δ-12", "COVID-19"). Only a sign
-# right after a digit is not one: it joins two numbers, a range or a date ("10-12", "12-05-2021").
-_REGION_NUMBER = re.compile(r"(?:(?<!\d)[-+±])?(?:[.,](?=\d))?\d+(?:[.,]\d+)*%?")
+# point too, ".5"), an exponent ("1e-3", "2.5e+4" are one number each, so "1e-3" is not "1 -3"), and a percent
+# sign. A "-" or "±" is its sign only after a character that is no letter or digit: after a letter it is a
+# hyphen ("COVID-19", "Δ-12"), after a digit it joins a range or a date ("10-12", "12-05-2021"). A "+" is its
+# sign after anything but a letter, so "10+12" is not "10-12".
+_VERBATIM_NUMBER = re.compile(
+    r"(?:(?<![^\W_])[-±]|(?<![^\W\d_])\+)?(?:[.,](?=\d))?\d+(?:[.,]\d+)*(?:e[-+]?\d+)?%?")
 
 
-def region(t: Region, v: views.Html) -> Mark:
+def verbatim(t: Verbatim, v: views.Html) -> Mark:
     """The text between `start` and `end` is `content` as a whole, within `max_diffs` edits, for every copy
     of `start` on the page: a closed world, so anything written there that the page does not print fails.
-    See docs/scoring/region.md.
+    See docs/scoring/verbatim.md.
 
     The page is the text view without image descriptions, nothing for an element that holds nothing (as
-    `page_near_empty`), folded as a region reads it (`_region_fold`), in the html's order: a table is read
+    `page_near_empty`), folded as a region reads it (`_verbatim_fold`), in the html's order: a table is read
     cell by cell, row by row, and a region runs on across it. An anchor is a copy of its text at a word edge,
     under fold (`_anchors`). Each copy of `start` opens a region that runs to the first copy of `end` after it
     (or to the page end); without a `start`, one region opens at the page start."""
-    page = _region_fold(views.text(_NOTHING.sub("", v.html), alt=False).replace(_WRAP, "\ufffd"))
+    page = _verbatim_fold(views.text(_NOTHING.sub("", v.html), alt=False).replace(_WRAP, "\ufffd"))
     if t.start is None:
         opens = [0]
     elif not (opens := [j for _, j in _anchors(t.start, page, t.end)]):
@@ -623,13 +625,13 @@ def region(t: Region, v: views.Html) -> Mark:
     return False, reasons[0] + (f" (and {len(reasons) - 1} more)" if len(reasons) > 1 else "")
 
 
-def region_anchor_copies(page_text: str, anchor: str) -> int:
+def verbatim_anchor_copies(page_text: str, anchor: str) -> int:
     """How many copies of `anchor` the scorer finds in `page_text` (a page's full text, as a gold author holds
-    it): a `region` anchor must have exactly one. See docs/scoring/region.md, Building a region test."""
-    return len(_anchors(anchor, _region_fold(page_text)))
+    it): a `verbatim` anchor must have exactly one. See docs/scoring/verbatim.md, Building a verbatim test."""
+    return len(_anchors(anchor, _verbatim_fold(page_text)))
 
 
-def _region_fold(s: str) -> str:
+def _verbatim_fold(s: str) -> str:
     """`normalize.fold`, with two things kept that it would lose: `_WRAP` where it joins a hyphen a line broke
     after, and a run of underscores that touches a letter or a digit on either side ("foo___bar", "token____",
     "____init"), which it would fold as a leader."""
@@ -642,27 +644,27 @@ def _anchors(text: str, page: str, inside: str | None = None) -> list[tuple[int,
     a line broke after is joined as fold joins it: one equivalence, with no retry without spaces. A copy
     inside a copy of the longer text `inside` (the start `Table 3` inside the end `Table 3 (continued)`) is
     that text's, not a copy."""
-    want = _region_fold(text).replace(_WRAP, "")
+    want = _verbatim_fold(text).replace(_WRAP, "")
     kept = [k for k, c in enumerate(page) if c != _WRAP]
     flat = page.replace(_WRAP, "")
     spans = [(kept[i], kept[j - 1] + 1) for i, j in _copies(want, flat, False)]
-    if inside and len(_region_fold(inside).replace(_WRAP, "")) > len(want):
+    if inside and len(_verbatim_fold(inside).replace(_WRAP, "")) > len(want):
         outer = _anchors(inside, page)
         spans = [(i, j) for i, j in spans if not any(a <= i and j <= b for a, b in outer)]
     return spans
 
 
-def _closed(got: str, t: Region) -> str:
+def _closed(got: str, t: Verbatim) -> str:
     """Why the folded region `got` is not the test's content within its edits; "" when it is. Both are read
     without the underscores and bullets a region does not compare (`_UNCOMPARED`), their white space one
     space, and compared as whole strings: an edit is a character substituted, inserted or deleted, or two
     adjacent ones swapped, and a `_WRAP` is free to drop or to read as a hyphen. Their numbers
-    (`_REGION_NUMBER`: sign, digits, separators, an exponent's sign) must be equal, in order, at any
-    budget."""
+    (`_VERBATIM_NUMBER`: sign, digits, separators, exponent) must be equal, in order, at any budget."""
     a, b = (re.sub(r" +", " ", _UNCOMPARED.sub("", x)).strip()
-            for x in (_region_fold(t.content or ""), got))
-    numbers = (_REGION_NUMBER.findall(a.replace(_WRAP, "")) == _REGION_NUMBER.findall(b.replace(_WRAP, "")))
-    edits = _region_edits(a, b, t.max_diffs)
+            for x in (_verbatim_fold(t.content or ""), got))
+    numbers = (_VERBATIM_NUMBER.findall(a.replace(_WRAP, ""))
+               == _VERBATIM_NUMBER.findall(b.replace(_WRAP, "")))
+    edits = _verbatim_edits(a, b, t.max_diffs)
     if numbers and edits <= t.max_diffs:
         return ""
     where = (f"between {t.start[:40]!r} and {t.end[:40]!r}" if t.start is not None and t.end is not None
@@ -674,7 +676,7 @@ def _closed(got: str, t: Region) -> str:
     return f"{where} holds {shown} where the gold has {gold} ({how})"
 
 
-def _region_edits(a: str, b: str, k: int) -> int:
+def _verbatim_edits(a: str, b: str, k: int) -> int:
     """The edits between `a` and `b` (as `_closed` counts them), or more than `k` when there are more."""
     if _WRAP not in a and _WRAP not in b:
         return OSA.distance(a, b)
@@ -893,7 +895,7 @@ TYPES: dict[str, tuple[type, Runner]] = {
     "order": (Order, order),
     "repeat": (Repeat, repeat),
     "page_near_empty": (PageNearEmpty, page_near_empty),
-    "region": (Region, region),
+    "verbatim": (Verbatim, verbatim),
     "table_cell": (TableCell, table_cell),
     "layout_kind": (LayoutKind, layout_kind),
     "format": (Format, format_mark),

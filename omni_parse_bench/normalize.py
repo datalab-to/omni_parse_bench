@@ -194,7 +194,7 @@ def fold_cased(s: str) -> str:
 def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool = False,
            drop_footnotes: bool = False, line_mark: str = "", keep_word_underscores: bool = False) -> str:
     """The fold before lowercasing, for inspecting a continuation's original case. `line_mark` is written
-    where a line-end hyphen is joined (a `region` reads it either way); `keep_word_underscores` keeps a run
+    where a line-end hyphen is joined (a `verbatim` reads it either way); `keep_word_underscores` keeps a run
     of underscores between two letters or digits (`foo___bar`) rather than folding it as a leader."""
     # Note: composed first, so a letter written as a base and a combining accent ("e" + U+0301, as a macOS
     # text layer gives it) is one letter to the hyphen rule below, as "é" is.

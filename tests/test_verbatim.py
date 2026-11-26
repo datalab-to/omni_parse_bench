@@ -1,7 +1,7 @@
 # ruff: noqa: E501
-"""`region`: what a gold file may say, and the verdicts it gives on closed stretches of a page: blank fields,
+"""`verbatim`: what a gold file may say, and the verdicts it gives on closed stretches of a page: blank fields,
 the end of a table, captions and whole short pages, written right, padded, filled, duplicated or split
-(docs/scoring/region.md)."""
+(docs/scoring/verbatim.md)."""
 from __future__ import annotations
 
 import pytest
@@ -18,7 +18,7 @@ def text(s: str, md: int = 0) -> dict:
 
 
 def gold_of(args: dict, settings: dict | None = None) -> tuple[gold.Test, ...]:
-    return gold.parse("p", {"tests": [{"id": "a", "test_type": "region", "output_type": "html",
+    return gold.parse("p", {"tests": [{"id": "a", "test_type": "verbatim", "output_type": "html",
                                        "derivation": "authored", "tags": [], "args": args,
                                        "settings": settings or {}}]})
 
@@ -46,11 +46,11 @@ def form(value: str) -> str:
 def test_the_loader_takes_any_mix_of_the_three_roles(args):
     [t] = gold_of(args)
     p = t.params
-    assert isinstance(p, R.Region)
+    assert isinstance(p, R.Verbatim)
     assert (p.start, p.end) == tuple(args[r]["text"] if r in args else None for r in ("start", "end"))
     assert (p.content, p.max_diffs) == ((args["content"]["text"], args["content"]["max_diffs"])
                                         if "content" in args else (None, 0))
-    assert gold.arg_kinds("region", args) == (("text",) if args else ())
+    assert gold.arg_kinds("verbatim", args) == (("text",) if args else ())
 
 
 @pytest.mark.parametrize("args, settings, why", [
@@ -258,10 +258,10 @@ def test_a_long_page_is_graded_quickly():
 def test_an_anchor_is_counted_as_the_scorer_finds_it():
     page = "Date of birth: 1985\nMother's Date of birth: 1960\nBirthdate of birth: x\nDate of birth:s"
     # Note: inside "Birthdate" is not at a word edge; after "birth:" a word edge is the colon itself
-    assert R.region_anchor_copies(page, DOB) == 3
-    assert R.region_anchor_copies("Report 2024 | p. 3\nThe report", "Report") == 2
-    assert R.region_anchor_copies("Place of birth: Paris", POB) == 1
-    assert R.region_anchor_copies("PlaceOfBirth: Paris", POB) == 0
+    assert R.verbatim_anchor_copies(page, DOB) == 3
+    assert R.verbatim_anchor_copies("Report 2024 | p. 3\nThe report", "Report") == 2
+    assert R.verbatim_anchor_copies("Place of birth: Paris", POB) == 1
+    assert R.verbatim_anchor_copies("PlaceOfBirth: Paris", POB) == 0
 
 
 def test_white_space_inside_an_anchor_or_the_region_is_one_space():
@@ -272,6 +272,17 @@ def test_white_space_inside_an_anchor_or_the_region_is_one_space():
 def test_a_list_bullet_inside_a_line_is_not_compared():
     assert verdict("<p>Items: • Rent ‣ Fuel</p>", None, None, "Items: Rent Fuel")[0]
     assert not verdict("<p>Items: * Rent - Fuel</p>", None, None, "Items: Rent Fuel")[0]
+    # Note: a bullet glued to its word is text, and costs an edit
+    assert not verdict("<p>Items: •Rent</p>", None, None, "Items: Rent")[0]
+    assert verdict("<p>Items: •Rent</p>", None, None, "Items: Rent", md=1)[0]
+
+
+def test_a_swap_costs_one_edit_beside_a_line_hyphen_too():
+    # Note: two paths count edits, one for text with a hyphen a line broke and one without; both count a swap
+    # of two adjacent characters as one edit
+    for page in ("<p>Teh self-aware unit</p>", "<p>Teh self-<br>aware unit</p>"):
+        assert verdict(page, None, None, "The self-aware unit", md=1)[0], page
+        assert not verdict(page, None, None, "The self-aware unit")[0], page
 
 
 @pytest.mark.parametrize("got, want", [
@@ -296,8 +307,8 @@ def test_an_anchor_is_found_under_fold_and_only_there():
     page = "<p>Date of self-<br>aware birth: </p><p>Place of birth:</p>"
     assert verdict(page, "Date of selfaware birth:", POB)[0]
     assert not verdict(page, "Date of self aware birth:", POB)[0]
-    assert R.region_anchor_copies("A self-\naware x", "selfaware") == 1
-    assert R.region_anchor_copies("A self-\naware x", "self-aware") == 0
+    assert R.verbatim_anchor_copies("A self-\naware x", "selfaware") == 1
+    assert R.verbatim_anchor_copies("A self-\naware x", "self-aware") == 0
 
 
 @pytest.mark.parametrize("anchor", ["Self-aware systems", "Date of self-aware birth:", "Self-", "SELF‐AWARE"])
@@ -309,9 +320,9 @@ def test_an_anchor_with_a_hyphen_after_a_letter_is_refused(anchor, role):
 
 def test_why_a_hyphen_after_a_letter_cannot_be_an_anchor():
     # Note: the loader refuses it, since a faithful page that breaks the line at the hyphen does not hold it
-    t = R.Region("Self-aware systems", None, "Learn.", 0)
-    assert R.region(t, views.html("<h1>Self-aware systems</h1><p>Learn.</p>"))[0]
-    assert not R.region(t, views.html("<h1>Self-<br>aware systems</h1><p>Learn.</p>"))[0]
+    t = R.Verbatim("Self-aware systems", None, "Learn.", 0)
+    assert R.verbatim(t, views.html("<h1>Self-aware systems</h1><p>Learn.</p>"))[0]
+    assert not R.verbatim(t, views.html("<h1>Self-<br>aware systems</h1><p>Learn.</p>"))[0]
 
 
 @pytest.mark.parametrize("anchor", ["3-D model", "pages 10-12", "COVID 19", "Name -"])
@@ -320,19 +331,27 @@ def test_a_hyphen_after_no_letter_may_be_in_an_anchor(anchor):
     assert t.params.start == anchor
 
 
-@pytest.mark.parametrize("got, want, md", [
-    ("Concentration 1e+3 M", "Concentration 1e-3 M", 1), ("Concentration 1e3 M", "Concentration 1e-3 M", 1),
-    ("Δ+12", "Δ-12", 1), ("Δ12", "Δ-12", 1), ("COVID 19", "COVID-19", 2), ("x+5", "x-5", 1),
+@pytest.mark.parametrize("got, want", [
+    ("Concentration 1e+3 M", "Concentration 1e-3 M"), ("Concentration 1e3 M", "Concentration 1e-3 M"),
+    ("Concentration 1 -3 M", "Concentration 1e-3 M"), ("Rate 1 3", "Rate 1e3"), ("Rate 2.5e4", "Rate 2.5e+4"),
+    ("Readings 10+12", "Readings 10-12"), ("Net +5", "Net -5"), ("Net 5", "Net -5"), ("x -5", "x +5"),
 ])
-def test_a_sign_after_a_letter_or_a_symbol_is_part_of_the_number(got, want, md):
-    ok, why = verdict(f"<p>{got}</p>", None, None, want, md)
+def test_a_number_with_its_sign_and_exponent_is_exact_at_any_budget(got, want):
+    ok, why = verdict(f"<p>{got}</p>", None, None, want, 1)
     assert not ok and why.endswith("(a number differs)"), why
-    assert verdict(f"<p>{want}</p>", None, None, want, md)[0]
+    assert verdict(f"<p>{want}</p>", None, None, want, 1)[0]
 
 
-@pytest.mark.parametrize("got, want", [("pages 10–12", "pages 10-12"), ("12/05/2021", "12-05-2021")])
-def test_a_sign_after_a_digit_joins_two_numbers(got, want):
-    assert verdict(f"<p>{got}</p>", None, None, want, 2)[0]
+@pytest.mark.parametrize("got, want", [("Strain COVID 19", "Strain COVID-19"), ("Δ+12", "Δ-12"), ("A+12", "A-12")])
+def test_a_hyphen_after_a_letter_is_no_sign(got, want):
+    # Note: as the number guard of `present` reads it: "COVID-19" holds a hyphen, so a space costs one edit
+    assert verdict(f"<p>{got}</p>", None, None, want, 1)[0]
+    assert not verdict(f"<p>{got}</p>", None, None, want, 0)[0]
+
+
+@pytest.mark.parametrize("got, want, md", [("pages 10–12", "pages 10-12", 0), ("12/05/2021", "12-05-2021", 2)])
+def test_a_hyphen_after_a_digit_joins_two_numbers(got, want, md):
+    assert verdict(f"<p>{got}</p>", None, None, want, md)[0]
 
 
 @pytest.mark.parametrize("got, want", [("token", "token____"), ("token____", "token"), ("set token now", "set token____ now"), ("token", "____token"),
