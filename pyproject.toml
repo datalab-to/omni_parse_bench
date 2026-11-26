@@ -52,6 +52,11 @@ pdf-inspector = [
     "pdf-inspector==1.27.1",
     "img2pdf==0.6.3",
 ]
+# The local LiteParse adapter (Apache-2.0); its Tesseract engine is built into the package.
+liteparse = [
+    "omni-parse-bench[harness]",
+    "liteparse==2.21.1",
+]
 dev = [
     "omni-parse-bench[benchmark]",
     "hypothesis>=6.100",

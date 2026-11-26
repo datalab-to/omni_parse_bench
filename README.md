@@ -44,10 +44,13 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | Unlimited-OCR | open | 3.3B | 79.5 | — | 70.7 | 76.6 | 91.1 | — |
 | Infinity-Parser2-Flash | open | 2.2B | 78.7 | — | 78.8 | 66.8 | 90.4 | — |
 | DeepSeek-OCR-2 | open | 3.4B | 75.4 | — | 64.6 | 70.2 | 91.4 | — |
+| LiteParse (ocria-nano) | open | n/a | 74.8 | — | 59.4 | 74.1 | 90.9 | — |
 | Indra OCR (Datalab) | open | about 12M | 71.4 | — | 62.5 | 59.6 | 92.0 | — |
 | HunyuanOCR-1.5 | open | 1.0B | 68.8 | — | 62.3 | 62.6 | 81.4 | — |
 | PyMuPDF4LLM (OCR) | open | n/a | 51.5 | — | 26.5 | 42.1 | 86.0 | — |
+| LiteParse (Tesseract) | open | n/a | 42.3 | — | 43.6 | 14.5 | 68.8 | — |
 | PyMuPDF4LLM | open | n/a | 41.2 | — | 17.7 | 42.0 | 64.0 | — |
+| LiteParse | open | n/a | 35.0 | — | 37.9 | 14.3 | 52.8 | — |
 | OpenDataLoader | open | n/a | 23.6 | — | 17.9 | 5.4 | 47.4 | — |
 | OvisOCR2 | open | 0.85B | none | — | 74.2 | 79.9 | unsupported | — |
 | Xiaomi-OCR-0 | open | 0.87B | none | — | 73.7 | 90.6 | unsupported | — |
@@ -63,7 +66,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 
 Scores use omni-parse-bench 1.7.0: saved predictions are regraded with it, and locally run open tools are fresh full runs (see the next paragraph); rows marked § keep their published 1.5.0 grades.
 
-Rows for open tools run locally (pdftotext, pdftext, MarkItDown, pdf-inspector, PyMuPDF4LLM and OpenDataLoader) are full runs graded with released omni-parse-bench 1.7.0, failed pages counted; settings and failures per tool are in [docs/providers.md](docs/providers.md).
+Rows for open tools run locally (pdftotext, pdftext, MarkItDown, pdf-inspector, PyMuPDF4LLM, OpenDataLoader and LiteParse) are full runs graded with released omni-parse-bench 1.7.0, failed pages counted; settings and failures per tool are in [docs/providers.md](docs/providers.md).
 
 \* Used in creating and verifying at least some tests.
 
@@ -422,10 +425,13 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | Unlimited-OCR | 31.3 | 89.3 | 75.3 | 69.1 | 68.8 | 59.3 | 15.6 | 50.4 | 36.8 |
 | Infinity-Parser2-Flash | 63.6 | 93.5 | 67.5 | 75.6 | 77.5 | 73.7 | 33.6 | 71.8 | 41.0 |
 | DeepSeek-OCR-2 | 28.5 | 82.0 | 68.9 | 59.6 | 64.3 | 50.6 | 9.6 | 37.0 | 43.0 |
+| LiteParse (ocria-nano) | 8.5 | 55.4 | 74.7 | 63.9 | 61.4 | 72.9 | 55.8 | 30.2 | 52.9 |
 | Indra OCR (Datalab) | 25.2 | 55.2 | 60.9 | 60.4 | 61.9 | 73.2 | 49.3 | 28.6 | 67.8 |
 | HunyuanOCR-1.5 | 40.2 | 67.4 | 63.3 | 58.1 | 65.1 | 53.7 | 45.3 | 50.5 | 42.6 |
 | PyMuPDF4LLM (OCR) | 3.2 | 5.8 | 43.9 | 40.0 | 36.6 | 53.8 | 8.7 | 9.1 | 24.3 |
+| LiteParse (Tesseract) | 2.0 | 54.0 | 18.9 | 35.2 | 32.2 | 47.1 | 15.6 | 5.9 | 31.5 |
 | PyMuPDF4LLM | 0.1 | 5.7 | 41.9 | 19.2 | 30.0 | 34.3 | 8.7 | 0.5 | 22.0 |
+| LiteParse | 0.0 | 54.4 | 17.7 | 19.6 | 27.3 | 34.3 | 15.9 | 0.7 | 30.3 |
 | OpenDataLoader | 0.1 | 4.4 | 10.1 | 21.4 | 19.5 | 34.6 | 7.6 | 0.9 | 22.2 |
 | OvisOCR2 | 36.6 | 94.0 | 79.9 | 78.9 | 72.5 | 58.2 | 49.9 | 52.5 | 31.0 |
 | Xiaomi-OCR-0 | 47.9 | 95.3 | 89.0 | 65.4 | 79.2 | 68.5 | 76.0 | 56.2 | 31.1 |

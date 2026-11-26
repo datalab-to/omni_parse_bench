@@ -216,6 +216,29 @@ ending in `+` continues the block before it and is read without the `+`):
 | table | table |
 | image, figure, chart, header_image, footer_image | figure |
 
+LiteParse (the `kind` of a block in its `extract_blocks` output, as its package lists them). Its text-layer
+and Tesseract rows have no class for page furniture (a running header, footer or page number is kept, as an
+ordinary paragraph); the ocria-nano row's LayoutNet names `page_header` and `page_footer`. It has no class for
+caption, footnote, equation or form, so it never gives those labels and its tests of those kinds fail. A kind
+that is not in the table, including one the package may add, fails the page's blocks with its name.
+
+| LiteParse kind | label |
+| --- | --- |
+| paragraph | text |
+| grid_fallback | text |
+| heading | heading |
+| list_item | list |
+| code | code |
+| table | table |
+| merged_table (ocria-nano) | table |
+| figure | figure |
+| page_header, page_footer (ocria-nano) | page_furniture |
+
+`grid_fallback` is the package's name for text laid out on a grid that it did not read as a table, kept as
+verbatim lines; it makes no claim of a table, so text is the only label it can honestly take. `rule`, a ruled
+line with no text, is not a block; nor is a block with no box (its text is still in the html). `merged_table` is
+a table with merged cells, with its `rows` of cells like a `table`.
+
 ## The vendors
 
 Each system's environment variables are in the last column, and `opb systems NAME` prints them. A key
@@ -238,6 +261,7 @@ that is missing stops a run before any call and says which `export` to type.
 | `pdf-inspector` | the local pdf-inspector package: its text mode, or with `ocr` its PP-OCRv6 Small mode | html | kept: it filters page numbers only | none |
 | `pymupdf4llm` (+ `-ocr`) | the local `pymupdf4llm` 2.1 package (AGPL-3.0), text layer plus a layout model | html, blocks | kept (`header=True, footer=True`) | none |
 | `opendataloader` | OpenDataLoader PDF 2.5.24, local Java engine (Apache-2.0) | html, blocks | kept (`include_header_footer`) | none |
+| `liteparse` | the local LiteParse package: its text-layer mode, or with `ocr` its Tesseract mode or (`ocr_backend=ocria-nano`) its ocria-nano mode | html, blocks | kept (`keep_headers_footers`) | none |
 
 A vendor's tiers are runs of their own, one config each (or one config and `--set`), with the same pages:
 
@@ -295,8 +319,7 @@ Per vendor:
   (`--psm 0`) and reads it with that script's model, English when it detects none it has a model
   for, so it is told nothing about the page. Its text is written as html inside `<pre>`, escaped,
   and it gives no layout blocks. It is free, so its cost is recorded as `usd` 0.0. A tesseract that
-  exits with an error fails the page as a `SystemFailed` with its stderr. Needs `brew install tesseract tesseract-lang` (or the
-  distribution's tesseract and its script models); and
+  exits with an error fails the page as a `SystemFailed` with its stderr. Needs `brew install tesseract tesseract-lang` (or the distribution's tesseract and its script models).
 - pdftotext: the text-layer floor, poppler's `pdftotext page.pdf -` run locally at no cost, at its
   documented default (reading order, no `-layout`). It reads the PDF's text layer and does no OCR, so
   an image page, which has none, is an empty page with no call, and so is a scanned PDF page without
@@ -393,6 +416,35 @@ Per vendor:
   `SystemTimeout` and kills the JVM child too. Needs `pip install 'omni-parse-bench[opendataloader]'` and
   Java 11 or later.
   Full public run: 2,937/2,937 pages; 0 failures; no OCR (8 first-pass timeouts succeeded on retry).
+- liteparse: LiteParse 2.21.1 (run-llama/liteparse, Apache-2.0; no model weights), run locally on the CPU, as
+  three rows. `liteparse` ("LiteParse") reads the PDF's text layer alone (`ocr_enabled=False`), so a page with
+  no text layer is empty. `liteparse-tesseract` ("LiteParse (Tesseract)", `ocr: true`) is the package's OCR
+  on, with its Tesseract engine (`ocr_backend="tesseract"`) reading what the text layer lacks, in English (the
+  package's default language); the engine is built into the
+  package (no `tesseract` binary is needed). `liteparse-ocria-nano` ("LiteParse (ocria-nano)", `ocr: true`,
+  `ocr_backend: ocria-nano`) is LiteParse's own OCR and table model package (README, "OCR with ocria-nano": a
+  line detector, a script router, four recognizers and LayoutNet, a learned table and layout model; CPU),
+  enabled by `from liteparse import models; models.pull("ocria-nano")` once and then
+  `ocr_backend="ocria-nano"` (its default once pulled). Its documented defaults are kept: pages render at 250
+  dpi and `ocr_language` is ignored. The adapter never pulls the models: a machine without them fails before
+  any page. Its weights are not Apache-2.0: they are under the OCRia-nano-1 Model License (LlamaIndex; Open
+  RAIL-M as modified), installed with them as `LICENSE`. It lists "evaluating or benchmarking the Model, by
+  any person or organization, including publishing the results" among its Research Purposes, and bars other
+  use by an entity with more than $2M of revenue or funding, or in a Competing Service. The weights are not
+  redistributed here and the run's outputs train no model; anyone running the row must accept that license
+  for their own use. Settings beyond the package's defaults:
+  `output_format="markdown"` and `extract_blocks=True` (the outputs; README "Markdown Output"),
+  `keep_headers_footers=True` (a documented option in the README's configuration list; the default strips
+  repeated page-band lines and page chrome, and a run's html keeps them), and `ocr_backend` always named (the
+  README's default is ocria-nano once pulled, so `"tesseract"` in the first two rows keeps them the same on a
+  machine that has pulled it).
+  Infrastructure only: parses run in the package's worker pool (`pool_size` the CPU count,
+  `parse_timeout=900`, `num_workers=1`; README "Worker Pool and Hard Timeouts"), closed at exit. html is the
+  Markdown through `markdown.to_html`; blocks are its layout blocks, labeled by the table above. Free
+  (`usd` 0.0). Needs `pip install 'omni-parse-bench[liteparse]'`, and for the third row the pulled models.
+  Full public run: LiteParse 2,937/2,937 pages; 0 failures; no OCR.
+  Full public run: LiteParse (Tesseract) 2,937/2,937 pages; 0 failures; Tesseract (English) OCR.
+  Full public run: LiteParse (ocria-nano) 2,937/2,937 pages; 0 failures; OCRia-nano OCR and table/layout models (8 first-pass timeouts succeeded on retry).
 
 ## Serving an open model
 
