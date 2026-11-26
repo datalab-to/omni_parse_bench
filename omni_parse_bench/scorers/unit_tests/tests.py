@@ -19,6 +19,8 @@ from . import runners
 FIELDS = ("id", "test_type", "output_type", "derivation", "tags", "args", "settings")
 KINDS = {"text": ("text", "max_diffs"), "number": ("number",), "latex": ("latex",)}
 OPTIONAL = {"text": ("place", "exact_case")}     # fields an arg of that kind may have
+SIDES = ("up", "down", "left", "right")    # the roles that also take {"empty": true} or {"end": true}
+FLAGS = ("empty", "end")
 RELATIONS = ("up", "down", "left", "right", "top_heading", "left_heading", "right_heading")
 # The roles of each test type's args, the content it compares. Not `vocab.ROLES`, which are tags.
 ARG_ROLES = {
@@ -180,6 +182,11 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
                 if "text" in a and a["exact_case"] and not (test_type == "present" and r == "content"):
                     raise ValueError(f"{where}: exact_case: true is supported on a present test's text "
                                      f"content only for now, not on {test_type}'s {r}")
+            if _flag(a):
+                if not (test_type == "table_cell" and r in SIDES):
+                    raise ValueError(f"{where}: {r}={a!r:.80}: {{empty: true}} and {{end: true}} are args of "
+                                     f"table_cell's {list(SIDES)} only")
+                continue
             match _kind(where, r, a):
                 case "text": _diffs(where, r, a)
                 case "latex": _renders(where, r, a)
@@ -242,12 +249,15 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
                 _no(where, settings)
                 for r in args:
                     for a in args[r] if r in LISTS else [args[r]]:
-                        if "text" not in a: raise ValueError(f"{where}: table_cell's {r} compares text only")
+                        if "text" not in a and not _flag(a):
+                            raise ValueError(f"{where}: table_cell's {r} compares text only")
+                shapes = {r: f for r in SIDES if r in args and (f := _flag(args[r]))}
                 return runners.TableCell(
-                    text("cell"), {r: text(r) for r in RELATIONS if r in args}, diffs(list(args)),
+                    text("cell"), {r: text(r) for r in RELATIONS if r in args and r not in shapes},
+                    diffs([r for r in args if r not in shapes]),
                     tuple(_frozen([a["text"] for a in args.get("headings", [])])),
                     text("section") if "section" in args else None,
-                    tuple(_frozen([a["text"] for a in args.get("row_groups", [])])))
+                    tuple(_frozen([a["text"] for a in args.get("row_groups", [])])), shapes)
             case _:
                 raise AssertionError(test_type)
     except TypeError as e:
@@ -289,6 +299,14 @@ def _arg(where: str, role: str, a: Any) -> runners.Arg:
             return runners.Text(a["text"], a["max_diffs"], _place(where, role, a.get("place", [])), exact)
         case "number": return runners.Number(a["number"])
         case _: return runners.Latex(a["latex"])
+
+
+def _flag(a: Any) -> str | None:
+    """`empty` or `end` when `a` is exactly `{"empty": true}` or `{"end": true}`, else None. A dict that
+    uses the name any other way (false, extra fields) is no flag, and `_kind` refuses it."""
+    if isinstance(a, dict) and len(a) == 1 and (k := next(iter(a))) in FLAGS and a[k] is True:
+        return k
+    return None
 
 
 def _kind(where: str, role: str, a: Any) -> str:

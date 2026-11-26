@@ -116,6 +116,7 @@ def test_the_certificate_counts_the_real_tests_it_says():
         f"OPB_DATASET is not revision {DATASET_REVISION[:7]} of the dataset: its manifest differs"
     from metamorphic.test_fold_and_case import EXACT, TESTS
     from metamorphic.test_equivalences import LATEX
+    from metamorphic.test_tables_and_layout import SIDED
     from metamorphic.test_text_matching import DIGIT_EDGED, FUZZY_NUMBERED, NUMBERED, VULGAR
     sizes = {"number": len(NUMBER), "order": len(ORDER), "exact text": len(EXACT),
              "digit-edged text": len(DIGIT_EDGED["present"]),
@@ -124,6 +125,7 @@ def test_the_certificate_counts_the_real_tests_it_says():
              "text strings": sum(len(text_strings(t.params)) for t in TESTS),
              "text tests": len([*TEXT, *ORDER, *REPEAT, *CELL]), "latex tests": len(LATEX),
              "fuzzy numbered text": len(FUZZY_NUMBERED), "numbered text": len(NUMBERED),
+             "table sides": len(SIDED), "table tests": len(CELL),
              "fraction text": sum(any(VULGAR.search(x) for x in text_strings(t.params))
                                   for t in TEXT + ORDER + REPEAT + CELL)}
     assert sizes == {k: n for k, (_, n) in REAL.items()}, "update REAL in common.py, then " + COMMAND

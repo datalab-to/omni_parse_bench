@@ -135,11 +135,13 @@ def near_empty(label, mark, rule, max_chars, out, **kw) -> Case:
 def cell(label, mark, rule, gold, out, md=0, headings=(), section=None, row_groups=(), **rel) -> Case:
     """`table_cell`; `out` is html, or a fixture name (`cell_fixture`) with optional replacements."""
     kw = {k: rel.pop(k) for k in ("show", "why") if k in rel}
+    shapes = {k: next(iter(rel.pop(k))) for k in [k for k, v in rel.items() if isinstance(v, dict)]}
     shown = [_md(gold, md)] + [f"{k} {code(v)}" for k, v in rel.items()]
+    shown += [f"{k} {code(v)}" for k, v in shapes.items()]
     shown += [f"headings {' > '.join(code(h) for h in headings)}"] if headings else []
     shown += [f"section {code(section)}"] if section else []
     shown += [f"row groups {' > '.join(code(g) for g in row_groups)}"] if row_groups else []
-    t = R.TableCell(gold, rel, md, tuple(headings), section, tuple(row_groups))
+    t = R.TableCell(gold, rel, md, tuple(headings), section, tuple(row_groups), shapes)
     return verdict(label, mark, rule, ", ".join(shown), out,
                    lambda: _v(R.table_cell(t, views.html(out))), **kw)
 

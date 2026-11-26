@@ -457,6 +457,32 @@ cell-section-wrong	fail	cells matching '6' found, but: not in the section 'Cohor
 cell-row-group-wrong	fail	cells matching '6' found, but: not in the row groups 'Female'
 cell-no-table	fail	no tables found
 cell-compound	pass
+## cell-empty-end
+cell-empty-blank	pass
+cell-empty-space	pass
+cell-empty-nbsp	pass
+cell-empty-br	pass
+cell-empty-dropped	pass
+cell-empty-copy	fail	cells matching '100' found, but: right '100' isn't empty; no right cell
+cell-empty-invented	fail	cells matching '100' found, but: right '200' isn't empty
+cell-empty-shifted	fail	cells matching '100' found, but: no right cell
+cell-empty-image	fail	cells matching '100' found, but: right 'an image' isn't empty
+cell-end-image	fail	cells matching '70' found, but: down: row 4 holds 'an image'
+cell-empty-left	pass
+cell-empty-left-copy	fail	cells matching '100' found, but: left 'rent' isn't empty; left '100' isn't empty
+cell-empty-colspan	fail	cells matching '100' found, but: no right cell
+cell-empty-edge	fail	cells matching '80' found, but: no right cell
+cell-empty-header	fail	cells matching 'Group' found, but: no right cell
+cell-empty-header-flat	pass
+cell-end-down	pass
+cell-end-empty-row	pass
+cell-end-invented-row	fail	cells matching '70' found, but: down: row 4 holds 'tax', '9', '8'
+cell-end-invented-row-far	fail	cells matching '70' found, but: down: row 5 holds '9'
+cell-end-right	pass
+cell-end-invented-column	fail	cells matching '80' found, but: right: column 4 holds 'x'
+cell-end-empty-column	pass
+cell-end-up	fail	cells matching 'Item' found, but: up: row 1 holds 'report'
+cell-end-anchor	fail	cells matching 'Rent' found, but: down: row 3 holds 'fuel', '70', '80'
 ## layout-rules
 lay-match	pass
 lay-list-is-text	pass
