@@ -93,6 +93,36 @@ def test_every_open_weight_fixture_names_a_known_provider():
         harness.system(fx["provider"], fx["options"])
 
 
+def test_indra_ocr_120_tracks_the_package_defaults_and_model_revision():
+    from omni_parse_bench.harness.providers import indra_ocr
+
+    config = indra_ocr.IndraOcr()
+    request = config.requests(config.SUPPORTS)[0]
+    assert indra_ocr.PACKAGE == "indra-ocr==1.2.0"
+    assert config.served == {"weights": "datalab-to/indra-ocr", "revision": "v1.2.0"}
+    assert request.sent["package"] == indra_ocr.PACKAGE
+    assert request.sent["settings"]["math"] is True
+    assert set(indra_ocr.LABELS) == {
+        "Text", "Table-Of-Contents", "Section-Header", "Page-Header", "Page-Footer",
+        "List-Group", "Caption", "Footnote", "Table", "Form",
+    }
+
+
+def test_indra_ocr_server_counts_cores_on_linux_and_macos(monkeypatch):
+    import importlib.util
+
+    path = Path(harness.__file__).parent / "providers" / "serve" / "indra-ocr" / "server.py"
+    spec = importlib.util.spec_from_file_location("indra_ocr_server", path)
+    assert spec and spec.loader
+    server = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(server)
+    monkeypatch.setattr(server.os, "sched_getaffinity", lambda _: {0, 1}, raising=False)
+    assert server.usable_cores() == 2
+    monkeypatch.delattr(server.os, "sched_getaffinity", raising=False)
+    monkeypatch.setattr(server.os, "cpu_count", lambda: 4)
+    assert server.usable_cores() == 4
+
+
 def test_a_chandra_picture_description_is_alt_text_not_page_text():
     _, outs, _ = _read(HERE / "chandra_ocr.json", frozenset({"html"}))
     described = "The seal of the National Archives"

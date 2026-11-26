@@ -14,7 +14,7 @@ from ..adapter import Served
 SUPPORTS = frozenset({"html", "blocks"})
 # Note: the package names its models (a tag of datalab-to/indra-ocr), so its version decides them; the
 # server's answer says which it loaded.
-PACKAGE = "indra-ocr==1.1.2"
+PACKAGE = "indra-ocr==1.2.0"
 # Indra OCR's block classes (its order_post.BLOCK_CLASSES, chandra's labels) onto views.LABELS.
 LABELS = {
     "Text": "text", "Table-Of-Contents": "text", "Section-Header": "heading", "Page-Header": "page_furniture",
@@ -26,9 +26,9 @@ LABELS = {
 @dataclasses.dataclass(frozen=True)
 class IndraOcr(Served):
     """Where the Indra OCR server (serve/indra-ocr/) answers, and how its Converter reads a page (the
-    package's defaults, but math read as LaTeX and headers and footers kept).
+    package's defaults, with headers and footers kept).
 
-    Run as the `indra-ocr` package (1.1.2) runs it with its `indra-ocr` command, with the models it names.
+    Run as the `indra-ocr` package (1.2.0) runs it with its `indra-ocr` command, with the models it names.
     Steps 1 to 4 run on the server (serve/indra-ocr/server.py); step 5 runs here, with no vendor code.
 
     How a page is processed:
@@ -40,9 +40,10 @@ class IndraOcr(Served):
       2. Image preprocessing  the package's own: the page turned upright and straightened.
       3. Model inference      ONNX Runtime, one single-threaded worker process per core, as its
                               `convert_many` runs: line detection, the recognizer (another for lines
-                              with Chinese characters), and the reading-order and layout model; with
-                              `math` on, a classifier finds the lines that hold math and a math
-                              recognizer reads them as text with inline LaTeX.
+                              with Chinese characters), and the reading-order and layout model; with `math`
+                              on by default, a classifier finds the lines that hold math and a math
+                              recognizer reads them as text with inline LaTeX. Word boxes are optional in
+                              the package and remain off because this adapter only needs block boxes.
       4. Vendor output parsing  the package's `Page`: its markdown (headings, lists, tables as HTML) and
                               its layout blocks in reading order, each with a label, a box in the pixels
                               of the page turned upright, and its text.
@@ -50,12 +51,8 @@ class IndraOcr(Served):
                               label (LABELS) and box divided by the upright page's size, then turned back
                               onto the page as sent (`layout.unturned`).
 
-    Differences from the vendor:
-
-      - math is read as LaTeX (`math` on, its `--math`; the package's default is off, which reads math as
-        plain text); and
-      - page headers and footers are kept in the markdown (`furniture`; the package leaves them out by
-        default), as every other adapter keeps them.
+    The adapter keeps page headers and footers in the markdown (`furniture`; the package leaves them out
+    by default), as every other adapter keeps them. Math stays on, matching the package's 1.2.0 default.
 
         docker build -t opb-indra-ocr omni_parse_bench/harness/providers/serve/indra-ocr
         docker run -p 8001:8001 opb-indra-ocr
@@ -67,7 +64,7 @@ class IndraOcr(Served):
     base_url: str = "http://127.0.0.1:8001"
     served: dict[str, Any] = dataclasses.field(
         default_factory=lambda: {"weights": "datalab-to/indra-ocr",
-                                 "revision": "v1.1.0"},
+                                 "revision": "v1.2.0"},
         metadata={"help": "the weights its server serves and their revision; by default its package's"})
     mode: str = dataclasses.field(default="auto", metadata={
         "help": "auto reads a PDF's text layer where it passes the checks and OCRs elsewhere; ocr never "

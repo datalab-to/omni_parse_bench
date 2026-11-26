@@ -26,6 +26,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 
 ### Changed
 
+- Indra OCR: update the CPU adapter to `indra-ocr==1.2.0` and model revision `v1.2.0`. Math is enabled by default; the full public run scores 78.8 (text 68.0, tables 75.8, layout 92.6) on 2,937 pages (#129).
 - Equations: marks a reader cannot tell apart in print now compare equal: a transpose superscript (`^\top`, `^T`, `^\intercal`, `^{-T}`), `||` and `\|`, `\llbracket`/`\rrbracket` and doubled brackets, `\bar` and `\overline` (or `\vec` and `\overrightarrow`) over one symbol, short and long arrows, binary and big operators when the big one carries limits, `Σ`/`∑` and `Π`/`∏` with an explicit relation in the lower limit, triangle and subset variants, stretchy angle fences, Unicode mathematical letters, Unicode primes, `ϱ ϰ`, `\iint`/`\iiint`, top-level row breaks, empty scripts and a raw `%`. Each is limited as described in docs/scoring/present-latex.md; script, blackboard and fraktur letters, Greek and Latin lookalikes, check and breve, `ϖ` and `π`, `=` and `≡` stay distinct.
 - Text: a `present` text gold that holds a digit keeps its numbers exact, at any `max_diffs`. Each maximal run of digits (after fold) is one token that must match the same number on the page; letters and punctuation still cost one edit each (docs/scoring/present-text.md, "Numbers are exact").
 - Fold: a vulgar fraction after a digit (`1½`, `10¾`) is set apart from it, so NFKC no longer glues the whole number to the numerator (`1½` -> `1 1/2`).

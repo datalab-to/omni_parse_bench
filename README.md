@@ -42,10 +42,10 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | PaddleOCR-VL-1.6 | open | 0.96B | 81.3 | — | 69.2 | 84.0 | 90.7 | — |
 | Nemotron 3.5 Parse | open | 0.63B | 79.9 | — | 72.6 | 77.1 | 90.0 | — |
 | Unlimited-OCR | open | 3.3B | 79.5 | — | 70.7 | 76.6 | 91.1 | — |
+| Indra OCR (Datalab) | open | about 17M | 78.8 | — | 68.0 | 75.8 | 92.6 | — |
 | Infinity-Parser2-Flash | open | 2.2B | 78.7 | — | 78.8 | 66.8 | 90.4 | — |
 | DeepSeek-OCR-2 | open | 3.4B | 75.4 | — | 64.6 | 70.2 | 91.4 | — |
 | LiteParse (ocria-nano) | open | n/a | 74.8 | — | 59.4 | 74.1 | 90.9 | — |
-| Indra OCR (Datalab) | open | about 12M | 71.4 | — | 62.5 | 59.6 | 92.0 | — |
 | HunyuanOCR-1.5 | open | 1.0B | 68.8 | — | 62.3 | 62.6 | 81.4 | — |
 | PyMuPDF4LLM (OCR) | open | n/a | 51.5 | — | 26.5 | 42.1 | 86.0 | — |
 | LiteParse (Tesseract) | open | n/a | 42.3 | — | 43.6 | 14.5 | 68.8 | — |
@@ -427,10 +427,10 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | PaddleOCR-VL-1.6 | 40.0 | 82.3 | 82.6 | 67.9 | 69.7 | 58.6 | 70.9 | 43.9 | 39.6 |
 | Nemotron 3.5 Parse | 39.3 | 75.8 | 77.1 | 75.4 | 75.1 | 71.3 | 48.6 | 48.4 | 60.1 |
 | Unlimited-OCR | 31.3 | 89.3 | 75.3 | 69.1 | 68.8 | 59.3 | 15.6 | 50.4 | 36.8 |
+| Indra OCR (Datalab) | 28.1 | 63.5 | 76.6 | 65.4 | 68.7 | 78.1 | 61.5 | 34.6 | 71.1 |
 | Infinity-Parser2-Flash | 63.6 | 93.5 | 67.5 | 75.6 | 77.5 | 73.7 | 33.6 | 71.8 | 41.0 |
 | DeepSeek-OCR-2 | 28.5 | 82.0 | 68.9 | 59.6 | 64.3 | 50.6 | 9.6 | 37.0 | 43.0 |
 | LiteParse (ocria-nano) | 8.5 | 55.4 | 74.7 | 63.9 | 61.4 | 72.9 | 55.8 | 30.2 | 52.9 |
-| Indra OCR (Datalab) | 25.2 | 55.2 | 60.9 | 60.4 | 61.9 | 73.2 | 49.3 | 28.6 | 67.8 |
 | HunyuanOCR-1.5 | 40.2 | 67.4 | 63.3 | 58.1 | 65.1 | 53.7 | 45.3 | 50.5 | 42.6 |
 | PyMuPDF4LLM (OCR) | 3.2 | 5.8 | 43.9 | 40.0 | 36.6 | 53.8 | 8.7 | 9.1 | 24.3 |
 | LiteParse (Tesseract) | 2.0 | 54.0 | 18.9 | 35.2 | 32.2 | 47.1 | 15.6 | 5.9 | 31.5 |
