@@ -50,7 +50,7 @@ first.
   test's `content`;
 - settings: values that configure the check as a whole (`expected_count`, or `kind` for a
   block kind). Never content;
-- output type: which output the test reads: `html`, or `blocks` for `layout_kind`;
+- output type: which output the test reads: `html`, or `blocks` for `layout_kind` and `layout_absent`;
 - derivation: how the test's answer was established (the publisher's XML, the PDF's text layer, a
   model panel, ...). A closed list in `vocab.DERIVATIONS`; and
 - tag: a word from a closed vocabulary that says what an arg's content is (`table`, `math`, `spa`,
@@ -96,6 +96,7 @@ It reads as: "some table in the output has a cell `167.8`, under the column head
 | table_cell | `cell`; optional `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `section`; optional lists `headings`, `row_groups` | | some table in the html has the cell, with these neighbors and headings |
 | format | `span`; optional `before`, `after` | exactly one of `marks`, `absent` (lists of `bold`, `italic`, `underline`, `strike`, `sup`, `sub`) | every letter of the span carries every mark in `marks` (and no letter of the words around it does), or no letter of it carries a mark in `absent`; read from the html's markup, see [scoring/format.md](scoring/format.md) |
 | layout_kind | `content`, with its `place` | `kind` | the smallest block covering at least half of the place is labeled `kind` (one of `views.LABELS`); for `text`, a `list` or `form` block (a list item, or a form field or key-value pair) passes too |
+| layout_absent | none | `kinds` | no block of the page is labeled one of `kinds` (labels of `views.LABELS` other than `text`, compared as written) ([layout_absent.md](scoring/layout_absent.md)) |
 
 `page_near_empty` takes no args and settings exactly `{"max_chars": N}`, where N is a whole number,
 0 or more. Judge it from the page: it prints nothing a reader would transcribe beyond what the limit
@@ -148,6 +149,7 @@ Which kinds each type accepts (`scorers/unit_tests/tests.py`):
 - `format`: `text` (`span`, `before`, `after`), each with `max_diffs` 0 (the context is found as written, no `place`, no `exact_case`);
 - `order`, `repeat` and `table_cell`: `text`; and
 - `layout_kind`: `text` with a `place`. Its text is shown to a reader and never compared.
+- `layout_absent`: no args;
 
 A layout block's `form` label is a form field or a key-value pair (a label with its value), or a
 region of them: Reducto's `Key Value`, Extend's `key_value` and LlamaParse's `key-value-region` are

@@ -25,6 +25,7 @@ READS = {
     "no_excess_repeats": "html",
     "table_cell": "html",
     "layout_kind": "blocks",
+    "layout_absent": "blocks",
     "format": "html",
 }
 
@@ -33,7 +34,7 @@ READS = {
 FAMILIES = {
     "present": "text", "order": "text", "repeat": "text", "page_near_empty": "text", "verbatim": "text",
     "no_excess_repeats": "text", "table_cell": "tables",
-    "layout_kind": "layout",
+    "layout_kind": "layout", "layout_absent": "layout",
     "format": "format",
 }
 # The families in the order a summary lists them, so two runs' summaries read alike.

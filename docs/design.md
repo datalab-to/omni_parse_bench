@@ -106,6 +106,7 @@ existing rules.
 | `no_excess_repeats` | `html` | no run of 16 words appears twice or more while each of its words appears more often than in the page's full text (tables read as text; math, figures but their caption and image descriptions not read) | `content` (the page's full text, any order; `max_diffs` 0); no settings | text | 0 |
 | `table_cell` | `html` | this cell exists with these neighbors, under these headings, in this section and in these row groups; the cell may be one line of a multi-line cell | `cell`, `up`, `down`, `left`, `right`, `top_heading`, `left_heading`, `right_heading`, `headings`, `section`, `row_groups` (text) | tables | 5,386 |
 | `layout_kind` | `blocks` | the smallest block covering half of this line's place has this kind | `content` (text with a `place`); `kind` | layout | 2,403 |
+| `layout_absent` | `blocks` | no block on the page carries a label in `kinds` (compared as written; `text` is never a kind) | no args; `kinds` | layout | 0 |
 | `format` | `html` | this span of text carries these marks (bold, italic, underline, strikethrough, superscript, subscript) and the words around it do not; or carries none of them | `span`, optional `before`, `after` (text, `max_diffs` 0); `marks` or `absent` | format | 0 |
 
 Of the `present` tests, 3,684 compare text, 3,268 an equation and 323 a number.
@@ -287,7 +288,7 @@ shows it.
 
 The headline is the mean of the families' scores: text (present, order, repeat, page_near_empty, region,
 no_excess_repeats), tables
-(table_cell) and layout (layout_kind), each family's score the share of its tests passed
+(table_cell) and layout (layout_kind, layout_absent), each family's score the share of its tests passed
 (`vocab.FAMILIES` maps every test type to one). A fourth family, format (`format`), is reported beside
 the headline and excluded from it when a headline family is present (`vocab.HEADLINE_FAMILIES`): it asks whether the output keeps a page's
 bold, italic, underline, strikethrough, superscript and subscript, which every other test is certified

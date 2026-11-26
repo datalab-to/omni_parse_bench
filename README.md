@@ -124,6 +124,7 @@ A test is a yes/no question about one page. Each test type belongs to one of fou
 | `present` with `{"absent": true}` | a known wrong reading (text under a redaction, the next page's first line) is not in the output | text |
 | `table_cell` | this cell sits under these headings and beside these neighbors | tables |
 | `layout_kind` | the block holding this line is a heading, text or table | layout |
+| `layout_absent` | no block on the page is a heading, table or another listed kind (a blank page) | layout |
 | `format` | this span of text is bold, italic, underlined, struck through, superscript or subscript, and the words around it are not (reported beside the headline) | format |
 
 A family's score is the share of its tests that pass, and the headline is the mean of the three headline family scores. Format is reported separately overall and per suite; a format-only run retains its format-based fallback headline. Format tests may share a page and suite with headline tests, so the page is predicted once.
