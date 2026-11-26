@@ -173,6 +173,23 @@ labels are free strings, not a documented list; these were seen in its answers o
 | table | table |
 | image | figure |
 
+Marker (its `BlockTypes`, as its JSON output names them; Line, Span, Char, TableCell, Page and Document
+are never regions of a page, and a group (FigureGroup, TableGroup, PictureGroup) gives its parts):
+
+| Marker type | label |
+| --- | --- |
+| Text, TextInlineMath, TableOfContents, Reference, Handwriting, Bibliography | text |
+| SectionHeader | heading |
+| PageHeader, PageFooter | page_furniture |
+| ListGroup, ListItem | list |
+| Caption | caption |
+| Footnote | footnote |
+| Equation | equation |
+| Code | code |
+| Table | table |
+| Form | form |
+| Picture, Figure, Diagram, ChemicalBlock, ComplexRegion | figure |
+
 Mistral (its documented block types):
 
 | Mistral type | label |
@@ -262,6 +279,7 @@ that is missing stops a run before any call and says which `export` to type.
 | `pymupdf4llm` (+ `-ocr`) | the local `pymupdf4llm` 2.1 package (AGPL-3.0), text layer plus a layout model | html, blocks | kept (`header=True, footer=True`) | none |
 | `opendataloader` | OpenDataLoader PDF 2.5.24, local Java engine (Apache-2.0) | html, blocks | kept (`include_header_footer`) | none |
 | `liteparse` | the local LiteParse package: its text-layer mode, or with `ocr` its Tesseract mode or (`ocr_backend=ocria-nano`) its ocria-nano mode | html, blocks | kept (`keep_headers_footers`) | none |
+| `marker-fast` (Marker (fast)), `marker` (Marker) | the local `marker-pdf` package, `--mode fast` (CPU) or `--mode balanced` (Surya VLM) | html, blocks | kept (`--keep_headers_footers`) | none; SURYA_INFERENCE_URL for `marker` |
 
 A vendor's tiers are runs of their own, one config each (or one config and `--set`), with the same pages:
 
@@ -445,6 +463,44 @@ Per vendor:
   Full public run: LiteParse 2,937/2,937 pages; 0 failures; no OCR.
   Full public run: LiteParse (Tesseract) 2,937/2,937 pages; 0 failures; Tesseract (English) OCR.
   Full public run: LiteParse (ocria-nano) 2,937/2,937 pages; 0 failures; OCRia-nano OCR and table/layout models (8 first-pass timeouts succeeded on retry).
+- marker-fast and marker: Marker (`marker-pdf` 2.2.0; Apache-2.0 code, weights under Datalab's modified AI
+  Pubs Open RAIL-M license), run in one persistent, killable child process group per mode. One class per row, the mode
+  being the class's: `marker-fast` ("Marker (fast)") is `--mode fast`, the documented CPU/MPS default
+  (in-process ONNX layout and OCR, no VLM, no LLM); `marker` ("Marker") is `--mode balanced`, the GPU default
+  (pdftext and layout on clean pages, Surya 2.5 VLM on tables, math, non-Latin scripts and scans; it starts
+  its own Surya server, or uses `SURYA_INFERENCE_URL`). The page budget covers waiting for the per-mode lock,
+  sending the request, Marker imports, version lookup and weight loading on the first page, conversion and
+  output serialization. Models and a Surya server persist between pages. On timeout, the worker group gets
+  SIGTERM for five seconds, then SIGKILL; the adapter also tracks and kills any detached Surya process or
+  container it started. A later page starts a fresh worker. The raw call record keeps the complete JSON
+  renderer tree; parsing maps its regions to OPB blocks.
+  Missing `marker-pdf` and unavailable weights fail with installation or cache/server guidance. The README's
+  `vllm` and `no_ocr` modes and its `--use_llm` hybrid (an LLM, `gemini-3.5-flash` by default, with its own
+  API key) are not rows. One setting is changed: page headers and footers are kept (`--keep_headers_footers`;
+  Marker drops them by default). PDF and image inputs are passed unchanged. A page is rendered twice from one
+  document, as Marker's html and JSON block tree. Blocks are the tree's regions in reading order, with boxes
+  normalized to the page frame; group nodes give their region children. Cost: `usd` 0.0. Not a dependency of
+  this package (it brings PyTorch): `uv pip install marker-pdf==2.2.0`.
+
+  | Marker JSON block type | OPB label / handling |
+  |---|---|
+  | `Text`, `TextInlineMath`, `TableOfContents`, `Reference`, `Handwriting`, `Bibliography` | `text` |
+  | `SectionHeader` | `heading` |
+  | `PageHeader`, `PageFooter` | `page_furniture` |
+  | `ListGroup`, `ListItem` | `list` |
+  | `Caption` | `caption` |
+  | `Footnote` | `footnote` |
+  | `Equation` | `equation` |
+  | `Code` | `code` |
+  | `Table` | `table` |
+  | `Form` | `form` |
+  | `Picture`, `Figure`, `Diagram`, `ChemicalBlock`, `ComplexRegion` | `figure` |
+  | `FigureGroup`, `TableGroup`, `PictureGroup` | group; children become blocks in place |
+  | `Line`, `Span`, `Char`, `TableCell` | parts of a block; not blocks themselves |
+  | `Page`, `Document` | frame/container; not blocks themselves |
+
+  Full public run: 2,937/2,937 pages; 0 failures; Marker (fast), CPU (`--mode fast`).
+  Full public run: 2,937 pages; 1 failed on Marker's empty-image JPEG error for a skewed scan; Marker (balanced), 81.5 headline (83.3 text, 65.9 tables, 95.3 layout), released OPB 1.7.0, B200 job 5648, run `marker-20261126-173920-178e`, dataset revision `24e3ef4d2aa1718e622d357db7f6d0d10742c93d`; Surya VLM via vLLM 0.25.1 with Marker's B200 settings (`VLLM_GPU_TYPE=b200`, 240 sequences, 32,768 batched tokens, greedy decoding).
 
 ## Serving an open model
 

@@ -35,6 +35,7 @@ try:
         liteparse,
         llamaparse,
         llm,
+        marker_pdf,
         mineru,
         minicpm_ocr,
         mistral,
@@ -77,6 +78,7 @@ ADAPTERS: dict[str, type[Parser]] = {a.name: a for a in (
     opendataloader.OpenDataLoader,
     pdf_inspector.PdfInspector, pymupdf4llm.PyMuPDF4LLM,
     liteparse.LiteParse,
+    marker_pdf.Marker, marker_pdf.MarkerFast,
     # Open models, each served from its folder in providers/serve/: the vendor's own code on a server of ours,
     # or vLLM alone where the vendor offers only the model.
     chandra_ocr.ChandraOcr, deepseek_ocr.DeepseekOcr, dots.Dots, glm_ocr.GlmOcr, hunyuan.Hunyuan,

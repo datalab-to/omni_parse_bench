@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -173,6 +176,9 @@ def test_production_child_parses_fake_vendor_outputs_without_vendor_package(tmp_
     _child_env(monkeypatch, tmp_path)
     _fake_vendor(tmp_path, '''
 import json
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 def convert(input_path, output_dir, **kwargs):
     out = Path(output_dir); out.mkdir(parents=True)
@@ -239,21 +245,40 @@ importlib.metadata.version = version
 
 
 def test_conversion_timeout_kills_the_java_process_group(tmp_path, monkeypatch):
-    import time
-
     _child_env(monkeypatch, tmp_path)
-    marker = tmp_path / "orphan-wrote-this"
-    _fake_vendor(tmp_path, f'''
-import subprocess, sys, time
+    child_pid_file = tmp_path / "child.pid"
+    monkeypatch.setenv("ODL_CHILD_PID", str(child_pid_file))
+    _fake_vendor(tmp_path, '''
+import os, subprocess, sys, time
 def convert(**kwargs):
-    child = "import pathlib,time; time.sleep(0.8); pathlib.Path({str(marker)!r}).touch()"
+    child = ("import os,pathlib,time; path=" + repr(os.environ["ODL_CHILD_PID"])
+             + "; pathlib.Path(path).write_text(str(os.getpid())); time.sleep(120)")
     subprocess.Popen([sys.executable, "-c", child])
-    time.sleep(5)
+    time.sleep(120)
 ''')
     pdf = tmp_path / "page.pdf"
     _blank_pdf(pdf)
     (request,) = odl.OpenDataLoader().requests(frozenset({"html"}))
-    with pytest.raises(errors.SystemTimeout):
-        odl.call(pdf, request, timeout=0.35)
-    time.sleep(1)
-    assert not marker.exists()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(odl.call, pdf, request, timeout=20)
+        deadline = time.monotonic() + 15
+        while not child_pid_file.exists():
+            if future.done():
+                future.result()
+            if time.monotonic() >= deadline:
+                pytest.fail("OpenDataLoader worker did not start its child process")
+            time.sleep(0.05)
+        child_pid = int(child_pid_file.read_text())
+        with pytest.raises(errors.SystemTimeout):
+            future.result(timeout=25)
+
+    deadline = time.monotonic() + 5
+    while True:
+        try:
+            os.kill(child_pid, 0)
+        except ProcessLookupError:
+            break
+        if time.monotonic() >= deadline:
+            pytest.fail(f"OpenDataLoader descendant {child_pid} survived process-group termination")
+        time.sleep(0.05)
