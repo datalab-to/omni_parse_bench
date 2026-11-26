@@ -209,6 +209,16 @@ def test_the_options_that_shape_the_image_name_the_run():
     assert folder(layout=True) == folder(layout=True, grounding_url="http://gpu:9100")
 
 
+def test_the_box_venv_keeps_the_image_torch_and_torchvision():
+    build = Path(ocria_1.__file__).parent / "serve" / "ocria-1"
+    dockerfile = (build / "Dockerfile").read_text()
+    override = (build / "no-torch.txt").read_text()
+    assert "COPY no-torch.txt /srv/no-torch.txt" in dockerfile
+    assert "uv pip install --python /opt/boxes/bin/python --override /srv/no-torch.txt" in dockerfile
+    assert 'torch; python_version < "0"' in override
+    assert 'torchvision; python_version < "0"' in override
+
+
 # --- layout boxes: a stand-in box server, answering as the card's serve_boxes.py does (items in pixels of the
 # image it was sent), plus what serve/ocria-1/boxes.py adds (`served`)
 

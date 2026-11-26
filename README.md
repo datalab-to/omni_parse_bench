@@ -28,6 +28,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | GPT-5.6 Sol | closed |  | 87.9 | ≈$94.49 | 86.0 | 91.9 | 85.9 | 17 |
 | MinerU2.5-Pro | open | 1.2B | 87.4 | — | 78.0 | 92.5 | 91.7 | — |
 | Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.4 | — | 83.9 | 84.6 | 93.5 | — |
+| OCRia-1 (+ vendor grounding, Docling Heron) | open | 5.17B (+ Heron detector) | 87.1 | — | 82.7 | 84.9 | 93.8 | — |
 | Surya OCR 2.5 (Datalab) | open | 0.69B | 86.3 | — | 84.3 | 78.8 | 95.8 | — |
 | OXR-1.0 | open | 1.4B | 85.6 | — | 77.0 | 88.3 | 91.4 | — |
 | OvisOCR3 | open | 0.85B | 84.5 | — | 78.2 | 84.7 | 90.6 | — |
@@ -413,6 +414,7 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | GPT-5.6 Sol | 66.9 | 89.8 | 91.7 | 86.0 | 87.5 | 90.8 | 77.2 | 75.0 | 71.8 |
 | MinerU2.5-Pro | 36.0 | 91.9 | 91.7 | 81.2 | 79.7 | 87.4 | 84.1 | 56.8 | 43.7 |
 | Infinity-Parser2-Pro | 72.1 | 93.5 | 84.6 | 82.7 | 85.9 | 86.4 | 62.7 | 78.2 | 54.2 |
+| OCRia-1 (+ vendor grounding, Docling Heron) | 62.5 | 93.7 | 84.7 | 82.7 | 82.7 | 83.3 | 53.7 | 73.2 | 50.4 |
 | Surya OCR 2.5 (Datalab) | 52.8 | 91.6 | 79.9 | 82.3 | 80.5 | 86.9 | 55.2 | 57.7 | 72.3 |
 | OXR-1.0 | 61.0 | 96.2 | 86.7 | 68.9 | 80.2 | 66.5 | 56.0 | 68.0 | 29.0 |
 | OvisOCR3 | 42.7 | 94.0 | 84.8 | 83.7 | 77.7 | 70.4 | 62.3 | 58.0 | 40.8 |

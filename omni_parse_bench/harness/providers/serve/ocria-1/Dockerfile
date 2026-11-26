@@ -27,9 +27,11 @@ FROM vllm/vllm-openai:v0.30.0@sha256:8a69ffad015f138d7170c4ddc429e230a3bc1c1719f
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 RUN ln -s "$(python3 -c 'import os, sys, vllm; print(os.path.realpath(sys.executable))')" /opt/vllm-python
 # The box server's venv (boxes.sh): the card's Transformers 5.22.2 over the image's torch and torchvision.
+COPY no-torch.txt /srv/no-torch.txt
 RUN curl -LsSf https://astral.sh/uv/0.13.5/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv venv /opt/boxes --python /opt/vllm-python --system-site-packages \
-    && uv pip install --python /opt/boxes/bin/python transformers==5.22.2 accelerate==1.16.0 timm==1.0.31 \
+    && uv pip install --python /opt/boxes/bin/python --override /srv/no-torch.txt \
+        transformers==5.22.2 accelerate==1.16.0 timm==1.0.31 \
         scipy==1.18.1 pypdfium2==5.13.0 huggingface_hub==2.5.0
 
 ENV PORT=8001

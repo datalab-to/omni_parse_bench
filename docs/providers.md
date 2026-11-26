@@ -848,9 +848,9 @@ revision `489f5fa`. Build and run `omni_parse_bench/harness/providers/serve/ocri
 `opb init ocria-1`. It is vLLM alone, as the model card runs it (`--max-model-len 32768`, one image per
 prompt); the card asks for vLLM 0.30 or later with `nvcc`, which the pinned `vllm/vllm-openai:v0.30.0`
 image has. Plan for one 24 GB GPU at least (weights, the 32,768-token context and the image tokens of a
-4.1-megapixel page).
+page at the model card's 4.1-megapixel image cap).
 
-Each page is one call: a PDF rendered at 300 DPI and scaled down to the card's 4.1-megapixel budget (an
+Each page is one call: a PDF rendered at 300 DPI and scaled down to the model card's 4.1-megapixel image cap (an
 image file is only scaled down), the card's `prompt.txt` (downloaded from the pinned revision at run time, its sha256 checked, not stored in this repository) as the system message, no user text, thinking
 off, temperature 0, at most 24,576 tokens. The reply is Markdown with tables in HTML and the model's own
 tags: `<page_header>`, `<page_footer>`, `<watermark>` and `<page_number>` stay in the page as text, in
@@ -862,8 +862,8 @@ separate package of the model repository, `ocria_grounding`, places the answer o
 generation. Docling's Heron detector
 ([docling-project/docling-layout-heron](https://huggingface.co/docling-project/docling-layout-heron),
 Apache-2.0, pinned at `8f39ad3`) finds the regions, and each word of the answer goes to the region holding
-it. On a PDF page with a text layer the word's position is its box in that layer; on an image, or a PDF
-without one, it comes from a second, teacher-forced pass of the same weights under Transformers 5.22.2,
+it. On a PDF page with a text layer the word's position is its box in that layer; on a scanned PDF without
+one or an image, it comes from a second, teacher-forced pass of the same weights under Transformers 5.22.2,
 from where the model looked while writing the word, and is rougher. The second pass needs its own GPU
 process. `serve/ocria-1/boxes.sh` runs it in the same image, on port 8100:
 
@@ -905,5 +905,5 @@ Purposes include "evaluating or benchmarking the Model, by any person or organiz
 publishing the results". Section 7 asks for credit to LlamaIndex, a link to the model and the license
 (huggingface.co/llamaindex/OCRia-1/blob/main/LICENSE); this repository holds no weights or model code.
 Other uses of the model or its output are restricted by revenue, funding and competing-service terms, and
-its output may not train another model except for Research Purposes. No benchmark score has been
-measured for this provider yet.
+its output may not train another model except for Research Purposes.
+Full public run: 2,937/2,937 pages, 0 failures; 87.1 headline (82.7 text, 84.9 tables, 93.8 layout), graded with released OPB 1.7.0 from `ocria-1-grounded-20261126-150502` (B200; HTML-only text/table scores unchanged).
