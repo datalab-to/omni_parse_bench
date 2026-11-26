@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """table_cell's `{"empty": true}` and `{"end": true}` args: what they accept in a gold file, and the verdicts
 they give on blank encodings, invented content, shifted and merged cells (docs/scoring/table_cell.md)."""
 from __future__ import annotations
@@ -272,3 +273,48 @@ def test_a_figure_does_not_change_a_text_verdict():
     drawn = rows(HEAD, ROW.format("<td><img src=a.png></td>"))
     t = {"cell": text("100"), "right": text("Q2")}
     assert verdict(t, plain) == verdict(t, drawn)
+
+
+# ------------------------------------------------------------------ every matching cell, every continuing table
+
+ONE = {"cell": text("100"), "right": EMPTY}
+TWO = f"<table><tr>{HEAD}</tr><tr>{ROW.format('<td></td>')}</tr><tr><td>Fuel</td><td>70</td><td>80</td></tr></table>"
+
+
+def test_every_cell_that_matches_must_be_empty_beside_it():
+    filled = TWO.replace("<td></td>", "<td>200</td>")
+    assert verdict(ONE, TWO) and verdict(ONE, TWO + TWO)
+    assert not verdict(ONE, TWO + filled) and not verdict(ONE, filled + TWO)
+    assert not verdict(ONE, rows(HEAD, ROW.format("<td></td>"), "<td>Fuel</td><td>100</td><td>200</td>"))
+    assert verdict(ONE, rows(HEAD, ROW.format("<td></td>"), "<td>Fuel</td><td>100</td><td></td>"))
+
+
+def test_a_cell_matching_by_one_line_must_hold_nothing_more():
+    assert not verdict(ONE, TWO.replace("<td>100</td>", "<td>100<br>200</td>"))
+    assert verdict({"cell": text("100"), "right": EMPTY, "top_heading": text("Q1")}, TWO)
+
+
+def test_a_relation_picks_which_cells_must_hold_the_shape():
+    two = rows(HEAD, ROW.format("<td></td>"), "<td>Fuel</td><td>100</td><td>200</td>")
+    assert verdict({"cell": text("100"), "left": text("Rent"), "right": EMPTY}, two)
+    assert not verdict({"cell": text("100"), "left": text("Fuel"), "right": EMPTY}, two)
+
+
+def test_end_reads_a_table_that_goes_on_from_the_anchors():
+    cont = "<table><tr><td>Tax</td><td>9</td><td>8</td></tr></table>"
+    args = {"cell": text("70"), "down": END}
+    assert verdict(args, TWO)
+    assert not verdict(args, TWO + cont) and not verdict(args, TWO + "\n" + cont)
+    assert not verdict(args, TWO + f"<table>{HEAD}<tr><td>Tax</td><td>9</td><td>8</td></tr></table>")
+    assert verdict(args, TWO + f"<table>{HEAD}</table>")    # a repeated header only
+    assert verdict(args, TWO + "<p>Note</p>" + cont)
+    assert verdict(args, TWO + "<table><tr><th>Cost</th><th>Q3</th><th>Q4</th></tr><tr><td>Tax</td><td>9</td><td>8</td></tr></table>")
+    assert verdict(args, TWO + "<table><tr><td>Tax</td><td>9</td></tr></table>")
+    assert "continuing" in score({"html": TWO + cont}, gold_of(args))[0].why
+
+
+def test_end_up_and_left_read_the_table_before_a_continuation():
+    first = "<table><tr><td>Tax</td><td>9</td><td>8</td></tr></table>"
+    assert not verdict({"cell": text("70"), "up": END}, rows(HEAD, "<td>Fuel</td><td>70</td><td>80</td>"))
+    assert not verdict({"cell": text("Fuel"), "up": END}, first + rows("<td>Fuel</td><td>70</td><td>80</td>"))
+    assert verdict({"cell": text("Fuel"), "up": END}, first + "<p>x</p>" + rows("<td>Fuel</td><td>70</td><td>80</td>"))

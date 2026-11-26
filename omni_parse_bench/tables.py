@@ -42,12 +42,14 @@ class Table(NamedTuple):
     covers: dict[Cell, tuple[tuple[int, ...], tuple[int, ...]]]   # the rows and the columns each cell covers
     labels: dict[int, Cell]   # the section rows (`label_rows`), by row
     figures: frozenset[Cell] = frozenset()   # cells holding an image or other figure, whatever its alt text
+    follower: int | None = None   # the index (in `parse`'s result) of the table written right after this one
 
 
 @functools.lru_cache(maxsize=16)
 def parse(html: str) -> tuple[Table, ...]:
     """Every table in `html` with at least one cell."""
-    out = []
+    out: list[Table] = []
+    tags: list = []
     # Note: a soup of its own, because <br> tags are rewritten in place below.
     for tag in _fresh_soup(html).find_all("table"):
         rows = tag.find_all("tr")
@@ -67,7 +69,26 @@ def parse(html: str) -> tuple[Table, ...]:
             specs.append(row)
         if specs and (table := _grid(specs)):
             out.append(table)
-    return tuple(out)
+            tags.append(tag)
+    where = {id(tag): i for i, tag in enumerate(tags)}
+    return tuple(t._replace(follower=where.get(id(_next_table(tag))))
+                 for t, tag in zip(out, tags, strict=True))
+
+
+def _next_table(tag):
+    """The table written right after `tag`, with nothing but white space, line breaks and empty elements
+    between them, or None."""
+    for sib in tag.next_siblings:
+        if isinstance(sib, str):
+            if sib.strip():
+                return None
+        elif sib.name == "table":
+            return sib
+        elif sib.name == "br" or not (sib.get_text(strip=True) or sib.find(FIGURES)):
+            continue
+        else:
+            return None
+    return None
 
 
 def _text(td) -> str:

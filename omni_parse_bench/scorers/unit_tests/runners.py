@@ -129,10 +129,13 @@ _TABLE_MARK = re.compile(f"{_TABLE_OPEN}|{_TABLE_CLOSE}")
 
 
 def blank_after(t: Present, v: views.Html) -> Mark:
-    """Some occurrence of the label `t.content` is followed by nothing but white space and placeholder
-    characters, up to the next stop or the end of the page. A label in a table cell reads the rest of its
-    cell, then the cell to its right, or, when that is another field's label (a header-row layout), the cell
-    below. Passes only when plain `present` passes too. See docs/scoring/present-text.md, "Blank fields".
+    """Every occurrence of the label `t.content` is followed by nothing but white space and placeholder
+    characters, up to the next stop or the end of the page, and has nothing before it (in its paragraph,
+    line or cell, when no other stop comes first). A label in a table cell reads the rest of its cell, then
+    every cell to its right up to another field's label, then, down its column, the cells below up to
+    another field's label (or the table's end, and then the text after the table up to the next stop); and
+    the cells to its left, back to another field's label. Passes only when plain `present` passes too. See
+    docs/scoring/present-text.md, "Blank fields".
 
     The page is the text view without image descriptions, nothing for an element that holds nothing (as
     `page_near_empty`); a table is read by `tables.parse`, so a label in one is judged by its cells, not by
@@ -141,27 +144,64 @@ def blank_after(t: Present, v: views.Html) -> Mark:
     if not ok:
         return False, why
     label = t.content.text
-    flow, spans = _flow(v.html)
+    flow, spans, loose, chunks = _flow(v.html)
     reasons: list[str] = []
+    copies = 0
     for start, region, cut in _regions(t, flow):
         if any(a <= start < b and parsed for a, b, parsed in spans):
             continue    # in a table the cell reader parses: its cells judge it
-        elif why := _in_text(label, t, region, cut):
+        copies += 1
+        if why := _in_text(label, t, region, cut):
             reasons.append(why)
-        else:
-            return True, ""
-    for table in tables.parse(v.html):
-        for rc, text in table.text.items():
-            for _, region, _cut in _regions(t, _fold_cell(text)):
-                if rest := _rest(t, region):
-                    reasons.append(f"{label[:60]!r} is followed by {rest[:60]!r} in its cell")
-                elif not (why := _value_cell(t, table, rc)):
-                    return True, ""
-                else:
-                    reasons.append(f"{label[:60]!r} cell's {why}")
-    if not reasons:
+    for line in re.split(r"[\u2029\n]", loose):
+        hay = normalize.fold(line)
+        reasons += [why for start, _, _ in _regions(t, hay) if (why := _before(label, t, hay, start))]
+    for (_, end, parsed), chunk in zip(spans, chunks, strict=True):
+        for n, table in enumerate(tables.parse(chunk) if parsed else ()):
+            for rc, text in table.text.items():
+                cell = _fold_cell(text)
+                for start, region, _cut in _regions(t, cell):
+                    copies += 1
+                    if rest := _rest(t, region):
+                        reasons.append(f"{label[:60]!r} is followed by {rest[:60]!r} in its cell")
+                    elif why := _before(label, t, cell, start):
+                        reasons.append(why)
+                    else:
+                        why, at_end = _value_cell(t, table, rc)
+                        if why:
+                            reasons.append(f"{label[:60]!r} cell's {why}")
+                        elif at_end and n == 0 and (why := _after_table(t, flow, end)):
+                            reasons.append(f"{label[:60]!r} {why}")
+    if not copies:
         return False, f"{label[:60]!r} not found whole, at a word edge, in one paragraph or one table cell"
+    if not reasons:
+        return True, ""
     return False, "; ".join(reasons[:2]) + (f" (and {len(reasons) - 2} more)" if len(reasons) > 2 else "")
+
+
+def _before(label: str, t: Present, hay: str, start: int) -> str:
+    """Why the text before the label that starts at `start` in the folded `hay` (a paragraph, a line or a
+    cell) holds a value, or "" when it is blank, or when another field's label comes first (what follows
+    that label is its value)."""
+    prior = hay[:start]
+    if _PLACEHOLDER.fullmatch(prior):
+        return ""
+    for x in t.stops:
+        if (f := normalize.fold(x.text)) and any(b <= start for _, b in _copies(f, hay, False)):
+            return ""
+    return f"{label[:60]!r} has {prior.strip()[:60]!r} before it"
+
+
+def _after_table(t: Present, flow: str, end: int) -> str:
+    """Why the text after a label's table, up to the next stop, holds a value (a value written past the
+    table), or "" when it is blank."""
+    stops = sorted(a for x in [*t.stops, t.content] if (f := normalize.fold(x.text))
+                   for a, _ in _copies(f, flow, False))
+    cut = next((a for a in stops if a >= end), None)
+    if not (rest := _rest(t, _TABLE_MARK.sub("", flow[end:cut]))):
+        return ""
+    return (f"is followed by {rest[:60]!r} after its table, "
+            f"{'before the next field' if cut is not None else 'to the end of the page'}")
 
 
 def _in_text(label: str, t: Present, region: str, cut: bool) -> str:
@@ -172,32 +212,41 @@ def _in_text(label: str, t: Present, region: str, cut: bool) -> str:
             f"{'before the next field' if cut else 'to the end of the page'}")
 
 
-def _flow(html: str) -> tuple[str, list[tuple[int, int, bool]]]:
+def _flow(html: str) -> tuple[str, list[tuple[int, int, bool]], str, list[str]]:
     """The folded text view of a page for `blank_after`, with a mark round each outermost table, and the
     stretches the tables take in it, each with whether the cell reader parses it (`tables.parse`): one it
-    cannot parse (`<td>` outside a `<tr>`) is read as text."""
-    parts, last, depth, begun, wholes = [], 0, 0, 0, []
+    cannot parse (`<td>` outside a `<tr>`) is read as text. Also the text view (not folded) of the page
+    without the tables the cell reader parses, and the html of each outermost table."""
+    parts, loose, chunks, last, depth, begun, wholes = [], [], [], 0, 0, 0, []
     for m in _TABLE_TAG.finditer(html):
         if m[1]:
             if depth:
                 depth -= 1
                 if depth == 0:
                     parts += [html[last:m.end()], f"<p>{_TABLE_CLOSE}</p>"]
-                    wholes.append(bool(tables.parse(html[begun:m.end()])))
+                    chunks.append(html[begun:m.end()])
+                    wholes.append(bool(tables.parse(chunks[-1])))
+                    loose += [] if wholes[-1] else [chunks[-1]]
                     last = m.end()
         else:
             if depth == 0:
                 parts += [html[last:m.start()], f"<p>{_TABLE_OPEN}</p>"]
+                loose.append(html[last:m.start()])
                 last = begun = m.start()
             depth += 1
     parts.append(html[last:])
     if depth:
-        wholes.append(bool(tables.parse(html[begun:])))
+        chunks.append(html[begun:])
+        wholes.append(bool(tables.parse(chunks[-1])))
+        loose += [] if wholes[-1] else [chunks[-1]]
+    else:
+        loose.append(html[last:])
     flow = normalize.fold(views.text(_NOTHING.sub("", "".join(parts)), alt=False))
     opens = [m.start() for m in re.finditer(re.escape(_TABLE_OPEN), flow)]
     closes = [m.end() for m in re.finditer(re.escape(_TABLE_CLOSE), flow)]
     closes += [len(flow)] * (len(opens) - len(closes))
-    return flow, [(a, b, ok) for (a, b), ok in zip(zip(opens, closes, strict=True), wholes, strict=True)]
+    return (flow, [(a, b, ok) for (a, b), ok in zip(zip(opens, closes, strict=True), wholes, strict=True)],
+            views.text(_NOTHING.sub("", "".join(loose)), alt=False), chunks)
 
 
 def _edge(want: str, hay: str, i: int, j: int) -> bool:
@@ -232,50 +281,73 @@ def _regions(t: Present, hay: str) -> list[tuple[int, str, bool]]:
     kept = [k for k, c in enumerate(hay) if c != " "] if squeezed else None
     w = hay.replace(" ", "") if squeezed else hay
     stops = sorted(s for x in t.stops if (f := normalize.fold(x.text)) for s in _copies(f, hay, squeezed))
+    ends = sorted([a for a, _ in stops] + [i for i, _ in spans])    # the next copy of the label ends one too
     out = []
     for i, j in spans:
         if any(a <= i and j <= b and b - a > j - i for a, b in stops):
             continue
-        cut = next((a for a, _ in stops if a >= j), None)
+        cut = next((a for a in ends if a >= j), None)
         out.append((_folded_span(i, j, kept)[0], w[j:cut], cut is not None))
     return out
 
 
 def _rest(t: Present, region: str) -> str:
     """What a field's region shows besides one copy of its printed placeholder and the characters a blank
-    shows; "" when it is blank."""
+    shows; "" when it is blank. A mask of underscores that markdown read as bold (`__/__/____` written as
+    `//`, its underscores gone) is the printed placeholder too."""
     if t.printed is not None:
         printed = normalize.fold(t.printed.text)
-        region = region.replace(printed, "", 1) if printed in region else region.replace(
-            printed.replace(" ", ""), "", 1)
+        for mask in (printed, printed.replace(" ", ""), re.sub(r"_+", "", printed)):
+            if mask.strip() and mask in region:
+                region = region.replace(mask, "", 1)
+                break
     return "" if _PLACEHOLDER.fullmatch(region) else region.strip()
 
 
-def _value_cell(t: Present, table: tables.Table, rc: tables.Cell) -> str:
-    """Why the cell right of the label cell `rc` (or, in a header-row layout, the cell below) holds a value:
-    "" when it is blank or there is none. The cell below is read when the right one is another field's label
-    (its whole text) or is missing in a table of several columns (a label in the last column).
-    Neighbors are read raw (no stand-in)."""
+def _value_cell(t: Present, table: tables.Table, rc: tables.Cell) -> tuple[str, bool]:
+    """Why a cell beside the label cell `rc` holds a value ("" when none does), and whether nothing in the
+    table comes after the label (no other field's label below it), so that its region goes on past the table.
+
+    Read, besides the rest of the label's own cell: every cell to its right, up to another field's label
+    (its whole text is a stop); then, in a table of several columns, the cells below it in its columns, up
+    to another field's label (a header-row layout, a label in the last column, a blank cell to the right);
+    and the cells to its left, back to another field's label (the value of that field, not this one's). An
+    image is a value. Neighbors are read raw (no stand-in)."""
     stops = [f for x in t.stops if (f := normalize.fold(x.text))]
     def is_label(x: tables.Cell) -> bool:
         """Whether the cell's whole text is another field's label."""
         return _fold_cell(table.text[x]) in stops
-    def held(slots: list[tables.Cell | None]) -> tuple[list[str], bool]:
-        """What the slots show besides another field's label, and whether one is such a label."""
-        shown = [x for x in dict.fromkeys(slots) if x is not None]
-        values = [(_rest(t, _fold_cell(table.text[x])) or "an image") for x in shown
-                  if not is_label(x) and (x in table.figures or _rest(t, _fold_cell(table.text[x])))]
-        return values, any(is_label(x) for x in shown)
-    right = _slots(table, rc, "right")
-    # with no cell to the right (a label in the last column) the value is below, in a table of more columns
-    values, labels = held(right) if right is not None else ([], len(table.grid[0]) > 1)
-    if values:
-        return f"value cell (right) holds {values[0][:60]!r}"
-    if not labels:    # a blank value cell; with no cell to the right, or a label there, the value is below
-        return ""
-    below = _slots(table, rc, "down")
-    values = held(below)[0] if below is not None else []
-    return f"value cell (below) holds {values[0][:60]!r}" if values else ""
+    def has_label(x: tables.Cell) -> bool:
+        """Whether another field's label is written in the cell."""
+        hay = _fold_cell(table.text[x])
+        return any(_copies(f, hay, False) for f in stops)
+    def value(x: tables.Cell | None) -> str:
+        """What the cell shows: "" for a blank one or another field's label."""
+        if x is None or is_label(x):
+            return ""
+        return _rest(t, _fold_cell(table.text[x])) or ("an image" if x in table.figures else "")
+    rows, cols = table.covers[rc]
+    width = len(table.grid[0])
+    for r in rows:    # to the left, back to another field's label
+        seen = list(dict.fromkeys(x for x in reversed(table.grid[r][:min(cols)]) if x is not None))
+        held = [v for x in seen if (v := value(x))]
+        if held and not any(has_label(x) for x in seen):
+            return f"value cell (left) holds {held[0][:60]!r}", False
+    for r in rows:    # to the right, up to another field's label
+        for x in dict.fromkeys(x for x in table.grid[r][max(cols) + 1:] if x is not None):
+            if is_label(x):
+                break
+            if v := value(x):
+                return f"value cell (right) holds {v[:60]!r}", False
+    if width == 1:
+        return "", False
+    for r in range(max(rows) + 1, len(table.grid)):    # below, up to another field's label
+        slots = [x for x in dict.fromkeys(table.grid[r][c] for c in cols) if x is not None]
+        if any(is_label(x) for x in slots):
+            return "", False
+        if held := [v for x in slots if (v := value(x))]:
+            return f"value cell (below) holds {held[0][:60]!r}", False
+    return "", True
 
 
 def _number_found(text: str, v: views.Html) -> Mark:
@@ -483,7 +555,9 @@ class TableCell(NamedTuple):
 
 def table_cell(t: TableCell, v: views.Html) -> Mark:
     """Some table has a cell matching `cell` whose neighbours and headings match `relations`, and
-    which sits under `headings`, in `section` and in `row_groups`.
+    which sits under `headings`, in `section` and in `row_groups`. With `{"empty": true}` or `{"end": true}`
+    on a side, every such cell (every cell that matches `cell` and holds the relations, headings, section and
+    row groups, in every table) must have nothing beside it or past it, and must hold nothing but `cell`.
 
     `headings` must appear in order among the cells over its column, other cells between them
     allowed: a heading written merged, repeated in each column it covers, or once beside empty cells
@@ -501,19 +575,29 @@ def table_cell(t: TableCell, v: views.Html) -> Mark:
     cell = _fold_cell(t.cell)
     thr = _cell_threshold(cell, t.max_diffs)
     expected = {k: _fold_cell(x) for k, x in t.relations.items() if x}
-    reasons = []
-    for table in ts:
+    reasons: list[str] = []    # why a cell is not the anchor
+    held: list[str] = []       # why an anchor has something beside it
+    anchors = 0
+    for i, table in enumerate(ts):
         for rc in [rc for rc, x in table.text.items() if _one_of(cell, x, thr, t.cell)]:
             failed = [why for k, want in expected.items()
                       if (why := _relation(table, rc, k, want, t.max_diffs, t.relations[k]))]
-            failed += [why for k, shape in t.shapes.items() if (why := _shape(table, rc, k, shape))]
             failed += _structure(t, table, rc)
-            if not failed:
+            if failed:
+                reasons += failed
+                continue
+            if not t.shapes:
                 return True, ""
-            reasons += failed
-    if not reasons:
+            anchors += 1
+            # a shape guard says nothing was invented beside the cell, so every such cell must hold it
+            if not _one_of(cell, table.text[rc], thr, t.cell, lines=False):
+                held.append(f"the cell holds more than {t.cell!r}: {_fold_cell(table.text[rc])!r}")
+            held += [why for k, shape in t.shapes.items() if (why := _shape(ts, i, rc, k, shape))]
+    if anchors and not held:
+        return True, ""
+    if not (reasons or held):
         return False, f"no cell matching {t.cell!r} in any table"
-    return False, f"cells matching {t.cell!r} found, but: {'; '.join(reasons)}"
+    return False, f"cells matching {t.cell!r} found, but: {'; '.join(held or reasons)}"
 
 
 def _latex_found(latex: str, v: views.Html) -> Mark:
@@ -1116,13 +1200,15 @@ def _slots(table: tables.Table, rc: tables.Cell, kind: str) -> list[tables.Cell 
     return [table.grid[r][c] for r, c in slots]
 
 
-def _shape(table: tables.Table, rc: tables.Cell, kind: str, shape: str) -> str:
-    """Why the cell at `rc` fails `{"empty": true}` or `{"end": true}` on one side, or "" when it holds.
+def _shape(ts: tuple[tables.Table, ...], i: int, rc: tables.Cell, kind: str, shape: str) -> str:
+    """Why the cell at `rc` of table `ts[i]` fails `{"empty": true}` or `{"end": true}` on one side, or ""
+    when it holds.
 
     `empty`: every slot touching that side of the cell is blank, read raw (no stand-in, unlike a text arg:
     a copy of the value above or beside must not pass); a missing trailing cell counts as blank, the table's
     edge does not (`no right cell`). `end`: no cell in any row below (any column to the right, ...) has
-    text."""
+    text, in the table or in a table that continues it (`_continues`)."""
+    table = ts[i]
     rows, cols = table.covers[rc]
     dr, dc = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}[kind]
     height, width = len(table.grid), len(table.grid[0])
@@ -1146,15 +1232,60 @@ def _shape(table: tables.Table, rc: tables.Cell, kind: str, shape: str) -> str:
         if cells:
             held = ", ".join(repr(_fold_cell(table.text[x]) or "an image") for x in cells[:3])
             return f"{kind}: {word} {n + 1} holds {held}{', ...' if len(cells) > 3 else ''}"
+    for other in _continuations(ts, i, kind):
+        for row in other.grid:
+            if cells := [x for x in dict.fromkeys(row) if not _blank(other, x)]:
+                held = ", ".join(repr(_fold_cell(other.text[x]) or "an image") for x in cells[:3])
+                return f"{kind}: a table continuing this one holds {held}{', ...' if len(cells) > 3 else ''}"
     return ""
 
 
-def _one_of(want: str, got: str, thr: float, raw: str = "") -> bool:
-    """Whether cell text `got`, or one of its lines, matches the folded `want`; or, given `raw` (the gold as
-    written), is it with a hyphen a line broke after read kept or dropped (`_hyphenated_cell`)."""
-    lines = [x for x in {got, *got.split("\n")} if x.strip()]
-    return (any(_cell_ratio(want, _fold_cell(x)) >= thr - EPS for x in lines)
-            or bool(raw) and any(_hyphenated_cell(raw, x) for x in lines))
+def _continuations(ts: tuple[tables.Table, ...], i: int, kind: str) -> list[tables.Table]:
+    """The tables that go on from `ts[i]` past the side `kind`, with the rows (or columns) a continuation
+    repeats left out: a table written right after it (`Table.follower`) that has as many columns (`down`) or
+    rows (`right`) and has no heading, or, below, repeats its first row. One written right before it, with
+    this table as the continuation, serves `up` and `left`. A continuation may be continued."""
+    out: list[tables.Table] = []
+    if kind in ("down", "right"):
+        cur = ts[i]
+        while cur.follower is not None and _goes_on(cur, nxt := ts[cur.follower], kind):
+            out.append(_without_repeat(nxt, cur, kind))
+            cur = nxt
+    else:
+        before = {t.follower: k for k, t in enumerate(ts) if t.follower is not None}
+        cur, k = ts[i], i
+        while (j := before.get(k)) is not None and _goes_on(ts[j], cur, "down" if kind == "up" else "right"):
+            out.append(ts[j])
+            cur, k = ts[j], j
+    return out
+
+
+def _goes_on(a: tables.Table, b: tables.Table, kind: str) -> bool:
+    """Whether `b`, written right after `a`, goes on from it below (`down`) or to its right."""
+    if kind == "down":
+        same = len(a.grid[0]) == len(b.grid[0])
+        return same and (not b.headings or _first_row(a) == _first_row(b))
+    return len(a.grid) == len(b.grid) and not b.headings
+
+
+def _first_row(t: tables.Table) -> list[str]:
+    return [_fold_cell(t.text[x]) for x in dict.fromkeys(t.grid[0]) if x is not None]
+
+
+def _without_repeat(b: tables.Table, a: tables.Table, kind: str) -> tables.Table:
+    """`b` with its first row left out when it repeats `a`'s (a header printed again), for `down`."""
+    if kind == "down" and b.headings and _first_row(a) == _first_row(b):
+        return b._replace(grid=b.grid[1:])
+    return b
+
+
+def _one_of(want: str, got: str, thr: float, raw: str = "", lines: bool = True) -> bool:
+    """Whether cell text `got`, or one of its lines (unless `lines` is False), matches the folded `want`; or,
+    given `raw` (the gold as written), is it with a hyphen a line broke after read kept or dropped
+    (`_hyphenated_cell`)."""
+    parts = [x for x in {got, *(got.split("\n") if lines else ())} if x.strip()]
+    return (any(_cell_ratio(want, _fold_cell(x)) >= thr - EPS for x in parts)
+            or bool(raw) and any(_hyphenated_cell(raw, x) for x in parts))
 
 
 # A hyphen (or a form NFKC makes one) with white space after it, perhaps past marks: a cell without one, on
