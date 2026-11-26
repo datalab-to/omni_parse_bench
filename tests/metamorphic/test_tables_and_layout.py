@@ -1,7 +1,13 @@
 """Relations of layout_kind tests (M8, M16, M18) and of table_cell tests (M9)."""
 from __future__ import annotations
 
+import json
+import random
+import re
 import string
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 from hypothesis import HealthCheck, assume, example, find, given, settings
@@ -543,83 +549,140 @@ def test_turning_a_real_neighbour_into_empty_or_end_fails_it():
 
 # ------------------------------------------------------------------ a test without the new args is unchanged
 
-
-def old_table_cell(t: runners.TableCell, page: str):
-    """`table_cell` as it was before `empty` and `end` (416c17b): the same search, with no shape
-    check. A frozen copy of that function's body over the current helpers."""
-    ts = runners.tables.parse(views.html(page).html)
-    if not ts:
-        return False, "no tables found"
-    cell = runners._fold_cell(t.cell)
-    thr = runners._cell_threshold(cell, t.max_diffs)
-    expected = {k: runners._fold_cell(x) for k, x in t.relations.items() if x}
-    reasons = []
-    for table in ts:
-        for rc in [rc for rc, x in table.text.items() if runners._one_of(cell, x, thr, t.cell)]:
-            failed = [why for k, want in expected.items()
-                      if (why := runners._relation(table, rc, k, want, t.max_diffs, t.relations[k]))]
-            failed += runners._structure(t, table, rc)
-            if not failed:
-                return True, ""
-            reasons += failed
-    if not reasons:
-        return False, f"no cell matching {t.cell!r} in any table"
-    return False, f"cells matching {t.cell!r} found, but: {'; '.join(reasons)}"
+OLD_COMMIT = "416c17b"    # main before `empty` and `end`
+ROOT = Path(__file__).resolve().parents[2]
+RUNNER = """
+import json, sys
+sys.path.insert(0, sys.argv[1])
+from omni_parse_bench import views
+from omni_parse_bench.scorers.unit_tests import runners
+out = []
+for params, page in json.load(sys.stdin):
+    cell, relations, max_diffs, headings, section, row_groups = params
+    t = runners.TableCell(cell, relations, max_diffs, tuple(headings), section, tuple(row_groups))
+    out.append(list(runners.table_cell(t, views.html(page))))
+json.dump(out, sys.stdout)
+"""
 
 
-def same_as_before(t: runners.TableCell, page: str) -> bool:
-    return old_table_cell(t, page) == runners.table_cell(t, views.html(page))
+@pytest.fixture(scope="module")
+def old_package(tmp_path_factory):
+    """The package at OLD_COMMIT, checked out from git into a folder of its own and run in a subprocess, so it
+    shares no code with the working tree. Skipped when the history does not hold that commit."""
+    if subprocess.run(["git", "cat-file", "-e", OLD_COMMIT], cwd=ROOT, capture_output=True).returncode:
+        pytest.skip(f"needs git history holding {OLD_COMMIT}")
+    where = tmp_path_factory.mktemp("old")
+    tar = subprocess.run(["git", "archive", OLD_COMMIT, "omni_parse_bench"], cwd=ROOT, check=True,
+                         capture_output=True).stdout
+    subprocess.run(["tar", "-x", "-C", str(where)], input=tar, check=True)
+    return where
 
 
-@relation(HOLDS, domain="4x3 tables of distinct cells with blanks, spans and a figure, every body cell with "
-                        "each of 3 neighbour, heading and structure tests")
-@given(CELLS, st.lists(st.tuples(st.integers(0, 3), st.integers(0, 2)), max_size=3, unique=True),
-       st.sampled_from(["", "<img src=a.png>", " colspan=2", " rowspan=2"]))
-def test_a_table_cell_test_without_empty_or_end_gives_the_verdict_it_gave_before(cells, blanks, extra):
-    """A table_cell test with no `empty` or `end` arg gets the same verdict and the same why as before those
-    args existed, on any table of cells, blanks, spans and figures: for each body cell its neighbours, its
-    headings, its top heading and its section, true or altered. [M97]
-    Why it matters for a score: the new args change no existing test's score."""
-    # Given a 4 x 3 table with blank cells, one cell holding a figure or carrying a span
-    rows = [list(cells[i:i + 3]) for i in range(0, 12, 3)]
-    held = [["" if (a, b) in blanks else x for b, x in enumerate(r)] for a, r in enumerate(rows)]
-    page = grid_html(held)
-    first = f"<td{extra}>" if "span" in extra else f"<td>{extra}"
-    html = page.replace("<td>", first, 1)
-    # When each cell is tested with its own neighbours and headings, and with a wrong one
-    for a in range(1, 4):
-        for b in range(3):
-            x = rows[a][b]
-            near = {"up": rows[a - 1][b], "top_heading": rows[0][b],
-                    **({"left": rows[a][b - 1]} if b else {}), **({"right": rows[a][b + 1]} if b < 2 else {}),
-                    **({"down": rows[a + 1][b]} if a < 3 else {})}
-            for params in (runners.TableCell(x, near, 0), runners.TableCell(x, {**near, "up": "ZZZ"}, 0),
-                           runners.TableCell(x, {}, 0, headings=(rows[0][b],), row_groups=(rows[a][0],)),
-                           runners.TableCell(x, {}, 0, section="ZZZ")):
-                # Then the verdict and the why are those of the frozen copy
-                assert same_as_before(params, html), (params, html)
+def old_verdicts(old_package, cases) -> list[tuple[bool, str]]:
+    """The old package's `table_cell` verdict and why for each (params, page)."""
+    jobs = [([c.cell, dict(c.relations), c.max_diffs, list(c.headings), c.section, list(c.row_groups)], page)
+            for c, page in cases]
+    done = subprocess.run([sys.executable, "-I", "-c", RUNNER, str(old_package)], input=json.dumps(jobs),
+                          check=True, capture_output=True, text=True).stdout
+    return [tuple(x) for x in json.loads(done)]
 
 
-@every_real_test("table tests", note="positive and negative pages, old function against the new")
-def test_every_real_table_cell_test_keeps_its_old_verdict():
-    """Every real table_cell test (none has an `empty` or `end` arg) gets the verdict and the why the frozen
-    old function gives, on a page holding its strings (mostly passing) and on pages with a row or column
-    appended, a cell blanked and the cell altered (mostly failing). [M97]
+def page_for(p: runners.TableCell) -> str:
+    """A table meant to satisfy the test: row groups, left heading and left, then the cell, right and right
+    heading across; the headings, top heading, section label, `up`, the cell's row and `down` down."""
+    rel = p.relations
+    cols = [*p.row_groups, *([rel["left_heading"]] if "left_heading" in rel else []),
+            *([rel["left"]] if "left" in rel else []), p.cell, *([rel["right"]] if "right" in rel else []),
+            *([rel["right_heading"]] if "right_heading" in rel else [])]
+    k = len(p.row_groups) + ("left_heading" in rel) + ("left" in rel)
+    if p.section and len(cols) == 1:
+        cols.append("")      # a section row needs a second cell to be a label row
+    heads = {*([len(p.row_groups)] if "left_heading" in rel else []),
+             *([len(cols) - 1] if "right_heading" in rel else [])}
+
+    def row(vals: dict[int, str], th=()) -> str:
+        return "<tr>" + "".join(
+            f"<{'th' if i in th else 'td'}>{escaped(vals.get(i, ''))}</{'th' if i in th else 'td'}>"
+            for i in range(len(cols))) + "</tr>"
+
+    rows = [row({k: h}, {k}) for h in p.headings]
+    rows += [row({k: rel["top_heading"]}, {k})] if "top_heading" in rel else []
+    label = f"<tr><td>{escaped(p.section)}</td>{'<td></td>' * (len(cols) - 1)}</tr>" if p.section else ""
+    rows += [label] if label else []
+    rows += [row({k: rel["up"]})] if "up" in rel else []
+    rows += [row(dict(enumerate(cols)), heads)]
+    rows += [row({k: rel["down"]})] if "down" in rel else []
+    return "<table>" + "".join(rows) + "</table>"
+
+
+def pages_around(p: runners.TableCell) -> list[str]:
+    """`page_for(p)` and altered pages: a row and a column appended, each cell blanked in turn, the cell's
+    text changed."""
+    base = page_for(p)
+    soup = [m for m in re.finditer(r"<td>([^<]*)</td>", base)]
+    blanked = [base[:m.start()] + "<td></td>" + base[m.end():] for m in soup[:12]]
+    changed = [base[:m.start()] + f"<td>{m[1]}x</td>" + base[m.end():] for m in soup[:12]]
+    return [base, base.replace("</table>", "<tr><td>zz</td></tr></table>"),
+            base.replace("</tr>", "<td>zz</td></tr>"), *blanked, *changed]
+
+
+def same_as_before(old_package, tests) -> tuple[int, int, list]:
+    """(pages compared, pages the new code passes, the (id, page) pairs where old and new differ)."""
+    cases = [(t.params, page) for t in tests for page in pages_around(t.params)]
+    old = old_verdicts(old_package, cases)
+    new = [runners.table_cell(c, views.html(page)) for c, page in cases]
+    names = [t.id for t in tests for _ in pages_around(t.params)]
+    return (len(cases), sum(n[0] for n in new),
+            [(i, page[:80]) for i, (_, page), o, n in zip(names, cases, old, new, strict=True)
+             if tuple(n) != o])
+
+
+@relation(HOLDS, domain="20 random 4x3 tables with blanks, a figure or a span, 240 tests of 4 kinds each; "
+                        "needs git history holding 416c17b")
+def test_a_table_cell_test_without_empty_or_end_gives_the_verdict_it_gave_before(old_package):
+    """A table_cell test with no `empty` or `end` arg gets the verdict and the why that the package at
+    416c17b gives (run from git in a subprocess, sharing no code), on 20 random tables of cells, blanks, spans and
+    figures (240 tests): for each body cell its neighbours, headings, row groups and section, true or altered. [M97]
+    Why it matters for a score: the new args, and the table reader's figure flag, change no existing
+    test's score."""
+    # Given random 4 x 3 tables with blanks, one figure or span, and tests drawn from each body cell
+    rnd = random.Random(97)
+    word = lambda: "".join(rnd.choices(string.ascii_uppercase, k=3))  # noqa: E731
+    cases = []
+    for _ in range(20):
+        rows = [[word() for _ in range(3)] for _ in range(4)]
+        held = [[x if rnd.random() > 0.25 else "" for x in r] for r in rows]
+        first = rnd.choice(["<td><img src=a.png>", "<td colspan=2>", "<td rowspan=2>", "<td><img alt=''>"])
+        page = grid_html(held).replace("<td>", first, 1)
+        for a in range(1, 4):
+            for b in range(3):
+                near = {"up": rows[a - 1][b], "top_heading": rows[0][b],
+                        **({"left": rows[a][b - 1]} if b else {}),
+                        **({"right": rows[a][b + 1]} if b < 2 else {}),
+                        **({"down": rows[a + 1][b]} if a < 3 else {})}
+                for params in (runners.TableCell(rows[a][b], near, 0),
+                               runners.TableCell(rows[a][b], {**near, "up": "ZZZ"}, 0),
+                               runners.TableCell(rows[a][b], {}, 0, headings=(rows[0][b],),
+                                                 row_groups=(rows[a][0],)),
+                               runners.TableCell(rows[a][b], {}, 0, section="ZZZ")):
+                    cases.append((params, page))
+    # When the old package and this one grade them; Then the verdicts and the whys are equal
+    old = old_verdicts(old_package, cases)
+    new = [tuple(runners.table_cell(c, views.html(page))) for c, page in cases]
+    differ = [(c, page) for (c, page), o, n in zip(cases, old, new, strict=True) if o != n]
+    assert not differ, f"{len(differ)}/{len(cases)} differ, e.g. {differ[:2]}"
+    assert {n[0] for n in new} == {True, False}, "the cases hold both verdicts"
+
+
+@every_real_test("table tests", note="a page built for each, and altered pages, old package against new")
+def test_every_real_table_cell_test_keeps_its_old_verdict(old_package):
+    """Every real table_cell test (none has an `empty` or `end` arg) gets the verdict and the why that the
+    package at 416c17b gives, on a page built to satisfy it (all of them pass there) and on altered pages: a
+    row and a column appended, each cell blanked in turn, a cell's text changed. [M97]
     Why it matters for a score: as for M97, over the dataset's own tests."""
-    # Given every real test, and the table its strings fill, and altered ones
-    bad = []
-    for t in CELL:
-        p = t.params
-        assert not p.shapes
-        grid = [["", p.relations.get("up", ""), ""],
-                [p.relations.get("left", ""), p.cell, p.relations.get("right", "")],
-                ["", p.relations.get("down", ""), ""]]
-        def edited(f, grid=grid):
-            return render([[f(a, b, x) for b, x in enumerate(r)] for a, r in enumerate(grid)])
-
-        pages = [render(grid), render([*grid, ["", "zz", ""]]), render([r + ["zz"] for r in grid]),
-                 *(edited(lambda a, b, x, pos=pos: "" if (a, b) == pos else x)
-                   for pos in ((0, 1), (1, 0), (1, 2), (2, 1))),
-                 edited(lambda a, b, x: x + "x" if (a, b) == (1, 1) else x)]
-        bad += [(t.id, pg[:60]) for pg in pages if not same_as_before(p, pg)]
-    assert not bad, f"{len(bad)} pages differ, e.g. {bad[:5]}"
+    # Given every real test, a table holding its strings, headings, row groups and section, and altered ones
+    compared, passed, differ = same_as_before(old_package, CELL)
+    # When the old package and this one grade them; Then they agree on every page, and each built page passes
+    assert not differ, f"{len(differ)}/{compared} pages differ, e.g. {differ[:5]}"
+    built = [runners.table_cell(t.params, views.html(page_for(t.params)))[0] for t in CELL]
+    assert all(built), f"{built.count(False)}/{len(CELL)} built pages do not pass, so the check is thinner"
