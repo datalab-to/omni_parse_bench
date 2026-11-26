@@ -87,7 +87,7 @@ a lowercase letter is then read joined (`well-` before `known` reads `wellknown`
 | a vulgar fraction alone | `¾` | `3/4` | `fold-fraction-alone` |
 | compatibility forms (ligatures, full width, sub- and superscripts) | `ﬁnal １２ m² H₂O ½ №` | `final 12 m2 h2o 1/2 no` | `fold-nfkc` |
 | zero-width and soft hyphen characters vanish | `a` U+200B `b a` U+00AD `b` | `ab ab` | `fold-invisible` |
-| checkboxes become ☒ or ☐ | `[x] Yes [ ] No ☑ ok` | `☒ yes ☐ no ☒ ok` | `fold-checkbox` |
+| checkboxes become ☒ or ☐ (`⊠`, a maths operator, stays as written) | `[x] Yes [ ] No ☑ ok ⊠ ◼ ◻` | `☒ yes ☐ no ☒ ok ⊠ ☒ ☐` | `fold-checkbox` |
 | a bracketed footnote marker becomes a spaced number | `Smith[1] and [12] Jones` | `smith 1 and 12 jones` | `fold-footnote` |
 | a bullet starting a line goes; one inside a line stays | `• one • two` | `one • two` | `fold-bullet` |
 | runs of 3 or more dots, dashes, `_`, `=`, `*` become a space | `Name ........ 5 a --- b ___ c *** d` | `name 5 a b c d` | `fold-leaders` |

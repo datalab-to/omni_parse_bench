@@ -1,5 +1,6 @@
 """Relations of text matching: the edit budget (M3, M23), order (M4, M25), repeat (M5), words broken at a
-hyphen (M11), digits glued to an answer (M13), numbers kept exact (M88, M89) and vulgar fractions (M90)."""
+hyphen (M11), digits glued to an answer (M13), numbers kept exact (M88, M89), vulgar fractions (M90) and
+checkbox glyphs (M91, M92)."""
 from __future__ import annotations
 
 import random
@@ -652,3 +653,62 @@ def test_every_real_test_with_a_vulgar_fraction_passes_it_written_in_ascii():
     assert tests, "no test with a vulgar fraction in the dataset"
     bad = [t.id for t in tests if not passes(t.params, ascii_fractions(answer_page(t.params)))]
     assert not bad, bad
+
+
+# ------------------------------------------------------------------------------------- checkboxes
+
+CHECKED_GLYPHS = ["☒", "☑", "■", "◼", "▣", "✓", "✔", "[x]", "<input type=checkbox checked>"]
+UNCHECKED_GLYPHS = ["☐", "□", "◻", "❏", "▢", "⬜", "[ ]", "<input type=checkbox>"]
+# Note: a test's text is plain text, so only a page can write a box as an input.
+TEXT_GLYPHS = [g for g in CHECKED_GLYPHS + UNCHECKED_GLYPHS if not g.startswith("<")]
+
+
+PAIRS = [(g, w) for g in TEXT_GLYPHS for w in CHECKED_GLYPHS + UNCHECKED_GLYPHS]
+
+
+@relation(HOLDS, domain=f"{len(PAIRS)} pairs: each text glyph as the gold, each spelling as the page")
+@pytest.mark.parametrize("gold, page", PAIRS)
+def test_a_checkbox_state_written_with_any_of_its_glyphs_keeps_every_verdict(gold, page):
+    """An exact (`max_diffs` 0) present text test gives the same verdict when a checkbox in its text or in the
+    page is written with another glyph of the same state (`☒`, `■`, `◼`, `[x]` or a checked input; `☐`,
+    `◻`, `[ ]` or an input), and a context that was wrong stays wrong. [M91]
+    Why it matters for a score: a form's boxes are drawn with whichever glyph the font or the model chose; the
+    state is the content, not the glyph."""
+    # Given an exact text test for "<glyph> Yes", and a page that writes the box with another glyph
+    p = runners.Present(runners.Text(f"{gold} Yes", 0))
+    # When the states agree; Then it passes, and when they differ it fails
+    same = (gold in CHECKED_GLYPHS) == (page in CHECKED_GLYPHS)
+    assert passes(p, f"<p>{page} Yes</p>") is same, (gold, page)
+    # And with the context wrong the verdict is a fail whatever the glyph
+    assert not passes(p, f"<p>{page} No</p>"), (gold, page)
+
+
+FLIPS = [(c, u) for c in CHECKED_GLYPHS for u in UNCHECKED_GLYPHS]
+
+
+@relation(HOLDS, domain=f"{len(FLIPS)} pairs: each checked spelling against each unchecked one")
+@pytest.mark.parametrize("checked, unchecked", FLIPS)
+def test_flipping_a_checkbox_flips_the_verdict_of_a_test_that_reads_it(checked, unchecked):
+    """An exact (`max_diffs` 0) present text test for a checked box fails on the page with that box
+    unchecked, and the other way round, whatever the glyphs. [M92]
+    Why it matters for a score: a model that reads a box wrong must not pass on the glyph it used."""
+    # Given an exact test for each state and a page of each
+    for gold, page in ((checked, unchecked), (unchecked, checked)):
+        if gold.startswith("<"):
+            gold = "☒" if gold in CHECKED_GLYPHS else "☐"    # a test's text is plain text
+        # When the page has the other state; Then the test fails, and it passes on its own state
+        p = runners.Present(runners.Text(f"{gold} Yes", 0))
+        assert not passes(p, f"<p>{page} Yes</p>")
+        assert passes(p, f"<p>{gold} Yes</p>")
+
+
+@more_evidence()
+def test_a_squared_times_sign_is_not_a_box():
+    """A text test for `A⊠B` passes on `A⊠B` and fails on `A☒B`, and the other way round. [M91]
+    Why it matters for a score: ⊠ is a maths operator as well as a box on some forms, and fold cannot tell the
+    two apart, so it keeps ⊠ as written (a known limit: a form that draws its boxes with ⊠ is not folded)."""
+    # Given exact text tests for a sign and for a box; When the page writes the other; Then they fail
+    for text, page in (("A⊠B", "A⊠B"), ("A ⊠ B", "A ⊠ B")):
+        assert passes(runners.Present(runners.Text(text, 0)), f"<p>{page}</p>")
+    for text, page in (("A⊠B", "A☒B"), ("A☒B", "A⊠B")):
+        assert not passes(runners.Present(runners.Text(text, 0)), f"<p>{page}</p>"), (text, page)
