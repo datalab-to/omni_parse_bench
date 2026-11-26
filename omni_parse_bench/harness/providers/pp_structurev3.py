@@ -1,7 +1,7 @@
 """PP-StructureV3 (PaddleOCR's PPStructureV3 pipeline), served from providers/serve/pp-structurev3/ on any
 host; a GPU is optional.
 
-Licenses: PaddleOCR (3.7.0), PaddleX (3.7.2) and paddlepaddle (3.3.1) are Apache-2.0 on PyPI. Every model the
+Licenses: PaddleOCR (3.7.0), PaddleX (3.7.2) and paddlepaddle (3.2.2) are Apache-2.0 on PyPI. Every model the
 pipeline loads is Apache-2.0 on its Hugging Face model card (`license: apache-2.0`, read 2026-11-25 for each
 of the 13 models in PINNED: PP-DocLayout_plus-L, PP-DocBlockLayout, PP-OCRv5_server_det and _rec,
 PP-LCNet_x1_0_doc_ori, _textline_ori and _table_cls, UVDoc, SLANet_plus, SLANeXt_wired, RT-DETR-L wired and
@@ -22,7 +22,7 @@ from ..adapter import Served
 
 SUPPORTS = frozenset({"html", "blocks"})
 # Note: the package names its models, so its version decides which; the server's answer says which it ran.
-PACKAGE = "paddleocr==3.7.0 (paddlex 3.7.2, paddlepaddle 3.3.1)"
+PACKAGE = "paddleocr==3.7.0 (paddlex 3.7.2, paddlepaddle 3.2.2)"
 # The Hugging Face models the pipeline loads at its defaults, at the commits its image holds: PaddleX's
 # Hugging Face source takes the latest of a model, so the image downloads these (serve/pp-structurev3/
 # model_pins.py, which a test keeps equal to this) before PaddleX looks. Their licenses are in the docstring.

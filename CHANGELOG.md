@@ -35,7 +35,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 
 ### Added
 
-- Provider: PP-StructureV3 (`pp-structurev3`, paddleocr 3.7.0), PaddleOCR's pipeline at its defaults with every block kept in the markdown, served from a CPU image (a GPU is optional): html from its markdown and layout blocks from its parsing result.
+- Provider: PP-StructureV3 (`pp-structurev3`, paddleocr 3.7.0, paddlepaddle 3.2.2), PaddleOCR's pipeline at its defaults with every block kept in the markdown, served from a CPU image (a GPU is optional): html from its markdown and layout blocks from its parsing result (#118).
 
 ### Changed
 

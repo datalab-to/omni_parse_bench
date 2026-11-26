@@ -3,6 +3,7 @@ the page as sent, and a block it cannot place fails the blocks, never guessed.""
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -91,3 +92,11 @@ def test_cpu_server_pins_paddle_322_for_the_one_dnn_pir_regression():
     lines = dockerfile.read_text().splitlines()
     assert any("Paddle#77340" in line and "oneDNN+PIR" in line for line in lines)
     assert any(line.startswith("RUN pip install") and "paddlepaddle==3.2.2" in line for line in lines)
+
+
+def test_adapter_package_declaration_matches_the_cpu_server_paddle_pin():
+    dockerfile = Path(pp.__file__).parent / "serve" / "pp-structurev3" / "Dockerfile"
+    install = next(line for line in dockerfile.read_text().splitlines() if line.startswith("RUN pip install"))
+    docker_version = re.search(r"paddlepaddle==([0-9.]+)", install)
+    adapter_version = re.search(r"paddlepaddle ([0-9.]+)", pp.PACKAGE)
+    assert docker_version and adapter_version and docker_version.group(1) == adapter_version.group(1)
