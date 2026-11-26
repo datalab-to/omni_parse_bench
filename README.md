@@ -39,6 +39,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | LightOnOCR-3-0.8B | open | 0.85B | 81.9 | — | 81.7 | 72.2 | 91.7 | — |
 | GLM-OCR | open | 1.3B | 81.9 | — | 71.6 | 84.7 | 89.3 | — |
 | Unlimited-OCR 2 | open | 3.3B | 81.5 | — | 73.0 | 80.0 | 91.6 | — |
+| Marker | open | n/a | 81.5 | — | 83.3 | 65.9 | 95.3 | — |
 | PaddleOCR-VL-1.6 | open | 0.96B | 81.3 | — | 69.2 | 84.0 | 90.7 | — |
 | Nemotron 3.5 Parse | open | 0.63B | 79.9 | — | 72.6 | 77.1 | 90.0 | — |
 | Unlimited-OCR | open | 3.3B | 79.5 | — | 70.7 | 76.6 | 91.1 | — |
@@ -67,7 +68,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 
 Scores use omni-parse-bench 1.7.0: saved predictions are regraded with it, and locally run open tools are fresh full runs (see the next paragraph); rows marked § keep their published 1.5.0 grades.
 
-Rows for open tools run locally (pdftotext, pdftext, MarkItDown, pdf-inspector, PyMuPDF4LLM, OpenDataLoader, LiteParse and Marker (fast)) are full runs graded with released omni-parse-bench 1.7.0, failed pages counted; settings and failures per tool are in [docs/providers.md](docs/providers.md).
+Rows for open tools run locally (pdftotext, pdftext, MarkItDown, pdf-inspector, PyMuPDF4LLM, OpenDataLoader, LiteParse, Marker (fast) and Marker) are full runs graded with released omni-parse-bench 1.7.0, failed pages counted; settings and failures per tool are in [docs/providers.md](docs/providers.md).
 
 \* Used in creating and verifying at least some tests.
 
@@ -425,6 +426,7 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | LightOnOCR-3-0.8B | 57.4 | 94.4 | 74.0 | 84.7 | 78.1 | 84.0 | 62.6 | 69.3 | 44.9 |
 | GLM-OCR | 42.6 | 90.3 | 83.9 | 69.0 | 75.7 | 66.5 | 61.8 | 55.4 | 27.3 |
 | Unlimited-OCR 2 | 35.8 | 88.2 | 79.3 | 71.9 | 70.9 | 59.4 | 34.4 | 49.5 | 44.3 |
+| Marker | 52.8 | 88.2 | 68.4 | 82.7 | 77.5 | 88.7 | 53.5 | 59.8 | 73.1 |
 | PaddleOCR-VL-1.6 | 40.0 | 82.3 | 82.6 | 67.9 | 69.7 | 58.6 | 70.9 | 43.9 | 39.6 |
 | Nemotron 3.5 Parse | 39.3 | 75.8 | 77.1 | 75.4 | 75.1 | 71.3 | 48.6 | 48.4 | 60.1 |
 | Unlimited-OCR | 31.3 | 89.3 | 75.3 | 69.1 | 68.8 | 59.3 | 15.6 | 50.4 | 36.8 |
