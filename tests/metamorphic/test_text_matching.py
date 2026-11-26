@@ -1,16 +1,19 @@
 """Relations of text matching: the edit budget (M3, M23), order (M4, M25), repeat (M5), words broken at a
-hyphen (M11) and digits glued to an answer (M13)."""
+hyphen (M11), digits glued to an answer (M13), numbers kept exact (M88, M89) and vulgar fractions (M90)."""
 from __future__ import annotations
 
 import random
+import re
 import string
+import unicodedata
 
 import pytest
-from hypothesis import example, given
+from hypothesis import assume, example, given
 from hypothesis import strategies as st
 
 from metamorphic.common import (CELL, HOLDS, INTENDED, ORDER, REPEAT, TEXT, answer_page,
-                                deviation, escaped, every_real_test, more_evidence, passes, relation)
+                                deviation, escaped, every_real_test, more_evidence, passes, relation,
+                                text_strings)
 from omni_parse_bench.normalize import fold
 from omni_parse_bench.scorers.unit_tests import runners
 
@@ -467,16 +470,185 @@ def test_a_digit_glued_to_a_number_fails_present_when_a_word_breaks_at_its_hyphe
 @given(st.sampled_from(["Total", "Fee", "Item no", "x"]), st.integers(10, 999), st.sampled_from("0123456789"),
        st.integers(1, 2), st.booleans())
 def test_a_copy_with_a_digit_glued_does_not_veto_a_match_elsewhere(word, n, d, k, glued_first):
-    """A text test with 1 or 2 edits allowed (`Total: 40`) that passes on a paragraph one digit off
-    (`Total: 41`) still passes when another paragraph holds its text with a digit glued (`Total: 400`), before
+    """A text test with 1 or 2 edits allowed (`Total: 40`) that passes on a paragraph one letter off
+    (`qotal: 40`) still passes when another paragraph holds its text with a digit glued (`Total: 400`), before
     or after it. [M13e]
     Why it matters for a score: one acceptable copy anywhere on the page is enough; a rejected copy elsewhere
     must not cancel it."""
-    # Given a text test with an edit to spend, and a paragraph one digit off that passes it
+    # Given a text test with an edit to spend, and a paragraph one letter off that passes it
     text = f"{word}: {n}"
-    near = f"{word}: {n - n % 10 + (n + 1) % 10}"
+    near = f"q{word[1:]}: {n}"
     p = runners.Present(runners.Text(text, k))
     assert passes(p, f"<p>{near}</p>")
     # When a paragraph holds the text with a digit glued, before or after; Then it still passes
     glued = f"<p>{text}{d}</p>"
     assert passes(p, glued + f"<p>{near}</p>" if glued_first else f"<p>{near}</p>" + glued)
+
+
+# ------------------------------------------------------------------------ numbers within an edit budget
+
+WORDS = ["Total", "page", "Item", "Figure", "Room"]     # longer than any budget, so no word is edited away
+PART = st.one_of(st.sampled_from(WORDS), st.integers(0, 9999).map(str))
+
+
+def number_changes(s: str) -> list[str]:
+    """`s` with one ASCII number (a maximal run of 0-9) changed: its last digit changed, a digit added or
+    dropped, split by a space or a point, or joined to the next number one character after it; every way."""
+    runs = list(re.finditer(r"[0-9]+", s))
+    out = []
+    for m in runs:
+        a, b = m.span()
+        out += [s[:b - 1] + str((int(s[b - 1]) + 1) % 10) + s[b:], s[:b] + "0" + s[b:], s[:b - 1] + s[b:]]
+        out += [s[:a + 1] + sep + s[a + 1:] for sep in " ." if b - a > 1]
+    out += [s[:x.end()] + s[y.start():] for x, y in zip(runs, runs[1:], strict=False)
+            if y.start() - x.end() == 1]
+    return out
+
+
+def letters_changed(s: str, k: int) -> str | None:
+    """`s` with up to k of its letters, spread through it, each replaced by another letter of its case (`q`,
+    or `z` for a `q`); None when it has no letter that folds to one character."""
+    at = [i for i, c in enumerate(s) if c.isalpha() and len(fold(c)) == 1]
+    if not at:
+        return None
+    out = list(s)
+    for i in at[::max(1, len(at) // k)][:k]:
+        q = "z" if s[i] in "qQ" else "q"
+        out[i] = q.upper() if s[i].isupper() else q
+    return "".join(out)
+
+
+@relation(HOLDS)
+@given(st.lists(PART, min_size=2, max_size=5), st.sampled_from([" ", ": "]), st.integers(1, 3), st.data())
+def test_letter_edits_within_the_budget_keep_a_text_with_numbers_passing(parts, sep, k, data):
+    """A text test with 1 to 3 edits allowed whose text holds a number passes on its text with up to that many
+    letters substituted, inserted or deleted, wherever its numbers stand (real tests: up to their own budget
+    of letters substituted). [M88]
+    Why it matters for a score: keeping numbers exact must not cost the letter typos the budget forgives."""
+    text = sep.join(parts)
+    assume(any(c.isdigit() for c in text) and any(c.isalpha() for c in text))
+    p = runners.Present(runners.Text(text, k))
+    # Given the text: it passes
+    assert passes(p, f"<p>{text}</p>")
+    # When up to k of its letters are substituted, inserted before, or deleted; Then it still passes
+    letters = [i for i, c in enumerate(text) if c.isalpha()]
+    edits = data.draw(st.lists(st.tuples(st.sampled_from(letters), st.sampled_from("sid")), max_size=k,
+                               unique_by=lambda e: e[0]))
+    out = list(text)
+    for i, kind in sorted(edits, reverse=True):
+        match kind:
+            case "s": out[i] = "z" if out[i] == "q" else "q"
+            case "i": out.insert(i, "q")
+            case _: del out[i]
+    assert passes(p, f"<p>{''.join(out)}</p>"), "".join(out)
+
+
+@relation(HOLDS)
+@example(parts=["Total", "41"], sep=": ", k=1, at=0)
+@example(parts=["Item", "1", "2"], sep=" ", k=3, at=0)
+@example(parts=["Item", "21"], sep=" ", k=0, at=3)
+@given(st.lists(PART, min_size=2, max_size=5), st.sampled_from([" ", ": "]), st.integers(0, 3),
+       st.integers(0))
+def test_changing_a_number_fails_a_text_test_at_any_budget(parts, sep, k, at):
+    """A text test with 0 to 3 edits allowed whose text holds a number fails on its text with one number
+    changed: a digit changed, added or dropped, the number split by a space or a point, or joined to the next
+    number (`Total: 41` fails on `Total: 40`, `Total: 410`, `Total: 4 1` and `Total 4.1`), at every budget.
+    [M89]
+    Why it matters for a score: an edit budget is for letters, and spacing is free only between words; a page
+    that prints another number has the number wrong."""
+    text = sep.join(parts)
+    changes = number_changes(text)
+    assume(changes)
+    p = runners.Present(runners.Text(text, k))
+    # Given the text: it passes; When one of its numbers is changed; Then it fails
+    assert passes(p, f"<p>{text}</p>")
+    changed = changes[at % len(changes)]
+    assert not passes(p, f"<p>{changed}</p>"), changed
+
+
+@more_evidence()
+def test_a_glued_copy_and_a_changed_number_do_not_add_up_to_a_pass():
+    """A text test with an edit to spend fails on a page that holds its text only cut out of a longer number
+    (`price 1,000`) and elsewhere with its number changed (`price 2`); each alone fails, and together they
+    still fail. A copy one letter off beside the glued one passes. [M89]
+    Why it matters for a score: the edit budget and the number must be met by one stretch of the page, not
+    one each."""
+    for gold, glued, changed, near in [("price 1", "price 1,000", "price 2", "prise 1"),
+                                       ("total 4", "total 4.5", "total 7", "totl 4")]:
+        p = runners.Present(runners.Text(gold, 1))
+        # Given a glued copy and a changed number: each fails, and together they fail
+        for page in (glued, changed, f"{glued} and {changed}", f"{changed} and {glued}"):
+            assert not passes(p, f"<p>{page}</p>"), page
+        # When a copy one letter off stands beside the glued one; Then it passes
+        assert passes(p, f"<p>{glued} and {near}</p>")
+
+
+# The loaded text tests whose folded text holds a digit, and those of them with an edit to spend.
+NUMBERED = [t for t in TEXT if any(c.isdigit() for c in fold(t.params.content.text))]
+FUZZY_NUMBERED = [t for t in NUMBERED if t.params.content.max_diffs > 0]
+
+
+@every_real_test({"M88": "fuzzy numbered text", "M89": "numbered text"})
+def test_every_real_text_test_with_a_number_keeps_it_exact():
+    """Every real text test with edits to spend whose text holds a number passes with up to its budget of
+    letters substituted, and every real text test whose text holds a number fails with any one of its ASCII
+    numbers changed. [M88, M89]
+    Why it matters for a score: as for M88 and M89, over the whole dataset."""
+    # Given every real text test with a number
+    assert FUZZY_NUMBERED, "no text test with a budget and a number in the dataset"
+    # When up to its budget of letters is substituted; Then it passes
+    lettered = [(t, x) for t in FUZZY_NUMBERED
+                if (x := letters_changed(t.params.content.text, t.params.content.max_diffs)) is not None]
+    lost = [(t.id, x[:60]) for t, x in lettered if not passes(t.params, f"<p>{escaped(x)}</p>")]
+    assert not lost, f"{len(lost)} letter edits within budget fail, e.g. {lost[:6]}"
+    # When one of its numbers is changed; Then it fails
+    kept = [(t.id, x[:60]) for t in NUMBERED for x in number_changes(t.params.content.text)
+            if passes(t.params, f"<p>{escaped(x)}</p>")]
+    assert not kept, f"{len(kept)} changed numbers still pass, e.g. {kept[:6]}"
+
+
+# ----------------------------------------------------------------------------------- vulgar fractions
+
+VULGAR = re.compile("[\u00bc-\u00be\u2150-\u215e\u2189]")
+
+
+def ascii_fractions(s: str) -> str:
+    """`s` with each vulgar fraction written in ASCII (`½` -> `1/2`), set apart from a digit before it by a
+    space (`1½` -> `1 1/2`)."""
+    return VULGAR.sub(lambda m: (" " if m.start() and s[m.start() - 1].isdigit() else "")
+                      + unicodedata.normalize("NFKC", m[0]).replace("\u2044", "/"), s)
+
+
+FRACTION_PART = st.one_of(PART, st.sampled_from("½¼¾⅓⅔⅛⅞↉"),
+                          st.builds("{}{}".format, st.integers(0, 99), st.sampled_from("½¼¾⅓⅛")))
+
+
+@relation(HOLDS)
+@example(gold=["1½", "Total"], other=["11", "/2", "Total"], sep=" ", k=0)
+@given(st.lists(FRACTION_PART, min_size=1, max_size=4), st.lists(FRACTION_PART, min_size=1, max_size=4),
+       st.sampled_from([" ", ""]), st.integers(0, 2))
+def test_a_vulgar_fraction_written_in_ascii_keeps_every_verdict(gold, other, sep, k):
+    """A text test gives the same verdict when a vulgar fraction in its text or in the page is written in
+    spaced ASCII (`1½` as `1 1/2`, `½` as `1/2`), on its own text and on another text. [M90]
+    Why it matters for a score: `1½` and `1 1/2` print the same quantity; neither may glue the whole number
+    to the numerator (`11/2`)."""
+    text = sep.join(gold)
+    # Given a text test and two pages: its text, and another text
+    for page in (text, sep.join(other)):
+        p = runners.Present(runners.Text(text, k))
+        verdict = passes(p, f"<p>{page}</p>")
+        # When the page's, or the test's, fractions are written in spaced ASCII; Then the verdict is the same
+        assert passes(p, f"<p>{ascii_fractions(page)}</p>") is verdict, page
+        assert passes(runners.Present(runners.Text(ascii_fractions(text), k)), f"<p>{page}</p>") is verdict
+
+
+@every_real_test("fraction text")
+def test_every_real_test_with_a_vulgar_fraction_passes_it_written_in_ascii():
+    """Every real text, order, repeat and table_cell test whose strings hold a vulgar fraction passes on its
+    answer with each fraction written in spaced ASCII. [M90]
+    Why it matters for a score: as for M90, on the fractions the tests really hold."""
+    # Given every real test with a vulgar fraction; When its answer writes them in ASCII; Then it passes
+    tests = [t for t in TEXT + ORDER + REPEAT + CELL if any(VULGAR.search(x) for x in text_strings(t.params))]
+    assert tests, "no test with a vulgar fraction in the dataset"
+    bad = [t.id for t in tests if not passes(t.params, ascii_fractions(answer_page(t.params)))]
+    assert not bad, bad

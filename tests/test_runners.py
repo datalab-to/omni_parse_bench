@@ -127,8 +127,8 @@ def test_order_squeezed_item_is_not_cut_out_of_a_longer_number(text, passes):
     ("7777777 77", "id 7777777 77 x", True),
     ("26a. Provide", "512 6a. provide", False),
     ("35 \u00b1 6", "35 \u00b1 6 33 \u00b1 8", True),
-    ("305357", "3 0 5 3 5 7", True),
-    ("305357", "x 3 0 5 3 5 7 y", True),
+    ("305357", "3 0 5 3 5 7", False),         # a space splits a number, at any budget
+    ("305357", "x 3 0 5 3 5 7 y", False),
 ])
 def test_a_squeezed_match_is_not_glued_to_the_digits_around_it(needle, text, passes):
     assert R.present(R.Present(R.Text(needle, 0)), html(f"<p>{text}</p>"))[0] is passes
@@ -666,26 +666,27 @@ def test_page_near_empty_counts_a_list_items_number():
     assert not R.page_near_empty(R.PageNearEmpty(0), html("<ol><li>x</li></ol>"))[0]
 
 @pytest.mark.parametrize("text, passes", [
-    ("<p>Total: 41</p>", True),
-    ("<p>Total: 400</p><p>Total: 41</p>", True),     # a glued copy does not veto a separate fuzzy one
-    ("<p>Total: 41</p><p>Total: 400</p>", True),
-    ("<p>Total: 400</p>", False),                    # nor does any window of the glued copy count
-    ("<p>Total: 400</p><p>Total: 4</p>", True),
+    ("<p>Totl: 40</p>", True),
+    ("<p>Total: 400</p><p>Totl: 40</p>", True),     # a glued copy does not veto a separate fuzzy one
+    ("<p>Totl: 40</p><p>Total: 400</p>", True),
+    ("<p>Total: 400</p>", False),                   # nor does any window of the glued copy count
+    ("<p>Total: 400</p><p>Total: 41</p>", False),   # and an edit may not touch the number
 ])
 def test_a_glued_copy_does_not_veto_a_fuzzy_match_elsewhere(text, passes):
     assert R.present(R.Present(R.Text("Total: 40", 1)), html(text))[0] is passes
 
 
 def test_a_squeezed_glued_copy_does_not_veto_a_fuzzy_match_elsewhere():
-    assert R.present(R.Present(R.Text("1 2 3 4", 1)), html("<p>12345</p><p>1235</p>"))[0]
-    assert not R.present(R.Present(R.Text("1 2 3 4", 1)), html("<p>12345</p>"))[0]
+    assert R.present(R.Present(R.Text("ab 1 2", 1)), html("<p>ab 123</p><p>xb 1 2</p>"))[0]
+    assert not R.present(R.Present(R.Text("ab 1 2", 1)), html("<p>ab 123</p>"))[0]
 
 
 @pytest.mark.parametrize("text, passes", [
-    ("<p>4 0</p>", True),
-    ("<p>400 4 0</p>", True),             # a glued copy does not veto a spaced one beside it
-    ("<p>400</p><p>4 0</p>", True),       # nor one in another paragraph
-    ("<p>140 4 0</p>", True),
+    ("<p>40</p>", True),
+    ("<p>400 40</p>", True),              # a glued copy does not veto a clean one beside it
+    ("<p>400</p><p>40</p>", True),        # nor one in another paragraph
+    ("<p>4 0</p>", False),                # a spaced copy is two numbers
+    ("<p>400 4 0</p>", False),
     ("<p>400</p>", False),
     ("<p>4 00</p>", False),
     ("<p>1400</p>", False),

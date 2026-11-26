@@ -43,10 +43,8 @@ text-longer-word	pass
 text-letter-beside	pass
 text-currency-extra	pass
 text-alt	pass
-text-exponent	pass
 text-sup-unit	pass
 text-table-flat	pass
-text-fuzzy-wrong-gold	pass
 text-short-fuzzy	pass
 ## text-penalized
 text-changed	fail	'Total' not found (best 0.800 < 1.000); closest 'totel'
@@ -66,6 +64,7 @@ text-checkbox-state	fail	'☒ Yes' not found (best 0.889 < 1.000); closest ' yes
 text-homoglyph	fail	'l' not found (best 0.000 < 1.000); closest '1'
 text-literal-stars	fail	'Total Due' not found (best 0.778 < 1.000); closest 'otal** du'
 text-caret	fail	'x^2' not found (best 0.800 < 1.000); closest 'x2'
+text-exponent	fail	'12' not found with its numbers exact (a number differs, or one was added, split or joined)
 text-sup-exponent	fail	'10 cells' not found (best 0.857 < 1.000); closest ' cells'
 text-sign-after-leaders	fail	'Revenue 4.8' not found (best 0.909 < 1.000); closest 'revenue -4.'
 text-exact-case	fail	'iPhone' not found (best 0.833 < 1.000); closest 'iphone'
@@ -86,10 +85,23 @@ edge-paren	pass
 edge-end-digit	fail	'x1' found only inside a longer number
 edge-end-letter	pass
 edge-squeeze-glued	fail	'1 2' found only inside a longer number
-edge-squeeze-spaced	pass
-edge-glued-and-spaced	pass
-edge-squeeze-digits	pass
+edge-squeeze-spaced	fail	'1 2' not found with its numbers exact (a number differs, or one was added, split or joined)
+edge-glued-and-spaced	fail	'40' not found with its numbers exact (a number differs, or one was added, split or joined)
+edge-squeeze-digits	fail	'305357' not found with its numbers exact (a number differs, or one was added, split or joined)
+edge-squeeze-word	pass
 edge-fuzzy	fail	'Total: 40' found only inside a longer number
+## text-numbers
+text-fuzzy-wrong-gold	fail	'Total: 41' not found with its numbers exact (a number differs, or one was added, split or joined)
+num-fuzzy-digit	fail	'Total: 41' not found with its numbers exact (a number differs, or one was added, split or joined)
+num-fuzzy-split	fail	'Total: 41' not found with its numbers exact (a number differs, or one was added, split or joined)
+num-fuzzy-point	fail	'Total: 41' not found with its numbers exact (a number differs, or one was added, split or joined)
+num-fuzzy-added	fail	'Total 41' not found with its numbers exact (a number differs, or one was added, split or joined)
+num-fuzzy-joined	fail	'Pages 1 to 2' not found with its numbers exact (a number differs, or one was added, split or joined)
+num-fuzzy-thousands	fail	'1,000' not found with its numbers exact (a number differs, or one was added, split or joined)
+num-fuzzy-script	fail	'3.' not found with its numbers exact (a number differs, or one was added, split or joined)
+num-fuzzy-letter	pass
+num-fuzzy-fullwidth	pass
+num-fuzzy-after	pass
 ## number-gold
 gold-point	12.5
 gold-leading-point	refused
@@ -485,6 +497,8 @@ fold-hyphen	developers, anglo- saxon
 fold-hyphen-caps	developers, rem
 fold-hyphen-block	headquarters developers
 fold-superscript	1,240 1
+fold-fraction	1 1/2
+fold-fraction-alone	3/4
 fold-nfkc	final 12 m2 h2o 1/2 no
 fold-invisible	ab ab
 fold-checkbox	☒ yes ☐ no ☒ ok

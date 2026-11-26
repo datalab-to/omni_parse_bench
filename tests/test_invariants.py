@@ -1,7 +1,8 @@
 """What must hold for every test, whatever its content: on tests/fixtures/invariants/, and on the
 published dataset when OPB_DATASET is set to its root.
 
-    empty      an empty output (html "", blocks []) passes no test;
+    empty      an empty output (html "", blocks []) passes no test except a page_near_empty test, which it
+               passes by definition;
     answer     a test's own answer written as the output (`answer`) passes it; and
     determined scoring a page twice, caches cleared, gives the same verdicts.
 

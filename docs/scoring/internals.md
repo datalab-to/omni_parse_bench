@@ -83,6 +83,8 @@ a lowercase letter is then read joined (`well-` before `known` reads `wellknown`
 | so does one between two words in capitals | `DEVELOP- ERS, RE- M` | `developers, rem` | `fold-hyphen-caps` |
 | a block break is a line break for a hyphen: it joins, as a `<br>` does | `<p>Head-</p><p>quarters</p><p>develop-<br>ers</p>` | `headquarters developers` | `fold-hyphen-block` |
 | a superscript digit after a digit is set apart | `1,240¹` | `1,240 1` | `fold-superscript` |
+| a vulgar fraction after a digit is set apart | `1½` | `1 1/2` | `fold-fraction` |
+| a vulgar fraction alone | `¾` | `3/4` | `fold-fraction-alone` |
 | compatibility forms (ligatures, full width, sub- and superscripts) | `ﬁnal １２ m² H₂O ½ №` | `final 12 m2 h2o 1/2 no` | `fold-nfkc` |
 | zero-width and soft hyphen characters vanish | `a` U+200B `b a` U+00AD `b` | `ab ab` | `fold-invisible` |
 | checkboxes become ☒ or ☐ | `[x] Yes [ ] No ☑ ok` | `☒ yes ☐ no ☒ ok` | `fold-checkbox` |

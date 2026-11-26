@@ -120,6 +120,8 @@ TABLES = [
         folds("fold-hyphen-caps", "so does one between two words in capitals", "DEVELOP- ERS, RE- M", "developers, rem"),
         folds("fold-hyphen-block", "a block break is a line break for a hyphen: it joins, as a `<br>` does", "<p>Head-</p><p>quarters</p><p>develop-<br>ers</p>", "headquarters developers"),
         folds("fold-superscript", "a superscript digit after a digit is set apart", "1,240¹", "1,240 1"),
+        folds("fold-fraction", "a vulgar fraction after a digit is set apart", "1½", "1 1/2"),
+        folds("fold-fraction-alone", "a vulgar fraction alone", "¾", "3/4"),
         folds("fold-nfkc", "compatibility forms (ligatures, full width, sub- and superscripts)", "ﬁnal １２ m² H₂O ½ №", "final 12 m2 h2o 1/2 no"),
         folds("fold-invisible", "zero-width and soft hyphen characters vanish", "a\u200bb a\u00adb", "ab ab", show="`a` U+200B `b a` U+00AD `b`"),
         folds("fold-checkbox", "checkboxes become ☒ or ☐", "[x] Yes [ ] No ☑ ok", "☒ yes ☐ no ☒ ok"),

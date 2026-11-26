@@ -82,8 +82,7 @@ and in the case files under [tests/scoring_probes](../../tests/scoring_probes/).
 | image descriptions | `Total` is found in `<img alt='Total'>` | `present`, `order` | (cases text-alt, ord-alt) |
 | styling | struck-through text still counts; bold and italic are dropped | every html test but `format` | (case text-strike) |
 | table structure, outside `table_cell` | two adjacent cells read as one string | `present`, `order` | (case text-table-flat) |
-| an exponent against a digit | `12` is found in `1<sup>2</sup>` | `present` (text) | (case text-exponent) |
-| the slack of an edit budget | with 1 edit, `Total: 41` is found in `Total: 400` | `present`, `table_cell` | (cases text-fuzzy-wrong-gold, cell-insertions) |
+| the slack of an edit budget | with 1 edit, `ab` is found in `a` | `present`, `table_cell` | (cases text-short-fuzzy, cell-insertions) |
 | letters around an equation | `xy` is found in `$wxy$` | `present` (latex) | (case tex-letter-beside) |
 | unknown LaTeX commands | `x+y` is found in `$x+\foo y$` | `present` (latex) | (case tex-unknown-macro) |
 | a second copy elsewhere | `Alpha` before `Beta` passes on `Beta Alpha Beta` | `order` | (case ord-any-pair) |
