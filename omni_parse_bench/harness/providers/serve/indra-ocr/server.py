@@ -22,6 +22,12 @@ SETTINGS = ("mode", "math", "dpi", "furniture")
 _converters: dict = {}
 
 
+def usable_cores() -> int:
+    """Count CPUs allowed to this process on Linux, or CPUs available on other platforms."""
+    affinity = getattr(os, "sched_getaffinity", None)
+    return len(affinity(0)) if affinity else (os.cpu_count() or 1)
+
+
 def converter(s: dict):
     """One single-threaded Converter per worker and settings, as `convert_many` gives each worker."""
     import indra_ocr
@@ -130,7 +136,7 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8001)
-    cores = len(os.sched_getaffinity(0))
+    cores = usable_cores()
     ap.add_argument("--workers", type=int, default=int(os.environ.get("WORKERS") or cores),
                     help="worker processes, one page each at a time (default: WORKERS, else one per usable "
                          "core); each loads its own models, the math models too when a request asks for math")
