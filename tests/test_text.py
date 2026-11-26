@@ -88,6 +88,14 @@ def test_controls_read_as_ballot_boxes():
     assert views.UNCHECKED in v and views.CHECKED in v
 
 
+def test_every_checked_glyph_folds_to_the_checked_box_and_every_unchecked_one_to_the_unchecked():
+    from omni_parse_bench.normalize import boxes
+    for g in "☑☒■◼▣✓✔✗✘":
+        assert boxes(f"{g} Yes") == "☒ Yes", g
+    for g in "☐□◻❏▢⬜":
+        assert boxes(f"{g} No") == "☐ No", g
+
+
 def test_image_alt_is_text():
     assert "Figure 13: caption" in views.text('<img src="x.png" alt="Figure 13: caption"/>')
 
