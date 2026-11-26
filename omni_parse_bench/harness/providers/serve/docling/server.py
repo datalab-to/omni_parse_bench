@@ -41,6 +41,35 @@ SERVED = {"weights": ", ".join(f"{repo}@{sha}" for repo, sha in (LAYOUT, TABLES,
           "revision": f"docling=={importlib.metadata.version('docling')}"}
 
 
+def no_cudnn_attention_in_formula_stage():
+    """Runs Docling's formula stage (CodeFormulaV2) with PyTorch's cuDNN attention kernel turned off, and
+    nothing else changed (the layout, table and OCR models keep PyTorch's defaults, as the `docling` row runs
+    them; in that row the stage reads nothing, so the setting has nothing to change).
+
+    Why: cuDNN attention builds a plan on the CPU for every new shape, and a VLM decoding a batch of formulas
+    meets a new shape at nearly every step. On a B200 (torch 2.11, cu128) the first pass over a page's
+    formulas ran at 300 to 740 ms a token, 93% of it in `aten::_cudnn_attention_forward` on the CPU (21 ms on
+    the GPU); a repeat of the same shapes in the same process ran at 15 ms. Each server worker keeps its own
+    plans, so pages kept paying. With cuDNN attention off, PyTorch picks its next kernel (flash or memory-
+    efficient attention) and the first pass runs at 14 to 16 ms a token: 5 to 8 s for a page of 4 to 8
+    formulas instead of 90 to 140 s. The kernels differ in bf16 rounding, so a long formula's LaTeX can differ
+    by a few characters (2 of 19 in that test). The stage is a generator that runs while the pipeline reads
+    it, one page at a time per worker (`_LOCK`), so the setting holds for exactly the stage's run and is
+    restored after it."""
+    from docling.models.stages.code_formula.code_formula_vlm_model import CodeFormulaVlmModel
+    from torch.nn.attention import SDPBackend, sdpa_kernel
+
+    call = CodeFormulaVlmModel.__call__
+    if getattr(call, "_opb_no_cudnn", False): return
+
+    def __call__(self, *args, **kwargs):
+        with sdpa_kernel([SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH]):
+            yield from call(self, *args, **kwargs)
+
+    __call__._opb_no_cudnn = True
+    CodeFormulaVlmModel.__call__ = __call__
+
+
 def make_converter(formula: bool = False):
     """Docling's converter, as the server runs it (the Dockerfile builds both modes once to download the
     models). `formula` turns on Docling's formula enrichment and nothing else."""
@@ -62,6 +91,7 @@ def make_converter(formula: bool = False):
         options.do_formula_enrichment = True
         spec = options.code_formula_options.model_spec.model_copy(update={"revision": CODE_FORMULA[1]})
         options.code_formula_options = options.code_formula_options.model_copy(update={"model_spec": spec})
+        no_cudnn_attention_in_formula_stage()
     return DocumentConverter(format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options),
                                              InputFormat.IMAGE: ImageFormatOption(pipeline_options=options)})
 

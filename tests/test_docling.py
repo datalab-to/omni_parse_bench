@@ -314,3 +314,24 @@ def test_the_formula_row_turns_on_formula_enrichment_alone_with_codeformula_pinn
     a_cf, b_cf = a["code_formula_options"], b["code_formula_options"]
     assert {k for k in a_cf if a_cf[k] != b_cf[k]} == {"model_spec"}
     assert {k for k in a_cf["model_spec"] if a_cf["model_spec"][k] != b_cf["model_spec"][k]} == {"revision"}
+
+
+def test_the_formula_stage_runs_without_cudnn_attention_and_restores_it(monkeypatch):
+    pytest.importorskip("docling")
+    import torch
+    from docling.models.stages.code_formula.code_formula_vlm_model import CodeFormulaVlmModel
+
+    seen = []
+
+    def stage(self, doc, batch):
+        for item in batch:
+            seen.append(torch.backends.cuda.cudnn_sdp_enabled())
+            yield item
+
+    monkeypatch.setattr(CodeFormulaVlmModel, "__call__", stage)
+    server = _server()
+    assert torch.backends.cuda.cudnn_sdp_enabled()
+    server.no_cudnn_attention_in_formula_stage()
+    server.no_cudnn_attention_in_formula_stage()    # once only: no wrapper around the wrapper
+    assert list(CodeFormulaVlmModel.__call__(object(), None, [1, 2])) == [1, 2]
+    assert seen == [False, False] and torch.backends.cuda.cudnn_sdp_enabled()
