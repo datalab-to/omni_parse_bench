@@ -1,6 +1,6 @@
 # ruff: noqa: E501
 """Relations taken from an external catalogue: the perturbations of ParseBench-2 (arXiv 2611.17400, Appendix A.2,
-CC BY 4.0), whose benign variations must keep a verdict and whose error types must flip it (M104 to M121).
+CC BY 4.0), whose benign variations must keep a verdict and whose error types must flip it (M104 to M120).
 The scorer's authors did not write the list: they read it and stated, for each perturbation that applies to OPB,
 what its documented rules say. Where OPB's rules differ from ParseBench-2's severity, the relation states the
 OPB rule."""
@@ -9,7 +9,7 @@ from __future__ import annotations
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
-from metamorphic.common import HOLDS, LIMITATION, deviation, escaped, passes, relation
+from metamorphic.common import HOLDS, LIMITATION, deviation, escaped, more_evidence, passes, relation
 from omni_parse_bench import markdown, views
 from omni_parse_bench.scorers.unit_tests import runners
 from omni_parse_bench.scorers.unit_tests.runners import _area as area
@@ -309,6 +309,9 @@ def test_transposing_a_table_swaps_left_and_top_heading_verdicts(rows, cols):
             assert not cell_passes(cell, {"top_heading": wrong}, table(original, 1, 1))
             assert not cell_passes(cell, {"left_heading": wrong}, table(transposed, 1, 1))
             assert not cell_passes(cell, {"left_heading": left[r]}, table(transposed, 1, 1))
+            wrong_row = left[(r + 1) % rows]
+            assert not cell_passes(cell, {"left_heading": wrong_row}, table(original, 1, 1))
+            assert not cell_passes(cell, {"top_heading": wrong_row}, table(transposed, 1, 1))
 
 
 SPANS = [
@@ -354,9 +357,19 @@ def test_repeating_a_section_row_cell_keeps_the_section_verdict():
     having a section row: a section row is one label in the first column, so the cell has no section
     (tables.py: 'a row of one label, in its first column'). Credit: ParseBench-2 (arXiv 2611.17400, A.2,
     CC BY 4.0): merged cells repeated, group labels."""
+    cell, args, _, repeated = SECTION
+    assert cell_passes(cell, {}, repeated, **args), repeated
+
+
+@more_evidence()
+def test_the_section_controls_of_a_repeated_section_row_hold():
+    """The controls of M120 hold: a section label written once across the table passes, and a wrong section fails
+    on that page and on the one that repeats the label in every cell. [M120]
+    Why it matters for a score: M120 stops at its first failing assertion; these show that only the repeated
+    label's positive verdict is what deviates."""
     cell, args, merged, repeated = SECTION
+    assert cell_passes(cell, {}, merged, **args), merged
     for page in (merged, repeated):
-        assert cell_passes(cell, {}, page, **args), page
         assert not cell_passes(cell, {}, page, section="Other"), page
 
 
@@ -392,11 +405,12 @@ def test_splitting_or_joining_paragraphs_keeps_present_and_order_verdicts():
 @relation(HOLDS, domain="a gold of 2 words x a paragraph break, a space or nothing between its copies, 1 or 2 "
                         "expected copies; a leader run and a line-end hyphen across the break")
 def test_a_paragraph_break_changes_repeat_and_present_only_by_edges_leaders_and_hyphens():
-    """A block break is a space except in three places: `repeat` counts the copies of a line in
+    """A block break is a space except in four places: `repeat` counts the copies of a line in
     `<p>the cat</p><p>the cat</p>` and `<p>the cat the cat</p>` alike (2), and changes only when the copies are
     glued with no space (`the catthe cat` is a longer word: 1 or 0 copies); a leader run stops at the break
     (`<p>a _</p><p>__</p><p>b</p>` does not read as `a b`); and a hyphen at the end of a block joins the next
-    block, as it does across a `<br>`. [M117]
+    block, as it does across a `<br>`; and a `repeat` test with a number reads line by line, so `12 500` is one
+    copy in `<p>12 500</p>` and none across `<p>12</p><p>500</p>`. [M117]
     Why it matters for a score: these are the only places where a paragraph break and a space differ; the
     documented rules (internals.md: the text view, the hyphen rule, the leader rule; repeat.md) say so.
     Credit: ParseBench-2 (arXiv 2611.17400, A.2, CC BY 4.0): paragraphs run together."""
@@ -412,6 +426,11 @@ def test_a_paragraph_break_changes_repeat_and_present_only_by_edges_leaders_and_
     assert copies(1, "<p>the</p><p>cat</p>") and copies(1, "<p>the cat</p>")
     # But copies glued with no space are not whole words
     assert not copies(2, "<p>the catthe cat</p>") and not copies(1, "<p>the catthe cat</p>")
+    # A number repeat reads line by line: a block break splits a space-grouped number
+    number = runners.Number("12 500")
+    def number_copies(page: str) -> bool:
+        return runners.repeat(runners.Repeat(number, 1), views.html(page))[0]
+    assert number_copies("<p>12 500</p>") and not number_copies("<p>12</p><p>500</p>")
     # A leader run stops at a break and not at a space; a hyphen joins across it
     assert not passes(text_test("a b"), "<p>a _</p><p>__</p><p>b</p>")
     assert passes(text_test("a b"), "<p>a _ __ b</p>")
