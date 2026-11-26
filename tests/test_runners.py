@@ -85,7 +85,7 @@ def test_present_needs_one_edit_per_edit_at_any_place(gold, page, edits):
     ("12", "12,5", False),
     ("3 Park Street", "13 Park Street and 3 Park Street", True),
     ("3 Park Street", "3 Park Street and 13 Park Street", True),
-    ("-5", "x-5", True),
+    ("-5", "x-5", False),     # a sign at the start of the gold is a sign; after a letter it is a hyphen
     ("5", "x-5", True),
     ("5", "a +5", False),
     ("12", "12. Next", True),
@@ -518,9 +518,9 @@ def test_an_order_item_cut_out_of_a_longer_number_says_so(before, after, text, w
 
 
 def _edited(n: int, k: int) -> tuple[str, str]:
-    """An n-letter cell and the same cell with its first k letters replaced by digits."""
+    """An n-letter cell and the same cell with its first k letters replaced by other letters."""
     want = "".join("abcdefghij"[i % 10] if i % 3 else "klmnopqrst"[i % 10] for i in range(n))
-    return want, "5" * k + want[k:]
+    return want, "z" * k + want[k:]
 
 
 # Note: 1 - k/n is not exactly representable for most n, and rapidfuzz's ratio for k substitutions lands a

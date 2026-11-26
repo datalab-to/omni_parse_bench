@@ -85,6 +85,7 @@ What the test ignores:
 | I | a heading written once beside an empty cell | `6`, headings `Group` > `B` | B[`<th colspan=2>Group</th>` → `<th>Group</th><th></th>`] | pass | `cell-headings-beside` |
 | I | the section row above | `6`, section `Cohort 1` | C | pass | `cell-section` |
 | I | a data row that repeats a value does not hide the section above it | `6`, section `Cohort 1` | C[`<td colspan=2>Cohort 1</td>` → `<td colspan=2>Cohort 1</td></tr><tr><td>Yes</td><td>Yes</td>`] | pass | `cell-section-then-data` |
+| I | a letter edit beside a number | `Total 1,240` (md 1) | `<table><tr><td>Totel 1,240</td></tr></table>` | pass | `cell-letter-with-number` |
 | I | a section label written in each cell of its row, not merged | `6`, section `Cohort 1` | C[`<td colspan=2>Cohort 1</td>` → `<td>Cohort 1</td><td>Cohort 1</td>`] | pass | `cell-section-repeated` |
 | I | a row-spanning cell to the left | `6`, row groups `Male` | C | pass | `cell-row-group` |
 <!-- /cases -->
@@ -124,6 +125,11 @@ What it penalizes:
 | P | a wrong neighbour | `1,300`, up `9` | A | fail: `cells matching '1,300' found, but: up '1,240' doesn't match '9' (0.00)` | `cell-up-wrong` |
 | P | a wrong heading | `1,240`, top_heading `Year` | A | fail: `cells matching '1,240' found, but: top_heading 'total' doesn't match 'year' (0.22)` | `cell-top-heading-wrong` |
 | P | headings in the wrong order | `5`, headings `A` > `Group` | B | fail: `cells matching '5' found, but: not under the headings 'A > Group'` | `cell-headings-swapped` |
+| P | with an edit to spend, a changed digit | `1,240` (md 1) | A[`1,240` → `1,241`] | fail | `cell-digit` |
+| P | digits transposed | `1,240` (md 2) | A[`1,240` → `1,420`] | fail | `cell-digit-moved` |
+| P | a changed digit in a neighbor | `1,300` (md 1), up `1,240` | A[`1,240` → `1,241`] | fail: `cells matching '1,300' found, but: up '1,241' has other numbers than '1,240'` | `cell-digit-neighbor` |
+| P | a lost minus sign | `-4.8` (md 1) | `<table><tr><td>4.8</td></tr></table>` | fail | `cell-sign-lost` |
+| P | a minus sign added | `4.8` (md 1) | `<table><tr><td>-4.8</td></tr></table>` | fail | `cell-sign-added` |
 | P | a wrong section | `6`, section `Cohort 2` | C | fail: `cells matching '6' found, but: not in the section 'Cohort 2' (nearest above: 'Cohort 1')` | `cell-section-wrong` |
 | P | a row that repeats a value is data for a test naming another section | `6`, section `Cohort 1` | C[`<td colspan=2>Cohort 1</td>` → `<td>Yes</td><td>Yes</td>`] | fail: `cells matching '6' found, but: not in the section 'Cohort 1' (nearest above: 'none')` | `cell-section-data-row` |
 | P | a wrong row group | `6`, row groups `Female` | C | fail: `cells matching '6' found, but: not in the row groups 'Female'` | `cell-row-group-wrong` |
@@ -217,9 +223,16 @@ Fixture T, used by the cases below:
 - **A named section may be a repeated value.** A test that names `Yes` as its section passes on a `Yes | Yes` row,
   because a row that writes the named label in every cell is read as that section row (case
   cell-section-repeated-value). The match is the section's own, so a repeated value within the test's `max_diffs`
-  of the section passes too (`Cohort 1 | Cohort 1` for `Cohort 2` with one edit, as a merged `Cohort 1` does). The
-  cells must fold to one string: `Cohort 1 | Cohort 3` is data. A repeated row that does not match the named
+  of the section passes too (`Cohort A | Cohort A` for `Cohort B` with one edit, as a merged `Cohort A` does). The
+  cells must fold to one string: `Cohort A | Cohort C` is data. A repeated row that does not match the named
   section is data (case cell-section-data-row).
+- **Numbers are exact (the ratio is not).** The cell, and each neighbor and heading, matches by the ratio below
+  and also needs the same numbers, each whole and signed as in
+  [present-text.md](present-text.md#numbers-are-exact): a changed digit, a digit added or dropped, a number
+  split or joined, or a minus sign lost or added fails at any `max_diffs` (cases cell-digit, cell-digit-moved,
+  cell-digit-neighbor, cell-sign-lost, cell-sign-added), and a letter edit beside a number still passes (case
+  cell-letter-with-number). A gold without a digit is not guarded. The section and row groups are compared as
+  strings by the same rule.
 - **Whole cells, but a loose ratio.** With an edit to spend, insertions cost half an edit each:
   `abcdefghij` with one edit matches `abcdefghijkl` (case cell-insertions), and `ab` matches `abcd` (case
   cell-short).

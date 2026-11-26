@@ -74,6 +74,9 @@ What it does not look at, so a wrong output passes:
 | B | a superscript digit after a letter read as a footnote marker | `area in m is` | `<p>area in m<sup>2</sup> is</p>` | pass | `text-sup-unit` |
 | B | two adjacent cells read as one string | `1 2` | `<table><tr><td>1</td><td>2</td></tr></table>` | pass | `text-table-flat` |
 | B | a short gold with an edit to spend | `ab` (md 1) | `a` | pass | `text-short-fuzzy` |
+| B | a unit changed within the budget | `Rate 5%` (md 1) | `Rate 5‰` | pass | `text-budget-unit` |
+| B | a letter changed into another real word | `Take it from the list` (md 1) | `Take it form the list` | pass | `text-budget-real-word` |
+| B | a negation dropped, at a budget that pays for it | `It does not work well` (md 4) | `It does work well` | pass | `text-budget-negation` |
 <!-- /cases -->
 
 What it penalizes:
@@ -146,6 +149,19 @@ unchanged, at any `max_diffs`: an edit may not change, add, drop, split or join 
 never joins two, and the matched text may not end inside one. Every other character still costs one edit, and
 a gold without a digit is matched as above.
 
+A minus sign belongs to its number: a `-` (or `−`, or an en dash, which fold to one) directly before a digit run is
+a sign unless the character before it is a letter or a digit (a Chinese, Japanese or Korean character does not
+count: such a text puts no space before its minus). So `-5`, `x = -5`, `(-5)`, `3 -5` and `变化-5` are signed, and a
+gold's sign must be written and cannot be added. In a `table_cell` cell, a `- ` with a space (`− 0.756`, `(− 5)`) is a sign
+too at the start of the cell or after an opening bracket (not in a page text, where `- 12` may start a list item). A `-` after a Latin letter or a digit is a hyphen:
+`A-12`, `2026-11-26`, `1-2` and `COVID-19` keep costing one edit to drop, as do a list dash (`- 5` in the middle
+of a text) and a space-dash-space (`3 - 2`). Spacing the page adds or drops does not change what a number is: a
+gold's hyphen before a number (`kg-1`) is matched by the page's spaced `kg -1`. The cost of this narrow rule: a
+minus written right after a Latin letter (`x-5`) reads as a hyphen, so a budget can still drop it, and a spaced
+minus in the middle of a text (`was − 5`) is not guarded.
+`order` and `table_cell` apply the same rule ([order.md](order.md#how-it-differs-from-present),
+[table_cell.md](table_cell.md#blind-spots)).
+
 <!-- cases:text-numbers -->
 | | difference | gold | output | verdict | case |
 |---|---|---|---|---|---|
@@ -157,6 +173,11 @@ a gold without a digit is matched as above.
 | P | two numbers joined | `Pages 1 to 2` (md 3) | `Pages 12` | fail | `num-fuzzy-joined` |
 | P | a dropped thousands separator joins two numbers | `1,000` (md 1) | `1000` | fail | `num-fuzzy-thousands` |
 | P | a digit of another script is another number | `3.` (md 1) | `๓.` | fail | `num-fuzzy-script` |
+| P | a lost minus sign | `Net -5 total` (md 2) | `Net 5 total` | fail | `txt-sign-lost` |
+| P | a minus sign added | `Net 5 total` (md 2) | `Net -5 total` | fail | `txt-sign-added` |
+| P | a lost minus sign inside brackets | `Margin (-5)` (md 2) | `Margin (5)` | fail | `txt-sign-bracket` |
+| I | a minus written as `−` or an en dash | `Net -5 total` (md 1) | `Net −5 total` | pass | `txt-sign-spelling` |
+| I | a hyphen after a letter or between figures is no sign: dropping one is an edit | `Case A-12 ok` (md 1) | `Case A12 ok` | pass | `txt-hyphen` |
 | I | a letter edit beside a number | `Total: 41` (md 1) | `Totel: 41` | pass | `num-fuzzy-letter` |
 | I | full-width digits fold first | `Room 3` (md 1) | `Room ３` | pass | `num-fuzzy-fullwidth` |
 | I | a number after the matched text is outside it | `Figure 3` (md 1) | `Figure 3 2019 data` | pass | `num-fuzzy-after` |
@@ -331,6 +352,11 @@ Blind spots of `blank_after`, besides those of `present`:
 - **No word edges.** `Total` is found in `Totally` (case text-longer-word). Use `repeat` for whole words.
 - **Letters beside a number are free.** `4.8` is found in `a4.8` (case text-letter-beside). Use a number arg
   ([present-number.md](present-number.md)) when sign and percent matter.
+- **A budget still pays for anything that is not a digit or a sign.** A unit that reads as another (`5%` for
+  `5‰`, case text-budget-unit), a letter change that makes another real word (`from` for `form`, case
+  text-budget-real-word), and, on a long passage with a budget of 2 or more, a dropped `not` (case
+  text-budget-negation) all pass. This is not a negation guard: keep the budget at 0 where one word flips the
+  meaning.
 - **Image descriptions pay.** A description that contains the string passes the test (case text-alt).
 - **Most budgets are real.** 1,370 of the 3,684 real present text tests allow 1 to 4 edits; the others allow none.
 - **Short golds and edit budgets are loose.** With one edit, `ab` is found in a page holding `a` (case

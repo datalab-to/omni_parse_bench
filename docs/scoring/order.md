@@ -32,6 +32,11 @@ system wrote it.
 | P | two letters swapped is 2 edits here | `Alpha` before `Beta` (md 1) | `<p>Alhpa</p><p>Beta</p>` | fail | `ord-transposition` |
 | I | the same with 2 edits | `Alpha` before `Beta` (md 2) | `<p>Alhpa</p><p>Beta</p>` | pass | `ord-transposition-2` |
 | B | a larger budget passes what a smaller one did (md 0 passes too) | `aa` before `a ba` (md 1) | `<p>b b a ab ab</p>` | pass | `ord-more-edits` |
+| P | with an edit to spend, a changed digit | `Total: 41` before `ZZZ` (md 1) | `<p>Total: 40</p><p>ZZZ</p>` | fail | `ord-digit-exact` |
+| P | with an edit to spend, a decimal point inserted | `Total 12` before `ZZZ` (md 2) | `<p>Total 1.2</p><p>ZZZ</p>` | fail | `ord-digit-point` |
+| P | a lost minus sign | `Net -5 total` before `ZZZ` (md 2) | `<p>Net 5 total</p><p>ZZZ</p>` | fail | `ord-sign-lost` |
+| P | a minus sign added | `Net 5 total` before `ZZZ` (md 2) | `<p>Net -5 total</p><p>ZZZ</p>` | fail | `ord-sign-added` |
+| I | a letter edit beside a number | `Total: 41` before `ZZZ` (md 1) | `<p>Totel: 41</p><p>ZZZ</p>` | pass | `ord-digit-letter` |
 | P | a digit continues a number | `Total: 40` before `ZZZ` | `<p>Total: 400</p><p>ZZZ</p>` | fail: `'before' text 'Total: 40' found only inside a longer number` | `ord-digit-edge` |
 | P | a footnote marker inside the phrase | `Smith and Jones` before `ZZZ` | `<p>Smith[1] and Jones</p><p>ZZZ</p>` | fail | `ord-footnote` |
 | I | hyphenated compound broken at a line end | `self-aware` before `ZZZ` | `<p>self- aware</p><p>ZZZ</p>` | pass | `ord-compound` |
@@ -44,6 +49,11 @@ system wrote it.
   text-transposition).
 - **No footnote retry.** `present` retries with a footnote marker dropped where it falls inside the phrase;
   here the marker stays, so `Smith and Jones` is not found in `Smith[1] and Jones` (case ord-footnote).
+- **Numbers are exact.** As in `present`, a string with a digit keeps each of its numbers whole at any
+  `max_diffs`, and a minus sign directly before a number must be written and cannot be added (the sign rule is in
+  [present-text.md](present-text.md#numbers-are-exact)); the edit budget is spent on the other characters (cases
+  ord-digit-exact, ord-digit-point, ord-sign-lost, ord-sign-added, ord-digit-letter). A string without a digit is
+  not guarded.
 - Like `present`, it has a digit edge on each string and no word edge (cases ord-digit-edge, ord-glued).
 
 ## Blind spots

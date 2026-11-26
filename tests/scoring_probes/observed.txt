@@ -46,6 +46,9 @@ text-alt	pass
 text-sup-unit	pass
 text-table-flat	pass
 text-short-fuzzy	pass
+text-budget-unit	pass
+text-budget-real-word	pass
+text-budget-negation	pass
 ## text-penalized
 text-changed	fail	'Total' not found (best 0.800 < 1.000); closest 'totel'
 text-over-budget	fail	'Total' not found (best 0.600 < 0.800); closest 'tutel'
@@ -99,6 +102,11 @@ num-fuzzy-added	fail	'Total 41' not found with its numbers exact (a number diffe
 num-fuzzy-joined	fail	'Pages 1 to 2' not found with its numbers exact (a number differs, or one was added, split or joined)
 num-fuzzy-thousands	fail	'1,000' not found with its numbers exact (a number differs, or one was added, split or joined)
 num-fuzzy-script	fail	'3.' not found with its numbers exact (a number differs, or one was added, split or joined)
+txt-sign-lost	fail	'Net -5 total' not found with its numbers exact (a number differs, or one was added, split or joined)
+txt-sign-added	fail	'Net 5 total' not found with its numbers exact (a number differs, or one was added, split or joined)
+txt-sign-bracket	fail	'Margin (-5)' not found with its numbers exact (a number differs, or one was added, split or joined)
+txt-sign-spelling	pass
+txt-hyphen	pass
 num-fuzzy-letter	pass
 num-fuzzy-fullwidth	pass
 num-fuzzy-after	pass
@@ -319,6 +327,11 @@ ord-table	fail	'Alpha' does not appear before 'Beta'
 ord-transposition	fail	'before' text 'Alpha' not found
 ord-transposition-2	pass
 ord-more-edits	pass
+ord-digit-exact	fail	'before' text 'Total: 41' not found
+ord-digit-point	fail	'before' text 'Total 12' not found
+ord-sign-lost	fail	'before' text 'Net -5 total' not found
+ord-sign-added	fail	'before' text 'Net 5 total' not found
+ord-digit-letter	pass
 ord-digit-edge	fail	'before' text 'Total: 40' found only inside a longer number
 ord-footnote	fail	'before' text 'Smith and Jones' not found
 ord-compound	pass
@@ -493,6 +506,7 @@ cell-headings-merged	pass
 cell-headings-beside	pass
 cell-section	pass
 cell-section-then-data	pass
+cell-letter-with-number	pass
 cell-section-repeated	pass
 cell-row-group	pass
 ## cell-blind
@@ -520,6 +534,11 @@ cell-heading-other-row	fail	cells matching '5' found, but: right_heading 'z' doe
 cell-up-wrong	fail	cells matching '1,300' found, but: up '1,240' doesn't match '9' (0.00)
 cell-top-heading-wrong	fail	cells matching '1,240' found, but: top_heading 'total' doesn't match 'year' (0.22)
 cell-headings-swapped	fail	cells matching '5' found, but: not under the headings 'A > Group'
+cell-digit	fail	no cell matching '1,240' in any table
+cell-digit-moved	fail	no cell matching '1,240' in any table
+cell-digit-neighbor	fail	cells matching '1,300' found, but: up '1,241' has other numbers than '1,240'
+cell-sign-lost	fail	no cell matching '-4.8' in any table
+cell-sign-added	fail	no cell matching '4.8' in any table
 cell-section-wrong	fail	cells matching '6' found, but: not in the section 'Cohort 2' (nearest above: 'Cohort 1')
 cell-section-data-row	fail	cells matching '6' found, but: not in the section 'Cohort 1' (nearest above: 'none')
 cell-row-group-wrong	fail	cells matching '6' found, but: not in the row groups 'Female'
