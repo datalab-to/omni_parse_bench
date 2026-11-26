@@ -9,6 +9,7 @@ constants (a threshold, a fill ratio) are module constants here, never parameter
 from __future__ import annotations
 
 import functools
+import html as html_lib
 import itertools
 import re
 import unicodedata
@@ -114,7 +115,6 @@ class Present(NamedTuple):
     blank_after: bool = False
     printed: Text | None = None     # the field's printed placeholder (`__/__/____`), allowed once
     stops: tuple[Text, ...] = ()    # every other field label on the page: where a field's region ends
-    md_mask: str | None = None      # `printed` as markdown writes it (set by the scorer)
 
 
 def present(t: Present, v: views.Html) -> Mark:
@@ -145,8 +145,8 @@ def blank_after(t: Present, v: views.Html) -> Mark:
     if not ok:
         return False, why
     label = t.content.text
-    t = t._replace(md_mask=_md_mask(t, v.html))
-    flow, spans, loose, chunks = _flow(v.html)
+    html = _unmangled(t, v.html)
+    flow, spans, loose, chunks = _flow(html)
     reasons: list[str] = []
     copies = 0
     for start, region, cut in _regions(t, flow):
@@ -293,27 +293,23 @@ def _regions(t: Present, hay: str) -> list[tuple[int, str, bool]]:
     return out
 
 
-def _md_mask(t: Present, html: str) -> str | None:
-    """The printed placeholder as the markdown converter writes it (`__/__/____` is read as bold and comes out
-    as `//`), folded, when the page holds the converter's html for it: a page written in markdown. A literal
-    `//` in html is not that mask."""
+def _unmangled(t: Present, html: str) -> str:
+    """The html with the printed placeholder that markdown lost to bold (`__/__/____` comes out as
+    `<strong>/</strong>/____`, text `//`) written as printed, wherever the converter's own html for it stands,
+    so that it is the mask there only: `//` written in html, or beside another label, stays a value."""
     if t.printed is None or "_" not in t.printed.text:
-        return None
-    converted = markdown.to_html(t.printed.text).strip()
-    inner = re.sub(r"^<p>|</p>$", "", converted)
-    if inner == t.printed.text or inner not in html:
-        return None
-    return normalize.fold(views.text(converted, alt=False)).strip() or None
+        return html
+    inner = re.sub(r"^<p>|</p>$", "", markdown.to_html(t.printed.text).strip())
+    return html if inner == t.printed.text else html.replace(inner, html_lib.escape(t.printed.text))
 
 
 def _rest(t: Present, region: str) -> str:
     """What a field's region shows besides one copy of its printed placeholder and the characters a blank
-    shows; "" when it is blank. A mask of underscores that a markdown page lost to bold (`_md_mask`) is the
-    printed placeholder too."""
+    shows; "" when it is blank."""
     if t.printed is not None:
         printed = normalize.fold(t.printed.text)
-        for mask in (printed, printed.replace(" ", ""), t.md_mask):
-            if mask and mask.strip() and mask in region:
+        for mask in (printed, printed.replace(" ", "")):
+            if mask.strip() and mask in region:
                 region = region.replace(mask, "", 1)
                 break
     return "" if _PLACEHOLDER.fullmatch(region) else region.strip()
@@ -593,9 +589,15 @@ def table_cell(t: TableCell, v: views.Html) -> Mark:
     cell = _fold_cell(t.cell)
     thr = _cell_threshold(cell, t.max_diffs)
     expected = {k: _fold_cell(x) for k, x in t.relations.items() if x}
+    def is_anchor(table: tables.Table, rc: tables.Cell) -> bool:
+        """Whether the cell matches `cell` and holds the test's relations, headings, section, row groups."""
+        return (_one_of(cell, table.text[rc], thr, t.cell)
+                and not [1 for k, want in expected.items()
+                         if _relation(table, rc, k, want, t.max_diffs, t.relations[k])]
+                and not _structure(t, table, rc))
     def again(other: tables.Table) -> bool:
-        """Whether a table holds the anchor cell too."""
-        return any(_one_of(cell, x, thr, t.cell) for x in other.text.values())
+        """Whether a table holds a second full anchor candidate: a cell that is the anchor."""
+        return any(is_anchor(other, rc) for rc in other.text)
     reasons: list[str] = []    # why a cell is not the anchor
     held: list[str] = []       # why an anchor has something beside it
     anchors = 0
@@ -1289,7 +1291,12 @@ def _goes_on(a: tables.Table, b: tables.Table, kind: str) -> bool:
     (as many rows), with no heading of its own. A table that prints its header again is not told from a
     second table of the same shape, so it is read as one."""
     same = len(a.grid[0]) == len(b.grid[0]) if kind == "down" else len(a.grid) == len(b.grid)
-    return same and not b.headings
+    return same and not _column_headed(b)
+
+
+def _column_headed(t: tables.Table) -> bool:
+    """Whether the table's first row is a row of headings (a body row led by a `<th scope=row>` is not)."""
+    return all(x in t.headings for x in t.grid[0] if x is not None)
 
 
 def _one_of(want: str, got: str, thr: float, raw: str = "", lines: bool = True) -> bool:

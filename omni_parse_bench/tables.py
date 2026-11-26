@@ -89,7 +89,7 @@ def _next_table(tag):
         if isinstance(el, Comment | Doctype | ProcessingInstruction | Declaration):
             continue
         if isinstance(el, str):
-            if el.strip():
+            if el.strip() and el.parent.name not in ("script", "style", "template"):
                 return None
         elif el.name == "table":
             return el if el.find_parent("table") is owner else None

@@ -322,3 +322,20 @@ def test_end_up_and_left_read_the_table_before_a_continuation():
     assert not verdict({"cell": text("70"), "up": END}, rows(HEAD, "<td>Fuel</td><td>70</td><td>80</td>"))
     assert not verdict({"cell": text("Fuel"), "up": END}, first + rows("<td>Fuel</td><td>70</td><td>80</td>"))
     assert verdict({"cell": text("Fuel"), "up": END}, first + "<p>x</p>" + rows("<td>Fuel</td><td>70</td><td>80</td>"))
+
+
+def test_a_second_table_excuses_only_a_full_anchor_candidate():
+    extra = "<table><tr><td>Tax</td><td>70</td><td>9</td></tr></table>"
+    args = {"cell": text("70"), "down": END}
+    assert verdict(args, TWO + extra)    # a second full candidate (no relations): judged as its own table, ends
+    left = {"cell": text("70"), "left": text("Fuel"), "down": END}
+    assert not verdict(left, TWO + extra)    # not the anchor as the test names it: an invented continuation
+    assert verdict(left, TWO + extra.replace("Tax", "Fuel"))    # a second Fuel / 70 row ends too
+
+
+def test_invisible_text_and_row_headers_do_not_change_what_goes_on():
+    cont = "<table><tr><td>Tax</td><td>9</td><td>8</td></tr></table>"
+    args = {"cell": text("70"), "down": END}
+    assert not verdict(args, TWO + "<script>void 0;</script><style>p{}</style><template>x</template>" + cont)
+    assert not verdict(args, TWO + "<table><tr><th scope=row>Tax</th><td>9</td><td>8</td></tr></table>")
+    assert verdict(args, TWO + "<p>Note</p>" + cont)

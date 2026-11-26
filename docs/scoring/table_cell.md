@@ -144,11 +144,11 @@ beside it, so a copy of that value passes. Two args say it, on `up`, `down`, `le
   the why is `no right cell`. A `colspan` that covers the slot fails.
 - `{"end": true}`: no cell in any row below (`down`), column to the right (`right`), row above (`up`) or column
   to the left (`left`) of the cell has text. Empty rows and columns pass: they invent nothing. The why names the
-  first row or column that holds text (`down: row 3 holds '9', '8'`). A table written right after the anchor's table (nothing visible between them: white space, a comment, an empty
+  first row or column that holds text (`down: row 3 holds '9', '8'`). A table written right after the anchor's table (nothing visible between them: white space, a comment, `<script>`, `<style>`, an empty
   element, or wrapper `<div>`s do not count) that goes on from it counts too: below, one with as many columns and no
-  heading; to the right, one with as many rows and no heading. For `up` and `left` it is the table written right
-  before. A table with a heading of its own, another width, text before it, or the anchor again (a copy, judged as
-  the anchor's table is) is another table (cases cell-end-next-table, cell-end-wrapped, cell-end-other-header,
+  column heading (a first row of headings; a body row led by `<th scope=row>` is not one); to the right, one with as many rows and no heading. For `up` and `left` it is the table written right
+  before. A table with a heading of its own, another width, text before it, or a second full anchor candidate (a cell that matches `cell` and holds the test's relations: a copy, judged as the
+  anchor's table is; with no relations any cell of that text is one) is another table (cases cell-end-next-table, cell-end-wrapped, cell-end-other-header,
   cell-end-text-between, cell-end-twice). A second table that prints the header again is not told from an
   independent table of the same shape, so its rows are not read (case cell-end-repeated-header).
 

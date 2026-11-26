@@ -432,3 +432,10 @@ def test_a_literal_slash_pair_is_not_the_markdown_mask():
     assert passes(f"<p>{DOB} {MASK}</p>")
     assert passes(markdown.to_html(f"{DOB} {MASK}"))
     assert not passes(markdown.to_html(f"{DOB} {MASK}") .replace("</p>", " //</p>"))
+
+
+def test_the_markdown_mask_is_the_mask_only_where_the_converter_wrote_it():
+    md = markdown.to_html(f"{DOB} {MASK}")
+    assert passes(md) and not passes(f"<p>{DOB} //</p>" + markdown.to_html(f"Name: {MASK}"))
+    assert not passes(markdown.to_html(f"{DOB} {MASK}\n\n{DOB} //"))
+    assert not passes(markdown.to_html(f"{DOB} //\n\nName: {MASK}"))
