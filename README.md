@@ -54,6 +54,7 @@ check any row. The dataset is on [Hugging Face](https://huggingface.co/datasets/
 | HunyuanOCR-1.5 | open | 68.8 | 62.3 | 62.6 | 81.4 | — |
 | Docling (formula) | open | 66.9 | 46.4 | 63.8 | 90.6 | — |
 | Docling | open | 64.5 | 39.1 | 63.8 | 90.6 | — |
+| PP-StructureV3 | open | 59.2 | 55.8 | 48.5 | 73.2 | — |
 | PyMuPDF4LLM (OCR) | open | 51.5 | 26.5 | 42.1 | 86.0 | — |
 | LiteParse (Tesseract) | open | 42.3 | 43.6 | 14.5 | 68.8 | — |
 | PyMuPDF4LLM | open | 41.2 | 17.7 | 42.0 | 64.0 | — |
@@ -65,7 +66,7 @@ Rows marked **(Datalab)** are Datalab's systems. Rows marked \* are models that 
 **About these results**
 
 - **Scorer:** omni-parse-bench 1.8.0 ([release notes](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/release-notes/v1.8.0.md)). The pending-regrade rows below are on an older scorer.
-- **How systems were run:** most rows are saved predictions regraded with no new calls; Gemini 4, Indra OCR, OCRia-1, Docling and the layout of two models are new runs ([release notes](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/release-notes/v1.8.0.md)); settings for each row are in [docs/providers.md](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/providers.md). Open tools run locally are fresh full runs.
+- **How systems were run:** most rows are saved predictions regraded with no new calls; Gemini 4, Indra OCR, OCRia-1, Docling, PP-StructureV3 and the layout of two models are new runs ([release notes](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/release-notes/v1.8.0.md)); settings for each row are in [docs/providers.md](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/providers.md). Open tools run locally are fresh full runs.
 - **Failed pages count as failed**, with all their tests failed, except † below.
 - \* Models that helped make or verify tests: 1,312 of the 8,499 text tests (15%) have a model-derived answer (derivation field `model_panel` or `model_review`) from Gemini 3.8 Flash, Claude Opus 5.5 or Claude Sonnet 5.5 (the data does not record which), and all 2,403 layout tests are `model_panel`. [Details](https://github.com/datalab-to/omni_parse_bench/blob/main/docs/leaderboard.md#starred-rows).
 - † **Gemini 4 got a second chance: no other system did.** Its rows combine one full pass with one rerun of the pages that pass failed. The first pass alone scores 85.0 (Argon) and 83.7 (Carbon). A single retry policy for all systems is planned.

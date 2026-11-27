@@ -54,6 +54,7 @@ try:
         pdftext_plain,
         pdf_inspector,
         pymupdf4llm,
+        pp_structurev3,
         reducto,
         surya_ocr,
         surya_ocr25,
@@ -88,8 +89,8 @@ ADAPTERS: dict[str, type[Parser]] = {a.name: a for a in (
     nanonets.Nanonets, nemotron_parse.NemotronParse, ocria_1.Ocria1, olmocr.OlmOcr, minicpm_ocr.MiniCpmOcr,
     oxr.Oxr,
     ovisocr.OvisOcr, ovisocr2.OvisOcr2, ovisocr3.OvisOcr3,
-    paddleocr_vl.PaddleOcrVl, surya_ocr.SuryaOcr, surya_ocr25.SuryaOcr25, unlimited.UnlimitedOcr,
-    unlimited_ocr2.UnlimitedOcr2, xiaomi_ocr.XiaomiOcr)}
+    paddleocr_vl.PaddleOcrVl, pp_structurev3.PpStructureV3, surya_ocr.SuryaOcr, surya_ocr25.SuryaOcr25,
+    unlimited.UnlimitedOcr, unlimited_ocr2.UnlimitedOcr2, xiaomi_ocr.XiaomiOcr)}
 
 
 def plugins() -> dict[str, metadata.EntryPoint]:

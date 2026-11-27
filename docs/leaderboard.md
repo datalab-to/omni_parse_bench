@@ -17,7 +17,7 @@ test, run and verdict is public, so you can check any row.
 ## All rows
 
 Scores use omni-parse-bench 1.8.0 ([release notes](release-notes/v1.8.0.md)). Most rows are saved predictions regraded with
-1.7.0, which gives the same numbers under 1.8.0. Fresh runs: Gemini 4, Indra OCR, OCRia-1, Docling, the layout of
+1.7.0, which gives the same numbers under 1.8.0. Fresh runs: Gemini 4, Indra OCR, OCRia-1, Docling, PP-StructureV3, the layout of
 Gemini 3.8 Flash and GPT-5.6 Sol, and the open rows run locally (pdftotext, pdftext, MarkItDown, pdf-inspector, PyMuPDF4LLM, OpenDataLoader, LiteParse). Rows marked \* are
 described in [Starred rows](#starred-rows). Refusals are counted for systems called through an LLM API only; a dash
 means not measured, not zero. Parameters are the weights' total; 5.17B for OCRia-1 excludes the Docling Heron layout
@@ -62,6 +62,7 @@ detector, and 35.1B for Infinity-Parser2-Pro is a mixture of experts.
 | HunyuanOCR-1.5 | open | 1.0B | 68.8 | 62.3 | 62.6 | 81.4 | — | — |
 | Docling (formula) | open | 0.4B | 66.9 | 46.4 | 63.8 | 90.6 | — | — |
 | Docling | open | 0.1B | 64.5 | 39.1 | 63.8 | 90.6 | — | — |
+| PP-StructureV3 | open | — | 59.2 | 55.8 | 48.5 | 73.2 | — | — |
 | PyMuPDF4LLM (OCR) | open | — | 51.5 | 26.5 | 42.1 | 86.0 | — | — |
 | LiteParse (Tesseract) | open | — | 42.3 | 43.6 | 14.5 | 68.8 | — | — |
 | PyMuPDF4LLM | open | — | 41.2 | 17.7 | 42.0 | 64.0 | — | — |
@@ -199,6 +200,7 @@ their published 1.5.0 results. Rows follow the order of the tables above.
 | HunyuanOCR-1.5 | 40.2 | 67.4 | 63.3 | 58.1 | 65.1 | 53.7 | 45.3 | 50.5 | 42.6 |
 | Docling (formula) | 18.6 | 24.2 | 65.3 | 63.2 | 57.4 | 68.5 | 26.4 | 29.1 | 47.0 |
 | Docling | 18.6 | 5.1 | 65.3 | 63.2 | 55.7 | 68.5 | 26.4 | 26.6 | 47.0 |
+| PP-StructureV3 | 12.8 | 83.5 | 49.4 | 46.0 | 50.2 | 50.1 | 42.4 | 23.8 | 14.2 |
 | PyMuPDF4LLM (OCR) | 3.2 | 5.8 | 43.9 | 40.0 | 36.6 | 53.8 | 8.7 | 9.1 | 24.3 |
 | LiteParse (Tesseract) | 2.0 | 54.0 | 18.9 | 35.2 | 32.2 | 47.1 | 15.6 | 5.9 | 31.5 |
 | PyMuPDF4LLM | 0.1 | 5.7 | 41.9 | 19.2 | 30.0 | 34.3 | 8.7 | 0.5 | 22.0 |
