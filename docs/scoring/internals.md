@@ -116,6 +116,8 @@ a lowercase letter is then read joined (`well-` before `known` reads `wellknown`
 | kept apart: diacritics, punctuation, currency, `**` | `naïve Mr. $5.00 **x**` | `naïve mr. $5.00 **x**` | `fold-kept` |
 <!-- /cases -->
 
+A `√` (U+221A) is a checked box (`☒`) when no operand follows it: nothing, a word after a space, or punctuation (`√ Done`, `（ √ ）`, a legend that prints a radical-shaped tick). It stays a root when an operand starts right after it (a letter, digit, `(`, `{`, `[`, `\`, `-`, `+`, `.` or another `√`: `√2`, `√x`, `√(a+b)`), or after spaces when a digit or a bracket does (`√ 2`, `√ 12 mg`, `√ (Yes)`, so a tick there stays a root). A `√` before a variable after a space (`√ x`) reads as a tick; write the root without the space. `√∞` and `√%` read as ticks.
+
 **Squeeze** is fold with every space removed. `present` and `order` try it once when the folded comparison fails,
 and `table_cell` compares cells both ways. It runs after fold, so the hyphen rule and the math reading still see
 the spaces.
