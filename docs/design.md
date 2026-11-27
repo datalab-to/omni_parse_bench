@@ -147,7 +147,7 @@ select tests and are scored one tag at a time (summarize the tests of one tag), 
 |---|---|---:|
 | `publisher_markup` | the publisher's JATS XML: table cells with their headings, sections and row groups | 4,919 |
 | `upstream_olmocr` | olmOCR-bench's own tests | 4,386 |
-| `model_panel` | independent models agree on what the page says; no model in the results table sits on a panel | 3,613 |
+| `model_panel` | independent models agree on what the page says; three of them (Gemini 3.8 Flash, Claude Opus 5.5, Claude Sonnet 5.5) are also on the leaderboard, marked * | 3,613 |
 | `authored` | we made the page or filled the form, so we know what's on it | 1,402 |
 | `rendered_source` | we rendered the page from markup we hold (a document written with its marks), so each mark is known | 0 |
 | `extractor_agreement` | independent text extractors (two, or three on `tiny_plans`) agree on the line | 823 |
