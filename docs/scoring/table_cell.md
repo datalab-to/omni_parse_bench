@@ -7,11 +7,21 @@ neighbours (`up`, `down`, `left`, `right`), heading cells (`top_heading`, `left_
 The test reads tables from the markup (`<table>`, `rowspan`, `colspan`, `<th>`), not from how the page looks:
 aligned text or pipes in a paragraph are not a table. It compares whole cells after fold, with a ratio that
 allows `max_diffs` edits, and also with spaces removed. A cell may match by one of its lines (lines are made by
-`<br>`). A cell that does not match is tried once more, exactly, as the whole cell or one of its lines, with each hyphen a line broke after (in
+`<br>`), and so may a neighbour; a heading is read whole. A cell that does not match is tried once more, exactly, as the whole cell or one of its lines, with each hyphen a line broke after (in
 the gold or the cell) read kept or dropped, so a hyphenated compound broken at a line end matches, as in `present`
 (case cell-compound). The test passes when one matching cell satisfies every stated role.
 
-- `up`, `down`, `left`, `right`: the neighbouring cell. An empty neighbour stands for the value written over it
+- `up`, `down`, `left`, `right`: the neighbouring cell, or one of its lines (`5<br>50` is `5` and `50`, not
+  `5 50`; case cell-neighbour-line). Beside the cell (`left`, `right`): any line of the neighbour when the cell
+  matched whole or is one line; when it matched by line i of several, the neighbour's line i if it has as many
+  lines (`A<br>B` beside `5<br>50`: `A` with `5`, `B` with `50`, not `A` with `50`; case
+  cell-neighbour-line-aligned); a neighbour of another length is matched by its first line for the cell's first
+  line, and by nothing but the whole neighbour for a later line. Above or below (`up`, `down`): the lines that
+  touch, the first line of a neighbour below and the last line of one above, against the cell's last line
+  (below) or first line (above) when the cell matched by one of several (cases cell-neighbour-line-touching,
+  cell-neighbour-line-two-away). Blank lines are left out before counting. This catches a name set beside
+  another row's value, not a merged row: `A` beside `5` passes there, as the merged cell keeps each name with
+  its value; a one-line neighbour is read whole, so `A<br>B` beside `5` passes both `A` and `B` with `5`. An empty neighbour stands for the value written over it
   (above, for `left` and `right`; to the left, for `up` and `down`). Instead of a text, one of these four may
   be `{"empty": true}` or `{"end": true}`, which catch invented table content (see "Empty cells and the end of a
   table").
@@ -122,6 +132,13 @@ What it penalizes:
 | P | the last cell of a row is not its own right heading | `5`, right_heading `5` | `<table><tr><td>a</td><td>5</td></tr></table>` | fail: `cells matching '5' found, but: no right_heading cell` | `cell-edge-self` |
 | I | a walk stays in the rows of its cell, past a cell that spans rows | `5`, right_heading `z` | `<table><tr><td>a</td><td rowspan=2>m</td><th>H</th></tr><tr><td>5</td><td>z</td></tr></table>` | pass | `cell-heading-own-row` |
 | P | a heading in another row is not the cell's heading | `5`, right_heading `H` | `<table><tr><td>a</td><td rowspan=2>m</td><th>H</th></tr><tr><td>5</td><td>z</td></tr></table>` | fail: `cells matching '5' found, but: right_heading 'z' doesn't match 'h' (0.00)` | `cell-heading-other-row` |
+| I | a neighbour matches by one of its lines (`<br>`) | `1.8`, up `50` | `<table><tr><td>5<br>50</td></tr><tr><td>1.8</td></tr></table>` | pass | `cell-neighbour-line` |
+| P | a neighbour whose line break is lost | `1.8`, up `50` | `<table><tr><td>5 50</td></tr><tr><td>1.8</td></tr></table>` | fail: `cells matching '1.8' found, but: up '5 50' doesn't match '50' (0.80)` | `cell-neighbour-line-lost` |
+| I | a multi-line cell reads the neighbour's line beside it | `A`, right `5` | `<table><tr><td>A<br>B</td><td>5<br>50</td></tr></table>` | pass | `cell-neighbour-line-aligned` |
+| P | a multi-line cell's line beside another line of its neighbour | `A`, right `50` | `<table><tr><td>A<br>B</td><td>5<br>50</td></tr></table>` | fail | `cell-neighbour-line-misaligned` |
+| I | a multi-line cell's last line reads the first line below it | `B`, down `5` | `<table><tr><td>A<br>B</td></tr><tr><td>5<br>50</td></tr></table>` | pass | `cell-neighbour-line-touching` |
+| P | a single line two lines away from the cell | `1.8`, up `5` | `<table><tr><td>5<br>50</td></tr><tr><td>1.8</td></tr></table>` | fail | `cell-neighbour-line-two-away` |
+| P | a neighbour's line has other numbers | `1.8`, up `5` | `<table><tr><td>50<br>500</td></tr><tr><td>1.8</td></tr></table>` | fail | `cell-neighbour-line-number` |
 | P | a wrong neighbour | `1,300`, up `9` | A | fail: `cells matching '1,300' found, but: up '1,240' doesn't match '9' (0.00)` | `cell-up-wrong` |
 | P | a wrong heading | `1,240`, top_heading `Year` | A | fail: `cells matching '1,240' found, but: top_heading 'total' doesn't match 'year' (0.22)` | `cell-top-heading-wrong` |
 | P | headings in the wrong order | `5`, headings `A` > `Group` | B | fail: `cells matching '5' found, but: not under the headings 'A > Group'` | `cell-headings-swapped` |
