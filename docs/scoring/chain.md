@@ -49,3 +49,8 @@ twice is the fold applied once; a swap of gold and output gives the same whole-s
 - Whole mode (`equal`) compares the entire supplied unit. An empty gold equals an empty unit (free spaces and breaks aside); a unit whose content spans more than one table cell is refused, not narrowed to one cell.
 - A token the fold rewrites keeps the markup and source span of the characters it came from, not of the run it sat in: `<p>ﬁ <b>X</b></p>` still reads `X` as bold.
 - A parenthesized digit keeps its parentheses: `⑴` reads `(1)`, so it matches `1` as a claim found inside it and equals `(1)` as a whole, but a whole unit `⑴` is not equal to a whole `1` (the punctuation is a symbol of its own). The circled digit has no punctuation and equals the digit either way.
+
+## Scope of this step, and one choice
+
+- Only a `present` text test runs on the chain in this change (the `chain` switch): its content, `absent` included. `order`, `repeat`, number, `verbatim`, `table_cell` and `format` keep their own readings until later changes move them onto it.
+- A gold that is nothing but footnote marks (`[25]`) keeps them at Cased, and so does the output it is read against: with the marks free the gold would be empty and unmatchable. A gold with any other content treats marks as free from Cased on.
