@@ -10,8 +10,8 @@
 #
 # The pipeline's models are in the image, each at the exact Hugging Face commit model_pins.py names, so the
 # server downloads nothing. Each worker loads its own models: where memory is short, set fewer workers with
-# WORKERS (docker run -e); on one GPU use at most 3 servers (WORKERS=3, or three containers): with more, Paddle
-# runs out of CUDA memory and a server answers HTTP 500, so restart it. A GPU server needs the host's NVIDIA
+# WORKERS (docker run -e); on one GPU use few servers: four on one H100 ran out of CUDA memory after about 2,400
+# pages and answered HTTP 500 (three is untested), so restart a server that does. A GPU server needs the host's NVIDIA
 # driver for CUDA 12.6 (the cu126 wheel). Set OPB_ENDPOINT_KEY (docker run -e) to require it as a bearer token, as opb sends it.
 FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1
 

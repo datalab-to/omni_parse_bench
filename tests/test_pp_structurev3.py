@@ -115,4 +115,28 @@ def test_gpu_server_pins_the_same_paddle_version_from_the_cu126_index():
     gpu = (serve / "Dockerfile.gpu").read_text()
     assert "paddlepaddle-gpu==3.2.2" in gpu and "/packages/stable/cu126/" in gpu
     assert "paddlepaddle==3.2.2" in (serve / "Dockerfile").read_text()
-    assert '"paddlepaddle", "paddlepaddle-gpu"' in (serve / "server.py").read_text()
+
+
+def test_server_reads_the_paddle_version_of_the_cpu_or_the_gpu_wheel(monkeypatch):
+    import ast
+    import importlib.metadata as md
+
+    # Note: server.py needs paddleocr at import, so only its version function is run.
+    src = (Path(pp.__file__).parent / "serve" / "pp-structurev3" / "server.py").read_text()
+    (func,) = [n for n in ast.parse(src).body if isinstance(n, ast.FunctionDef) and n.name == "_paddle_version"]
+    scope = {"importlib": __import__("importlib")}
+    exec(compile(ast.Module([func], []), "server.py", "exec"), scope)
+
+    def only(name):
+        def version(dist):
+            if dist != name:
+                raise md.PackageNotFoundError(dist)
+            return "3.2.2"
+        return version
+
+    for wheel in ("paddlepaddle", "paddlepaddle-gpu"):
+        monkeypatch.setattr(md, "version", only(wheel))
+        assert scope["_paddle_version"]() == "3.2.2"
+    monkeypatch.setattr(md, "version", only("neither"))
+    with pytest.raises(md.PackageNotFoundError):
+        scope["_paddle_version"]()

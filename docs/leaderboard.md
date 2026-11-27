@@ -17,7 +17,7 @@ test, run and verdict is public, so you can check any row.
 ## All rows
 
 Scores use omni-parse-bench 1.8.0 ([release notes](release-notes/v1.8.0.md)). Most rows are saved predictions regraded with
-1.7.0, which gives the same numbers under 1.8.0. Fresh runs: Gemini 4, Indra OCR, OCRia-1, Docling, the layout of
+1.7.0, which gives the same numbers under 1.8.0. Fresh runs: Gemini 4, Indra OCR, OCRia-1, Docling, PP-StructureV3, the layout of
 Gemini 3.8 Flash and GPT-5.6 Sol, and the open rows run locally (pdftotext, pdftext, MarkItDown, pdf-inspector, PyMuPDF4LLM, OpenDataLoader, LiteParse). Rows marked \* are
 described in [Starred rows](#starred-rows). Refusals are counted for systems called through an LLM API only; a dash
 means not measured, not zero. Parameters are the weights' total; 5.17B for OCRia-1 excludes the Docling Heron layout
