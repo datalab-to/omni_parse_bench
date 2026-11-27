@@ -47,6 +47,9 @@ What the test ignores:
 | I | checkbox written another way | `☒ Yes` | `<p><input type=checkbox checked> Yes</p>` | pass | `text-checkbox` |
 | I | a variable in math | `U test` | `$U$ test` | pass | `text-math-letter` |
 | I | a symbol in math | `3σ` | `$3\sigma$` | pass | `text-math-symbol` |
+| I | a symbol written in LaTeX, the gold a character | `¬p` | `$\neg p$` | pass | `text-math-negation` |
+| I | a relation written in LaTeX, the gold a character | `a≠b` | `$a \ne b$` | pass | `text-math-relation` |
+| I | words in `\mbox` in math | `x if y` | `$x\mbox{ if } y$` | pass | `text-math-words` |
 | I | middle dot as a decimal point | `2.3` | `2·3` | pass | `text-middot` |
 | I | a raised decimal point without a leading zero | `·2480550383` | `.2480550383` | pass | `text-leading-middot` |
 | I | dashes glued to a number are a leader | `Revenue 5` | `Revenue -----5` | pass | `text-glued-dash` |
@@ -85,6 +88,7 @@ What it penalizes:
 | | difference | gold | output | verdict | case |
 |---|---|---|---|---|---|
 | P | a changed letter | `Total` | `Totel` | fail: `'Total' not found (best 0.800 < 1.000); closest 'totel'` | `text-changed` |
+| P | a negation left out of a page | `¬p` | `<p>p</p>` | fail | `text-math-negation-dropped` |
 | P | more edits than `max_diffs` | `Total` (md 1) | `Tutel` | fail | `text-over-budget` |
 | P | each inserted letter is an edit | `lorem ipsum dolor sit amet` (md 2) | `lorem izpsum dolqor sit amjet` | fail | `text-inserted` |
 | P | a text at the edge of the page gets no extra edits | `lorem ipsum` (md 2) | `abc xxxem ipsum` | fail | `text-page-edge` |

@@ -69,6 +69,16 @@ families unified, then two single quotes in a row read as a double quote (TeX's 
 pair `'’`, so an apostrophe next to a quote mark reads as a double quote too: `Smiths'’` is `smiths"`); full-width punctuation made ASCII; a decimal middle dot made a point; spacing collapsed;
 lowercase. A run of three single quotes reads its first two as the double quote (`'''` is `"'`).
 
+Math is read by pylatexenc, plus a table of symbols it leaves out (`omni_parse_bench/texsymbols.py`): each command
+there reads as the character the equation test renders it as, so `$\neg p$`, `$a \ne b$` and `$a \leqslant b$` read
+as `¬p`, `a≠b` and `a≤b`, and the text and equation tests agree on what a command means. `\mbox`, `\texttt`,
+`\textsf`, `\textmd` and `\textup` read their words, as `\text` does. The fold also unifies the slanted and
+double-line forms of ≤ and ≥ (⩽ ≦, ⩾ ≧), n-ary operators with their binary ones (⨁ and ⊕, and the other four), the
+set relations ⫅ ⫆ ⫋ ⫌ with ⊆ ⊇ ⊊ ⊋, and ⊲ ⊳ with ◃ ▹. Left as they were, on purpose: `\dots` and `\ldots` (dots are
+leaders: `...` and `…` fold to a space on both sides), `\circ` (a degree sign), `\preceq` and `\succeq` (≼ ≽, KaTeX's ⪯ ⪰)
+and `\diamond` (◊, KaTeX's ⋄), so a gold in the other glyph does not match them (a blind spot), and `\xrightarrow{f}`
+(its arrow and its label are left out).
+
 White space may sit inside a leader run, and a `<br>` or a newline is white space. A block break (the end of a
 paragraph, cell or other block tag) is not: a leader run stops at it. For a line-end hyphen a block break is a
 line break like any other, so the hyphen joins across it: outputs that write one paragraph per printed line
@@ -79,6 +89,7 @@ a lowercase letter is then read joined (`well-` before `known` reads `wellknown`
 | rule | input | reads as | case |
 |---|---|---|---|
 | math is read as text | `$c_{\text{MC}}$ and $$2 . 5 5$$` | `cmc and 2.55` | `fold-math` |
+| a LaTeX symbol reads as its character | `$\neg p$ and $a \ne b$` | `¬p and a≠b` | `fold-math-symbol` |
 | a line-end hyphen before a lowercase letter joins; a capital after a word in mixed case keeps it | `develop- ers, Anglo- Saxon` | `developers, anglo- saxon` | `fold-hyphen` |
 | so does one between two words in capitals | `DEVELOP- ERS, RE- M` | `developers, rem` | `fold-hyphen-caps` |
 | a block break is a line break for a hyphen: it joins, as a `<br>` does | `<p>Head-</p><p>quarters</p><p>develop-<br>ers</p>` | `headquarters developers` | `fold-hyphen-block` |

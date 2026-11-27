@@ -511,10 +511,20 @@ def repeat(t: Repeat, v: views.Html) -> Mark:
     return False, f"{text[:50]!r} appears {n if h is None else h}x{how}, not {t.expected_count}x"
 
 
+# Note: scripts written without spaces between words: Han, kana, Hangul, Thai, Lao, Khmer, Myanmar, Tibetan. A
+# letter of one beside a match does not glue it, as no space is there to end a word.
+_UNSPACED = ("\u0e00-\u0eff\u0f00-\u0fff\u1000-\u109f\u1100-\u11ff\u1780-\u17ff\u19e0-\u19ff"
+             "\u2e80-\u2fdf\u3005\u3007\u3021-\u3029\u3038-\u303b\u3041-\u30ff\u3130-\u318f\u31f0-\u31ff"
+             "\u3400-\u4dbf\u4e00-\u9fff\ua960-\ua97f\ua9e0-\ua9ff\uaa60-\uaa7f\uac00-\ud7ff\uf900-\ufaff"
+             "\uff66-\uff9f\uffa0-\uffdc\U0001b000-\U0001b16f\U00020000-\U0003134f")
+_GLUED = rf"(?!(?:[{_UNSPACED}]))[^\W_]"    # a letter or digit that is not of an unspaced script
+
+
 def _text_copies(text: str, page: str) -> int:
-    """How many whole-word copies of `text` the page holds, after `normalize.fold` on both. """
+    """How many whole-word copies of `text` the page holds, after `normalize.fold` on both: no letter or digit
+    glued to either end, unless it is of a script written without spaces (`_UNSPACED`)."""
     chars = [c for c in normalize.fold(text) if not c.isspace()]
-    pattern = r"(?<![^\W_])" + r"\s*".join(re.escape(c) for c in chars) + r"(?![^\W_])"
+    pattern = rf"(?<!{_GLUED})" + r"\s*".join(re.escape(c) for c in chars) + rf"(?!{_GLUED})"
     return len(re.findall(pattern, normalize.fold(page)))
 
 

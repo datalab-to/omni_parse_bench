@@ -25,6 +25,9 @@ text-compound	pass
 text-checkbox	pass
 text-math-letter	pass
 text-math-symbol	pass
+text-math-negation	pass
+text-math-relation	pass
+text-math-words	pass
 text-middot	pass
 text-leading-middot	pass
 text-glued-dash	pass
@@ -51,6 +54,7 @@ text-budget-real-word	pass
 text-budget-negation	pass
 ## text-penalized
 text-changed	fail	'Total' not found (best 0.800 < 1.000); closest 'totel'
+text-math-negation-dropped	fail	'¬p' not found (best 0.667 < 1.000); closest 'p'
 text-over-budget	fail	'Total' not found (best 0.600 < 0.800); closest 'tutel'
 text-inserted	fail	'lorem ipsum dolor sit amet' not found (best 0.885 < 0.923); closest 'lorem izpsum dolqor sit am'
 text-page-edge	fail	'lorem ipsum' not found (best 0.727 < 0.818); closest 'em ipsum'
@@ -292,6 +296,7 @@ tex-bare-line	pass
 tex-split-cells	pass
 ## latex-penalized
 tex-case	fail	equation not found (4 symbols; the output's math has 4)
+tex-too-deep	fail	no math in the output
 tex-symbol	fail	equation not found (4 symbols; the output's math has 4)
 tex-single-bracket	fail	equation not found (7 symbols; the output's math has 5)
 tex-blackboard	fail	equation not found (1 symbols; the output's math has 1)
@@ -361,6 +366,10 @@ rep-missing	fail	'Total' appears 1x, not 2x
 rep-extra	fail	'Total' appears 3x, not 2x
 rep-longer-word	fail	'Total' appears 0x, not 1x
 rep-digit	fail	'Total' appears 0x, not 1x
+rep-cjk-neighbor	pass
+rep-katakana-model	pass
+rep-katakana-duplicate	fail	'4284A' appears 3x, not 2x
+rep-cyrillic-glued	fail	'Тест' appears 0x, not 1x
 rep-typo	fail	'Total' appears 0x, not 1x
 rep-alt-only	fail	'Total' appears 0x, not 1x
 rep-overlap	fail	'aa' appears 0x, not 1x
@@ -763,6 +772,7 @@ view-alt	see chart
 view-seen	see
 ## internals-fold
 fold-math	cmc and 2.55
+fold-math-symbol	¬p and a≠b
 fold-hyphen	developers, anglo- saxon
 fold-hyphen-caps	developers, rem
 fold-hyphen-block	headquarters developers

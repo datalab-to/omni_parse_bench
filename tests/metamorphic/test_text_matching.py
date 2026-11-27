@@ -277,6 +277,25 @@ def test_repeat_needs_exactly_its_count(text, n, rnd):
     assert not passes(r, page_with_lines(text, n - 1, rnd))
 
 
+@relation(HOLDS, domain="9 texts x 5 neighbors, 2 sides, 1 to 3 copies")
+@given(st.sampled_from(["一年里的第", "资料来源", "ประเทศ", "ការ", "ありがとう", "안녕", "ab", "1", "第12"]),
+       st.sampled_from(["一", "か", "한", "ก", "ក"]), st.sampled_from(["x", "Я", "7", "é", "Ω"]),
+       st.booleans(), st.integers(1, 3))
+def test_repeat_counts_a_copy_beside_a_script_written_without_spaces(text, unspaced, spaced, before, n):
+    """A repeat test counts each copy of its text that has a letter of a script written without spaces (Han,
+    kana, Hangul, Thai, Khmer) glued to either end, and counts none that has a letter or digit of a spaced
+    script glued there (Latin, Cyrillic, Greek). [M194]
+    Why it matters for a score: a line that starts with the same words in Chinese or Thai has no space to end
+    its word, so requiring one scored every system 0 on such a test."""
+    # Given n lines each holding the text with a neighbor glued before or after it
+    glue = lambda c: f"{c}{text}" if before else f"{text}{c}"  # noqa: E731
+    r = runners.Repeat(runners.Text(text, 0), n)
+    # When the neighbor is of an unspaced script; Then every copy counts
+    assert passes(r, "".join(f"<p>{glue(unspaced)}</p>" for _ in range(n)))
+    # When it is of a spaced script; Then none counts, so a test of n fails
+    assert not passes(r, "".join(f"<p>{glue(spaced)}</p>" for _ in range(n)))
+
+
 @more_evidence(pool="repeat")
 @given(st.sampled_from(REPEAT), st.randoms(use_true_random=False))
 def test_repeat_needs_exactly_its_count_on_loaded_tests(t, rnd):

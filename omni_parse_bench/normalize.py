@@ -8,7 +8,7 @@ import re
 import sys
 import unicodedata
 
-from omni_parse_bench import mathspans, views
+from omni_parse_bench import mathspans, texsymbols, views
 
 # Note: Cf is the whole invisible-formatting category, so a stray one (a zero-width space in "Ac\u200bme")
 # never splits a word; but the prepended concatenation marks are Cf and printed (the Arabic number
@@ -120,6 +120,13 @@ _PRE_NFKC = str.maketrans({"〜": "~", "∗": "*"})
 # ţ; gershayim is the Hebrew double quote.
 _POST_NFKC = str.maketrans({"ş": "ș", "ţ": "ț", "Ş": "Ș", "Ţ": "Ț", "״": '"'})
 _WRAP_HYPHEN = re.compile("[-‐‑](?=\\s)")
+# Note: one relation or operator, two glyphs: the slanted ≤ ≥ and their double-line forms are ≤ ≥ (so
+# `\leqslant` reads as ≤), an n-ary operator is its binary one, and the set relations and triangles fold
+# as `equations` folds them.
+_SYMBOL_ALIASES = str.maketrans({"♢": "◊", "≦": "≤", "≧": "≥", "⩽": "≤", "⩾": "≥",
+                                 "⨀": "⊙", "⨁": "⊕", "⨂": "⊗", "⨄": "⊎", "⨆": "⊔",
+                                 "⫅": "⊆", "⫆": "⊇", "⫋": "⊊", "⫌": "⊋", "⊲": "◃", "⊳": "▹",
+                                 "⟺": "⇔", "⟷": "↔", "⌅": "⊼"})
 
 
 def fold(s: str) -> str:
@@ -152,7 +159,8 @@ def fold(s: str) -> str:
         typography       dash, quote (with primes, ꞌ, ˈ), space and arrow families unified, then two single
                          quotes in a row (TeX's `` and '', or a mixed pair '’) -> "; the fraction slash
                          -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII; ş ţ -> ș ț; ״ -> "
-        symbols          decimal middle dots -> "."; ♢ -> ◊; ≦ -> ≤
+        symbols          decimal middle dots -> "."; ♢ -> ◊; ≦ ⩽ -> ≤; ≧ ⩾ -> ≥; ⨀ ⨁ ⨂ ⨄ ⨆ -> ⊙ ⊕ ⊗ ⊎ ⊔;
+                         ⫅ ⫆ ⫋ ⫌ -> ⊆ ⊇ ⊊ ⊋; ⊲ ⊳ -> ◃ ▹; ⟺ ⟷ -> ⇔ ↔; ⌅ -> ⊼
         case, spacing    lowercased (case kept for an arg with exact_case: `fold_cased`); whitespace
                          collapsed and trimmed
 
@@ -219,7 +227,7 @@ def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool
     s = _LEADERS.sub(_leader_in_word if keep_word_underscores else " ", s).replace(views.BREAK, " ")
     s = typography(s, preserve_dashes=preserve_dashes)
     s = s.replace("…", "...").translate(_CJK_PUNCT)
-    s = _DECIMAL_MIDDOT.sub(".", s).replace("♢", "◊").replace("≦", "≤")
+    s = _DECIMAL_MIDDOT.sub(".", s).translate(_SYMBOL_ALIASES)
     return _WHITESPACE.sub(" ", s).strip()
 
 
@@ -453,6 +461,8 @@ def _text_context():
     macros = [latex2text.MacroTextSpec(name, simplify_repl="%s/%s") for name in _FRACTION_STYLES]
     # The optional alignment argument shifts cfrac's numerator and denominator to args 2 and 3.
     macros.append(latex2text.MacroTextSpec(_CFRAC_STYLE, simplify_repl="%(2)s/%(3)s"))
+    macros += [latex2text.MacroTextSpec(name, simplify_repl=ch) for name, ch in texsymbols.SYMBOLS.items()]
+    macros += [latex2text.MacroTextSpec(name, simplify_repl="%s") for name in texsymbols.TEXT]
     db.add_context_category("opb-fraction-styles", macros=macros, prepend=True)
     return db
 
@@ -467,5 +477,6 @@ def _walker_context():
     macros = [MacroSpec(name, "{{") for name in _FRACTION_STYLES]
     # cfrac takes an optional [l] or [r] argument before its numerator and denominator.
     macros.append(MacroSpec(_CFRAC_STYLE, "[{{"))
+    macros += [MacroSpec(name, "{") for name in texsymbols.TEXT]
     db.add_context_category("opb-fraction-styles", macros=macros, prepend=True)
     return db

@@ -38,6 +38,15 @@ bars compare as a double bar, so `||x||` and `\lVert x\rVert` match. This also f
   and subscripts are dropped. If the row-aware match fails, the matcher also tries the earlier reading that
   ignored top-level row breaks; similarly, it can retry the earlier reading of a TeX percent comment.
 - The plain-text fallback uses the same arrow, triangle and subset glyph aliases as math.
+- **Math nested more than 64 groups deep is not read.** KaTeX reads nested groups (`{`, `\left`, `\begin`) by
+  recursion, and a span that nests thousands of them (or loops thousands of `\dots`) overran the stack of the
+  embedded engine and killed the whole scoring process. A span nested deeper than `equations.MAX_NESTING` (64)
+  now renders as no math, so a test whose equation is on the page's other spans still passes, and one that
+  needed that span fails with `no math in the output` (case tex-too-deep). A gold equation that deep is refused
+  as one that does not render. A run of unbraced commands (`\sqrt\sqrt...`, `\dots\dots...`) is bounded by the
+  engine's own stack limit (256 KB), with the same result; that limit is set when the first `MiniRacer` of the
+  process starts, so a program that started its own before scoring keeps V8's default and only the 64-group
+  bound protects it.
 
 These glyph folds do not infer mathematical meaning: for example a long arrow can match a short arrow, and
 an explicitly limited Σ can match a summation sign. Angle brackets stay distinct from inequality signs, and ℓ from `l`.
@@ -131,6 +140,7 @@ What it penalizes:
 | | difference | gold | output | verdict | case |
 |---|---|---|---|---|---|
 | P | letter case | `x^2` | `$X^2$` | fail: `equation not found (4 symbols; the output's math has 4)` | `tex-case` |
+| P | math nested more than 64 groups deep is not read | `x` | `$\frac{1}{\frac{1}{…x…}}$`, 65 levels | fail | `tex-too-deep` |
 | P | a different exponent | `x^2` | `$x^3$` | fail | `tex-symbol` |
 | P | a single bracket for a double bracket | `[[z,w]]` | `$[z,w]$` | fail | `tex-single-bracket` |
 | P | blackboard, script or fraktur dropped | `\mathbb{R}` | `$R$` | fail | `tex-blackboard` |

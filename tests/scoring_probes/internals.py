@@ -116,6 +116,7 @@ TABLES = [
     table(
         "internals-fold",
         folds("fold-math", "math is read as text", "$c_{\\text{MC}}$ and $$2 . 5 5$$", "cmc and 2.55"),
+        folds("fold-math-symbol", "a LaTeX symbol reads as its character", r"$\neg p$ and $a \ne b$", "¬p and a≠b"),
         folds("fold-hyphen", "a line-end hyphen before a lowercase letter joins; a capital after a word in mixed case keeps it", "develop- ers, Anglo- Saxon", "developers, anglo- saxon"),
         folds("fold-hyphen-caps", "so does one between two words in capitals", "DEVELOP- ERS, RE- M", "developers, rem"),
         folds("fold-hyphen-block", "a block break is a line break for a hyphen: it joins, as a `<br>` does", "<p>Head-</p><p>quarters</p><p>develop-<br>ers</p>", "headquarters developers"),
