@@ -372,14 +372,14 @@ def test_repeating_a_section_row_cell_keeps_the_section_verdict():
             assert cell_passes("6", {}, page, section=label), (label, page)
             assert not cell_passes("6", {}, page, section="Other"), (label, page)
     # And copies that each match the gold within its edits but differ from each other are data, not a section
-    page = ("<table><tr><th>A</th><th>B</th></tr><tr><td>Cohort 1</td><td>Cohort 3</td></tr>"
+    page = ("<table><tr><th>A</th><th>B</th></tr><tr><td>Cohort A</td><td>Cohort C</td></tr>"
             "<tr><td>5</td><td>6</td></tr></table>")
-    assert not cell_passes("6", {}, page, section="Cohort 2", max_diffs=1), page
+    assert not cell_passes("6", {}, page, section="Cohort B", max_diffs=1), page
     # And the section is matched within the edits a test allows, merged or repeated
-    for first in ("<td colspan=2>Cohort 1</td>", "<td>Cohort 1</td><td>Cohort 1</td>"):
+    for first in ("<td colspan=2>Cohort A</td>", "<td>Cohort A</td><td>Cohort A</td>"):
         page = f"<table><tr><th>A</th><th>B</th></tr><tr>{first}</tr><tr><td>5</td><td>6</td></tr></table>"
-        assert cell_passes("6", {}, page, section="Cohort 2", max_diffs=1), page
-        assert not cell_passes("6", {}, page, section="Cohort 2"), page
+        assert cell_passes("6", {}, page, section="Cohort B", max_diffs=1), page
+        assert not cell_passes("6", {}, page, section="Cohort B"), page
     # And a section followed by a row of repeated data keeps it, merged or repeated, and the data row is never
     # credited as a section for a test naming another one
     for first in ("<td colspan=2>Cohort</td>", "<td>Cohort</td><td>Cohort</td>"):

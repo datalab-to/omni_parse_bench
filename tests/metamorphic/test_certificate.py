@@ -8,7 +8,8 @@ import sys
 
 import pytest
 
-from metamorphic.common import CELL, CHECKS, DEVIATION_STATUS, DEVIATIONS, HOLDS, LAYOUT, LIVE, NUMBER, ORDER
+from metamorphic.common import (CELL, CELL_DIGIT, CHECKS, DEVIATION_STATUS, DEVIATIONS, HOLDS, LAYOUT, LIVE,
+                                NUMBER, ORDER, ORDER_DIGIT)
 from metamorphic.common import (DATASET_REVISION, MANIFEST_SHA256, POOLS, REAL, RELATIONS, REPEAT,
                                 REPEAT_NUMBER, RUN_IN_CI,
                                TEXT, manifest_sha256, text_strings)
@@ -154,7 +155,8 @@ def test_the_certificate_pools_are_the_loaded_tests():
              "text, number": len(TEXT + NUMBER), "layout": len(LAYOUT), "number": len(NUMBER),
              "digit-edged text, repeat": len(DIGIT_EDGED["present"]) + len(DIGIT_EDGED["repeat"]),
              "exact text": len(EXACT), "text, order, repeat, table_cell": len(TEXT + ORDER + REPEAT + CELL),
-             "batch": len(TEXT + NUMBER + ORDER + REPEAT + REPEAT_NUMBER + CELL), "latex": len(LATEX)}
+             "batch": len(TEXT + NUMBER + ORDER + REPEAT + REPEAT_NUMBER + CELL), "latex": len(LATEX),
+             "order digit": len(ORDER_DIGIT), "table_cell digit": len(CELL_DIGIT)}
     assert sizes == {k: v[2 if LIVE else 1] for k, v in POOLS.items()}, "update POOLS in common.py"
 
 

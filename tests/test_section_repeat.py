@@ -78,15 +78,15 @@ def test_a_repeated_section_beside_headings_and_row_groups_keeps_both():
     assert not section_passes(page, "Cohort 1", cell="8", headings=("B",), row_groups=("Female",))
 
 
-@pytest.mark.parametrize("first", ["<td colspan=2>Cohort 1</td>", "<td>Cohort 1</td><td>Cohort 1</td>"])
+@pytest.mark.parametrize("first", ["<td colspan=2>Cohort A</td>", "<td>Cohort A</td><td>Cohort A</td>"])
 def test_a_repeated_section_matches_within_the_edits_a_merged_one_does(first):
     page = f"<table><tr><th>A</th><th>B</th></tr><tr>{first}</tr><tr><td>5</td><td>6</td></tr></table>"
-    assert section_passes(page, "Cohort 2", max_diffs=1)
-    assert not section_passes(page, "Cohort 2")
+    assert section_passes(page, "Cohort B", max_diffs=1)
+    assert not section_passes(page, "Cohort B")
     assert not section_passes(page, "Other", max_diffs=1)
 
 
 def test_cells_that_each_match_within_the_edits_but_differ_are_not_a_repeated_section():
-    page = under("<tr><td>Cohort 1</td><td>Cohort 3</td><td>Cohort 1</td></tr>")
-    assert not section_passes(page, "Cohort 2", max_diffs=1)
-    assert not section_passes(page, "Cohort 1")
+    page = under("<tr><td>Cohort A</td><td>Cohort C</td><td>Cohort A</td></tr>")
+    assert not section_passes(page, "Cohort B", max_diffs=1)
+    assert not section_passes(page, "Cohort A")

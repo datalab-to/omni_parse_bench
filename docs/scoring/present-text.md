@@ -74,6 +74,9 @@ What it does not look at, so a wrong output passes:
 | B | a superscript digit after a letter read as a footnote marker | `area in m is` | `<p>area in m<sup>2</sup> is</p>` | pass | `text-sup-unit` |
 | B | two adjacent cells read as one string | `1 2` | `<table><tr><td>1</td><td>2</td></tr></table>` | pass | `text-table-flat` |
 | B | a short gold with an edit to spend | `ab` (md 1) | `a` | pass | `text-short-fuzzy` |
+| B | a unit changed within the budget | `Rate 5%` (md 1) | `Rate 5‰` | pass | `text-budget-unit` |
+| B | a letter changed into another real word | `Take it from the list` (md 1) | `Take it form the list` | pass | `text-budget-real-word` |
+| B | a negation dropped, at a budget that pays for it | `It does not work well` (md 4) | `It does work well` | pass | `text-budget-negation` |
 <!-- /cases -->
 
 What it penalizes:
@@ -141,10 +144,35 @@ exact instead ([Numbers are exact](#numbers-are-exact)).
 
 ## Numbers are exact
 
-A gold that holds a digit must match with each of its numbers (a maximal run of digits, after fold) whole and
-unchanged, at any `max_diffs`: an edit may not change, add, drop, split or join a number, the squeezed retry
-never joins two, and the matched text may not end inside one. Every other character still costs one edit, and
-a gold without a digit is matched as above.
+A gold that holds a digit must match with each of its numbers whole and unchanged, after fold, at any
+`max_diffs`: an edit may not change, add, drop, split or join a number, the squeezed retry never joins two, and
+the matched text may not end inside one. A number is digit runs joined by a single `.` between digits, or by a
+single `,` before exactly three digits: `1.2`, `1,240`, `12.05.2021`. A comma before one, two or four digits is a
+list comma, not part of a number (`0.39, 1.56`, `1,2`, `7,2016`), and so is one followed by a space. A leading `.`
+(`.5`) after white space, a bracket or an operator is part of a number. Its separators are part of it: `1,2` or
+`12` for `1.2`, `1240` or `1, 240` for `1,240` and `5` for `.5` are other numbers; a space after a list comma is
+free (`(1.13, 3.99)` is `(1.13,3.99)`). A leading zero the page adds (`0.150` for `.150`) is a digit the guard
+refuses. Every other character still costs one edit, and a gold without a digit is matched as above.
+
+A sign belongs to its number: a `-` (or `−`, or an en dash, which fold to one), `+` or `±` directly before a
+number is a sign unless the character before it is a letter or a digit. So `-5`, `+1.55`, `x = -5`, `(-5)` and
+`3 -5` are signed, and so are an exponent's sign (`1e-3`) and a sign after a Chinese, Japanese or Korean
+character (such a text puts no space before it). A gold's sign must be written and cannot be added: `+1.55` is
+not `1.55`. A sign before a currency symbol counts too (`-$1,234`, `(−€5)`), the symbol being part of the
+number. In a `table_cell` cell, a `-`, `+` or `±` followed by a space (`− 0.756`, `+ 0.30 (+ 23%)`, `to − 23.4`) is a sign too
+unless a value (a digit, `%` or `)`) comes right before it (`3 - 5` is not signed). On a page text or a cell, a
+spaced sign on the page (`− 0.756` for the gold's `−0.756`) in front of a number the gold writes signed is that sign: `12.20 -13.20` matches `12.20 - 13.20`, while
+the sign dropped (`12.20 13.20`) fails.
+
+A `-` after a Latin letter or a digit is a hyphen: `A-12`, `2026-11-26`, `1-2` and `COVID-19` keep costing one
+edit to drop, as do a list dash (`- 5` in the middle of a text) and a space-dash-space (`3 - 2`). This differs
+on purpose from the number reader of `region`, which reads a sign after a letter too (`A-12`): a page often
+writes such an id as `COVID 19` or `A12`, and a budget exists for that kind of noise. Spacing a unit exponent either way does not change
+what a number is: a gold's `kg-1` is matched by the page's spaced `kg -1`, and a gold's `dm -3` by `dm-3` (after a
+letter only). A `+` or `±` between two values (`6% ± 2%`, `1 +2`) is an operator, not a sign. The cost of this narrow rule: a minus written right after a Latin letter (`x-5`) reads as a hyphen, so
+a budget can still drop it, and a spaced minus in the middle of a text (`was − 5`) is not guarded. `order` and
+`table_cell` apply the same rule ([order.md](order.md#how-it-differs-from-present),
+[table_cell.md](table_cell.md#blind-spots)).
 
 <!-- cases:text-numbers -->
 | | difference | gold | output | verdict | case |
@@ -156,7 +184,20 @@ a gold without a digit is matched as above.
 | P | a letter read as a digit adds a number | `Total 41` (md 1) | `Tota1 41` | fail | `num-fuzzy-added` |
 | P | two numbers joined | `Pages 1 to 2` (md 3) | `Pages 12` | fail | `num-fuzzy-joined` |
 | P | a dropped thousands separator joins two numbers | `1,000` (md 1) | `1000` | fail | `num-fuzzy-thousands` |
+| P | a comma for the decimal point | `Rate 1.2 per` (md 1) | `Rate 1,2 per` | fail | `txt-decimal-comma` |
+| P | a decimal point dropped | `Rate 1.2 per` (md 2) | `Rate 12 per` | fail | `txt-decimal-dropped` |
+| P | a lost plus sign | `Dose +1.55 mg` (md 2) | `Dose 1.55 mg` | fail | `txt-plus-lost` |
+| P | a lost plus-minus sign | `Dose ±0.3 mg` (md 2) | `Dose 0.3 mg` | fail | `txt-plus-minus-lost` |
+| P | a leading point is part of the number | `Area .5 ha` (md 2) | `Area 5 ha` | fail | `txt-leading-point` |
+| P | a zero the page adds before a leading point is a digit the guard refuses | `Area .150 (4.07)` (md 1) | `Area 0.150 (4.07)` | fail | `txt-leading-zero` |
+| I | a space after a comma between numbers is free | `CI (1.13, 3.99) here` (md 1) | `CI (1.13,3.99) here` | pass | `txt-comma-space` |
+| I | so is a space dropped from a date list | `on 12, 19 November 2012` (md 1) | `on 12,19 November 2012` | pass | `txt-comma-space-date` |
 | P | a digit of another script is another number | `3.` (md 1) | `๓.` | fail | `num-fuzzy-script` |
+| P | a lost minus sign | `Net -5 total` (md 2) | `Net 5 total` | fail | `txt-sign-lost` |
+| P | a minus sign added | `Net 5 total` (md 2) | `Net -5 total` | fail | `txt-sign-added` |
+| P | a lost minus sign inside brackets | `Margin (-5)` (md 2) | `Margin (5)` | fail | `txt-sign-bracket` |
+| I | a minus written as `−` or an en dash | `Net -5 total` (md 1) | `Net −5 total` | pass | `txt-sign-spelling` |
+| I | a hyphen after a letter or between figures is no sign: dropping one is an edit | `Case A-12 ok` (md 1) | `Case A12 ok` | pass | `txt-hyphen` |
 | I | a letter edit beside a number | `Total: 41` (md 1) | `Totel: 41` | pass | `num-fuzzy-letter` |
 | I | full-width digits fold first | `Room 3` (md 1) | `Room ３` | pass | `num-fuzzy-fullwidth` |
 | I | a number after the matched text is outside it | `Figure 3` (md 1) | `Figure 3 2019 data` | pass | `num-fuzzy-after` |
@@ -331,6 +372,18 @@ Blind spots of `blank_after`, besides those of `present`:
 - **No word edges.** `Total` is found in `Totally` (case text-longer-word). Use `repeat` for whole words.
 - **Letters beside a number are free.** `4.8` is found in `a4.8` (case text-letter-beside). Use a number arg
   ([present-number.md](present-number.md)) when sign and percent matter.
+- **A budget still pays for anything that is not a digit or a sign.** A unit that reads as another (`5%` for
+  `5‰`, case text-budget-unit), a letter change that makes another real word (`from` for `form`, case
+  text-budget-real-word), and, on a long passage with a budget of 2 or more, a dropped `not` (case
+  text-budget-negation) all pass. This is not a negation guard: keep the budget at 0 where one word flips the
+  meaning.
+- **A comma before one or two digits is a list comma.** A decimal comma (`1,2`) is two numbers to the reader, so
+  `1,2` passes for `1 2` or `1;2` with an edit to spend; `1.2` for `1,2` still fails. A thousands comma against a
+  list comma (`80,100` for `80, 100`) is a number change.
+- **A page that tightens a spaced range gains a sign.** A gold `12.20 - 13.20` fails on `12.20 -13.20` (the
+  page's `-13.20` is a signed number); the other way round passes. Rarer than a page that spaces a sign.
+- **Brackets round a number are not a sign.** An accounting negative `(1,234)` passes for `1,234` and the other
+  way round when the budget has 2 edits to spend (case cell-accounting-brackets); keep the budget at 0 for it.
 - **Image descriptions pay.** A description that contains the string passes the test (case text-alt).
 - **Most budgets are real.** 1,370 of the 3,684 real present text tests allow 1 to 4 edits; the others allow none.
 - **Short golds and edit budgets are loose.** With one edit, `ab` is found in a page holding `a` (case

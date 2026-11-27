@@ -130,11 +130,13 @@ NUMBER = "\U000F0000"
 
 
 def encoded(gold: str, page: str) -> tuple[str, str]:
-    """Both strings with each distinct maximal run of digits made one private-use character of its own."""
+    """Both strings with each distinct number (digit runs joined by a `.`, or a `,` before exactly three
+    digits; a leading `.` after a space or bracket) made one private-use character of its own."""
     codes: dict[str, str] = {}
 
     def encode(s: str) -> str:
-        return re.sub(r"\d+", lambda m: codes.setdefault(m[0], chr(ord(NUMBER) + len(codes))), s)
+        return re.sub(r"(?:(?<![^ \t\n\xa0(\[{<>=:;|/±+-])\.(?=\d))?\d+(?:\.\d+|,\d{3}(?!\d))*",
+                      lambda m: codes.setdefault(m[0].replace(" ", ""), chr(ord(NUMBER) + len(codes))), s)
     return encode(gold), encode(page)
 
 

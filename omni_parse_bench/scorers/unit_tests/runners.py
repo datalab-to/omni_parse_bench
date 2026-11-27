@@ -399,13 +399,22 @@ def order(t: Order, v: views.Html) -> Mark:
     folded = normalize.fold(v.text)
     cut = [False, False]
     both = False
+    # Note: a string that holds a digit is found with its numbers exact (`_near_numbers`), as `present` finds
+    # one (`_numbers_kept`); then both are found in the folded text's own indices, so they can be ordered.
+    strict = [any(c.isdigit() for c in normalize.fold(x)) for x in (t.before, t.after)]
     for f in (normalize.fold, normalize.squeeze):
         hay = f(v.text)
         kept = [k for k, c in enumerate(folded) if not c.isspace()] if f is normalize.squeeze else None
-
-        raw = [_near(f(x), hay, t.max_diffs) for x in (t.before, t.after)]
-        a, b = (_unglued(m, folded, kept) for m in raw)
-        cut = [c or (bool(m) and not x) for c, m, x in zip(cut, raw, (a, b), strict=True)]
+        if any(strict):
+            raw = [_near_numbers(normalize.fold(x), folded, t.max_diffs, f is normalize.squeeze)
+                   for x in (t.before, t.after)]
+            a, b = raw
+            cut = [c or (s and not m and _only_glued(x, v.text))
+                   for c, s, m, x in zip(cut, strict, raw, (t.before, t.after), strict=True)]
+        else:
+            raw = [_near(f(x), hay, t.max_diffs) for x in (t.before, t.after)]
+            a, b = (_unglued(m, folded, kept) for m in raw)
+            cut = [c or (bool(m) and not x) for c, m, x in zip(cut, raw, (a, b), strict=True)]
         if a and b and any(x.start < y.start for x in a for y in b):
             return True, ""
         both = both or bool(a and b)
@@ -1003,6 +1012,26 @@ def _near(want: str, hay: str, max_diffs: int) -> list:
     return sorted(found.values())
 
 
+def _near_numbers(want: str, folded: str, max_diffs: int, squeezed: bool) -> list:
+    """`want`'s matches in `folded`, as `_near` finds them, but with every number of `want` whole and exact
+    (as `_numbers_kept`): a number is one block of `max_diffs + 1` characters, so an edit that changes, adds
+    or drops one costs more than the budget. Each match starts at an index of `folded`, also when `squeezed`
+    (the spaces of both removed, after the numbers are blocks, so a squeeze never joins two numbers). A copy
+    cut out of a longer number is no match: that number is another block."""
+    encoded = _encode(want, folded, max_diffs + 1)
+    if encoded is None:
+        return []
+    needle, text, index = encoded
+    if squeezed:
+        live = [i for i, c in enumerate(text) if c != " "]
+        needle = needle.replace(" ", "")
+        text, index = "".join(text[i] for i in live), [index[i] for i in live]
+    if not needle:
+        return []
+    found = _near(needle, text, max_diffs)
+    return [fuzzysearch.Match(index[m.start], index[m.start], m.dist, "") for m in found]
+
+
 def _unglue(want: str, hay: str, folded: str = "", kept: list[int] | None = None) -> str:
     """`hay` with each exact copy of `want` cut out of a longer number (`_glued`) blanked out, so no window of
     a rejected copy matches while a fuzzy match elsewhere still can (`kept`: see `_edges_ok`)."""
@@ -1068,25 +1097,144 @@ _NUMBER_CHAR = "\U000F0000"
 _PLANE_15_16 = re.compile("[\U000F0000-\U0010FFFF]")
 
 
-def _tokens(want: str, hay: str) -> tuple[str, str] | None:
-    """`want` and `hay` with each maximal run of digits (`str.isdigit`) made one character: a private-use
-    code point of its own for each distinct run of `want`, and one shared by every run of `hay` that `want`
-    lacks (no edit may touch a number, so those never need telling apart). None when a number of `want`
-    is missing from `hay`, which no stretch can then match."""
+def _joins_hyphen(c: str) -> bool:
+    """Whether a `-` after `c` is a hyphen: `c` is a letter or a digit, other than a character of a script
+    written without spaces (Chinese, Japanese, Korean: such a text puts no space before its minus)."""
+    cjk = "\u2e80" <= c <= "\u9fff" or "\uac00" <= c <= "\ud7af" or "\uf900" <= c <= "\ufaff"
+    return c.isalnum() and not cjk
+
+
+def _exponent(s: str, i: int) -> bool:
+    """Whether the `-` at `s[i]` is the sign of an exponent: `1e-3`, `2.5E-4`."""
+    return s[i - 1:i] in ("e", "E") and s[i - 2:i - 1].isdigit()
+
+
+def _operator(s: str, i: int) -> bool:
+    """Whether the `+` or `±` at `s[i]` stands between two values (`6% ± 2%`, `1 +2`), not before a number."""
+    return s[i] != "-" and _after_value(s, i)
+
+
+def _after_value(s: str, i: int) -> bool:
+    """Whether a value (a digit, `%` or `)`) comes before `s[i]`, white space apart."""
+    before = s[:i].rstrip()[-1:]
+    return before.isdigit() or before in ("%", ")")
+
+
+def _unit_signed(s: str) -> set[str]:
+    """The signed numbers of the folded `s` written after a letter and a space (`dm -3`, `kg -1`): a text that
+    does not space the minus (`dm-3`) holds the same number."""
+    return {"".join(s[a:b].split()) for a, b, number in _number_pieces(s, spaced=True)
+            if number and s[a] == "-" and s[a - 1:a] == " " and s[a - 2:a - 1].isalpha()}
+
+
+def _hyphened(s: str) -> set[str]:
+    """The numbers of the folded `s` that have a hyphen directly before them (`A-12`, `kg-1`): spaced, as in
+    `kg -1`, that hyphen reads as a sign, and a text that spaces it is not holding a different number."""
+    after = [("".join(s[a:b].split()), s[a - 1:a] == "-") for a, b, number in _number_pieces(s)
+             if number and s[a] != "-"]
+    bare = {n for n, hyphen in after if not hyphen}
+    return {n for n, hyphen in after if hyphen and n not in bare}
+
+
+# What may stand before the leading point of `.5`: white space, a bracket, an operator or a sign.
+_BEFORE_POINT = frozenset(" \t\n\xa0([{<>=:;|/±+-")
+
+
+def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
+    """`s` as spans (start, end, is_number) that tile it. A number is digit runs (`str.isdigit`) joined by a
+    single `.` between digits, or by a single `,` before exactly three digits (`1.2`, `1,240`, `12.05.2021`;
+    a comma before one, two or four digits is a list comma: `0.39, 1.56`, `1,2`, `7,2016`): its separators
+    are part of it, so a `,` for a `.` is another number, as is `1000` for `1,000`. A leading `.` (`.5`)
+    after white space, a bracket or an operator is part of it, and so is its sign: a `-`, `+` or `±`
+    directly before it (`-5`, `+1.55`, `x = -5`, `(-5)`, `3 -5`) unless a letter or a digit comes before the
+    sign, so `A-12`, `2026-11-26` and `1-2` hold a hyphen (as `_number_pattern` reads one), and `1e-3` has
+    the exponent's sign. A `-` before a number after white space, as in `3 -5`, is a sign; `3 - 5` has none.
+    A `- `, `+ ` or `± ` with a space is a sign too when `spaced` and no value comes before it (a table cell
+    `\u2212 0.756`, `to \u2212 23.4`; a page that starts a list item `- 12` is not a negative number)."""
+    nums: list[list[int]] = []
+    pos = 0
+    for digits, run in itertools.groupby(s, str.isdigit):
+        end = pos + len(list(run))
+        if digits:
+            sep = s[pos - 1] if nums and nums[-1][1] == pos - 1 else ""
+            if sep == "." or sep == "," and end - pos == 3:
+                nums[-1][1] = end
+            else:
+                nums.append([pos, end])
+        pos = end
+    spans: list[tuple[int, int, bool]] = []
+    last = 0
+    for a, b in nums:
+        if s[a - 1:a] == "." and a > last and (a == 1 or s[a - 2] in _BEFORE_POINT):
+            a -= 1
+        # the sign stands before a currency symbol too (`-$1,234`), which then belongs to the number
+        p = a - 1 if a - 1 > last and unicodedata.category(s[a - 1]) == "Sc" else a
+        if s[p - 1:p] in ("-", "+", "±") and p - 1 >= last and not _operator(s, p - 1) and (
+                not _joins_hyphen(s[p - 2:p - 1]) or _exponent(s, p - 1)):
+            a = p - 1
+        elif (spaced and s[a - 1:a] == " " and s[a - 2:a - 1] in ("-", "+", "±") and a - 2 >= last
+              and not _after_value(s, a - 2)):
+            a -= 2
+        if a > last:
+            spans.append((last, a, False))
+        spans.append((a, b, True))
+        last = b
+    if last < len(s):
+        spans.append((last, len(s), False))
+    return spans
+
+
+def _encode(want: str, hay: str, copies: int = 1) -> tuple[str, str, list[int]] | None:
+    """`want` and `hay` with each number (`_number_pieces`) made `copies` characters, all alike: a private-use
+    code point of its own for each distinct number of `want`, and one shared by every number of `hay` that
+    `want` lacks (no edit may touch a number, so those never need telling apart). With them, the index in
+    `hay` of what each character of the encoded `hay` stands for. None when a number of `want` is missing
+    from `hay`, which no stretch can then match."""
     codes: dict[str, str] = {}
+    hyphened = _hyphened(want)
+    unit_signed = _unit_signed(want)
 
-    def encode(s: str, gold: bool) -> str:
-        out = []
-        for digits, run in itertools.groupby(_PLANE_15_16.sub("\ufffd", s), str.isdigit):
-            run = "".join(run)
-            if digits and gold:
-                codes.setdefault(run, chr(ord(_NUMBER_CHAR) + 1 + len(codes)))
-            out.append(codes.get(run, _NUMBER_CHAR) if digits else run)
-        return "".join(out)
+    def encode(s: str, gold: bool) -> tuple[str, list[int]]:
+        s = _PLANE_15_16.sub("\ufffd", s)
+        out, index = [], []
+        for a, b, number in _number_pieces(s):
+            if number:
+                key = "".join(s[a:b].split())
+                if not gold and s[a] == "-" and s[a + 1:b] in hyphened and key not in codes:
+                    out.append("-")           # a spaced hyphen in front of a number the gold hyphenates
+                    index.append(a)
+                    a += 1
+                    key = "".join(s[a:b].split())
+                elif (not gold and s[a - 1:a] == "-" and s[a - 2:a - 1].isalpha() and "-" + key in unit_signed
+                      and out and out[-1][-1:] == "-" and index[-1] == a - 1):
+                    out[-1] = out[-1][:-1]    # a hyphen in front of a number the gold writes with a minus
+                    index.pop()
+                    key = "-" + key
+                elif (not gold and s[a - 1:a] == " " and s[a - 2:a - 1] in ("-", "+", "±")
+                      and s[a - 2] + key in codes and out and out[-1][-2:] == s[a - 2:a]
+                      and index[-1] == a - 1):
+                    key = s[a - 2] + key      # a spaced sign in front of a number the gold writes with one
+                    out[-1] = out[-1][:-2]
+                    del index[-2:]
+                key = "".join(key.split())
+                if gold:
+                    codes.setdefault(key, chr(ord(_NUMBER_CHAR) + 1 + len(codes)))
+                out.append(codes.get(key, _NUMBER_CHAR) * copies)
+                index += [a] * copies
+            else:
+                out.append(s[a:b])
+                index += range(a, b)
+        return "".join(out), index
 
-    want = encode(want, True)
-    hay = encode(hay, False)
-    return None if any(c not in hay for c in codes.values()) else (want, hay)
+    want, _ = encode(want, True)
+    hay, index = encode(hay, False)
+    return None if any(c not in hay for c in codes.values()) else (want, hay, index)
+
+
+def _tokens(want: str, hay: str) -> tuple[str, str] | None:
+    """`want` and `hay` with each number one character (`_encode`), or None."""
+    encoded = _encode(want, hay)
+    return None if encoded is None else encoded[:2]
 
 
 def _numbers_kept(needle: str, text: str, max_diffs: int, fold_page: Callable[[str], str] = normalize.fold,
@@ -1173,6 +1321,33 @@ def _fold_cell(s: str) -> str:
     return normalize.fold(s)
 
 
+def _numbers_of(s: str) -> list[str]:
+    """The numbers of a folded string, signs included (`_number_pieces`), in order."""
+    return ["".join(s[a:b].split()) for a, b, number in _number_pieces(s, spaced=True) if number]
+
+
+def _same_numbers(want: str, got: str) -> bool:
+    """Whether the folded `got` holds the numbers of the folded `want`, no more, no fewer; true when `want`
+    has none (as `present`, whose rule is about the numbers of a gold that has one)."""
+    if not (numbers := _numbers_of(want)):
+        return True
+    hyphened, unit_signed = _hyphened(want), _unit_signed(want)
+    ours = []
+    for a, b, number in _number_pieces(got, spaced=True):
+        if number:
+            n = "".join(got[a:b].split())
+            if n[0] == "-" and n[1:] in hyphened and n not in numbers:        # `kg -1` for the gold's `kg-1`
+                n = n[1:]
+            elif (n[0] != "-" and got[a - 1:a] == "-" and got[a - 2:a - 1].isalpha()
+                  and "-" + n in unit_signed):                         # `dm-3` for the gold's `dm -3`
+                n = "-" + n
+            elif (n[0] not in "-+±" and got[a - 1:a] == " " and got[a - 2:a - 1] in ("-", "+", "±")
+                  and got[a - 2] + n in numbers):
+                n = got[a - 2] + n                                             # `- 5` for the gold's `-5`
+            ours.append(n)
+    return numbers == ours
+
+
 def _cell_threshold(cell: str, max_diffs: int) -> float:
     return max(TABLE_MIN_RATIO, 1.0 - max_diffs / max(1, len(cell)))
 
@@ -1196,13 +1371,16 @@ def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_di
         over = "up" if kind in ("left", "right") else "left"
         cells = {_stand_in(table, c, over) for c in getattr(table, kind)[rc]}
     texts = [_fold_cell(table.text[c]) for c in cells]
-    if any(_cell_ratio(want, x) >= thr - EPS for x in texts):
+    # Note: the numbers of a neighbor or heading are exact too (`_one_of`).
+    if any(_cell_ratio(want, x) >= thr - EPS and _same_numbers(want, x) for x in texts):
         return ""
     if raw and any(_hyphenated_cell(raw, table.text[c]) for c in cells):
         return ""
     if not texts:
         return f"no {kind} cell"
     best = max(texts, key=lambda x: _cell_ratio(want, x))
+    if _cell_ratio(want, best) >= thr - EPS:
+        return f"{kind} {best!r} has other numbers than {want!r}"
     return f"{kind} {best!r} doesn't match {want!r} ({_cell_ratio(want, best):.2f})"
 
 
@@ -1301,7 +1479,9 @@ def _one_of(want: str, got: str, thr: float, raw: str = "", lines: bool = True) 
     given `raw` (the gold as written), is it with a hyphen a line broke after read kept or dropped
     (`_hyphenated_cell`)."""
     parts = [x for x in {got, *(got.split("\n") if lines else ())} if x.strip()]
-    return (any(_cell_ratio(want, _fold_cell(x)) >= thr - EPS for x in parts)
+    # Note: an edit may not touch a number: the cell holds the gold's numbers, no more, no fewer, as `present`
+    # keeps them (`_numbers_kept`), at any budget.
+    return (any(_cell_ratio(want, f) >= thr - EPS and _same_numbers(want, f) for f in map(_fold_cell, parts))
             or bool(raw) and any(_hyphenated_cell(raw, x) for x in parts))
 
 

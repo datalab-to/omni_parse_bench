@@ -106,6 +106,7 @@ ORDER = of(runners.Order)
 REPEAT = [t for t in of(runners.Repeat) if isinstance(t.params.content, runners.Text)]
 REPEAT_NUMBER = [t for t in of(runners.Repeat) if isinstance(t.params.content, runners.Number)]
 CELL, LAYOUT = of(runners.TableCell), of(runners.LayoutKind)
+
 for _name, _tests in [("text", TEXT), ("number", NUMBER), ("order", ORDER), ("repeat", REPEAT),
                       ("table_cell", CELL), ("layout_kind", LAYOUT)]:
     assert _tests, f"no {_name} tests: check tests/fixtures/invariants/ or OPB_DATASET"
@@ -125,6 +126,10 @@ def text_strings(p) -> list[str]:
         section = [p.section] if p.section else []
         return [p.cell, *p.headings, *section, *p.row_groups, *p.relations.values()]
     return []
+
+
+ORDER_DIGIT = [t for t in ORDER if any(c.isdigit() for x in text_strings(t.params) for c in x)]
+CELL_DIGIT = [t for t in CELL if any(c.isdigit() for x in text_strings(t.params) for c in x)]
 
 
 # Each population a check over every real test runs over, and its size in the published dataset.
@@ -147,6 +152,8 @@ POOLS = {
     "text, order, repeat, table_cell": ("text, order, repeat and table_cell tests", 11, 10_294),
     "batch": ("text, number, order, repeat and table_cell tests", 19, 10_617),
     "latex": ("equation tests (present with a latex arg)", 3, 3_268),
+    "order digit": ("order tests with a digit", 1, 633),
+    "table_cell digit": ("table_cell tests with a digit", 4, 4_660),
 }
 
 # The Hypothesis tests whose input space runs out in CI before the profile's max_examples, and how many
