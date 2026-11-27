@@ -1109,6 +1109,11 @@ def _exponent(s: str, i: int) -> bool:
     return s[i - 1:i] in ("e", "E") and s[i - 2:i - 1].isdigit()
 
 
+def _opens(s: str, i: int) -> bool:
+    """Whether `s[i]` starts the string, or follows an opening bracket or a comma or semicolon and a space."""
+    return i == 0 or s[i - 1] in "([{" or s[i - 2:i] in (", ", "; ")
+
+
 def _operator(s: str, i: int) -> bool:
     """Whether the `+` or `±` at `s[i]` stands between two values (`6% ± 2%`, `1 +2`), not before a number."""
     return s[i] != "-" and _after_value(s, i)
@@ -1130,7 +1135,8 @@ def _unit_signed(s: str) -> set[str]:
 def _hyphened(s: str) -> set[str]:
     """The numbers of the folded `s` that have a hyphen directly before them (`A-12`, `kg-1`): spaced, as in
     `kg -1`, that hyphen reads as a sign, and a text that spaces it is not holding a different number."""
-    after = [(s[a:b], s[a - 1:a] == "-") for a, b, number in _number_pieces(s) if number and s[a] != "-"]
+    after = [("".join(s[a:b].split()), s[a - 1:a] == "-") for a, b, number in _number_pieces(s)
+             if number and s[a] != "-"]
     bare = {n for n, hyphen in after if not hyphen}
     return {n for n, hyphen in after if hyphen and n not in bare}
 
@@ -1141,21 +1147,24 @@ _BEFORE_POINT = frozenset(" \t\n\xa0([{<>=:;|/±+-")
 
 def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
     """`s` as spans (start, end, is_number) that tile it. A number is digit runs (`str.isdigit`) joined by a
-    single `.` between digits, or a single `,` before one to three digits (`1.2`, `1,240`, `12.05.2021`, but
-    not `7,2016`): its separators are part of it, so a `,` for a `.` is another number, as is `1000` for
-    `1,000`. A leading `.` (`.5`) after white space, a bracket or an operator is part of it, and so is its
-    sign: a `-`, `+` or `±` directly before it (`-5`, `+1.55`, `x = -5`, `(-5)`, `3 -5`) unless a letter or a
-    digit comes before the sign, so `A-12`, `2026-11-26` and `1-2` hold a hyphen (as `_number_pattern` reads
-    one), and `1e-3` has the exponent's sign. A `-` before a number after white space, as in `3 -5`, is a
-    sign; `3 - 5` has none. A `- ` at the start of the string or after an opening bracket is a sign too when
-    `spaced` (a table cell `− 0.756`; a page that starts a list item `- 12` is not a negative number)."""
+    single `.` between digits, or a single `,` (and a space or none) before one to three digits (`1.2`,
+    `1,240`, `0.39, 1.56`, `12.05.2021`, but not `7,2016`): its separators are part of it, so a `,` for a
+    `.` is another number, as is `1000` for `1,000`. A leading `.` (`.5`) after white space, a bracket or an
+    operator is part of it, and so is its sign: a `-`, `+` or `±` directly before it (`-5`, `+1.55`, `x = -5`,
+    `(-5)`, `3 -5`) unless a letter or a digit comes before the sign, so `A-12`, `2026-11-26` and `1-2` hold
+    a hyphen (as `_number_pattern` reads one), and `1e-3` has the exponent's sign. A `-` before a number
+    after white space, as in `3 -5`, is a sign; `3 - 5` has none. A `- ` at the start of the string, after
+    an opening bracket or after `, ` is a sign too when `spaced` (a table cell `\u2212 0.756`; a page that
+    starts a list item `- 12` is not a negative number)."""
     nums: list[list[int]] = []
     pos = 0
     for digits, run in itertools.groupby(s, str.isdigit):
         end = pos + len(list(run))
         if digits:
             sep = s[pos - 1] if nums and nums[-1][1] == pos - 1 else ""
-            if sep == "." or sep == "," and end - pos <= 3:
+            # a comma and a space then digits joins as the comma without the space does (`0.39, 1.56`)
+            spaced_comma = bool(nums) and nums[-1][1] == pos - 2 and s[pos - 2:pos] == ", "
+            if sep == "." or (sep == "," or spaced_comma) and end - pos <= 3:
                 nums[-1][1] = end
             else:
                 nums.append([pos, end])
@@ -1170,7 +1179,7 @@ def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
         if s[p - 1:p] in ("-", "+", "±") and p - 1 >= last and not _operator(s, p - 1) and (
                 not _joins_hyphen(s[p - 2:p - 1]) or _exponent(s, p - 1)):
             a = p - 1
-        elif spaced and s[a - 2:a] == "- " and a - 2 >= last and (a == 2 or s[a - 3] in "([{"):
+        elif spaced and s[a - 2:a] == "- " and a - 2 >= last and _opens(s, a - 2):
             a -= 2
         if a > last:
             spans.append((last, a, False))

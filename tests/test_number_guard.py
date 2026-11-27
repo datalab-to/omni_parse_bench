@@ -262,3 +262,34 @@ def test_a_spaced_minus_on_the_page_is_the_golds_minus(gold, page):
                                         ("5 6", "5 6 6")])
 def test_the_numbers_of_a_cell_are_in_order_and_as_many(gold, page):
     assert not cell(gold, page, 3), (gold, page)
+
+
+@pytest.mark.parametrize("gold, page", [
+    ("CI (1.13, 3.99) here", "CI (1.13,3.99) here"), ("CI (1.13,3.99) here", "CI (1.13, 3.99) here"),
+    ("on 12, 19 November 2012", "on 12,19 November 2012"),
+    ("on 12,19 November 2012", "on 12, 19 November 2012"),
+    ("[-100, -60, 80,100]", "[-100, -60, 80, 100]"), ("(0.39, 1.56)", "(0.39,1.56)"),
+])
+def test_the_space_after_a_comma_between_numbers_is_not_a_number_change(gold, page):
+    assert all(all_types(gold, page, 1)), (gold, page)
+
+
+@pytest.mark.parametrize("gold, page", [
+    ("CI (1.13, 3.99) here", "CI (1.13. 3.99) here"), ("CI (1.13, 3.99) here", "CI (1.13 3.99) here"),
+    ("sum 1,240 here", "sum 1240 here"), ("sum 1, 240 here", "sum 1240 here"),
+    ("rate 1.2 per", "rate 1, 2 per"),
+])
+@pytest.mark.parametrize("md", [1, 3])
+def test_a_comma_that_is_dropped_or_replaced_is_still_a_number_change(gold, page, md):
+    assert not any(all_types(gold, page, md)), (gold, page, md)
+
+
+def test_a_spaced_minus_after_a_comma_in_a_cell_is_a_sign():
+    gold, page = "− 0.075 (− 0.15, − 0.001)", "−0.075 (−0.15, −0.001)"
+    assert cell(gold, page, 1) and cell(page, gold, 1)
+    assert not cell(gold, "−0.075 (−0.15, 0.001)", 3) and not cell(gold, "0.075 (0.15, 0.001)", 3)
+
+
+def test_a_leading_zero_the_page_adds_is_a_digit_the_guard_refuses():
+    assert not any(all_types(".150 (4.07)", "0.150 (4.07)", 1))
+    assert not any(all_types("0.150 (4.07)", ".150 (4.07)", 1))

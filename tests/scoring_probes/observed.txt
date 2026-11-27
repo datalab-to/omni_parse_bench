@@ -106,6 +106,9 @@ txt-decimal-dropped	fail	'Rate 1.2 per' not found with its numbers exact (a numb
 txt-plus-lost	fail	'Dose +1.55 mg' not found with its numbers exact (a number differs, or one was added, split or joined)
 txt-plus-minus-lost	fail	'Dose ±0.3 mg' not found with its numbers exact (a number differs, or one was added, split or joined)
 txt-leading-point	fail	'Area .5 ha' not found with its numbers exact (a number differs, or one was added, split or joined)
+txt-leading-zero	fail	'Area .150 (4.07)' not found with its numbers exact (a number differs, or one was added, split or joined)
+txt-comma-space	pass
+txt-comma-space-date	pass
 num-fuzzy-script	fail	'3.' not found with its numbers exact (a number differs, or one was added, split or joined)
 txt-sign-lost	fail	'Net -5 total' not found with its numbers exact (a number differs, or one was added, split or joined)
 txt-sign-added	fail	'Net 5 total' not found with its numbers exact (a number differs, or one was added, split or joined)

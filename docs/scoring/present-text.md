@@ -146,10 +146,13 @@ exact instead ([Numbers are exact](#numbers-are-exact)).
 
 A gold that holds a digit must match with each of its numbers whole and unchanged, after fold, at any
 `max_diffs`: an edit may not change, add, drop, split or join a number, the squeezed retry never joins two, and
-the matched text may not end inside one. A number is digit runs joined by a single `.` or `,` between digits
-(`1.2`, `1,240`, `12.05.2021`), with a leading `.` (`.5`) when no letter or digit comes before it. Its separators
-are part of it: `1,2` or `12` for `1.2`, `1240` for `1,240` and `5` for `.5` are other numbers. Every other
-character still costs one edit, and a gold without a digit is matched as above.
+the matched text may not end inside one. A number is digit runs joined by a single `.` between digits, or by a
+single `,` (and a space or none) before one to three digits: `1.2`, `1,240`, `12.05.2021`, `0.39, 1.56`, but not
+`7,2016`. A leading `.` (`.5`) after white space, a bracket or an operator is part of it. Its separators are part
+of it: `1,2` or `12` for `1.2`, `1240` for `1,240` and `5` for `.5` are other numbers; only a space after a
+comma between two numbers is free (`(1.13, 3.99)` is `(1.13,3.99)`). A leading zero the page adds (`0.150` for
+`.150`) is a digit the guard refuses. Every other character still costs one edit, and a gold without a digit is
+matched as above.
 
 A sign belongs to its number: a `-` (or `−`, or an en dash, which fold to one), `+` or `±` directly before a
 number is a sign unless the character before it is a letter or a digit. So `-5`, `+1.55`, `x = -5`, `(-5)` and
@@ -158,7 +161,7 @@ character (such a text puts no space before it). A gold's sign must be written a
 not `1.55`. A sign before a currency symbol counts too (`-$1,234`, `(−€5)`), the symbol being part of the
 number, and a spaced minus on the page (`− 0.756` for the gold's `−0.756`) is the gold's minus unless a value comes
 before it (`3 - 5`). In a `table_cell` cell, a `- ` with a space (`− 0.756`, `(− 5)`) is a sign too at the start of the
-cell or after an opening bracket (in a page text `- 12` may start a list item).
+cell, after an opening bracket or after `, ` (in a page text `- 12` may start a list item).
 
 A `-` after a Latin letter or a digit is a hyphen: `A-12`, `2026-11-26`, `1-2` and `COVID-19` keep costing one
 edit to drop, as do a list dash (`- 5` in the middle of a text) and a space-dash-space (`3 - 2`). This differs
@@ -185,6 +188,9 @@ a budget can still drop it, and a spaced minus in the middle of a text (`was −
 | P | a lost plus sign | `Dose +1.55 mg` (md 2) | `Dose 1.55 mg` | fail | `txt-plus-lost` |
 | P | a lost plus-minus sign | `Dose ±0.3 mg` (md 2) | `Dose 0.3 mg` | fail | `txt-plus-minus-lost` |
 | P | a leading point is part of the number | `Area .5 ha` (md 2) | `Area 5 ha` | fail | `txt-leading-point` |
+| P | a zero the page adds before a leading point is a digit the guard refuses | `Area .150 (4.07)` (md 1) | `Area 0.150 (4.07)` | fail | `txt-leading-zero` |
+| I | a space after a comma between numbers is free | `CI (1.13, 3.99) here` (md 1) | `CI (1.13,3.99) here` | pass | `txt-comma-space` |
+| I | so is a space dropped from a date list | `on 12, 19 November 2012` (md 1) | `on 12,19 November 2012` | pass | `txt-comma-space-date` |
 | P | a digit of another script is another number | `3.` (md 1) | `๓.` | fail | `num-fuzzy-script` |
 | P | a lost minus sign | `Net -5 total` (md 2) | `Net 5 total` | fail | `txt-sign-lost` |
 | P | a minus sign added | `Net 5 total` (md 2) | `Net -5 total` | fail | `txt-sign-added` |

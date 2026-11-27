@@ -135,8 +135,8 @@ def encoded(gold: str, page: str) -> tuple[str, str]:
     codes: dict[str, str] = {}
 
     def encode(s: str) -> str:
-        return re.sub(r"(?:(?<![^ \t\n\xa0(\[{<>=:;|/±+-])\.(?=\d))?\d+(?:\.\d+|,\d{1,3}(?!\d))*",
-                      lambda m: codes.setdefault(m[0], chr(ord(NUMBER) + len(codes))), s)
+        return re.sub(r"(?:(?<![^ \t\n\xa0(\[{<>=:;|/±+-])\.(?=\d))?\d+(?:\.\d+|, ?\d{1,3}(?!\d))*",
+                      lambda m: codes.setdefault(m[0].replace(" ", ""), chr(ord(NUMBER) + len(codes))), s)
     return encode(gold), encode(page)
 
 
