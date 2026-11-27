@@ -162,6 +162,16 @@ def excess(label, mark, rule, gold, out, shown_gold=None, **kw) -> Case:
                    lambda: _v(R.no_excess_repeats(R.NoExcessRepeats(gold), views.html(html(out)))), **kw)
 
 
+def absent(label, mark, rule, gold, out, md=0, from_markdown=False, **kw) -> Case:
+    """`present` with `{"absent": true}`: `gold` must not be found. `from_markdown`: `out` is markdown,
+    turned to html as the harness
+    does."""
+    from omni_parse_bench import markdown
+    page = markdown.to_html(out) if from_markdown else html(out)
+    return verdict(label, mark, rule, "not " + _md(gold, md), out,
+                   lambda: _v(R.present(R.Present(R.Text(gold, md), absent=True), views.html(page))), **kw)
+
+
 def cell(label, mark, rule, gold, out, md=0, headings=(), section=None, row_groups=(), **rel) -> Case:
     """`table_cell`; `out` is html, or a fixture name (`cell_fixture`) with optional replacements."""
     kw = {k: rel.pop(k) for k in ("show", "why") if k in rel}

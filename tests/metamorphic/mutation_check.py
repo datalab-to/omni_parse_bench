@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Mutation check: each relation of M126 to M144, M150 to M159 and M160 to M167 must FAIL when the scorer rule it pins is removed or changed.
+"""Mutation check: each relation of M126 to M144, M150 to M159, M160 to M167 and M170 to M173 must FAIL when the scorer rule it pins is removed or changed.
 
 Not a test file (pytest does not collect it). From the repository root:
 
@@ -365,6 +365,21 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
     ('M164', 'scorers/unit_tests/runners.py',
      'if not (twice := [r for r, n in runs.items() if n >= 2]):',
      'if not (twice := [r for r, n in runs.items() if n >= 50]):'),
+    ('M170', 'scorers/unit_tests/runners.py',
+     '    ok, _ = found(t.content, _visible(v))\n    return _mark(not ok,',
+     '    ok, _ = found(t.content._replace(max_diffs=0), _visible(v))\n    return _mark(not ok,'),
+    ('M170', 'scorers/unit_tests/runners.py',
+     '    ok, _ = found(t.content, _visible(v))\n    return _mark(not ok,',
+     '    ok, _ = found(t.content, v)\n    return _mark(not ok,'),
+    ('M171', 'scorers/unit_tests/runners.py',
+     '    ok, _ = found(t.content, _visible(v))\n    return _mark(not ok,',
+     '    ok, _ = found(t.content, views.html(re.sub(r"<li\\b.*?</li>", "", _visible(v).html, flags=re.S)))\n    return _mark(not ok,'),
+    ('M172', 'scorers/unit_tests/runners.py',
+     '    ok, _ = found(t.content, _visible(v))\n    return _mark(not ok,',
+     '    ok, _ = found(t.content._replace(max_diffs=t.content.max_diffs // 2), _visible(v))\n    return _mark(not ok,'),
+    ('M173', 'scorers/unit_tests/runners.py',
+     '    lost = strict and ok and not _numbers_kept(a.text, v.text, a.max_diffs, fold_one, fold_one)',
+     '    lost = False'),
 ]
 
 

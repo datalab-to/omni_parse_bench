@@ -1,8 +1,9 @@
 """What must hold for every test, whatever its content: on tests/fixtures/invariants/, and on the
 published dataset when OPB_DATASET is set to its root.
 
-    empty      an empty output (html "", blocks []) passes no test except a page_near_empty test, or a region
-               test with no anchors and no content, which it passes by definition;
+    empty      an empty output (html "", blocks []) passes no test except a page_near_empty test, a region
+               test with no anchors and no content, or a present test with {absent: true}, which it passes
+               by definition;
     answer     a test's own answer written as the output (`answer`) passes it; and
     determined scoring a page twice, caches cleared, gives the same verdicts.
 
@@ -44,6 +45,7 @@ def answer(t: gold.Test) -> dict[str, Any]:
     """The output that writes exactly what `t` asks for, and nothing else."""
     p, e = t.params, _html.escape
     match p:
+        case runners.Present(absent=True): html = "<p>.</p>"     # the page without the reading
         case runners.Present(content=runners.Text(text=x)): html = f"<p>{e(x)}</p>"
         case runners.Present(content=runners.Number(number=x)): html = f"<p>{e(x)}</p>"
         case runners.Present(content=runners.Latex(latex=x)): html = f"<p>$${e(x)}$$</p>"
@@ -112,8 +114,10 @@ def failures(tests: Sequence[gold.Test], outputs, want: str) -> list[str]:
 def test_an_empty_output_passes_no_test(tests):
     # A page_near_empty test asks for a page with at most max_chars characters, so an empty output passes
     # it by definition; the next test checks that it fails one character over.
-    # A verbatim test with no anchors and no content asks for an empty page too.
+    # A verbatim test with no anchors and no content asks for an empty page too, and a present test with
+    # {absent: true} asks for a reading not to be written, so an empty output passes both.
     asked = [t for t in tests if not isinstance(t.params, runners.PageNearEmpty)
+             and getattr(t.params, "absent", False) is not True
              and t.params != runners.Verbatim(None, None, None, 0)]
     bad = failures(asked, lambda t: EMPTY, "fail")
     assert not bad, f"{len(bad)} tests pass on an empty output, e.g. {bad[:5]}"

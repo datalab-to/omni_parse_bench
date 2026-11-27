@@ -36,9 +36,8 @@ ARG_ROLES = {
 }
 LISTS = frozenset({"headings", "row_groups", "stops"})   # roles that take a list of args
 REQUIRED = {"present": ("content",), "order": ("before", "after"), "repeat": ("content",),
-            "page_near_empty": (), "verbatim": (), "no_excess_repeats": ("content",), "table_cell": ("cell",),
-            "layout_kind": ("content",),
-            "format": ("span",)}
+            "page_near_empty": (), "verbatim": (), "no_excess_repeats": ("content",),
+            "table_cell": ("cell",), "layout_kind": ("content",), "format": ("span",)}
 assert set(ARG_ROLES) == set(REQUIRED) == set(runners.TYPES) == set(vocab.READS) == set(vocab.FAMILIES)
 
 
@@ -204,6 +203,8 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
     try:
         match test_type:
             case "present":
+                if "absent" in settings:
+                    return _absent(where, args, settings)
                 blank = _blank_after(where, args, settings)
                 content = _arg(where, "content", args["content"])
                 if not blank:
@@ -296,8 +297,8 @@ def _blank_after(where: str, args: Mapping[str, Any], settings: Mapping[str, Any
             raise ValueError(f"{where}: present's {extra} are roles of {{blank_after: true}} only")
         return False
     if not (set(settings) == {"blank_after"} and settings["blank_after"] is True):
-        raise ValueError(f"{where}: present's settings are {{}} or exactly {{\"blank_after\": true}}, "
-                         f"not {dict(settings)!r:.80}")
+        raise ValueError(f"{where}: present's settings are {{}}, exactly {{\"blank_after\": true}} or "
+                         f"exactly {{\"absent\": true}}, not {dict(settings)!r:.80}")
     given = [("content", args["content"]), *[("printed", args[r]) for r in ("printed",) if r in args],
              *[("stops", a) for a in args.get("stops", [])]]
     for r, a in given:
@@ -348,6 +349,30 @@ def _verbatim(where: str, args: Mapping[str, Any], settings: Mapping[str, Any]) 
                              "region there; choose another anchor")
     return runners.Verbatim(start, end, content["text"] if content else None,
                           content["max_diffs"] if content else 0)
+
+
+def _absent(where: str, args: Mapping[str, Any], settings: Mapping[str, Any]) -> runners.Present:
+    """A present test with `{"absent": true}`, checked: its settings are exactly that, its one role a text arg
+    of at least `ABSENT_MIN_CHARS` folded characters (a specific reading; whether the page prints it is the
+    author's check, `runners.absent_collisions`), with `max_diffs` at most `ABSENT_MAX_DIFFS_SHARE` of them;
+    no place, no exact_case."""
+    if not (set(settings) == {"absent"} and settings["absent"] is True):
+        raise ValueError(f"{where}: present's settings are {{}}, exactly {{\"blank_after\": true}} or "
+                         f"exactly {{\"absent\": true}}, not {dict(settings)!r:.80}")
+    if extra := [r for r in ("printed", "stops") if r in args]:
+        raise ValueError(f"{where}: present's {extra} are roles of {{blank_after: true}} only")
+    c = args["content"]
+    if not (isinstance(c, dict) and set(c) == {"text", "max_diffs"}):
+        raise ValueError(f"{where}: an absent content is a text arg {{text, max_diffs}} (no place, no "
+                         f"exact_case, no number or latex), not {c!r:.80}")
+    n = len(normalize.fold(c["text"])) if isinstance(c["text"], str) else 0
+    if n < runners.ABSENT_MIN_CHARS:
+        raise ValueError(f"{where}: an absent content must have at least {runners.ABSENT_MIN_CHARS} "
+                         f"characters after folding (it has {n}), so that it names a specific reading")
+    if isinstance(c["max_diffs"], int) and c["max_diffs"] > (top := int(n * runners.ABSENT_MAX_DIFFS_SHARE)):
+        raise ValueError(f"{where}: an absent content's max_diffs must be at most {top} (a quarter of its "
+                         f"{n} folded characters), not {c['max_diffs']}")
+    return runners.Present(_arg(where, "content", c), absent=True)
 
 
 def arg_kinds(test_type: str, args: Mapping[str, Any]) -> tuple[str, ...]:
