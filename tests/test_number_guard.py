@@ -315,3 +315,35 @@ def test_a_number_after_a_comma_and_a_space_is_its_own_number(gold, page):
 ])
 def test_a_gold_that_stops_inside_a_list_of_numbers_passes(gold, page):
     assert all(all_types(gold, page, 0)[:2]), (gold, page)
+
+
+@pytest.mark.parametrize("gold, page", [
+    ("+ 0.30 (+ 23%)", "+0.30 (+23%)"), ("+0.30 (+23%)", "+ 0.30 (+ 23%)"),
+    ("− 32.9 (− 42.0 to − 23.4)", "−32.9 (−42.0 to −23.4)"),
+    ("−32.9 (−42.0 to −23.4)", "− 32.9 (− 42.0 to − 23.4)"),
+])
+def test_spaced_signs_in_a_cell_read_as_the_same_signs_unspaced(gold, page):
+    assert cell(gold, page, 1), (gold, page)
+
+
+@pytest.mark.parametrize("gold, lost", [("+ 0.30 (+ 23%)", "0.30 (23%)"),
+                                        ("− 32.9 (− 42.0 to − 23.4)", "−32.9 (−42.0 to 23.4)"),
+                                        ("± 0.3 here", "0.3 here")])
+def test_a_lost_spaced_sign_in_a_cell_still_fails(gold, lost):
+    assert not cell(gold, lost, 3), (gold, lost)
+
+
+def test_a_spaced_dash_between_values_is_no_sign_in_a_cell():
+    assert cell("3 - 5", "3 5", 1) and cell("3 - 5", "3-5", 1)
+
+
+@pytest.mark.parametrize("gold, page", [("12.20 -13.20 Discussion", "12.20 - 13.20 discussion"),
+                                        ("12.20 -13.20 here", "12.20 - 13.20 here")])
+def test_a_time_range_with_a_spaced_hyphen_is_the_golds_hyphen(gold, page):
+    assert all(all_types(gold, page, 1)[:2]), (gold, page)
+
+
+@pytest.mark.parametrize("gold, lost", [("at 5 -3 here", "at 5 3 here"),
+                                        ("12.20 -13.20 here", "12.20 13.20 here")])
+def test_a_lost_hyphen_before_a_number_after_a_value_still_fails(gold, lost):
+    assert not any(all_types(gold, lost, 0)[:2]), (gold, lost)

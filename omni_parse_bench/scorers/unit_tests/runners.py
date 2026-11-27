@@ -1109,11 +1109,6 @@ def _exponent(s: str, i: int) -> bool:
     return s[i - 1:i] in ("e", "E") and s[i - 2:i - 1].isdigit()
 
 
-def _opens(s: str, i: int) -> bool:
-    """Whether `s[i]` starts the string, or follows an opening bracket or a comma or semicolon and a space."""
-    return i == 0 or s[i - 1] in "([{" or s[i - 2:i] in (", ", "; ")
-
-
 def _operator(s: str, i: int) -> bool:
     """Whether the `+` or `±` at `s[i]` stands between two values (`6% ± 2%`, `1 +2`), not before a number."""
     return s[i] != "-" and _after_value(s, i)
@@ -1154,8 +1149,8 @@ def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
     directly before it (`-5`, `+1.55`, `x = -5`, `(-5)`, `3 -5`) unless a letter or a digit comes before the
     sign, so `A-12`, `2026-11-26` and `1-2` hold a hyphen (as `_number_pattern` reads one), and `1e-3` has
     the exponent's sign. A `-` before a number after white space, as in `3 -5`, is a sign; `3 - 5` has none.
-    A `- ` at the start of the string, after an opening bracket or after `, ` is a sign too when `spaced` (a
-    table cell `\u2212 0.756`; a page that starts a list item `- 12` is not a negative number)."""
+    A `- `, `+ ` or `± ` with a space is a sign too when `spaced` and no value comes before it (a table cell
+    `\u2212 0.756`, `to \u2212 23.4`; a page that starts a list item `- 12` is not a negative number)."""
     nums: list[list[int]] = []
     pos = 0
     for digits, run in itertools.groupby(s, str.isdigit):
@@ -1177,7 +1172,8 @@ def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
         if s[p - 1:p] in ("-", "+", "±") and p - 1 >= last and not _operator(s, p - 1) and (
                 not _joins_hyphen(s[p - 2:p - 1]) or _exponent(s, p - 1)):
             a = p - 1
-        elif spaced and s[a - 2:a] == "- " and a - 2 >= last and _opens(s, a - 2):
+        elif (spaced and s[a - 1:a] == " " and s[a - 2:a - 1] in ("-", "+", "±") and a - 2 >= last
+              and not _after_value(s, a - 2)):
             a -= 2
         if a > last:
             spans.append((last, a, False))
@@ -1214,11 +1210,12 @@ def _encode(want: str, hay: str, copies: int = 1) -> tuple[str, str, list[int]] 
                     out[-1] = out[-1][:-1]    # a hyphen in front of a number the gold writes with a minus
                     index.pop()
                     key = "-" + key
-                elif (not gold and s[a - 2:a] == "- " and "-" + key in codes and not _after_value(s, a - 2)
-                      and out and out[-1][-2:] == "- " and index[-1] == a - 1):
-                    out[-1] = out[-1][:-2]    # a spaced minus in front of a number the gold writes with one
+                elif (not gold and s[a - 1:a] == " " and s[a - 2:a - 1] in ("-", "+", "±")
+                      and s[a - 2] + key in codes and out and out[-1][-2:] == s[a - 2:a]
+                      and index[-1] == a - 1):
+                    key = s[a - 2] + key      # a spaced sign in front of a number the gold writes with one
+                    out[-1] = out[-1][:-2]
                     del index[-2:]
-                    key = "-" + key
                 key = "".join(key.split())
                 if gold:
                     codes.setdefault(key, chr(ord(_NUMBER_CHAR) + 1 + len(codes)))
@@ -1344,8 +1341,9 @@ def _same_numbers(want: str, got: str) -> bool:
             elif (n[0] != "-" and got[a - 1:a] == "-" and got[a - 2:a - 1].isalpha()
                   and "-" + n in unit_signed):                         # `dm-3` for the gold's `dm -3`
                 n = "-" + n
-            elif n[0] != "-" and got[a - 2:a] == "- " and "-" + n in numbers and not _after_value(got, a - 2):
-                n = "-" + n                                                    # `- 5` for the gold's `-5`
+            elif (n[0] not in "-+±" and got[a - 1:a] == " " and got[a - 2:a - 1] in ("-", "+", "±")
+                  and got[a - 2] + n in numbers):
+                n = got[a - 2] + n                                             # `- 5` for the gold's `-5`
             ours.append(n)
     return numbers == ours
 

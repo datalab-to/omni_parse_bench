@@ -159,9 +159,10 @@ number is a sign unless the character before it is a letter or a digit. So `-5`,
 `3 -5` are signed, and so are an exponent's sign (`1e-3`) and a sign after a Chinese, Japanese or Korean
 character (such a text puts no space before it). A gold's sign must be written and cannot be added: `+1.55` is
 not `1.55`. A sign before a currency symbol counts too (`-$1,234`, `(−€5)`), the symbol being part of the
-number, and a spaced minus on the page (`− 0.756` for the gold's `−0.756`) is the gold's minus unless a value comes
-before it (`3 - 5`). In a `table_cell` cell, a `- ` with a space (`− 0.756`, `(− 5)`) is a sign too at the start of the
-cell, after an opening bracket or after `, ` (in a page text `- 12` may start a list item).
+number. In a `table_cell` cell, a `-`, `+` or `±` followed by a space (`− 0.756`, `+ 0.30 (+ 23%)`, `to − 23.4`) is a sign too
+unless a value (a digit, `%` or `)`) comes right before it (`3 - 5` is not signed). On a page text or a cell, a
+spaced sign on the page (`− 0.756` for the gold's `−0.756`) in front of a number the gold writes signed is that sign: `12.20 -13.20` matches `12.20 - 13.20`, while
+the sign dropped (`12.20 13.20`) fails.
 
 A `-` after a Latin letter or a digit is a hyphen: `A-12`, `2026-11-26`, `1-2` and `COVID-19` keep costing one
 edit to drop, as do a list dash (`- 5` in the middle of a text) and a space-dash-space (`3 - 2`). This differs
