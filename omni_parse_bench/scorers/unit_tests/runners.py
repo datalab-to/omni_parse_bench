@@ -512,7 +512,8 @@ def repeat(t: Repeat, v: views.Html) -> Mark:
 
 
 # Note: scripts written without spaces between words: Han, kana, Hangul, Thai, Lao, Khmer, Myanmar, Tibetan. A
-# letter of one beside a match does not glue it, as no space is there to end a word.
+# letter of one beside a match does not glue it, as no space is there to end a word (Hangul is spaced in
+# modern Korean, but a copy followed by a particle is still a copy, so it is listed).
 _UNSPACED = ("\u0e00-\u0eff\u0f00-\u0fff\u1000-\u109f\u1100-\u11ff\u1780-\u17ff\u19e0-\u19ff"
              "\u2e80-\u2fdf\u3005\u3007\u3021-\u3029\u3038-\u303b\u3041-\u30ff\u3130-\u318f\u31f0-\u31ff"
              "\u3400-\u4dbf\u4e00-\u9fff\ua960-\ua97f\ua9e0-\ua9ff\uaa60-\uaa7f\uac00-\ud7ff\uf900-\ufaff"
