@@ -372,6 +372,23 @@ def _digit_run(u: str, i: int) -> int:
 def _qty_end(
     u: str, i: int, sign_ok: bool, sup_exponent: bool = True, spaced_ok: bool = False
 ) -> tuple[int | None, int]:
+    """Where the quantity starting at `i` ends (see `_qty_one`), extended over a fraction chain `a/b/c`
+    (iteratively: a long run of slashes must not recurse)."""
+    j, core = _qty_one(u, i, sign_ok, sup_exponent, spaced_ok)
+    if j is None:
+        return None, core
+    n = len(u)
+    while j < n and u[j] == "/":
+        r, _ = _qty_one(u, j + 1, False, sup_exponent)
+        if r is None:
+            break
+        j = r
+    return j, core
+
+
+def _qty_one(
+    u: str, i: int, sign_ok: bool, sup_exponent: bool = True, spaced_ok: bool = False
+) -> tuple[int | None, int]:
     """Where the quantity starting at `i` ends, or (None, core_end): no quantity, with the end of the number
     when letters glued to it are what rule it out (the run is then one Word). `sign_ok` says a sign may start
     it."""
@@ -428,10 +445,6 @@ def _qty_end(
                 break
     if j == core and j < n and _glues(u[j]) and not (script_class(u[j]) != SPACED and _is_letter(u[j])):
         return None, core  # letters, digits or marks glued on: a Word
-    if j < n and u[j] == "/":
-        r, _ = _qty_end(u, j + 1, False, sup_exponent)
-        if r is not None:
-            return r, core
     return j, core
 
 
@@ -449,6 +462,10 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
     sup_exp = "sup_exponent" in rules
     starts = [m.start() for m in _CLUSTER.finditer(u)]
     boundary = set(starts) | {n}
+    following = [n] * (n + 1)  # the start of the next cluster after each offset
+    for a, b in zip(starts, starts[1:] + [n], strict=True):
+        for x in range(a, b):
+            following[x] = b
     i = 0
 
     def prev_glues(k: int) -> bool:
@@ -557,7 +574,7 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
             i = j
             continue
         # a Sym: one cluster
-        j = next((s for s in starts if s > i), n)
+        j = following[i]
         put(SYM, i, j)
         i = j
 

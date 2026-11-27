@@ -572,3 +572,18 @@ def test_a_quantity_keeps_its_spelling_through_the_fold():
 def test_with_text_fold_off_the_reading_is_the_unfolded_one():
     with switches.using(text_fold=False):
         assert words("<p>ﬁx “q”</p>") == ["ﬁx", "q"]
+
+
+def test_long_inputs_are_linear_and_do_not_recurse():
+    """A fraction chain of any length reads as one quantity, and a very long line of symbols reads in time
+    linear in its length (these once recursed and went quadratic)."""
+    import time
+
+    from omni_parse_bench import reader
+
+    t0 = time.time()
+    chain = reader.tokenize("1/" * 20000 + "1")
+    assert len(chain) == 1 and chain[0].cls == reader.QTY
+    syms = reader.tokenize("§" * 200000)
+    assert len(syms) == 200000
+    assert time.time() - t0 < 20
