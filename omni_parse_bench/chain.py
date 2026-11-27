@@ -22,6 +22,7 @@ raw candidates only grow along the chain (law L1). A candidate is identified by 
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 from collections.abc import Iterable
 from typing import NamedTuple
@@ -29,7 +30,7 @@ from typing import NamedTuple
 import regex
 
 from . import reader, switches, work
-from .reader import BREAK, CONTENT, MARK, QTY, SPACE, SYM, WORD, WRAP, Token  # noqa: F401
+from .reader import BREAK, CONTENT, MARK, MATH, QTY, SPACE, SYM, WORD, WRAP, Token  # noqa: F401
 
 ID, TEXT, CASED, WORDS = "Id", "Text", "Cased", "Words"
 POINTS = (ID, TEXT, CASED, WORDS)
@@ -90,7 +91,7 @@ def cells(
     cased, text = r >= RANK[CASED], r >= RANK[TEXT]
     out: list[Cell] = []
     group, seen = 0, None  # the cell group changes where content moves from one table cell to another
-    for i, t in enumerate(tokens):
+    for i, t in _expanded(tokens):
         if t.cls in CONTENT:
             if "cell_windows" in rules:
                 if seen is not None and t.cell != seen[0]:
@@ -102,7 +103,8 @@ def cells(
             if gold:
                 free = cased  # a space of the gold is free from Cased on (one-sided, or squeezed)
             else:
-                free = cased and (_script_free(tokens, i) or "space_one_sided" not in rules)
+                joined = tokens[i].cls == SPACE and _script_free(tokens, i)
+                free = cased and (joined or "space_one_sided" not in rules)
             out.append(Cell(" ", "s", i, True, True, free, group))
         elif t.cls == BREAK:
             free = cased and "break_free" in rules
@@ -117,7 +119,7 @@ def cells(
             out.append(Cell(t.canon, "q", i, True, True, False, group))
         else:
             word = t.cls == WORD
-            body = t.canon if t.cls == QTY else t.text
+            body = t.canon if t.cls in (QTY, MATH) else t.text
             parts = _CLUSTER.findall(body)
             edges = "word_edges" in rules
             kind = "m" if t.cls == MARK else "c"  # a mark equals only a mark, never a letter or a quantity
@@ -128,6 +130,17 @@ def cells(
                     Cell(c, kind, i, j == 0 or not edges, j == len(parts) - 1 or not edges, False, group)
                 )
     return out
+
+
+def _expanded(tokens: list[Token]):
+    """(index, token) pairs, a `Math` token replaced by the tokens of its text reading, each with the math
+    token's index: math reads as words, quantities and symbols as the text around it does."""
+    for i, t in enumerate(tokens):
+        if t.cls == MATH:
+            for u in reader.tokenize(t.canon, rules=reader_rules()):
+                yield i, dataclasses.replace(u, cell=t.cell)
+        else:
+            yield i, t
 
 
 def _script_free(tokens: list[Token], i: int) -> bool:

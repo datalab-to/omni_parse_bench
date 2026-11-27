@@ -113,3 +113,18 @@ def test_a_table_cell_with_a_shape_is_a_for_all_row():
     shaped = plain._replace(shapes={"right": "empty"})
     assert schema.variant("table_cell", plain).quantifier == schema.EXISTS
     assert schema.variant("table_cell", shaped).quantifier == schema.ALL
+
+
+def test_a_negative_format_test_is_a_locator_and_a_claim():
+    from omni_parse_bench import switches, views
+
+    t = runners.Format(None, "Total", None, 0, (), ("bold",))
+    plain, bold = views.html("<p>Total due</p>"), views.html("<p><b>Total</b> due</p>")
+    absent_target = views.html("<p>Nothing here</p>")
+    with switches.using(format_locator=False):
+        assert not runners.format_mark(t, plain)[0]          # no marks anywhere: nothing shows one could be
+    with switches.using(format_locator=True):
+        assert runners.format_mark(t, plain)[0]              # the target is there and carries no bold
+        assert not runners.format_mark(t, bold)[0]           # the claim has a witness
+        assert not runners.format_mark(t, absent_target)[0]  # the locator has none
+        assert not runners.format_mark(t, views.html(""))[0]

@@ -61,7 +61,16 @@ CONTENT = frozenset(
 # The four script classes of section 8 of the design, for a letter's cluster.
 SPACED, HANGUL, CHARACTER, PHRASE = "spaced", "hangul", "character", "phrase"
 
-RULES = ("visibility", "alt_text_out", "cell_windows", "sup_exponent", "tokens", "text_fold")
+RULES = (
+    "visibility",
+    "alt_text_out",
+    "cell_windows",
+    "sup_exponent",
+    "tokens",
+    "text_fold",
+    "leading_dot",
+    "math_spans",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -371,16 +380,16 @@ def _digit_run(u: str, i: int) -> int:
 
 
 def _qty_end(
-    u: str, i: int, sign_ok: bool, sup_exponent: bool = True, spaced_ok: bool = False
+    u: str, i: int, sign_ok: bool, sup_exponent: bool = True, spaced_ok: bool = False, dot: bool = False
 ) -> tuple[int | None, int]:
     """Where the quantity starting at `i` ends (see `_qty_one`), extended over a fraction chain `a/b/c`
     (iteratively: a long run of slashes must not recurse)."""
-    j, core = _qty_one(u, i, sign_ok, sup_exponent, spaced_ok)
+    j, core = _qty_one(u, i, sign_ok, sup_exponent, spaced_ok, dot)
     if j is None:
         return None, core
     n = len(u)
     while j < n and u[j] == "/":
-        r, _ = _qty_one(u, j + 1, False, sup_exponent)
+        r, _ = _qty_one(u, j + 1, False, sup_exponent, False, dot)
         if r is None:
             break
         j = r
@@ -388,7 +397,7 @@ def _qty_end(
 
 
 def _qty_one(
-    u: str, i: int, sign_ok: bool, sup_exponent: bool = True, spaced_ok: bool = False
+    u: str, i: int, sign_ok: bool, sup_exponent: bool = True, spaced_ok: bool = False, dot: bool = False
 ) -> tuple[int | None, int]:
     """Where the quantity starting at `i` ends, or (None, core_end): no quantity, with the end of the number
     when letters glued to it are what rule it out (the run is then one Word). `sign_ok` says a sign may start
@@ -402,10 +411,16 @@ def _qty_one(
             k = j
             while k < n and u[k].isspace():
                 k += 1
-            if k < n and (_is_digit(u[k]) or unicodedata.category(u[k]) == "Sc"):
+            if k < n and (
+                _is_digit(u[k])
+                or unicodedata.category(u[k]) == "Sc"
+                or (dot and u[k] == "." and k + 1 < n and _is_digit(u[k + 1]))
+            ):
                 j = k
     if j < n and unicodedata.category(u[j]) == "Sc":
         j += 1
+    if dot and j + 1 < n and u[j] == "." and _is_digit(u[j + 1]):
+        j += 1  # a leading-dot decimal: `.5`
     d = _digit_run(u, j)
     if d == j:
         return None, i
@@ -461,6 +476,7 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
     called for each token, `lo:hi` the stretch of `u` it stands for (sentinels included)."""
     n = len(u)
     sup_exp = "sup_exponent" in rules
+    dot = "leading_dot" in rules
     starts = [m.start() for m in _CLUSTER.finditer(u)]
     boundary = set(starts) | {n}
     following = [n] * (n + 1)  # the start of the next cluster after each offset
@@ -554,9 +570,14 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
             QTY,
             WORD,
         )  # a spaced sign ("- 0.756"): no Qty or letter stands directly before
-        starts_number = _is_digit(c) or unicodedata.category(c) == "Sc" or c in _SIGNS
+        starts_number = (
+            _is_digit(c)
+            or unicodedata.category(c) == "Sc"
+            or c in _SIGNS
+            or (dot and c == "." and i + 1 < n and _is_digit(u[i + 1]))
+        )
         if starts_number and (c in _SIGNS or not prev_glues(i)):
-            end, core = _qty_end(u, i, sign_ok, sup_exp, spaced_ok)
+            end, core = _qty_end(u, i, sign_ok, sup_exp, spaced_ok, dot)
             if end is not None and (end in boundary or end == n or u[end] in (SUP_OPEN, SUP_CLOSE)):
                 raw = u[i:end]
                 put(QTY, i, end, canon=qty_canon(raw))
@@ -689,6 +710,56 @@ def _align(rm: str, fm: str, line_start: bool) -> list[tuple[int, int]]:
         elif b1 > b0:
             out.extend([(a0, max(a1, a0 + 1) - 1)] * (b1 - b0))
     return out
+
+
+_MATH_HOLDER = "\ufffc"
+_BRACKET_MATH = re.compile(r"\\\((?P<a>.+?)\\\)|\\\[(?P<b>.+?)\\\]", re.S)
+
+
+def _math_reading(src: str) -> str:
+    """A math span's text reading, as the text view writes it (letters and plain symbols as written, LaTeX
+    converted to Unicode); the source itself when it is math too long or too spaced to read."""
+    from . import normalize
+
+    try:
+        read = normalize._math_to_text(src)
+    except Exception:
+        return src
+    return read if read and read != src else src
+
+
+def _math_segments(segments: list) -> tuple[list, list[str]]:
+    """The segments of a line with each math span (`$..$`, `$$..$$`, `\\(..\\)`, `\\[..\\]`) replaced by one
+    placeholder character, and the spans' source in order: the reader reads each as one `Math` token. A span
+    that crosses a change of markup is left as text."""
+    from . import mathspans
+
+    plain = "".join(t for t, _ in segments)
+    if "$" not in plain and "\\" not in plain:
+        return segments, []
+    brackets = [m for m in _BRACKET_MATH.finditer(plain) if "$" not in m[0][2:-2]]
+    apart = tuple((m.start(), m.end()) for m in brackets)
+    spans = sorted(
+        {(m.start(), m.end()) for m in brackets}
+        | {(x.start, x.end) for x in mathspans.find(plain, apart=apart)}
+    )
+    out: list = []
+    srcs: list[str] = []
+    pos = 0
+    for text, markup in segments:
+        lo, hi = pos, pos + len(text)
+        at = lo
+        for s0, s1 in spans:
+            if s0 >= at and s1 <= hi:
+                if s0 > at:
+                    out.append((plain[at:s0], markup))
+                out.append((_MATH_HOLDER, markup))
+                srcs.append(plain[s0:s1])
+                at = s1
+        if at < hi:
+            out.append((plain[at:hi], markup))
+        pos = hi
+    return out, srcs
 
 
 def _spaced_letter(u: str, i: int) -> bool:
@@ -878,6 +949,9 @@ class _Builder:
         u_parts: list[str] = []
         mk: list[frozenset[str]] = []
         in_sup = False
+        maths: list[str] = []
+        if "math_spans" in self.rules:
+            segments, maths = _math_segments(segments)
         for text, markup in segments:
             sup = "sup" in markup
             if sup and not in_sup:
@@ -916,6 +990,10 @@ class _Builder:
             else:
                 ms = {frozenset()}
             both = frozenset.intersection(*ms)
+            if text == _MATH_HOLDER and maths:
+                tex = maths.pop(0)
+                self._add(MATH, tex, _math_reading(tex), block, line, both, cell, script)
+                return
             self._add(cls, text, canon, block, line, both, cell, script)
 
         recs: list[tuple] = []

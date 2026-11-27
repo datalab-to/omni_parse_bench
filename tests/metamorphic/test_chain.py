@@ -212,6 +212,7 @@ def test_a_circled_digit_is_the_digit(x, in_gold):
     """Writing a digit as its circled form, in the gold or in the page, leaves a text claim passing at Text, Cased and Words
     (a circled and a plain digit are the same enumerator). [M215]
     Why it matters for a score: models write `①` for a list's `1`; a careful reader takes them as one."""
+    assume("$" not in x and "\\" not in x)   # inside a math span nothing is folded
     m = re.search("[1-3]", x)
     circled = x[: m.start()] + "①②③"[int(m[0]) - 1] + x[m.end():]
     assume(not re.search("[0-9]", x[m.end():m.end() + 1]) and not re.search("[0-9.,]", x[max(0, m.start() - 1):m.start()]))

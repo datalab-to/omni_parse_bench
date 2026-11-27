@@ -64,6 +64,38 @@ _SWITCHES = (
         False,
     ),
     Switch(
+        "leading_dot",
+        "A decimal written without its integer part (`.5`, `-.5`, `$.50`) is one quantity, so a budget "
+        "cannot drop its point; it equals only its own spelling (`.5` is not `0.5`).",
+        4,
+        False,
+    ),
+    Switch(
+        "math_spans",
+        "A math span written in the text of an output (`$..$`, `$$..$$`, `\\(..\\)`, `\\[..\\]`) "
+        "is one `Math` "
+        "token carrying its source, as a `<math>` element is, not a run of words and symbols.",
+        4,
+        False,
+    ),
+    Switch(
+        "format_locator",
+        "A negative `format` test is a locator and a claim: the context must be found, and no occurrence of "
+        "it carries a forbidden mark. An output with no marks at all passes it when the context is there "
+        "(before: it failed, since nothing showed a mark could have been written).",
+        4,
+        True,
+    ),
+    Switch(
+        "region_blank",
+        "A blank field's label outside a table cell is read on the chain's region relation: each copy of the "
+        "label opens a region to the next stop or label, blank when it holds only white space and "
+        "placeholder "
+        "symbols (the printed mask once). Cells keep the grid reading.",
+        4,
+        True,
+    ),
+    Switch(
         "text_fold",
         "The Id to Text fold (compatibility forms, typography, invisible characters, leaders, look-alike "
         "symbols) is applied once, between the quantity scan and word tokenization.",

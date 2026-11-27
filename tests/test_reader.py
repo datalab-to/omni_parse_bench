@@ -10,10 +10,13 @@ from omni_parse_bench import reader, switches, views
 from omni_parse_bench.views import MalformedOutput
 
 
+LATER = ("text_fold", "leading_dot", "math_spans")    # rules of the steps after the reader's own
+
+
 @pytest.fixture(autouse=True)
 def rules_on():
     """The reader's rules of step 1 on; the text fold (step 2) is off here and on where a test says so."""
-    with switches.using(**{r: r != "text_fold" for r in reader.RULES}):
+    with switches.using(**{r: r not in LATER for r in reader.RULES}):
         yield
 
 
@@ -641,3 +644,33 @@ def test_a_scorer_error_fails_one_test_and_not_the_run(monkeypatch, caplog):
 
     page = scorer.UnitTests().score({"html": "<p>hello</p>"}, [bad, ok])
     assert page.result["scorer_errors"] == 1
+
+
+
+
+# ------------------------------------------------------------------------- leading dot, math spans (step 4)
+
+
+def test_a_leading_dot_decimal_is_one_quantity_when_the_rule_is_on():
+    with switches.using(leading_dot=True):
+        assert gold(".5") == [("Qty", ".5")] and gold("-.5") == [("Qty", "-.5")]
+        assert gold("$.50 or (.5)") == [
+        ("Qty", "$.50"),
+        ("Word", "or"),
+        ("Sym", "("),
+        ("Qty", ".5"),
+        ("Sym", ")"),
+    ]
+        assert gold("x.5")[-1] == ("Qty", "5") and gold("1.5") == [("Qty", "1.5")]
+        assert gold(".5kg") == [("Qty", ".5kg")] and gold("a .5")[-1] == ("Qty", ".5")
+    assert gold(".5") == [("Sym", "."), ("Qty", "5")]
+
+
+def test_a_math_span_in_the_text_is_one_math_token_when_the_rule_is_on():
+    with switches.using(math_spans=True):
+        assert toks("<p>We have $p<0.05$ done</p>") == [
+            ("Word", "We"), ("Word", "have"), ("Math", "$p<0.05$"), ("Word", "done")]
+        assert ("Math", "$$E=mc^2$$") in toks("<p>$$E=mc^2$$</p>")
+        assert ("Math", "\\(a_2\\)") in toks("<p>ok \\(a_2\\) end</p>")
+        assert toks("<p>costs $5 and $6</p>").count(("Math", "$5 and $")) == 0   # prices stay text
+    assert ("Math", "$p<0.05$") not in toks("<p>We have $p<0.05$ done</p>")

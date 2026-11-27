@@ -25,7 +25,7 @@ HIDERS = ['<span style="display:none">{}</span>', '<span style="visibility:hidde
 
 def STEP1():
     """The reader's rules of step 1 on, and none of the later ones (the text fold changes what a token holds)."""
-    return switches.using(**{r: r != "text_fold" for r in reader.RULES})
+    return switches.using(**{r: r not in ("text_fold", "leading_dot", "math_spans") for r in reader.RULES})
 
 
 def raw_test(kind: str, x: str) -> dict:

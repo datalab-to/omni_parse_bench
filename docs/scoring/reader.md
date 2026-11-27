@@ -62,3 +62,8 @@ A quantity is read once, on the raw characters, before any fold:
 
 A unit with a space (`10 kg`) is a quantity and a word; a unit is protected only when glued to its number.
 CJK numerals (`三万`) are words.
+
+## Leading-dot decimals and math spans (switches `leading_dot`, `math_spans`)
+
+- `leading_dot`: a decimal written without its integer part (`.5`, `-.5`, `$.50`, `.5kg`) is one `Qty`, scanned at the same places as any quantity (after a space, a bracket, the start of a line; not after a letter or digit, so `x.5` is `x`, `.`, `5`). Equality is by spelling: `.5` is not `0.5`, and a budget can no longer drop its point.
+- `math_spans`: a math span written in the text of an output (`$..$` and `$$..$$` as `mathspans` pairs them, so a price stays text, and `\(..\)` and `\[..\]`) is one `Math` token carrying its source, as a `<math>` element is, and compared as the text it renders (`$\alpha$` reads `α`, `$x^2$` reads `x2`, as the text view writes them; its delimiters and TeX commands are not text, and math too long or too spaced to read is compared as written). A span that crosses a change of markup or a line is left as text. The leading-dot rule also takes a spaced sign (`− .5`) and a fraction (`1/.5`) as one quantity.
