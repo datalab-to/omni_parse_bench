@@ -531,6 +531,22 @@ ab-markdown	fail	'Johnathan Quincy Smithers' found, a reading the page does not 
 ab-next-page	fail	'Chapter 4. The harbor at night' found, a reading the page does not print
 ab-line-hyphen	fail	'Chapter 4. The harbor at night' found, a reading the page does not print
 ab-other-order	fail	'North station opens Tuesday' found, a reading the page does not print
+## layout-absent-ignored
+la-none	pass
+la-folio	pass
+la-text	pass
+la-figure	pass
+la-form	pass
+la-other-kinds	pass
+## layout-absent-blind
+la-heading-as-text	pass
+la-text-unread	pass
+## layout-absent-penalized
+la-heading	fail	a heading block at [0.20, 0.40, 0.80, 0.50]: 'SAMPLE HEADING'
+la-table	fail	a table block at [0.20, 0.40, 0.80, 0.50]: ''
+la-list	fail	a list block at [0.20, 0.40, 0.80, 0.50]: '- item'
+la-many	fail	a caption block at [0.20, 0.40, 0.80, 0.50]: 'Fig. 1' (and 1 more)
+la-tiny	fail	a code block at [0.50, 0.50, 0.51, 0.51]: ''
 ## format-rules
 fm-bold	pass
 fm-strong	pass

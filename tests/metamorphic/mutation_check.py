@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Mutation check: each relation of M126 to M144, M150 to M159, M160 to M167 and M170 to M173 must FAIL when the scorer rule it pins is removed or changed.
+"""Mutation check: each relation of M126 to M144, M150 to M159, M160 to M167, M170 to M173 and M174 to M177 must FAIL when the scorer rule it pins is removed or changed.
 
 Not a test file (pytest does not collect it). From the repository root:
 
@@ -380,6 +380,21 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
     ('M173', 'scorers/unit_tests/runners.py',
      '    lost = strict and ok and not _numbers_kept(a.text, v.text, a.max_diffs, fold_one, fold_one)',
      '    lost = False'),
+    ('M174', 'scorers/unit_tests/runners.py',
+     '    bad = [b for b in blocks if b.label in t.kinds]',
+     '    bad = [b for b in blocks[:1] if b.label in t.kinds]'),
+    ('M174', 'scorers/unit_tests/runners.py',
+     '    bad = [b for b in blocks if b.label in t.kinds]',
+     '    bad = [b for b in blocks if b.label in t.kinds and _area(b.bbox) > 0.001]'),
+    ('M175', 'scorers/unit_tests/runners.py',
+     '    bad = [b for b in blocks if b.label in t.kinds]',
+     '    bad = [b for b in blocks if b.label in t.kinds or b.label == "figure"]'),
+    ('M176', 'scorers/unit_tests/runners.py',
+     '    bad = [b for b in blocks if b.label in t.kinds]',
+     '    bad = [b for b in blocks if b.label in t.kinds and b.text == ""]'),
+    ('M177', 'scorers/unit_tests/runners.py',
+     '    bad = [b for b in blocks if b.label in t.kinds]',
+     '    bad = [b for b in blocks if b.label in t.kinds and b.label != "heading"]'),
 ]
 
 

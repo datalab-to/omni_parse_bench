@@ -12,7 +12,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from omni_parse_bench import equations, normalize, vocab
+from omni_parse_bench import equations, normalize, views, vocab
 
 from . import runners
 
@@ -32,12 +32,14 @@ ARG_ROLES = {
     "no_excess_repeats": ("content",),
     "table_cell": ("cell", "headings", "section", "row_groups", *RELATIONS),
     "layout_kind": ("content",),
+    "layout_absent": (),
     "format": ("before", "span", "after"),
 }
 LISTS = frozenset({"headings", "row_groups", "stops"})   # roles that take a list of args
 REQUIRED = {"present": ("content",), "order": ("before", "after"), "repeat": ("content",),
             "page_near_empty": (), "verbatim": (), "no_excess_repeats": ("content",),
-            "table_cell": ("cell",), "layout_kind": ("content",), "format": ("span",)}
+            "table_cell": ("cell",), "layout_kind": ("content",), "layout_absent": (),
+            "format": ("span",)}
 assert set(ARG_ROLES) == set(REQUIRED) == set(runners.TYPES) == set(vocab.READS) == set(vocab.FAMILIES)
 
 
@@ -252,6 +254,8 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
                 if set(settings) != {"kind"}:
                     raise ValueError(f"{where}: layout_kind's settings are exactly {{kind}}")
                 return runners.LayoutKind(_arg(where, "content", args["content"]), settings["kind"])
+            case "layout_absent":
+                return _layout_absent(where, args, settings)
             case "format":
                 if set(settings) not in ({"marks"}, {"absent"}):
                     raise ValueError(
@@ -373,6 +377,26 @@ def _absent(where: str, args: Mapping[str, Any], settings: Mapping[str, Any]) ->
         raise ValueError(f"{where}: an absent content's max_diffs must be at most {top} (a quarter of its "
                          f"{n} folded characters), not {c['max_diffs']}")
     return runners.Present(_arg(where, "content", c), absent=True)
+
+
+def _layout_absent(where: str, args: Mapping[str, Any],
+                   settings: Mapping[str, Any]) -> runners.LayoutAbsent:
+    """A layout_absent test's parameters, checked (its args are none, as `ARG_ROLES` says): settings exactly
+    `{"kinds": [...]}`, a list of distinct block labels other than `text`."""
+    if set(settings) != {"kinds"}:
+        raise ValueError(f"{where}: layout_absent's settings are exactly {{kinds}}, not {sorted(settings)}")
+    kinds = settings["kinds"]
+    if not (isinstance(kinds, list) and kinds and all(isinstance(k, str) for k in kinds)):
+        raise ValueError(f"{where}: layout_absent's kinds is a non-empty list of block labels, not "
+                         f"{kinds!r:.80}")
+    if unknown := [k for k in kinds if k not in views.LABELS]:
+        raise ValueError(f"{where}: layout_absent's kinds {unknown} are not block labels {views.LABELS}")
+    if len(set(kinds)) != len(kinds):
+        raise ValueError(f"{where}: layout_absent's kinds repeat a label")
+    if "text" in kinds:
+        raise ValueError(f"{where}: layout_absent cannot forbid text (page_near_empty reads text, and a list "
+                         "or form block is text to layout_kind)")
+    return runners.LayoutAbsent(tuple(kinds))
 
 
 def arg_kinds(test_type: str, args: Mapping[str, Any]) -> tuple[str, ...]:

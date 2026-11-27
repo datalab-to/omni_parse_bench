@@ -26,9 +26,10 @@ case that is run against the scorer in CI (see [Keeping the pages true](#keeping
 | `present`, `{"absent": true}` | a reading the page does not print is not in the output | text | 0 | [present-absent.md](present-absent.md) |
 | `table_cell` | a table has this cell, with these neighbours and headings | tables | 5,386 | [table_cell.md](table_cell.md) |
 | `layout_kind` | the layout block on this line has this label | layout | 2,403 | [layout_kind.md](layout_kind.md) |
+| `layout_absent` | no layout block on the page has one of these labels | layout | 0 | [layout_absent.md](layout_absent.md) |
 
 Counts are of the published dataset: 16,288 tests on 2,937 pages. The first ten rows read the page's `html`
-output; `layout_kind` reads its `blocks`.
+output; `layout_kind` and `layout_absent` read its `blocks`.
 
 <!-- cases:readme-scoring -->
 | rule | input | reads as | case |
@@ -101,7 +102,7 @@ and in the case files under [tests/scoring_probes](../../tests/scoring_probes/).
   [present-latex.md](present-latex.md), [order.md](order.md), [repeat.md](repeat.md),
   [page_near_empty.md](page_near_empty.md), [verbatim.md](verbatim.md), [no_excess_repeats.md](no_excess_repeats.md),
   [present-absent.md](present-absent.md), [format.md](format.md),
-  [table_cell.md](table_cell.md), [layout_kind.md](layout_kind.md): one page per test, each with the same shape:
+  [table_cell.md](table_cell.md), [layout_kind.md](layout_kind.md), [layout_absent.md](layout_absent.md): one page per test, each with the same shape:
   what it asks, its rules table, its blind spots.
 - [internals.md](internals.md): how an output becomes the text the tests compare: markdown to html, the text
   view, the fold steps, the dollar reader, the edit budget, the hyphen rule, and what a gold must be to load.

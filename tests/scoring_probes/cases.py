@@ -172,6 +172,22 @@ def absent(label, mark, rule, gold, out, md=0, from_markdown=False, **kw) -> Cas
                    lambda: _v(R.present(R.Present(R.Text(gold, md), absent=True), views.html(page))), **kw)
 
 
+BLANK = ("heading", "table", "caption", "equation", "footnote", "list", "code")
+
+
+def layout_absent(label, mark, rule, blocks: Sequence[tuple[str, tuple[float, ...], str]],
+                  kinds: Sequence[str] = BLANK, **kw) -> Case:
+    """`layout_absent` with `kinds` (by default the set for a blank page); `blocks` are (label, bbox,
+    text)."""
+    raw = [{"label": b, "bbox": list(box), "text": text} for b, box, text in blocks]
+    shown = "; ".join(f"{b} {list(box)} {text!r}" for b, box, text in blocks) or "no blocks"
+    named = ", ".join(code(k) for k in kinds)
+    gold = "none of the blank-page set" if tuple(kinds) == BLANK else f"no {named}"
+    t = R.LayoutAbsent(tuple(kinds))
+    return verdict(label, mark, rule, gold, "", lambda: _v(R.layout_absent(t, views.blocks(raw))),
+                   show=code(shown) if blocks else shown, **kw)
+
+
 def cell(label, mark, rule, gold, out, md=0, headings=(), section=None, row_groups=(), **rel) -> Case:
     """`table_cell`; `out` is html, or a fixture name (`cell_fixture`) with optional replacements."""
     kw = {k: rel.pop(k) for k in ("show", "why") if k in rel}

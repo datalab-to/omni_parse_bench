@@ -2,8 +2,8 @@
 published dataset when OPB_DATASET is set to its root.
 
     empty      an empty output (html "", blocks []) passes no test except a page_near_empty test, a region
-               test with no anchors and no content, or a present test with {absent: true}, which it passes
-               by definition;
+               test with no anchors and no content, a present test with {absent: true} or a layout_absent
+               test, which it passes by definition;
     answer     a test's own answer written as the output (`answer`) passes it; and
     determined scoring a page twice, caches cleared, gives the same verdicts.
 
@@ -64,6 +64,8 @@ def answer(t: gold.Test) -> dict[str, Any]:
             html = f"<p>{e(p.before or '')}{span}{e(p.after or '')}</p>"
             # Note: a negative test is only scored on an output that has a mark somewhere
             html += "" if p.marks else "<p><b>note</b></p>"
+        case runners.LayoutAbsent():     # a blank page: one text block
+            return {"blocks": [{"label": "text", "bbox": [0.1, 0.1, 0.9, 0.2], "text": "x"}]}
         case runners.LayoutKind():
             xs = p.content.place
             box = [min(b[0] for b in xs), min(b[1] for b in xs), max(b[2] for b in xs), max(b[3] for b in xs)]
@@ -116,7 +118,8 @@ def test_an_empty_output_passes_no_test(tests):
     # it by definition; the next test checks that it fails one character over.
     # A verbatim test with no anchors and no content asks for an empty page too, and a present test with
     # {absent: true} asks for a reading not to be written, so an empty output passes both.
-    asked = [t for t in tests if not isinstance(t.params, runners.PageNearEmpty)
+    # A layout_absent test passes an empty block list by definition too.
+    asked = [t for t in tests if not isinstance(t.params, runners.PageNearEmpty | runners.LayoutAbsent)
              and getattr(t.params, "absent", False) is not True
              and t.params != runners.Verbatim(None, None, None, 0)]
     bad = failures(asked, lambda t: EMPTY, "fail")

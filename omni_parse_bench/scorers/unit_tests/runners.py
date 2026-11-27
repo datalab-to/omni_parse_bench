@@ -970,6 +970,25 @@ def layout_kind(t: LayoutKind, blocks: Sequence[Block]) -> Mark:
     return _mark(ok, f"its block is labelled {b.label!r}, not {t.kind!r}: {b.text[:60]!r}")
 
 
+class LayoutAbsent(NamedTuple):
+    kinds: tuple[str, ...]  # labels of views.LABELS no block may carry; never "text"
+
+
+def layout_absent(t: LayoutAbsent, blocks: Sequence[Block]) -> Mark:
+    """No block of the output, anywhere on the page, is labelled one of `kinds`. A label is compared as
+    written: `AS_TEXT` is not applied (a list block is a list here), and `text` is never a kind, since
+    `page_near_empty` reads text. Every other block, its text and its box are ignored. See
+    docs/scoring/layout_absent.md."""
+    bad = [b for b in blocks if b.label in t.kinds]
+    if not bad:
+        return True, ""
+    b = bad[0]
+    box = ", ".join(f"{x:.2f}" for x in b.bbox)
+    more = f" (and {len(bad) - 1} more)" if len(bad) > 1 else ""
+    article = "an" if b.label[0] in "aeiou" else "a"
+    return False, f"{article} {b.label} block at [{box}]: {b.text[:60]!r}{more}"
+
+
 def holder(place: Sequence[Box], blocks: Sequence[Block]) -> Block | None:
     """The smallest block covering at least MIN_PLACE_COVER of the place's area, or None; of blocks of equal
     area (within a relative `AREA_EPS`), the first listed.
@@ -1022,6 +1041,7 @@ TYPES: dict[str, tuple[type, Runner]] = {
     "no_excess_repeats": (NoExcessRepeats, no_excess_repeats),
     "table_cell": (TableCell, table_cell),
     "layout_kind": (LayoutKind, layout_kind),
+    "layout_absent": (LayoutAbsent, layout_absent),
     "format": (Format, format_mark),
 }
 
