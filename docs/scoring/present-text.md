@@ -376,6 +376,8 @@ Blind spots of `blank_after`, besides those of `present`:
   text-budget-real-word), and, on a long passage with a budget of 2 or more, a dropped `not` (case
   text-budget-negation) all pass. This is not a negation guard: keep the budget at 0 where one word flips the
   meaning.
+- **A space after a comma is free, so a list comma and a number comma look alike.** `1,240` passes for `1, 240`
+  and `12,5` for `12, 5` (a thousands or decimal comma against a list comma); `1240` for `1,240` still fails.
 - **Brackets round a number are not a sign.** An accounting negative `(1,234)` passes for `1,234` and the other
   way round when the budget has 2 edits to spend (case cell-accounting-brackets); keep the budget at 0 for it.
 - **Image descriptions pay.** A description that contains the string passes the test (case text-alt).

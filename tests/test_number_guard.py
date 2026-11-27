@@ -293,3 +293,8 @@ def test_a_spaced_minus_after_a_comma_in_a_cell_is_a_sign():
 def test_a_leading_zero_the_page_adds_is_a_digit_the_guard_refuses():
     assert not any(all_types(".150 (4.07)", "0.150 (4.07)", 1))
     assert not any(all_types("0.150 (4.07)", ".150 (4.07)", 1))
+
+
+@pytest.mark.parametrize("gold, page", [("rate 7,2016 per", "rate 7;2016 per"), ("on 7,2016 and", "on 7 2016 and")])
+def test_a_comma_before_four_digits_is_no_number_separator(gold, page):
+    assert all(all_types(gold, page, 1)), (gold, page)
