@@ -13,6 +13,8 @@ dependencies = [
     "mini-racer>=0.14",      # an embedded V8 that runs KaTeX, which equations are compared by
     "pylatexenc>=2.10",      # LaTeX spans -> text in the fold
     "rapidfuzz>=3.0",        # fuzzy containment for text and table cells
+    "html5lib>=1.1,<2",      # the WHATWG html parser: one reading of malformed html (reader.py)
+    "regex>=2026.11.25,<2027",  # grapheme clusters (\\X) and script properties; the Unicode version is its own
 ]
 
 [project.optional-dependencies]

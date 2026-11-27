@@ -11,6 +11,14 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 
 ## [Unreleased]
 
+### Score impact
+
+- Reader rules behind switches (below): off by default, so no verdict moves in this change. With `visibility` and `alt_text_out` on, a page's hidden text and its images' alt text stop counting as text: verdicts can move from pass to fail (a string written only in hidden markup or alt text) and from fail to pass (a negative test of text the page never shows). Regrade with each switch alone before turning any on.
+
+### Added
+
+- Reader (`omni_parse_bench/reader.py`, `docs/scoring/reader.md`): one HTML5 parser reads an output into blocks, lines and tokens (words by grapheme cluster and script class, quantities, symbols, footnote marks, wrapped hyphens), with hidden text and alt text left out, table cells as blocks a window never crosses, and a quantity reader (signs, separators, exponents, glued units, currency, fractions). Each rule is a named switch (`omni_parse_bench/switches.py`, set with `OPB_SWITCHES`): `visibility`, `alt_text_out`, `cell_windows`, `sup_exponent`, `tokens`. The text views consult `visibility` and `alt_text_out`; the others are used by the steps that follow. New dependencies: `html5lib`, `regex`.
+
 ## [1.9.0] - 2026-11-27
 
 ### Score impact

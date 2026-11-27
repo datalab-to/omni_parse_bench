@@ -12,6 +12,8 @@ import html as _html
 import re
 from typing import NamedTuple
 
+from . import switches
+
 HOLD_OPEN, HOLD_CLOSE = "\ue000", "\ue001"
 CHECKED, UNCHECKED = "☒", "☐"
 
@@ -118,7 +120,7 @@ def html(s: str) -> Html:
 
         v = views.html("<p>Let <b>x</b> be</p>")
         v.html    # the HTML itself: table_cell tests parse it
-        v.text    # what a reader sees, image alt text included: tests that credit text read it
+        v.text    # what a reader sees, alt text included (unless `alt_text_out`): tests crediting text use it
         v.seen    # the text view without alt text: tests that fault extra text read it
 
     The text view is the HTML with these rewrites, in this order:
@@ -139,7 +141,11 @@ def html(s: str) -> Html:
         entities                  -> unescaped"""
     if not isinstance(s, str):
         raise MalformedOutput(f"html must be a string, not {type(s).__name__}: {s!r:.80}")
-    return Html(s, text(s), text(s, alt=False))
+    hide, alt_out = switches.on("visibility"), switches.on("alt_text_out")
+    if hide or alt_out:
+        from . import reader     # the reader's one parser takes out what a page hides and image alt text
+        s = reader.visible_html(s, hidden=hide, alt=alt_out)
+    return Html(s, text(s, alt=not alt_out), text(s, alt=False))
 
 
 def blocks(raw: list) -> tuple[Block, ...]:
