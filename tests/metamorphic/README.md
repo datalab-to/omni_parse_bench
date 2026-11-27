@@ -7,7 +7,7 @@ Each promise is a *relation*: change a page, or a test, in a way that should not
 known way), and the verdict should follow. Example: putting a passing answer in bold must not make its test
 fail.
 
-- The certificate lists the 185 relations its authors selected: 176 hold and 9 deviate. It is not every
+- The certificate lists the 186 relations its authors selected: 177 hold and 9 deviate. It is not every
   relation of the scorer (see [Not covered](#not-covered)). Four of the 9 (M1a to M1c and M1e) are about
   folding a string twice, which the scorer never does and no document promises, so they change no score.
 - It is generated from the tests. CI fails if it is out of date, or if a status disagrees with its test.
@@ -157,9 +157,9 @@ target text is still in the scorer.
 
 ## Number guard relations
 
-M121 to M125, M180 to M182 state the number guard: an edit budget never pays for a digit or a minus sign in `present`, `order`
+M121 to M125, M180 to M183 state the number guard: an edit budget never pays for a digit or a minus sign in `present`, `order`
 and `table_cell` (M121, M122 changed digit; M123 minus lost or added; M124 hyphens that are not signs keep costing
-an edit; M125 letter edits keep their verdict). M180 a separator inside a number, M181 a plus or plus-minus sign, M182 the space after a comma between numbers; M123 to M125 credit the same ParseBench-2 catalogue.
+an edit; M125 letter edits keep their verdict). M180 a separator inside a number, M181 a plus or plus-minus sign, M182 the space after a comma between numbers, M183 a gold that stops inside a list of numbers; M123 to M125 credit the same ParseBench-2 catalogue.
 
 ## External relations
 

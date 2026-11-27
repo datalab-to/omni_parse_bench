@@ -305,3 +305,13 @@ def test_a_comma_before_four_digits_is_no_number_separator(gold, page):
                                         ("12 cases", "n = 5, 12 cases")])
 def test_a_number_after_a_comma_and_a_space_is_its_own_number(gold, page):
     assert all(all_types(gold, page, 0)[:2]), (gold, page)    # a cell is matched whole
+
+
+@pytest.mark.parametrize("gold, page", [
+    ("meet C&MS Items 630,", "meet C&MS Items 630, 632, 633 and"), ("A 630", "A 630, 632"),
+    ("pages 5 and 7", "pages 5 and 7, 9"),
+    ("conform with C&MS 625.11 and 725.06,", "conform with C&MS 625.11 and 725.06, 730"),
+    ("Items 630, 632", "see Items 630, 632, 633"),
+])
+def test_a_gold_that_stops_inside_a_list_of_numbers_passes(gold, page):
+    assert all(all_types(gold, page, 0)[:2]), (gold, page)

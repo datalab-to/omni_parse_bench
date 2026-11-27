@@ -193,3 +193,20 @@ def test_a_space_after_a_comma_between_numbers_is_free_but_a_dropped_comma_is_no
                       ("rate 1.2 per", "rate 1, 2 per"), ("rate 1.2 per", "rate 1,2 per"), ("rate 1,2 per", "rate 1.2 per")]:
         for md in (1, 2, 3):
             assert not any(verdicts(gold, page, md)), (gold, page, md)
+
+
+LISTS = [("meet C&MS Items 630,", "meet C&MS Items 630, 632, 633 and"), ("A 630", "A 630, 632"),
+         ("pages 5 and 7", "pages 5 and 7, 9"), ("Items 630, 632", "see Items 630, 632, 633")]
+
+
+@relation(HOLDS, domain="4 golds that stop at a number of a list x budgets 0 to 3 x `present` and `order`: the page "
+                        "prints the list on, with more numbers after a comma and a space")
+def test_a_gold_that_stops_inside_a_list_of_numbers_passes():
+    """A gold that ends at a number of a list (`Items 630,`, `pages 5 and 7`) passes on a page that prints the list
+    on (`Items 630, 632, 633`), in `present` and `order`, at budgets 0 to 3: a comma and a space end a number. [M183]
+    Why it matters for a score: a number guard that joined a list into one number would fail faithful pages."""
+    for gold, page in LISTS:
+        for md in BUDGETS:
+            escaped = _html.escape(page)
+            assert passes(text_test(gold, md), f"<p>{escaped}</p>"), (gold, page, md)
+            assert passes(order_test(gold, "zzzz", md), f"<p>{escaped}</p><p>zzzz</p>"), (gold, page, md)
