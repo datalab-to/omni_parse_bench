@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """table_cell's `{"empty": true}` and `{"end": true}` args: what they accept in a gold file, and the verdicts
 they give on blank encodings, invented content, shifted and merged cells (docs/scoring/table_cell.md)."""
 from __future__ import annotations
@@ -272,3 +273,99 @@ def test_a_figure_does_not_change_a_text_verdict():
     drawn = rows(HEAD, ROW.format("<td><img src=a.png></td>"))
     t = {"cell": text("100"), "right": text("Q2")}
     assert verdict(t, plain) == verdict(t, drawn)
+
+
+# ------------------------------------------------------------------ every matching cell, every continuing table
+
+ONE = {"cell": text("100"), "right": EMPTY}
+TWO = f"<table><tr>{HEAD}</tr><tr>{ROW.format('<td></td>')}</tr><tr><td>Fuel</td><td>70</td><td>80</td></tr></table>"
+
+
+def test_every_cell_that_matches_must_be_empty_beside_it():
+    filled = TWO.replace("<td></td>", "<td>200</td>")
+    assert verdict(ONE, TWO) and verdict(ONE, TWO + TWO)
+    assert not verdict(ONE, TWO + filled) and not verdict(ONE, filled + TWO)
+    assert not verdict(ONE, rows(HEAD, ROW.format("<td></td>"), "<td>Fuel</td><td>100</td><td>200</td>"))
+    assert verdict(ONE, rows(HEAD, ROW.format("<td></td>"), "<td>Fuel</td><td>100</td><td></td>"))
+
+
+def test_a_cell_matching_by_one_line_must_hold_nothing_more():
+    assert not verdict(ONE, TWO.replace("<td>100</td>", "<td>100<br>200</td>"))
+    assert verdict({"cell": text("100"), "right": EMPTY, "top_heading": text("Q1")}, TWO)
+
+
+def test_a_relation_picks_which_cells_must_hold_the_shape():
+    two = rows(HEAD, ROW.format("<td></td>"), "<td>Fuel</td><td>100</td><td>200</td>")
+    assert verdict({"cell": text("100"), "left": text("Rent"), "right": EMPTY}, two)
+    assert not verdict({"cell": text("100"), "left": text("Fuel"), "right": EMPTY}, two)
+
+
+def test_end_reads_a_table_that_goes_on_from_the_anchors():
+    cont = "<table><tr><td>Tax</td><td>9</td><td>8</td></tr></table>"
+    args = {"cell": text("70"), "down": END}
+    assert verdict(args, TWO)
+    assert not verdict(args, TWO + cont) and not verdict(args, TWO + "\n" + cont)
+    assert verdict(args, TWO + f"<table><tr>{HEAD}</tr><tr><td>Tax</td><td>9</td><td>8</td></tr></table>")    # a limit: a second table with a header
+    assert verdict(args, TWO + TWO) and verdict(args, TWO + TWO.replace("100", "110").replace("70", "71"))
+    assert not verdict(args, TWO + TWO.replace("<td>80</td>", "<td>80</td></tr><tr><td>Tax</td><td>9</td><td>8</td>"))
+    assert not verdict(args, TWO + f"<div>{cont}</div>") and not verdict(args, TWO + f"<!-- x -->{cont}")
+    assert not verdict(args, f"<div>{TWO}</div><div>{cont}</div>") and not verdict(args, TWO + f"<p></p>\n{cont}")
+    assert verdict(args, TWO + "<p>Note</p>" + cont) and verdict(args, TWO + f"<div><p>Note</p>{cont}</div>")
+    assert verdict(args, TWO + "<p>Note</p>" + cont)
+    assert verdict(args, TWO + "<table><tr><th>Cost</th><th>Q3</th><th>Q4</th></tr><tr><td>Tax</td><td>9</td><td>8</td></tr></table>")
+    assert verdict(args, TWO + "<table><tr><td>Tax</td><td>9</td></tr></table>")
+    assert "continuing" in score({"html": TWO + cont}, gold_of(args))[0].why
+
+
+def test_end_up_and_left_read_the_table_before_a_continuation():
+    first = "<table><tr><td>Tax</td><td>9</td><td>8</td></tr></table>"
+    assert not verdict({"cell": text("70"), "up": END}, rows(HEAD, "<td>Fuel</td><td>70</td><td>80</td>"))
+    assert not verdict({"cell": text("Fuel"), "up": END}, first + rows("<td>Fuel</td><td>70</td><td>80</td>"))
+    assert verdict({"cell": text("Fuel"), "up": END}, first + "<p>x</p>" + rows("<td>Fuel</td><td>70</td><td>80</td>"))
+
+
+def test_a_second_table_excuses_only_a_full_anchor_candidate():
+    extra = "<table><tr><td>Tax</td><td>70</td><td>9</td></tr></table>"
+    args = {"cell": text("70"), "down": END}
+    assert verdict(args, TWO + extra)    # a second full candidate (no relations): judged as its own table, ends
+    left = {"cell": text("70"), "left": text("Fuel"), "down": END}
+    assert not verdict(left, TWO + extra)    # not the anchor as the test names it: an invented continuation
+    assert verdict(left, TWO + extra.replace("Tax", "Fuel"))    # a second Fuel / 70 row ends too
+
+
+def test_invisible_text_and_row_headers_do_not_change_what_goes_on():
+    cont = "<table><tr><td>Tax</td><td>9</td><td>8</td></tr></table>"
+    args = {"cell": text("70"), "down": END}
+    assert not verdict(args, TWO + "<script>void 0;</script><style>p{}</style><template>x</template>" + cont)
+    assert not verdict(args, TWO + "<table><tr><th scope=row>Tax</th><td>9</td><td>8</td></tr></table>")
+    assert verdict(args, TWO + "<p>Note</p>" + cont)
+
+
+def test_a_blank_corner_before_column_headers_is_a_header_row_and_row_headers_are_not():
+    args = {"cell": text("70"), "down": END}
+    corner = "<table><tr><td></td><th scope=col>Plan</th><th scope=col>Actual</th></tr><tr><td>Tax</td><td>9</td><td>8</td></tr></table>"
+    assert verdict(args, TWO + corner)    # an independent table with a header row
+    assert verdict(args, TWO + corner.replace("<td></td>", "<td><br></td>"))
+    rowhead = "<table><tr><th scope=row>Tax</th><th scope=row>9</th><th scope=row>8</th></tr></table>"
+    assert not verdict(args, TWO + rowhead)
+    assert not verdict(args, TWO + "<table><tr><th scope=row>Tax</th><td>9</td><td>8</td></tr></table>")
+    assert not verdict(args, TWO + "<table><tr><th>Tax</th><td>9</td><td>8</td></tr></table>")
+
+
+def test_what_a_page_does_not_draw_is_not_between_tables():
+    cont = "<table><tr><td>Tax</td><td>9</td><td>8</td></tr></table>"
+    args = {"cell": text("70"), "down": END}
+    for hidden in ("<template><span>Hidden</span></template>", "<template><img src=x></template>",
+                   "<script>1</script>", "<style>p{}</style>", "<template><div><p>deep</p></div></template>"):
+        assert not verdict(args, TWO + hidden + cont), hidden
+    assert verdict(args, TWO + "<template><table><tr><td>a</td><td>b</td><td>c</td></tr></table></template>")
+    assert not verdict(args, TWO + "<template><table><tr><td>a</td><td>b</td><td>c</td></tr></table></template>" + cont)
+
+
+def test_a_table_the_page_does_not_draw_is_not_an_anchor_of_a_shape_guard():
+    args = {"cell": text("70"), "left": text("Fuel"), "down": END}
+    hidden = "<template>" + TWO.replace("</table>", "<tr><td>Tax</td><td>9</td><td>8</td></tr></table>") + "</template>"
+    assert verdict(args, TWO + hidden)
+    assert not verdict(args, hidden)    # its anchor is not drawn
+    assert not verdict({"cell": text("100"), "right": EMPTY}, hidden)
+    assert verdict({"cell": text("70")}, hidden)    # a plain cell test keeps reading it

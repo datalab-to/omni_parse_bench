@@ -9,6 +9,8 @@ import functools
 from collections.abc import Callable
 from typing import Literal, NamedTuple
 
+from bs4 import Comment, Declaration, Doctype, ProcessingInstruction
+
 from omni_parse_bench import normalize, views
 
 Cell = tuple[int, int]
@@ -42,12 +44,16 @@ class Table(NamedTuple):
     covers: dict[Cell, tuple[tuple[int, ...], tuple[int, ...]]]   # the rows and the columns each cell covers
     labels: dict[int, Cell]   # the section rows (`label_rows`), by row
     figures: frozenset[Cell] = frozenset()   # cells holding an image or other figure, whatever its alt text
+    column_headed: bool = False   # the first row is a row of column headings (a blank corner cell allowed)
+    hidden: bool = False   # the table sits in an element the page does not draw (`<template>`)
+    follower: int | None = None   # the index (in `parse`'s result) of the table written right after this one
 
 
 @functools.lru_cache(maxsize=16)
 def parse(html: str) -> tuple[Table, ...]:
     """Every table in `html` with at least one cell."""
-    out = []
+    out: list[Table] = []
+    tags: list = []
     # Note: a soup of its own, because <br> tags are rewritten in place below.
     for tag in _fresh_soup(html).find_all("table"):
         rows = tag.find_all("tr")
@@ -67,7 +73,64 @@ def parse(html: str) -> tuple[Table, ...]:
             specs.append(row)
         if specs and (table := _grid(specs)):
             out.append(table)
-    return tuple(out)
+            tags.append(tag)
+    where = {id(tag): i for i, tag in enumerate(tags)}
+    return tuple(t._replace(follower=where.get(id(_next_table(tag))), column_headed=_column_headed(tag),
+                            hidden=_hidden(tag))
+                 for t, tag in zip(out, tags, strict=True))
+
+
+def _column_headed(tag) -> bool:
+    """Whether the first row of the table `tag` holds column headings and nothing else but blank cells: `<th>`
+    (or `<thead>`) cells that do not say `scope=row`, perhaps after a blank corner cell. A body row led by a
+    row header (`<th scope=row>`, or a `<th>` beside data) is not one."""
+    rows = tag.find_all("tr")
+    cells = rows[0].find_all(["th", "td"], recursive=False) if rows else []
+    heads = blank = 0
+    in_thead = bool(rows) and rows[0].find_parent("thead") is not None
+    for td in cells:
+        if td.name == "th" or in_thead:
+            if str(td.get("scope", "")).strip().lower() in ("row", "rowgroup"):
+                return False
+            heads += 1
+        elif td.get_text(strip=True) or td.find(FIGURES):
+            return False
+        else:
+            blank += 1
+    return heads > 0
+
+
+
+_HIDDEN = ("script", "style", "template")    # what a page never shows
+
+
+def _hidden(el) -> bool:
+    """Whether `el` sits inside an element that is not drawn (`_HIDDEN`)."""
+    return any(p.name in _HIDDEN for p in el.parents)
+
+
+def _next_table(tag):
+    """The table that comes next in the page as it reads, in the same table or outside any: nothing visible
+    (text, an image) between them, however the markup nests them (a wrapper `<div>`, a comment, an empty
+    element), or None. What is not drawn (`<script>`, `<style>`, `<template>`, tables in them) is not
+    between them."""
+    if _hidden(tag):
+        return None
+    owner = tag.find_parent("table")
+    last = tag
+    while getattr(last, "contents", None):
+        last = last.contents[-1]
+    for el in last.next_elements:
+        if isinstance(el, Comment | Doctype | ProcessingInstruction | Declaration) or _hidden(el):
+            continue
+        if isinstance(el, str):
+            if el.strip():
+                return None
+        elif el.name == "table":
+            return el if el.find_parent("table") is owner else None
+        elif el.name in FIGURES:
+            return None
+    return None
 
 
 def _text(td) -> str:

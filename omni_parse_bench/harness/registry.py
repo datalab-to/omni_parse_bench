@@ -41,6 +41,7 @@ try:
         mistral,
         nanonets,
         nemotron_parse,
+        ocria_1,
         olmocr,
         opendataloader,
         ovisocr,
@@ -83,7 +84,7 @@ ADAPTERS: dict[str, type[Parser]] = {a.name: a for a in (
     chandra_ocr.ChandraOcr, deepseek_ocr.DeepseekOcr, docling.Docling, dots.Dots, glm_ocr.GlmOcr,
     hunyuan.Hunyuan,
     indra_ocr.IndraOcr, infinity.Infinity, lighton.LightOn, mineru.MinerU, nanonets.Nanonets,
-    nemotron_parse.NemotronParse, olmocr.OlmOcr, minicpm_ocr.MiniCpmOcr, oxr.Oxr,
+    nemotron_parse.NemotronParse, ocria_1.Ocria1, olmocr.OlmOcr, minicpm_ocr.MiniCpmOcr, oxr.Oxr,
     ovisocr.OvisOcr, ovisocr2.OvisOcr2, ovisocr3.OvisOcr3,
     paddleocr_vl.PaddleOcrVl, surya_ocr.SuryaOcr, surya_ocr25.SuryaOcr25, unlimited.UnlimitedOcr,
     unlimited_ocr2.UnlimitedOcr2, xiaomi_ocr.XiaomiOcr)}

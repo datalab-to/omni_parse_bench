@@ -28,6 +28,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | GPT-5.6 Sol | closed |  | 87.9 | ≈$94.49 | 86.0 | 91.9 | 85.9 | 17 |
 | MinerU2.5-Pro | open | 1.2B | 87.4 | — | 78.0 | 92.5 | 91.7 | — |
 | Infinity-Parser2-Pro | open | 35.1B (MoE) | 87.4 | — | 83.9 | 84.6 | 93.5 | — |
+| OCRia-1 (+ vendor grounding, Docling Heron) | open | 5.17B (+ Heron detector) | 87.1 | — | 82.7 | 84.9 | 93.8 | — |
 | Surya OCR 2.5 (Datalab) | open | 0.69B | 86.3 | — | 84.3 | 78.8 | 95.8 | — |
 | OXR-1.0 | open | 1.4B | 85.6 | — | 77.0 | 88.3 | 91.4 | — |
 | OvisOCR3 | open | 0.85B | 84.5 | — | 78.2 | 84.7 | 90.6 | — |
@@ -36,11 +37,11 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | Azure | closed |  | 83.4 | $5.00 | 75.2 | 82.3 | 92.8 | — |
 | Surya OCR 2 (Datalab) | open | 0.67B | 83.3 | — | 81.2 | 74.6 | 94.3 | — |
 | LightOnOCR-3-4B | open | 4.5B | 83.1 | — | 84.4 | 70.9 | 94.0 | — |
+| Nemotron 3.5 Parse | open | 0.63B | 82.3 | — | 73.7 | 82.7 | 90.5 | — |
 | LightOnOCR-3-0.8B | open | 0.85B | 81.9 | — | 81.7 | 72.2 | 91.7 | — |
 | GLM-OCR | open | 1.3B | 81.9 | — | 71.6 | 84.7 | 89.3 | — |
 | Unlimited-OCR 2 | open | 3.3B | 81.5 | — | 73.0 | 80.0 | 91.6 | — |
 | PaddleOCR-VL-1.6 | open | 0.96B | 81.3 | — | 69.2 | 84.0 | 90.7 | — |
-| Nemotron 3.5 Parse | open | 0.63B | 79.9 | — | 72.6 | 77.1 | 90.0 | — |
 | Unlimited-OCR | open | 3.3B | 79.5 | — | 70.7 | 76.6 | 91.1 | — |
 | Indra OCR (Datalab) | open | about 17M | 78.8 | — | 68.0 | 75.8 | 92.6 | — |
 | Infinity-Parser2-Flash | open | 2.2B | 78.7 | — | 78.8 | 66.8 | 90.4 | — |
@@ -415,6 +416,7 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | GPT-5.6 Sol | 66.9 | 89.8 | 91.7 | 86.0 | 87.5 | 90.8 | 77.2 | 75.0 | 71.8 |
 | MinerU2.5-Pro | 36.0 | 91.9 | 91.7 | 81.2 | 79.7 | 87.4 | 84.1 | 56.8 | 43.7 |
 | Infinity-Parser2-Pro | 72.1 | 93.5 | 84.6 | 82.7 | 85.9 | 86.4 | 62.7 | 78.2 | 54.2 |
+| OCRia-1 (+ vendor grounding, Docling Heron) | 62.5 | 93.7 | 84.7 | 82.7 | 82.7 | 83.3 | 53.7 | 73.2 | 50.4 |
 | Surya OCR 2.5 (Datalab) | 52.8 | 91.6 | 79.9 | 82.3 | 80.5 | 86.9 | 55.2 | 57.7 | 72.3 |
 | OXR-1.0 | 61.0 | 96.2 | 86.7 | 68.9 | 80.2 | 66.5 | 56.0 | 68.0 | 29.0 |
 | OvisOCR3 | 42.7 | 94.0 | 84.8 | 83.7 | 77.7 | 70.4 | 62.3 | 58.0 | 40.8 |
@@ -423,11 +425,11 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | Azure | 36.0 | 85.6 | 82.0 | 82.0 | 76.6 | 87.9 | 78.9 | 49.8 | 47.5 |
 | Surya OCR 2 (Datalab) | 48.1 | 91.7 | 75.3 | 73.6 | 76.1 | 75.6 | 44.9 | 51.2 | 72.5 |
 | LightOnOCR-3-4B | 67.6 | 94.6 | 73.1 | 85.7 | 81.1 | 87.3 | 61.2 | 76.8 | 51.8 |
+| Nemotron 3.5 Parse | 40.1 | 75.9 | 82.7 | 78.5 | 77.8 | 74.9 | 55.0 | 49.8 | 61.1 |
 | LightOnOCR-3-0.8B | 57.4 | 94.4 | 74.0 | 84.7 | 78.1 | 84.0 | 62.6 | 69.3 | 44.9 |
 | GLM-OCR | 42.6 | 90.3 | 83.9 | 69.0 | 75.7 | 66.5 | 61.8 | 55.4 | 27.3 |
 | Unlimited-OCR 2 | 35.8 | 88.2 | 79.3 | 71.9 | 70.9 | 59.4 | 34.4 | 49.5 | 44.3 |
 | PaddleOCR-VL-1.6 | 40.0 | 82.3 | 82.6 | 67.9 | 69.7 | 58.6 | 70.9 | 43.9 | 39.6 |
-| Nemotron 3.5 Parse | 39.3 | 75.8 | 77.1 | 75.4 | 75.1 | 71.3 | 48.6 | 48.4 | 60.1 |
 | Unlimited-OCR | 31.3 | 89.3 | 75.3 | 69.1 | 68.8 | 59.3 | 15.6 | 50.4 | 36.8 |
 | Indra OCR (Datalab) | 28.1 | 63.5 | 76.6 | 65.4 | 68.7 | 78.1 | 61.5 | 34.6 | 71.1 |
 | Infinity-Parser2-Flash | 63.6 | 93.5 | 67.5 | 75.6 | 77.5 | 73.7 | 33.6 | 71.8 | 41.0 |
