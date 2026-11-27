@@ -892,7 +892,7 @@ def table_cell(t: TableCell, v: views.Html) -> Mark:
         """Whether the cell matches `cell` and holds the test's relations, headings, section, row groups."""
         return (_one_of(cell, table.text[rc], thr, t.cell)
                 and not [1 for k, want in expected.items()
-                         if _relation(table, rc, k, want, t.max_diffs, t.relations[k])]
+                         if _relation(table, rc, k, want, t.max_diffs, t.relations[k], (cell, thr, t.cell))]
                 and not _structure(t, table, rc))
     def again(other: tables.Table) -> bool:
         """Whether a table holds a second full anchor candidate: a cell that is the anchor."""
@@ -905,7 +905,8 @@ def table_cell(t: TableCell, v: views.Html) -> Mark:
             continue    # a shape guard reads what the page draws
         for rc in [rc for rc, x in table.text.items() if _one_of(cell, x, thr, t.cell)]:
             failed = [why for k, want in expected.items()
-                      if (why := _relation(table, rc, k, want, t.max_diffs, t.relations[k]))]
+                      if (why := _relation(table, rc, k, want, t.max_diffs, t.relations[k],
+                                          (cell, thr, t.cell)))]
             failed += _structure(t, table, rc)
             if failed:
                 reasons += failed
@@ -1681,9 +1682,10 @@ def _cell_ratio(a: str, b: str) -> float:
 
 
 def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_diffs: int,
-              raw: str = "") -> str:
+              raw: str = "", anchor: tuple[str, float, str] | None = None) -> str:
     """Why the cell at `rc` fails one relation, or "" when it holds. `raw` is the gold as written, for the
-    hyphen fallback (`_hyphenated_cell`)."""
+    hyphen fallback (`_hyphenated_cell`). `anchor` is the test's folded cell, its threshold and its raw text:
+    a neighbour is read by lines as the cell was matched (`_neighbour_ok`)."""
     thr = _cell_threshold(want, max_diffs)
     if kind.endswith("_heading"):
         walk = {"top_heading": "up", "left_heading": "left", "right_heading": "right"}
@@ -1694,10 +1696,13 @@ def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_di
         over = "up" if kind in ("left", "right") else "left"
         cells = {_stand_in(table, c, over) for c in getattr(table, kind)[rc]}
     texts = [_fold_cell(table.text[c]) for c in cells]
-    # Note: the numbers of a neighbor or heading are exact too (`_one_of`).
-    if any(_cell_ratio(want, x) >= thr - EPS and _same_numbers(want, x) for x in texts):
-        return ""
-    if raw and any(_hyphenated_cell(raw, table.text[c]) for c in cells):
+    # Note: the numbers of a neighbor or heading are exact too (`_one_of`). A neighbour may match by one of
+    # its lines (`<br>`), aligned with the line the cell matched by (`_neighbour_ok`); a heading is read
+    # whole.
+    if kind.endswith("_heading") or anchor is None:
+        if any(_one_of(want, table.text[c], thr, raw, lines=False) for c in cells):
+            return ""
+    elif any(_neighbour_ok(want, table.text[c], thr, raw, kind, table.text[rc], *anchor) for c in cells):
         return ""
     if not texts:
         return f"no {kind} cell"
@@ -1705,6 +1710,42 @@ def _relation(table: tables.Table, rc: tables.Cell, kind: str, want: str, max_di
     if _cell_ratio(want, best) >= thr - EPS:
         return f"{kind} {best!r} has other numbers than {want!r}"
     return f"{kind} {best!r} doesn't match {want!r} ({_cell_ratio(want, best):.2f})"
+
+
+def _neighbour_ok(want: str, got: str, thr: float, raw: str, kind: str, cell_got: str, cell: str,
+                  cell_thr: float, cell_raw: str) -> bool:
+    """Whether the neighbour text `got`, on side `kind` of the cell holding `cell_got` (which matches the
+    test's `cell` whole or by some of its lines), matches `want`. The neighbour matches whole. Beyond that it
+    matches by a line, blank lines left out.
+
+    Beside (`left`, `right`): any line when the cell matched whole or is one line; when it matched by line
+    i of several, line i of a neighbour of as many lines, else (a neighbour of other length) line 0 for
+    i = 0 and nothing for i > 0. So `A<br>B` beside `5<br>50` reads `A` with `5` and `B` with `50`, and
+    `5 50` joined by a space is one line. Above and below (`up`, `down`): the lines that touch, the last
+    line of the cell and the first of the neighbour below it, the first line of the cell and the last of
+    the neighbour above it."""
+    if _one_of(want, got, thr, raw, lines=False):
+        return True
+    cell_lines = [x for x in cell_got.split("\n") if x.strip()]
+    lines = [x for x in got.split("\n") if x.strip()]
+    if not lines:
+        return False
+    whole = len(cell_lines) <= 1 or _one_of(cell, cell_got, cell_thr, cell_raw, lines=False)
+    if kind in ("up", "down"):
+        edge = 0 if kind == "down" else -1      # the neighbour's line that touches the cell
+        if not whole:
+            mine = len(cell_lines) - 1 if kind == "down" else 0     # the cell's line that touches it
+            if not _one_of(cell, cell_lines[mine], cell_thr, cell_raw, lines=False):
+                return False
+        return _one_of(want, lines[edge], thr, raw, lines=False)
+    if whole:
+        return _one_of(want, got, thr, raw)
+    for i, x in enumerate(cell_lines):
+        if _one_of(cell, x, cell_thr, cell_raw, lines=False):
+            j = i if len(lines) == len(cell_lines) else 0 if i == 0 else None
+            if j is not None and _one_of(want, lines[j], thr, raw, lines=False):
+                return True
+    return False
 
 
 def _blank(table: tables.Table, c: tables.Cell | None) -> bool:

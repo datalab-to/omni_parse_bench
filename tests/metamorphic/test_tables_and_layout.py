@@ -547,6 +547,161 @@ def test_turning_a_real_neighbour_into_empty_or_end_fails_it():
     assert not bad, f"{len(bad)} cases, e.g. {bad[:5]}"
 
 
+LINE = "987654"     # a line no test's strings hold: a number
+
+
+def stack(text: str, first: bool, sep: str = "<br>") -> str:
+    """`text` written with another line beside it, before it (`first`) or after, as html."""
+    return f"{LINE}{sep}{escaped(text)}" if first else f"{escaped(text)}{sep}{LINE}"
+
+
+CELLS_OF = {"up": (0, 1), "down": (2, 1), "left": (1, 0), "right": (1, 2)}
+
+
+def around(cell: str, sides: dict[str, str]) -> str:
+    """The 3 x 3 table holding `cell` (html) in the middle and each side's html beside it."""
+    grid = [["", "", ""], ["", cell, ""], ["", "", ""]]
+    for k, x in sides.items():
+        grid[CELLS_OF[k][0]][CELLS_OF[k][1]] = x
+    rows = ("<tr>" + "".join(f"<td>{x}</td>" for x in r) + "</tr>" for r in grid)
+    return "<table>" + "".join(rows) + "</table>"
+
+
+@relation(HOLDS, domain="each side x a value of 1 to 5 characters x 1 to 3 other numbers x a place among "
+                        "them, on a 3 x 3 table: the side written as the lines (`<br>`), then joined by a "
+                        "space")
+@given(st.sampled_from(["up", "down", "left", "right"]),
+       st.text(string.ascii_uppercase + string.digits, min_size=1, max_size=5),
+       st.lists(st.integers(10_000, 99_999).map(str), min_size=1, max_size=3), st.integers(0, 3))
+def test_a_neighbour_stacked_with_other_lines_passes_but_not_joined_by_a_space(side, value, others, at):
+    """A table_cell test that names a neighbour's text (`up`, `down`, `left`, `right`) passes when that
+    neighbour cell is written as several lines (`<br>`) and one of them is the text, beside any other lines:
+    at any place for `left` and `right`, as the first line for `down` and the last for `up` (the line that
+    touches the cell), and `up` or `down` fails at any other place; it fails when the lines are joined by a
+    space (the break lost, with a number beside the text); and it still passes on the text alone. [M184]
+    Why it matters for a score: a system that writes two rows' values as one stacked cell (`5<br>50`) says
+    what a system that splits the rows says; one that loses the break reads as one string and is graded as
+    it is."""
+    # Given a 3 x 3 table with the cell `X` in the middle, and the test's side naming `value`
+    at = min(at, len(others))
+    lines = [*others[:at], value, *others[at:]]
+
+    def page(text: str) -> str:
+        return around("XX", {side: text})
+
+    test = runners.TableCell("XX", {side: value}, 0)
+    # When the side is the text alone, the lines (`<br>`), or the lines joined by a space; Then it passes,
+    # passes where the text touches the cell (anywhere beside it), and fails
+    assert passes(test, page(escaped(value)))
+    touches = {"up": at == len(others), "down": at == 0}.get(side, True)
+    assert passes(test, page("<br>".join(lines))) == touches
+    assert not passes(test, page(" ".join(lines)))
+
+
+@every_real_test("table sides", note="each on its own 3 x 3 table, passing first")
+def test_a_real_neighbour_stacked_with_another_line_passes_but_not_joined_by_a_space():
+    """A real table_cell test with a neighbour (`up`, `down`, `left`, `right`) unlike its cell, that passes on
+    a 3 x 3 table holding its cell in the middle and each neighbour's text beside it, still passes when every
+    neighbour is stacked (`<br>`) with another line, beside the text and, for `up` and `down`, off the side
+    that touches the cell, and fails when that line is joined to the text by a space or, for `up` and `down`,
+    sits between the text and the cell (a neighbour written over several lines is left out, as is a test
+    with edits to spend and no digit to guard). [M184]
+    Why it matters for a score: as for M184, over the dataset's own strings: a neighbour that shares a cell
+    with the value of another row is read as the value it holds."""
+    # Given each real test with a neighbour unlike its cell, and the 3 x 3 table its strings fill
+    bad = []
+    for t in SIDED:
+        if any("\n" in t.params.relations[k] for k in sided(t)):
+            continue
+        p = t.params._replace(relations={k: t.params.relations[k] for k in sided(t)}, headings=(),
+                              section=None, row_groups=())
+        # (an edit budget may pay for the extra number when the text holds no digit to guard)
+        guarded = p.max_diffs == 0 or all(any(ch.isdigit() for ch in x) for x in p.relations.values())
+        if not passes(p, around(escaped(p.cell), {k: escaped(x) for k, x in p.relations.items()})):
+            bad.append((t.id, "base"))
+            continue
+        # When each neighbour has another line (before its text: `first`), kept off the side that touches the
+        # cell for `up` and `down`; Then it passes, and fails when the line is joined by a space
+        touch = {"up": True, "down": False}     # the `first` that leaves the text touching the cell
+        for first in (True, False):
+            for sep in ("<br>", " "):
+                page = around(escaped(p.cell), {k: stack(x, touch.get(k, first), sep)
+                                                for k, x in p.relations.items()})
+                if sep == "<br>" and not passes(p, page):
+                    bad.append((t.id, "stacked", first))
+                if sep == " " and guarded and passes(p, page):
+                    bad.append((t.id, "joined", first))
+        # And `up` or `down` with the other line between its text and the cell fails
+        for k in touch:
+            if guarded and k in p.relations:
+                page = around(escaped(p.cell), {j: stack(x, touch[j] != (j == k) if j in touch else True)
+                                                for j, x in p.relations.items()})
+                if passes(p, page):
+                    bad.append((t.id, "far line", k))
+    assert not bad, f"{len(bad)} cases, e.g. {bad[:5]}"
+
+
+@relation(HOLDS, domain="2 to 4 lines of cell and neighbour (distinct words and numbers), each line as the "
+                        "cell: the neighbour's same line, another line, an extra line, joined by a space")
+@given(st.lists(st.text(string.ascii_uppercase, min_size=4, max_size=5), min_size=2, max_size=4, unique=True),
+       st.lists(st.integers(10_000, 99_999).map(str), min_size=5, max_size=5, unique=True), st.data())
+def test_a_multi_line_cell_reads_the_line_of_its_neighbour_beside_it(words, numbers, data):
+    """A table_cell test whose cell matches line i of a cell of several lines (`<br>`) and names the `right`
+    neighbour's text passes when that neighbour has as many lines and its line i is the text; it fails when
+    the text is another line of the neighbour, when the neighbour has more lines and i is not the first, and
+    when its lines are joined by a space. [M186]
+    Why it matters for a score: `A<br>B` beside `5<br>50` says A is beside 5 and B beside 50; a system that
+    merges two rows' cells keeps each name with its value, and one that sets a name beside another row's
+    value is not credited."""
+    # Given a cell of n lines and a neighbour of n lines, written side by side
+    n = len(words)
+    nums = numbers[:n]
+    i = data.draw(st.integers(0, n - 1))
+    j = data.draw(st.integers(0, n - 1).filter(lambda x: x != i))
+
+    def page(cell_lines, neighbour: str) -> str:
+        return f"<table><tr><td>{'<br>'.join(cell_lines)}</td><td>{neighbour}</td></tr></table>"
+
+    ok = page(words, "<br>".join(nums))
+    # When the neighbour's line i is named; Then the test passes
+    assert passes(runners.TableCell(words[i], {"right": nums[i]}, 0), ok)
+    # When another line is named, the neighbour has an extra line, or the lines are joined; Then it fails
+    assert not passes(runners.TableCell(words[i], {"right": nums[j]}, 0), ok)
+    if i > 0:
+        assert not passes(runners.TableCell(words[i], {"right": nums[i]}, 0),
+                          page(words, "<br>".join([*nums, numbers[n]])))
+    assert not passes(runners.TableCell(words[i], {"right": nums[i]}, 0), page(words, " ".join(nums)))
+
+
+@relation(HOLDS, domain="a cell of 1 to 4 lines above or below a neighbour of 2 to 4 lines (distinct words "
+                        "and numbers): the lines that touch, then every other line of either")
+@given(st.lists(st.text(string.ascii_uppercase, min_size=4, max_size=5), min_size=1, max_size=4, unique=True),
+       st.lists(st.integers(10_000, 99_999).map(str), min_size=2, max_size=4, unique=True),
+       st.sampled_from(["up", "down"]))
+def test_up_and_down_read_the_lines_that_touch_the_cell(words, numbers, side):
+    """A table_cell test whose cell matches a line of a cell of several lines (`<br>`) and names the `down`
+    neighbour's text passes when that is the neighbour's first line and the cell's line is its last; for `up`,
+    the neighbour's last line and the cell's first. It fails when the text is another line of the neighbour or
+    the cell's line is not the one that touches. A one-line cell reads only the neighbour's touching line.
+    [M187]
+    Why it matters for a score: in `A<br>B` over `5<br>50`, B is the line right above 5, and A is two lines
+    away: a system is credited for what sits next to a value, not for what sits two lines from it."""
+    # Given the cell's lines above (`down`) or below (`up`) the neighbour's lines, in two rows
+    rows = ["<br>".join(words), "<br>".join(numbers)]
+    rows = rows if side == "down" else rows[::-1]
+    page = "<table>" + "".join(f"<tr><td>{r}</td></tr>" for r in rows) + "</table>"
+    own = len(words) - 1 if side == "down" else 0
+    other = 0 if side == "down" else len(numbers) - 1
+
+    def test(i, j):
+        return runners.TableCell(words[i], {side: numbers[j]}, 0)
+    # When the touching lines are named; Then the test passes
+    assert passes(test(own, other), page)
+    # When another line of the neighbour is named, or another line of the cell; Then it fails
+    assert not any(passes(test(own, j), page) for j in range(len(numbers)) if j != other)
+    assert not any(passes(test(i, other), page) for i in range(len(words)) if i != own)
+
+
 # ------------------------------------------------------------------ a test without the new args is unchanged
 
 OLD_COMMIT = "416c17b"    # main before `empty` and `end`

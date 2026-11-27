@@ -684,6 +684,13 @@ cell-heading-self	pass
 cell-edge-self	fail	cells matching '5' found, but: no right_heading cell
 cell-heading-own-row	pass
 cell-heading-other-row	fail	cells matching '5' found, but: right_heading 'z' doesn't match 'h' (0.00)
+cell-neighbour-line	pass
+cell-neighbour-line-lost	fail	cells matching '1.8' found, but: up '5 50' doesn't match '50' (0.80)
+cell-neighbour-line-aligned	pass
+cell-neighbour-line-misaligned	fail	cells matching 'A' found, but: right '5 50' doesn't match '50' (0.80)
+cell-neighbour-line-touching	pass
+cell-neighbour-line-two-away	fail	cells matching '1.8' found, but: up '5 50' doesn't match '5' (0.50)
+cell-neighbour-line-number	fail	cells matching '1.8' found, but: up '50 500' doesn't match '5' (0.33)
 cell-up-wrong	fail	cells matching '1,300' found, but: up '1,240' doesn't match '9' (0.00)
 cell-top-heading-wrong	fail	cells matching '1,240' found, but: top_heading 'total' doesn't match 'year' (0.22)
 cell-headings-swapped	fail	cells matching '5' found, but: not under the headings 'A > Group'
