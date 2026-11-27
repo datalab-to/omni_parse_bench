@@ -49,7 +49,7 @@ LABELS = {
     "text": "text", "abstract": "text", "content": "text", "reference": "text", "reference_content": "text",
     "aside_text": "text",
     "paragraph_title": "heading", "doc_title": "heading",
-    "footnote": "footnote", "figure_title": "caption", "algorithm": "code",
+    "footnote": "footnote", "vision_footnote": "footnote", "figure_title": "caption", "algorithm": "code",
     "formula": "equation", "formula_number": "equation",
     "header": "page_furniture", "footer": "page_furniture", "number": "page_furniture",
     "table": "table",

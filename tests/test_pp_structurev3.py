@@ -16,7 +16,8 @@ FIXTURE = Path(__file__).parent / "fixtures" / "open_weights" / "pp_structurev3.
 # PP-DocLayout_plus-L's label_list, as its inference.yml has it.
 MODEL_LABELS = (
     "paragraph_title image text number abstract content figure_title formula table reference doc_title "
-    "footnote header algorithm footer seal chart formula_number aside_text reference_content").split()
+    "footnote vision_footnote header algorithm footer seal chart formula_number aside_text "
+    "reference_content").split()
 
 
 def _raw() -> dict:
@@ -100,3 +101,18 @@ def test_adapter_package_declaration_matches_the_cpu_server_paddle_pin():
     docker_version = re.search(r"paddlepaddle==([0-9.]+)", install)
     adapter_version = re.search(r"paddlepaddle ([0-9.]+)", pp.PACKAGE)
     assert docker_version and adapter_version and docker_version.group(1) == adapter_version.group(1)
+
+
+def test_a_vision_footnote_block_is_a_footnote():
+    raw = _raw()
+    raw["parsing_res_list"][0]["block_label"] = "vision_footnote"
+    outs, errs = _parse(raw)
+    assert errs == {} and outs["blocks"][0]["label"] == "footnote"
+
+
+def test_gpu_server_pins_the_same_paddle_version_from_the_cu126_index():
+    serve = Path(pp.__file__).parent / "serve" / "pp-structurev3"
+    gpu = (serve / "Dockerfile.gpu").read_text()
+    assert "paddlepaddle-gpu==3.2.2" in gpu and "/packages/stable/cu126/" in gpu
+    assert "paddlepaddle==3.2.2" in (serve / "Dockerfile").read_text()
+    assert '"paddlepaddle", "paddlepaddle-gpu"' in (serve / "server.py").read_text()

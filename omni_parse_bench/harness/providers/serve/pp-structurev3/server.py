@@ -19,6 +19,18 @@ KEY = os.environ.get("OPB_ENDPOINT_KEY")
 # Note: every request sets these, from the adapter's options (the vendor's values by default).
 SETTINGS = ("furniture",)
 DEVICE = os.environ.get("DEVICE", "cpu")
+
+
+def _paddle_version() -> str:
+    """The installed paddle version: the CPU wheel is `paddlepaddle`, the GPU one `paddlepaddle-gpu`."""
+    for dist in ("paddlepaddle", "paddlepaddle-gpu"):
+        try:
+            return importlib.metadata.version(dist)
+        except importlib.metadata.PackageNotFoundError:
+            continue
+    raise importlib.metadata.PackageNotFoundError("paddlepaddle")
+
+
 _LOCK = threading.Lock()
 _pipeline = None
 # What it serves, in every reply: the pipeline's models at the commits the image holds (model_pins.py), and
@@ -96,5 +108,6 @@ def parse(page: Page, authorization: str | None = Header(default=None)) -> dict:
     for heavy in ("layout_det_res", "overall_ocr_res", "doc_preprocessor_res"):
         out.pop(heavy, None)
     out["markdown"] = res.markdown["markdown_texts"]
-    out["vendor"] = {p: importlib.metadata.version(p) for p in ("paddleocr", "paddlex", "paddlepaddle")}
+    out["vendor"] = {"paddleocr": importlib.metadata.version("paddleocr"),
+                     "paddlex": importlib.metadata.version("paddlex"), "paddlepaddle": _paddle_version()}
     return {**out, "served": SERVED}
