@@ -165,6 +165,27 @@ def test_the_sign_of_an_exponent_is_kept(gold, lost):
     assert not any(all_types(gold, lost, 1)), gold
 
 
+@pytest.mark.parametrize("gold, split", [("rate 1e-3 per", "rate 1 -3 per"), ("rate 1e3 per", "rate 1 3 per"),
+                                          ("n 6.02e23 ok", "n 6.02 23 ok"), ("p 2.5E+4 ok", "p 2.5 +4 ok")])
+def test_a_number_in_scientific_notation_is_one_number(gold, split):
+    assert all(all_types(gold, gold, 0))
+    assert not any(all_types(gold, split, 2)), gold
+
+
+@pytest.mark.parametrize("s, numbers", [("rate 1e-3 per", ["1e-3"]), ("2.5E+4 x", ["2.5e+4"]),
+                                        ("id a1e3 ok", ["1e3"]), ("id 1e3m ok", ["1e3"]),
+                                        ("x 10e y", ["10"]), ("1e-3-2", ["1e-3", "2"])])
+def test_an_exponent_joins_its_number_whatever_letter_is_glued_to_it(s, numbers):
+    assert R._numbers_of(s.lower()) == numbers
+
+
+@pytest.mark.parametrize("gold, page", [("mda 2.45E-002 here", "mda 2.45E-002x here"),
+                                        ("mda 2.45E-002 here", "mda x2.45E-002 here")])
+def test_a_letter_glued_to_a_number_in_scientific_notation_costs_one_edit(gold, page):
+    assert all(all_types(gold, page, 1)), page
+    assert not any(all_types(gold, page, 0)), page
+
+
 @pytest.mark.parametrize("gold, page", [
     ("rate 1.2 per", "rate 1,2 per"),          # a comma for the decimal point
     ("rate 1,2 per", "rate 1.2 per"),

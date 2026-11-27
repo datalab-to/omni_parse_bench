@@ -94,6 +94,7 @@ What it penalizes:
 | P | a middle-dot separator after a CJK character | `太原·2020` | `太原.2020` | fail | `text-middot-cjk` |
 | P | a dropped thousands separator | `1,240` | `1240` | fail | `text-thousands` |
 | P | decimal comma for a point | `1.5` | `1,5` | fail | `text-decimal-comma` |
+| P | a number in scientific notation split, within the budget | `Rate 1e3 per s` (md 2) | `Rate 1 3 per s` | fail | `text-sci-split` |
 | P | a dropped currency sign | `$5.00` | `5.00` | fail | `text-currency-lost` |
 | P | an extra word inside | `Hello World` | `Hello big World` | fail | `text-extra-word` |
 | P | words swapped | `Hello World` | `World Hello` | fail | `text-word-order` |
@@ -151,7 +152,9 @@ single `,` before exactly three digits: `1.2`, `1,240`, `12.05.2021`. A comma be
 list comma, not part of a number (`0.39, 1.56`, `1,2`, `7,2016`), and so is one followed by a space. A leading `.`
 (`.5`) after white space, a bracket or an operator is part of a number. Its separators are part of it: `1,2` or
 `12` for `1.2`, `1240` or `1, 240` for `1,240` and `5` for `.5` are other numbers; a space after a list comma is
-free (`(1.13, 3.99)` is `(1.13,3.99)`). A leading zero the page adds (`0.150` for `.150`) is a digit the guard
+free (`(1.13, 3.99)` is `(1.13,3.99)`). A number in scientific notation is one number, its exponent
+included: a mantissa, then `e` or `E`, an optional sign and digits (`1e-3`, `2.5E+4`, `6.02e23`), a letter glued
+to it aside (`2.45E-002x` holds `2.45E-002`), so `1e3` written `1 3` is another number (case text-sci-split). A leading zero the page adds (`0.150` for `.150`) is a digit the guard
 refuses. Every other character still costs one edit, and a gold without a digit is matched as above.
 
 A sign belongs to its number: a `-` (or `−`, or an en dash, which fold to one), `+` or `±` directly before a

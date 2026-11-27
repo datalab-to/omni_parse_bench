@@ -179,18 +179,20 @@ def test_a_value_written_anywhere_between_the_anchors_fails(where, token, conten
 
 
 CONTENTS = ["Results of the trial in 2019", "We study parsing. It is hard.", "Rent 100 Fuel 70",
-            "Concentration 1e-3 M", "Rate 2e5 per s", "Readings 10-12 mg", "Set token____ now", "Call ____init now"]
+            "Concentration 1e-3 M", "Rate 2e5 per s", "Readings 10-12 mg", "Net -5 units", "Set token____ now",
+            "Call ____init now"]
 
 
-@relation(HOLDS, domain="8 contents (two in scientific notation, one with a range; two with an underscore run "
-                        "at one side of a word) x 7 edits (a word dropped, a character dropped, a word doubled, a "
-                        "number changed, the sign flipped, the exponent's e written as a space, the underscores "
-                        "dropped; each where the content holds what it edits) x 2 budgets (0, 1)")
+@relation(HOLDS, domain="9 contents (two in scientific notation, one with a range, one signed; two with an "
+                        "underscore run at one side of a word) x 8 edits (a word dropped, a character dropped, a word "
+                        "doubled, a number changed, a number added, a sign flipped (not a range's), the exponent's e "
+                        "written as a space, the underscores dropped; each where the content holds what it edits) x 2 "
+                        "budgets (0, 1)")
 def test_text_taken_from_a_region_or_a_number_changed_fails():
-    """A region that loses a word, loses a character (with no edit to spend), doubles a word, changes a number
-    flips a sign (an exponent's, or a range's "-" written "+") or splits a number in scientific notation
-    ("2e5" written "2 5"; at any budget), or drops an underscore run that touches a letter on one side (with no
-    edit to spend), fails, while the region as printed passes. [M152]
+    """A region that loses a word, loses a character (with no edit to spend), doubles a word, changes or adds a
+    number, flips a sign (an exponent's or a number's, not a range's) or splits a number in scientific notation ("2e5"
+    written "2 5"; at any budget), or drops an underscore run that touches a letter on one side (with no edit
+    to spend), fails, while the region as printed passes. [M152]
     Why it matters for a score: a region is compared as a whole, so a missing or changed part costs as an added
     one does, and a number is read whole, with its sign and exponent."""
     page = "<p>Abstract</p><p>{}</p><h2>Introduction</h2>"
@@ -205,7 +207,8 @@ def test_text_taken_from_a_region_or_a_number_changed_fails():
                        "drop char": content[1:] if md == 0 else content[2:] + "zz",
                        "double word": " ".join([words[0], *words]),
                        "number": re.sub(r"\d(?!.*\d)", lambda m: str((int(m[0]) + 1) % 10), content),
-                       "sign": content.replace("-", "+"), "exponent": re.sub(r"(?<=\d)e", " ", content)}
+                       "sign": re.sub(r"(?<![^\W_])-|(?<=\de)-", "+", content), "exponent": re.sub(r"(?<=\d)e", " ", content),
+                       "add number": content.replace(" ", " 1", 1)}
             if md == 0:
                 changed["underscores"] = content.replace("_", "")
             for edit, x in changed.items():

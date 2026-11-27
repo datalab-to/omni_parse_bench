@@ -66,6 +66,7 @@ TABLES = [
         text("text-middot-cjk", "P", "a middle-dot separator after a CJK character", "太原·2020", "太原.2020"),
         text("text-thousands", "P", "a dropped thousands separator", "1,240", "1240"),
         text("text-decimal-comma", "P", "decimal comma for a point", "1.5", "1,5"),
+        text("text-sci-split", "P", "a number in scientific notation split, within the budget", "Rate 1e3 per s", "Rate 1 3 per s", md=2),
         text("text-currency-lost", "P", "a dropped currency sign", "$5.00", "5.00"),
         text("text-extra-word", "P", "an extra word inside", "Hello World", "Hello big World"),
         text("text-word-order", "P", "words swapped", "Hello World", "World Hello"),

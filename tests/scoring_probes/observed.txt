@@ -60,6 +60,7 @@ text-middot-letter	fail	'A·1' not found (best 0.667 < 1.000); closest 'a.1'
 text-middot-cjk	fail	'太原·2020' not found (best 0.857 < 1.000); closest '太原.2020'
 text-thousands	fail	'1,240' not found (best 0.889 < 1.000); closest '1240'
 text-decimal-comma	fail	'1.5' not found (best 0.667 < 1.000); closest '1,5'
+text-sci-split	fail	'Rate 1e3 per s' not found with its numbers exact (a number differs, or one was added, split or joined)
 text-currency-lost	fail	'$5.00' not found (best 0.889 < 1.000); closest '5.00'
 text-extra-word	fail	'Hello World' not found (best 0.706 < 1.000); closest 'hello '
 text-word-order	fail	'Hello World' not found (best 0.667 < 1.000); closest 'world'
@@ -425,6 +426,8 @@ vb-spacing	pass
 vb-hyphen	pass
 vb-hyphen-joined	pass
 vb-range	pass
+vb-spaced-sign	pass
+vb-unit-exponent	pass
 vb-code-hyphen	pass
 vb-across-table	pass
 vb-table-end	pass
@@ -435,6 +438,11 @@ vb-whole-page	pass
 vb-alt	pass
 vb-before-start	pass
 vb-header-row	pass
+vb-percent	pass
+vb-range-plus	pass
+vb-percent-dropped	pass
+vb-list-comma	pass
+vb-operator-dropped	pass
 vb-budget-letters	pass
 ## verbatim-alt
 vb-alt-present	pass
@@ -464,7 +472,8 @@ vb-hyphen-space	fail	the page holds 'a self-aware system' where the gold has 'a 
 vb-sign	fail	the page holds 'net +12.5' where the gold has 'net -12.5' (a number differs)
 vb-exponent	fail	the page holds 'concentration 1e+3 m' where the gold has 'concentration 1e-3 m' (a number differs)
 vb-exponent-split	fail	the page holds 'rate 1 3 per s' where the gold has 'rate 1e3 per s' (a number differs)
-vb-range-plus	fail	the page holds 'readings 10+12' where the gold has 'readings 10-12' (a number differs)
+vb-sign-currency	fail	the page holds 'gain $1,234' where the gold has 'gain -$1,234' (a number differs)
+vb-cjk-sign	fail	the page holds '温度 3' where the gold has '温度-3' (a number differs)
 vb-underscore-run	fail	the page holds 'set token' where the gold has 'set token____' (4 edits, max_diffs 0)
 vb-decimal	fail	the page holds 'rate 1,25' where the gold has 'rate 1.25' (a number differs)
 vb-longer-label	fail	copy 2 of 2: between 'Date of birth:' and 'Place of birth:' holds "1960 mother's" where the gold has nothing (13 edits, max_diffs 0)

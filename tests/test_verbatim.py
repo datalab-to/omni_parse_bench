@@ -180,8 +180,8 @@ def test_the_budget_is_spent_over_the_whole_region(got, ok):
 @pytest.mark.parametrize("got, want", [
     ("Total 12 500", "Total 12500"), ("Total 12500 1", "Total 12500"), ("Total 1250", "Total 12500"),
     ("Total 12,500", "Total 12500"), ("Total 125OO", "Total 12500"), ("Net +12.5", "Net -12.5"),
-    ("Net 12.5", "Net -12.5"), ("Rate 1,25", "Rate 1.25"), ("Rate 125", "Rate 1.25"), ("Up 5", "Up 5%"),
-    ("Rate 5", "Rate .5"), ("Rate .5", "Rate 5"), ("Net +.5", "Net -.5"),
+    ("Net 12.5", "Net -12.5"), ("Rate 1,25", "Rate 1.25"), ("Rate 125", "Rate 1.25"), ("Rate 5", "Rate .5"), ("Rate .5", "Rate 5"),
+    ("Net +.5", "Net -.5"),
 ])
 def test_numbers_are_exact_at_any_budget(got, want):
     assert verdict(f"<p>{want}</p>", None, None, want, md=2)[0]
@@ -334,12 +334,25 @@ def test_a_hyphen_after_no_letter_may_be_in_an_anchor(anchor):
 @pytest.mark.parametrize("got, want", [
     ("Concentration 1e+3 M", "Concentration 1e-3 M"), ("Concentration 1e3 M", "Concentration 1e-3 M"),
     ("Concentration 1 -3 M", "Concentration 1e-3 M"), ("Rate 1 3", "Rate 1e3"), ("Rate 2.5e4", "Rate 2.5e+4"),
-    ("Readings 10+12", "Readings 10-12"), ("Net +5", "Net -5"), ("Net 5", "Net -5"), ("x -5", "x +5"),
+    ("Net +5", "Net -5"), ("Net 5", "Net -5"), ("x -5", "x +5"), ("Gain $1,234", "Gain -$1,234"),
+    ("温度 3", "温度-3"), ("温度3", "温度-3"),
 ])
 def test_a_number_with_its_sign_and_exponent_is_exact_at_any_budget(got, want):
     ok, why = verdict(f"<p>{got}</p>", None, None, want, 1)
     assert not ok and why.endswith("(a number differs)"), why
     assert verdict(f"<p>{want}</p>", None, None, want, 1)[0]
+
+
+@pytest.mark.parametrize("got, want", [
+    ("Rate 5", "Rate 5%"), ("Rate 5‰", "Rate 5%"), ("Rate 5 %", "Rate 5%"), ("Readings 10+12", "Readings 10-12"),
+    ("June 7, 2016", "June 7,2016"), ("Values 0.39,1.56", "Values 0.39, 1.56"), ("x = - 5", "x = -5"),
+    ("Unit kg -1", "Unit kg-1"), ("Unit dm-3", "Unit dm -3"), ("Sum 1 2", "Sum 1 +2"),
+])
+def test_what_the_shared_number_reader_reads_as_no_number_change_costs_an_edit(got, want):
+    # Note: the numbers are read as every test reads them (`runners._same_numbers`): a percent sign, a list
+    # comma, a range's "-" or "+" and an operator are text, and a unit exponent or a sign may be spaced
+    assert verdict(f"<p>{got}</p>", None, None, want, 1)[0]
+    assert not verdict(f"<p>{got}</p>", None, None, want, 0)[0]
 
 
 @pytest.mark.parametrize("got, want", [("Strain COVID 19", "Strain COVID-19"), ("Δ+12", "Δ-12"), ("A+12", "A-12")])

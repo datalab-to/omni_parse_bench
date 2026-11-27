@@ -586,13 +586,6 @@ _WRAPS = re.compile(r"[^\W\d_]-")
 # -> "//"), and a bullet glyph before a space, a list's mark, which fold drops only at the start of a line.
 # An underscore that touches a letter or a digit ("foo_bar", "_token", "__init__") is text.
 _UNCOMPARED = re.compile(r"(?<!\w)_+(?!\w)|[•‣◦▪▶∙●](?=\s|$)")
-# A number as a region compares it: its sign, its digits and the separators between them (a leading decimal
-# point too, ".5"), an exponent ("1e-3", "2.5e+4" are one number each, so "1e-3" is not "1 -3"), and a percent
-# sign. A "-" or "±" is its sign only after a character that is no letter or digit: after a letter it is a
-# hyphen ("COVID-19", "Δ-12"), after a digit it joins a range or a date ("10-12", "12-05-2021"). A "+" is its
-# sign after anything but a letter, so "10+12" is not "10-12".
-_VERBATIM_NUMBER = re.compile(
-    r"(?:(?<![^\W_])[-±]|(?<![^\W\d_])\+)?(?:[.,](?=\d))?\d+(?:[.,]\d+)*(?:e[-+]?\d+)?%?")
 
 
 def verbatim(t: Verbatim, v: views.Html) -> Mark:
@@ -658,12 +651,12 @@ def _closed(got: str, t: Verbatim) -> str:
     """Why the folded region `got` is not the test's content within its edits; "" when it is. Both are read
     without the underscores and bullets a region does not compare (`_UNCOMPARED`), their white space one
     space, and compared as whole strings: an edit is a character substituted, inserted or deleted, or two
-    adjacent ones swapped, and a `_WRAP` is free to drop or to read as a hyphen. Their numbers
-    (`_VERBATIM_NUMBER`: sign, digits, separators, exponent) must be equal, in order, at any budget."""
+    adjacent ones swapped, and a `_WRAP` is free to drop or to read as a hyphen. Their numbers, as every test
+    reads them (`_numbers_of`, `_same_numbers`), must be the same, in order, at any budget."""
     a, b = (re.sub(r" +", " ", _UNCOMPARED.sub("", x)).strip()
             for x in (_verbatim_fold(t.content or ""), got))
-    numbers = (_VERBATIM_NUMBER.findall(a.replace(_WRAP, ""))
-               == _VERBATIM_NUMBER.findall(b.replace(_WRAP, "")))
+    want, have = a.replace(_WRAP, ""), b.replace(_WRAP, "")
+    numbers = _same_numbers(want, have) if _numbers_of(want) else not _numbers_of(have)
     edits = _verbatim_edits(a, b, t.max_diffs)
     if numbers and edits <= t.max_diffs:
         return ""
@@ -1297,6 +1290,16 @@ def _hyphened(s: str) -> set[str]:
 _BEFORE_POINT = frozenset(" \t\n\xa0([{<>=:;|/±+-")
 
 
+def _exponent_of(s: str, nums: list[list[int]], pos: int, end: int) -> bool:
+    """Whether the digits `s[pos:end]` are the exponent of the number `nums[-1]`: an `e` or `E`, then an
+    optional sign, joins them to it (`1e-3`, `2.5E+4`, `6.02e23`). A letter glued before or after (`x1e3`,
+    `1e3m`) does not split it, as a letter beside a number never does."""
+    if not nums:
+        return False
+    mark = pos - 1 - (s[pos - 1:pos] in ("-", "+"))
+    return nums[-1][1] == mark and s[mark:mark + 1] in ("e", "E")
+
+
 def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
     """`s` as spans (start, end, is_number) that tile it. A number is digit runs (`str.isdigit`) joined by a
     single `.` between digits, or by a single `,` before exactly three digits (`1.2`, `1,240`, `12.05.2021`;
@@ -1307,14 +1310,15 @@ def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
     sign, so `A-12`, `2026-11-26` and `1-2` hold a hyphen (as `_number_pattern` reads one), and `1e-3` has
     the exponent's sign. A `-` before a number after white space, as in `3 -5`, is a sign; `3 - 5` has none.
     A `- `, `+ ` or `± ` with a space is a sign too when `spaced` and no value comes before it (a table cell
-    `\u2212 0.756`, `to \u2212 23.4`; a page that starts a list item `- 12` is not a negative number)."""
+    `\u2212 0.756`, `to \u2212 23.4`; a page that starts a list item `- 12` is not a negative number). A
+    number in scientific notation is one number, its exponent included (`_exponent_of`)."""
     nums: list[list[int]] = []
     pos = 0
     for digits, run in itertools.groupby(s, str.isdigit):
         end = pos + len(list(run))
         if digits:
             sep = s[pos - 1] if nums and nums[-1][1] == pos - 1 else ""
-            if sep == "." or sep == "," and end - pos == 3:
+            if sep == "." or sep == "," and end - pos == 3 or _exponent_of(s, nums, pos, end):
                 nums[-1][1] = end
             else:
                 nums.append([pos, end])

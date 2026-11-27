@@ -62,16 +62,18 @@ that changes the text passes:
   vb-hyphen-joined, vb-hyphen-space); a hyphen fold keeps (`Anglo- Saxon`) is text;
 - the two may differ by at most `max_diffs` edits (a character substituted, inserted or deleted, or two adjacent
   characters swapped), counted over the whole region;
-- their numbers must be equal, in order, at any budget: a number is its sign, its digits, the `.` and `,`
-  between them or before them, and a `%` after them, so `-12.5` is not `+12.5`, `1.25` is not `1,25`, `.5` is
-  not `5` and `12 500` is not `12500` (cases vb-number-in-budget, vb-sign, vb-decimal, vb-number-split).
-  A number in scientific notation is one number with its exponent: `1e-3` is not `1e+3`, `1e3` or `1 -3`
-  (cases vb-exponent, vb-exponent-split). A `-` or `±` is a sign only after a character that is no letter
-  or digit (the rule the number-guard change gives `present`): after a letter it is a hyphen (`COVID-19` written
-  `COVID 19` costs one edit, case vb-code-hyphen), after a digit it joins a range or a date (`10-12`,
-  `12-05-2021`, case vb-range). A `+` is a sign after anything but a letter, so `10-12` is not `10+12`
-  (case vb-range-plus). These are the verbatim test's own numeric forms; `present` reads numbers as
-  before.
+- their numbers must be the same, in order, at any budget, read as every test reads them
+  ([present-text.md](present-text.md#numbers-are-exact)): a number is its digits, the `.` between them, a `,`
+  before exactly three digits, a leading `.` and its sign, so `-12.5` is not `+12.5`, `1.25` is not `1,25`,
+  `.5` is not `5` and `12 500` is not `12500` (cases vb-number-in-budget, vb-sign, vb-decimal,
+  vb-number-split). A number in scientific notation is one number with its exponent: `1e-3` is not `1e+3`,
+  `1e3` or `1 -3` (cases vb-exponent, vb-exponent-split). A sign is a `-`, `+` or `±` directly before a
+  number or its currency symbol (`-$1,234` is not `$1,234`, case vb-sign-currency), also after a Chinese,
+  Japanese or Korean character (`温度-3` is not `温度 3`, case vb-cjk-sign); after a Latin letter or a digit
+  a `-` is a hyphen (`COVID-19` written `COVID 19` costs one edit, case vb-code-hyphen) or joins a range or
+  a date (`12-05-2021`, case vb-range), and a `+` or `±` after a value is an operator (`6% ± 2%`). A unit
+  exponent or a sign written with a space (`kg -1` for `kg-1`, `- 5` for `-5`) costs one edit (cases
+  vb-unit-exponent, vb-spaced-sign).
 
 The text view writes a superscript as a word of its own (`parsing.<sup>1</sup>` reads `parsing. 1`); content
 that holds a superscript writes it so. A NUL character on the page is read as U+FFFD, as an HTML parser reads it;
@@ -95,6 +97,8 @@ What the test ignores:
 | I | a compound broken at a line end | page start … page end: `A self-aware system` | `A self-<br>aware system` | pass | `vb-hyphen` |
 | I | a word broken at a line end, joined in the gold | page start … page end: `Our developers` | `Our develop-<br>ers` | pass | `vb-hyphen-joined` |
 | I | a date's hyphens written as slashes, within the budget: a hyphen after a digit joins two numbers | page start … page end: `Issued 12-05-2021` (md 2) | `Issued 12/05/2021` | pass | `vb-range` |
+| I | a sign written with a space, within the budget | page start … page end: `x = -5` (md 1) | `x = - 5` | pass | `vb-spaced-sign` |
+| I | a unit exponent written with a space, within the budget | page start … page end: `Unit kg-1` (md 1) | `Unit kg -1` | pass | `vb-unit-exponent` |
 | I | a code's hyphen after a letter written as a space, within the budget: no sign | page start … page end: `Strain COVID-19` (md 1) | `Strain COVID 19` | pass | `vb-code-hyphen` |
 | I | the region runs across a table, cell by cell | `Table 2. Costs` … `The costs fell`: `Rent 100 Fuel 70` | `<p>Table 2. Costs</p><table><tr><td>Rent</td><td>100</td></tr><tr><td>Fuel</td><td>70</td></tr></table><p>The costs fell.</p>` | pass | `vb-across-table` |
 | I | nothing after a table's last cell | `Fuel 70` … `The costs fell`: nothing | `<table><tr><td>Rent</td><td>100</td></tr><tr><td>Fuel</td><td>70</td></tr></table><p>The costs fell.</p>` | pass | `vb-table-end` |
@@ -111,6 +115,11 @@ What it does not look at, so a wrong output passes:
 | B | an image description in the region is not read | `Date of birth:` … `Place of birth:`: nothing | `<p>Name: Ann Lee</p><p>Date of birth: <img alt='12/03/1985'></p><p>Place of birth: Paris</p>` | pass | `vb-alt` |
 | B | text before the start is outside the region | `Date of birth:` … `Place of birth:`: nothing | `<p>12/03/1985 Date of birth:</p><p>Place of birth: Paris</p>` | pass | `vb-before-start` |
 | B | a header-row table reads its labels first, then its values | `Date of birth:` … `Place of birth:`: nothing | `<table><tr><td>Date of birth:</td><td>Place of birth:</td></tr><tr><td>12/03/1985</td><td>Paris</td></tr></table>` | pass | `vb-header-row` |
+| B | a percent sign written as a per mille sign, within the budget: a percent sign is text | page start … page end: `Rate 5%` (md 1) | `Rate 5‰` | pass | `vb-percent` |
+| B | a range's hyphen written as a plus, within the budget: a plus after a value is an operator | page start … page end: `Readings 10-12` (md 1) | `Readings 10+12` | pass | `vb-range-plus` |
+| B | a percent sign dropped, within the budget | page start … page end: `Rate 5%` (md 1) | `Rate 5` | pass | `vb-percent-dropped` |
+| B | a space after a comma before four digits, within the budget: such a comma is a list comma | page start … page end: `June 7,2016` (md 1) | `June 7, 2016` | pass | `vb-list-comma` |
+| B | a plus after a value dropped, within the budget: it is an operator | page start … page end: `Sum 1 +2` (md 1) | `Sum 1 2` | pass | `vb-operator-dropped` |
 | B | letters added within the budget | `Table 3` … `Mean`: `Results of the trial` (md 2) | `<p>Table 3 Results of the trial a</p><p>Mean</p>` | pass | `vb-budget-letters` |
 <!-- /cases -->
 
@@ -152,7 +161,8 @@ What it penalizes:
 | P | a sign changed, within the budget | page start … page end: `Net -12.5` (md 2) | `Net +12.5` | fail: `the page holds 'net +12.5' where the gold has 'net -12.5' (a number differs)` | `vb-sign` |
 | P | an exponent's sign changed, within the budget | page start … page end: `Concentration 1e-3 M` (md 1) | `Concentration 1e+3 M` | fail: `the page holds 'concentration 1e+3 m' where the gold has 'concentration 1e-3 m' (a number differs)` | `vb-exponent` |
 | P | a number in scientific notation split, within the budget | page start … page end: `Rate 1e3 per s` (md 1) | `Rate 1 3 per s` | fail: `the page holds 'rate 1 3 per s' where the gold has 'rate 1e3 per s' (a number differs)` | `vb-exponent-split` |
-| P | a range's hyphen written as a plus, within the budget | page start … page end: `Readings 10-12` (md 1) | `Readings 10+12` | fail: `the page holds 'readings 10+12' where the gold has 'readings 10-12' (a number differs)` | `vb-range-plus` |
+| P | a sign before a currency symbol dropped, within the budget | page start … page end: `Gain -$1,234` (md 1) | `Gain $1,234` | fail: `the page holds 'gain $1,234' where the gold has 'gain -$1,234' (a number differs)` | `vb-sign-currency` |
+| P | a sign after a CJK character dropped, within the budget | page start … page end: `温度-3` (md 1) | `温度 3` | fail: `the page holds '温度 3' where the gold has '温度-3' (a number differs)` | `vb-cjk-sign` |
 | P | an underscore run at the end of a name dropped | page start … page end: `set token____` | `set token` | fail: `the page holds 'set token' where the gold has 'set token____' (4 edits, max_diffs 0)` | `vb-underscore-run` |
 | P | a decimal point written as a comma, within the budget | page start … page end: `Rate 1.25` (md 2) | `Rate 1,25` | fail | `vb-decimal` |
 | P | the start inside a longer label opens a region too: a start must be unique on the page | `Date of birth:` … `Place of birth:`: nothing | `<p>Date of birth:</p><p>Place of birth: Paris</p><p>Mother's Date of birth: 1960</p><p>Mother's Place of birth: Rome</p>` | fail: `copy 2 of 2: between 'Date of birth:' and 'Place of birth:' holds "1960 mother's" where the gold has nothing (13 edits, max_diffs 0)` | `vb-longer-label` |
@@ -194,6 +204,26 @@ What it penalizes:
   added number (cases vb-budget-letters, vb-number-in-budget). With `max_diffs` 0, nothing passes that changes
   the text. A sign is never spent, but at a budget of 1 a hyphen after a letter or a digit may turn into
   another mark (`Δ-12` read `Δ+12`, `1-2` read `1/2`): such a hyphen is no sign (Numbers, above).
+- **A percent sign, a range's mark, an operator and a list comma's space are text**, as every test reads
+  numbers: at a budget of 1, `5%` read `5‰` or `5`, `10-12` read `10+12`, `1 +2` read `1 2` and `7,2016`
+  read `7, 2016` pass (cases vb-percent, vb-percent-dropped, vb-range-plus, vb-operator-dropped,
+  vb-list-comma).
+- **A percent sign, a range's mark, an operator and a list comma's space are text**, as every test reads
+  numbers: at a budget of 1, `5%` read `5‰` or `5`, `10-12` read `10+12`, `1 +2` read `1 2` and `7,2016`
+  read `7, 2016` pass (cases vb-percent, vb-percent-dropped, vb-range-plus, vb-operator-dropped,
+  vb-list-comma).
+- **A percent sign, a range's mark, an operator and a list comma's space are text**, as every test reads
+  numbers: at a budget of 1, `5%` read `5‰` or `5`, `10-12` read `10+12`, `1 +2` read `1 2` and `7,2016`
+  read `7, 2016` pass (cases vb-percent, vb-percent-dropped, vb-range-plus, vb-operator-dropped,
+  vb-list-comma).
+- **A percent sign, a range's mark, an operator and a list comma's space are text**, as every test reads
+  numbers: at a budget of 1, `5%` read `5‰` or `5`, `10-12` read `10+12`, `1 +2` read `1 2` and `7,2016`
+  read `7, 2016` pass (cases vb-percent, vb-percent-dropped, vb-range-plus, vb-operator-dropped,
+  vb-list-comma).
+- **A percent sign, a range's mark, an operator and a list comma's space are text**, as every test reads
+  numbers: at a budget of 1, `5%` read `5‰` or `5`, `10-12` read `10+12`, `1 +2` read `1 2` and `7,2016`
+  read `7, 2016` pass (cases vb-percent, vb-percent-dropped, vb-range-plus, vb-operator-dropped,
+  vb-list-comma).
 
 The why reads `<where> holds <output> where the gold has <content> (<n> edit(s), max_diffs <k>)`, or
 `(a number differs)`; `<where>` is `between <start> and <end>`, `after <start> to the page end`, `from the page
