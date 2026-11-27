@@ -1,0 +1,248 @@
+{
+ "model": "Docling",
+ "page": "olmo_arxiv_math-2502.15977_pg21-p1",
+ "provider": "docling",
+ "options": {},
+ "outputs": [
+  "html",
+  "blocks"
+ ],
+ "sent": null,
+ "raw": {
+  "html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\"/>\n<title>tmp4h48rvpc</title>\n<meta name=\"generator\" content=\"Docling HTML Serializer\"/>\n<style>\n    html {\n        background-color: #f5f5f5;\n        font-family: Arial, sans-serif;\n        line-height: 1.6;\n    }\n    body {\n        max-width: 800px;\n        margin: 0 auto;\n        padding: 2rem;\n        background-color: white;\n        box-shadow: 0 0 10px rgba(0,0,0,0.1);\n    }\n    h1, h2, h3, h4, h5, h6 {\n        color: #333;\n        margin-top: 1.5em;\n        margin-bottom: 0.5em;\n    }\n    h1 {\n        font-size: 2em;\n        border-bottom: 1px solid #eee;\n        padding-bottom: 0.3em;\n    }\n    table {\n        border-collapse: collapse;\n        margin: 1em 0;\n        width: 100%;\n    }\n    th, td {\n        border: 1px solid #ddd;\n        padding: 8px;\n        text-align: left;\n    }\n    th {\n        background-color: #f2f2f2;\n        font-weight: bold;\n    }\n    figure {\n        margin: 1.5em 0;\n        text-align: center;\n    }\n    figcaption {\n        color: #666;\n        font-style: italic;\n        margin-top: 0.5em;\n    }\n    img {\n        max-width: 100%;\n        height: auto;\n    }\n    pre {\n        background-color: #f6f8fa;\n        border-radius: 3px;\n        padding: 1em;\n        overflow: auto;\n    }\n    code {\n        font-family: monospace;\n        background-color: #f6f8fa;\n        padding: 0.2em 0.4em;\n        border-radius: 3px;\n    }\n    pre code {\n        background-color: transparent;\n        padding: 0;\n    }\n    .formula {\n        text-align: center;\n        padding: 0.5em;\n        margin: 1em 0;\n        background-color: #f9f9f9;\n    }\n    .formula-not-decoded {\n        text-align: center;\n        padding: 0.5em;\n        margin: 1em 0;\n        background: repeating-linear-gradient(\n            45deg,\n            #f0f0f0,\n            #f0f0f0 10px,\n            #f9f9f9 10px,\n            #f9f9f9 20px\n        );\n    }\n    .page-break {\n        page-break-after: always;\n        border-top: 1px dashed #ccc;\n        margin: 2em 0;\n    }\n    .key-value-region {\n        background-color: #f9f9f9;\n        padding: 1em;\n        border-radius: 4px;\n        margin: 1em 0;\n    }\n    .key-value-region dt {\n        font-weight: bold;\n    }\n    .key-value-region dd {\n        margin-left: 1em;\n        margin-bottom: 0.5em;\n    }\n    .form-container {\n        border: 1px solid #ddd;\n        padding: 1em;\n        border-radius: 4px;\n        margin: 1em 0;\n    }\n    .form-item {\n        margin-bottom: 0.5em;\n    }\n    .image-classification {\n        font-size: 0.9em;\n        color: #666;\n        margin-top: 0.5em;\n    }\n    details.docling-meta {\n        margin: 0.5em 0;\n        font-size: 0.9em;\n        text-align: left;\n    }\n    figure details.docling-meta {\n        text-align: left;\n    }\n    details.docling-meta > summary {\n        cursor: pointer;\n        color: #555;\n        font-style: italic;\n        padding: 2px 6px;\n    }\n    .docling-meta-field {\n        background-color: #f0f0f0;\n        border-left: 3px solid #ccc;\n        padding: 6px 10px;\n        margin: 4px 0 4px 1em;\n        border-radius: 3px;\n        text-align: left;\n    }\n    .docling-meta-field-label {\n        font-weight: bold;\n        color: #444;\n    }\n    pre.docling-meta-code {\n        background-color: #1e1e1e;\n        color: #d4d4d4;\n        border-radius: 4px;\n        padding: 10px 12px;\n        margin: 6px 0;\n        overflow-x: auto;\n        font-family: \"SFMono-Regular\", Consolas, \"Liberation Mono\", Menlo, monospace;\n        font-size: 0.85em;\n        line-height: 1.45;\n        white-space: pre;\n        tab-size: 4;\n    }\n    pre.docling-meta-code code {\n        background: transparent;\n        border: none;\n        padding: 0;\n        color: inherit;\n        font-family: inherit;\n        font-size: inherit;\n        display: block;\n        white-space: pre;\n    }\n</style>\n</head>\n<body>\n<div class='page'>\n<p>REDUCED SUPERSCHEMES AND THE COMBINATORICS OF TORIC SUPERVARIETIES 21</p>\n<figure><figcaption><div class=\"caption\">Figure 3. The decorated fan of an action of Q(1)2 on P2|2</div></figcaption></figure>\n<p>Example 4.28. Let us use Proposition 4.26 and Corollary 4.27 to classify toric supervarieties with supertorus Q(1)n and underlying variety Pn ∼= XΣ for the complete fan whose rays are ρi = R+xi for i = 1, ..., n and ρ0 = R+(-x1 - ... - xn).</p>\n<p>For i = 1, ..., n, the ray ρi must be decorated by a subspace Vρi such that [Vρi , Vρi ] ⊆ Cxi. Hence Vρi = Cθi or 0. Likewise, unless Vρ0 = 0, we have Vρ0 = C(θ1 ± θ2 ± ... ± θn) for some 2n-1 choices of ±.</p>\n<p>It is straightforward to verify that condition (b) of the definition of a large-orbit decorated fan holds regardless of which subspaces are chosen. We therefore obtain a collection of 2n(1 + 2n-1 ) toric supervarieties which are not equivariantly isomorphic. Many, however, are isomorphic via toric morphisms (to be defined in the following section).</p>\n<p>Notice that if all but one of these decorations is nonzero, then the decorated fan describes a supervariety isomorphic to projective superspace Pn|n. For instance, if Vρi = Cθi and Vρ0 = 0, then the coordinate superalgebras of the affine charts can be written as</p>\n<div class=\"formula-not-decoded\">Formula not decoded</div>\n<div class=\"formula-not-decoded\">Formula not decoded</div>\n<p>Figure 3 depicts the corresponding decorated fan for n = 2,</p>\n<p>If instead we change the decoration of ρ0 to θ1 + ... + θn, then the resulting affine charts have coordinate superalgebras</p>\n<div class=\"formula-not-decoded\">Formula not decoded</div>\n<div class=\"formula-not-decoded\">Formula not decoded</div>\n<p>so the supervariety is decidedly not isomorphic to projective superspace. Figure 4(B) depicts corresponding decorated fan for n = 1.</p>\n<p>In general, when T = Q(1)n, there are finitely many possible decorations for each ray. Namely, for ρ = R+(a1x1 + ... + anxn), there are 2d-1 many possible \"square root subspaces\" C(√a1θ1 ± ... ± √anθn), where d is the number of indices i = 1, ..., n for which ai ̸= 0.</p>\n<p>The prior example admitted no issues of compatibility between different rays of the same cone. This is not ordinarily the case; if ρ1 = R+(a1x1 + ... + anxn) and ρ2 = R+(b1x1 + ... + bnxn), compatibility is less common if the linear matroid on the n vectors</p>\n<div class=\"formula-not-decoded\">Formula not decoded</div>\n<p>and</p>\n</div>\n</body>\n</html>",
+  "markdown": "REDUCED SUPERSCHEMES AND THE COMBINATORICS OF TORIC SUPERVARIETIES 21\n\nFigure 3. The decorated fan of an action of Q(1)2 on P2|2\n\n<!-- image -->\n\nExample 4.28. Let us use Proposition 4.26 and Corollary 4.27 to classify toric supervarieties with supertorus Q(1)n and underlying variety Pn ∼= XΣ for the complete fan whose rays are ρi = R+xi for i = 1, ..., n and ρ0 = R+(-x1 - ... - xn).\n\nFor i = 1, ..., n, the ray ρi must be decorated by a subspace Vρi such that [Vρi , Vρi ] ⊆ Cxi. Hence Vρi = Cθi or 0. Likewise, unless Vρ0 = 0, we have Vρ0 = C(θ1 ± θ2 ± ... ± θn) for some 2n-1 choices of ±.\n\nIt is straightforward to verify that condition (b) of the definition of a large-orbit decorated fan holds regardless of which subspaces are chosen. We therefore obtain a collection of 2n(1 + 2n-1 ) toric supervarieties which are not equivariantly isomorphic. Many, however, are isomorphic via toric morphisms (to be defined in the following section).\n\nNotice that if all but one of these decorations is nonzero, then the decorated fan describes a supervariety isomorphic to projective superspace Pn|n. For instance, if Vρi = Cθi and Vρ0 = 0, then the coordinate superalgebras of the affine charts can be written as\n\n<!-- formula-not-decoded -->\n\n<!-- formula-not-decoded -->\n\nFigure 3 depicts the corresponding decorated fan for n = 2,\n\nIf instead we change the decoration of ρ0 to θ1 + ... + θn, then the resulting affine charts have coordinate superalgebras\n\n<!-- formula-not-decoded -->\n\n<!-- formula-not-decoded -->\n\nso the supervariety is decidedly not isomorphic to projective superspace. Figure 4(B) depicts corresponding decorated fan for n = 1.\n\nIn general, when T = Q(1)n, there are finitely many possible decorations for each ray. Namely, for ρ = R+(a1x1 + ... + anxn), there are 2d-1 many possible \"square root subspaces\" C(√a1θ1 ± ... ± √anθn), where d is the number of indices i = 1, ..., n for which ai ̸= 0.\n\nThe prior example admitted no issues of compatibility between different rays of the same cone. This is not ordinarily the case; if ρ1 = R+(a1x1 + ... + anxn) and ρ2 = R+(b1x1 + ... + bnxn), compatibility is less common if the linear matroid on the n vectors\n\n<!-- formula-not-decoded -->\n\nand",
+  "items": [
+   {
+    "label": "page_header",
+    "text": "REDUCED SUPERSCHEMES AND THE COMBINATORICS OF TORIC SUPERVARIETIES 21",
+    "bbox": [
+     98.99,
+     51.92895879999992,
+     523.2791546775682,
+     59.7649205659942
+    ],
+    "page_no": 1,
+    "layer": "furniture"
+   },
+   {
+    "label": "picture",
+    "text": "",
+    "bbox": [
+     206.57244249822628,
+     74.16749533343386,
+     387.8784654328007,
+     209.81952689590435
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "caption",
+    "text": "Figure 3. The decorated fan of an action of Q(1)2 on P2|2",
+    "bbox": [
+     144.858,
+     225.7604316999999,
+     449.9195140502991,
+     237.82555742132558
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "text",
+    "text": "Example 4.28. Let us use Proposition 4.26 and Corollary 4.27 to classify toric supervarieties with supertorus Q(1)n and underlying variety Pn ∼= XΣ for the complete fan whose rays are ρi = R+xi for i = 1, ..., n and ρ0 = R+(-x1 - ... - xn).",
+    "bbox": [
+     72.00000000000006,
+     258.55174279999994,
+     523.2783967155201,
+     297.9637019167145
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "text",
+    "text": "For i = 1, ..., n, the ray ρi must be decorated by a subspace Vρi such that [Vρi , Vρi ] ⊆ Cxi. Hence Vρi = Cθi or 0. Likewise, unless Vρ0 = 0, we have Vρ0 = C(θ1 ± θ2 ± ... ± θn) for some 2n-1 choices of ±.",
+    "bbox": [
+     72.0,
+     300.43060839999987,
+     523.2757544404479,
+     338.7745574213255
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "text",
+    "text": "It is straightforward to verify that condition (b) of the definition of a large-orbit decorated fan holds regardless of which subspaces are chosen. We therefore obtain a collection of 2n(1 + 2n-1 ) toric supervarieties which are not equivariantly isomorphic. Many, however, are isomorphic via toric morphisms (to be defined in the following section).",
+    "bbox": [
+     72.00000000000003,
+     342.27360839999983,
+     523.2806408368639,
+     394.5655574213254
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "text",
+    "text": "Notice that if all but one of these decorations is nonzero, then the decorated fan describes a supervariety isomorphic to projective superspace Pn|n. For instance, if Vρi = Cθi and Vρ0 = 0, then the coordinate superalgebras of the affine charts can be written as",
+    "bbox": [
+     71.99999999999994,
+     398.06460839999977,
+     523.2790915128322,
+     438.16728371066256
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "formula",
+    "text": "",
+    "bbox": [
+     238.08399999999995,
+     446.0876083999998,
+     357.1918144000001,
+     457.5687019167145
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "formula",
+    "text": "",
+    "bbox": [
+     187.97700000000012,
+     479.23543169999976,
+     407.2988144000002,
+     494.2127019167145
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "text",
+    "text": "Figure 3 depicts the corresponding decorated fan for n = 2,",
+    "bbox": [
+     72.00000000000017,
+     499.1486083999998,
+     376.62170612044815,
+     509.59655742132543
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "text",
+    "text": "If instead we change the decoration of ρ0 to θ1 + ... + θn, then the resulting affine charts have coordinate superalgebras",
+    "bbox": [
+     72.00000000000017,
+     513.0966083999997,
+     523.2764400386561,
+     537.4915574213254
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "formula",
+    "text": "",
+    "bbox": [
+     238.08400000000017,
+     547.1716083999997,
+     357.19181440000034,
+     558.6517019167145
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "formula",
+    "text": "",
+    "bbox": [
+     72.00000000000034,
+     567.2996083999997,
+     510.3238144000005,
+     600.1777019167145
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "text",
+    "text": "so the supervariety is decidedly not isomorphic to projective superspace. Figure 4(B) depicts corresponding decorated fan for n = 1.",
+    "bbox": [
+     72.00000000000051,
+     607.5546083999998,
+     523.2753273528327,
+     631.9505574213254
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "text",
+    "text": "In general, when T = Q(1)n, there are finitely many possible decorations for each ray. Namely, for ρ = R+(a1x1 + ... + anxn), there are 2d-1 many possible \"square root subspaces\" C(√a1θ1 ± ... ± √anθn), where d is the number of indices i = 1, ..., n for which ai ̸= 0.",
+    "bbox": [
+     72.00000000000006,
+     641.5494316999998,
+     523.2813393546247,
+     696.4897019167147
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "text",
+    "text": "The prior example admitted no issues of compatibility between different rays of the same cone. This is not ordinarily the case; if ρ1 = R+(a1x1 + ... + anxn) and ρ2 = R+(b1x1 + ... + bnxn), compatibility is less common if the linear matroid on the n vectors",
+    "bbox": [
+     72.00000000000006,
+     698.9566083999999,
+     523.278907639552,
+     738.3327019167147
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "formula",
+    "text": "",
+    "bbox": [
+     257.59000000000003,
+     745.182802,
+     337.685222480896,
+     772.6067019167147
+    ],
+    "page_no": 1,
+    "layer": "body"
+   },
+   {
+    "label": "text",
+    "text": "and",
+    "bbox": [
+     72.00000000000011,
+     466.2156083999998,
+     90.86052363955211,
+     476.66355742132544
+    ],
+    "page_no": 1,
+    "layer": "body"
+   }
+  ],
+  "page": {
+   "width": 595.276,
+   "height": 841.89001
+  },
+  "status": "success",
+  "vendor": {
+   "docling": "2.153.0",
+   "docling-core": "2.108.0",
+   "docling-ibm-models": "4.0.5",
+   "docling-parse": "7.28.0"
+  },
+  "served": {
+   "weights": "docling-project/docling",
+   "revision": "2.153.0"
+  }
+ }
+}
