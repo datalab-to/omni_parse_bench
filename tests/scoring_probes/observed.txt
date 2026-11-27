@@ -546,6 +546,8 @@ cell-digit-moved	fail	no cell matching '1,240' in any table
 cell-digit-neighbor	fail	cells matching '1,300' found, but: up '1,241' has other numbers than '1,240'
 cell-sign-lost	fail	no cell matching '-4.8' in any table
 cell-sign-added	fail	no cell matching '4.8' in any table
+cell-accounting-brackets	pass
+cell-currency-sign	fail	no cell matching '-$5' in any table
 cell-decimal-comma	fail	no cell matching '1.2' in any table
 cell-plus-lost	fail	no cell matching '+1.55' in any table
 cell-section-wrong	fail	cells matching '6' found, but: not in the section 'Cohort 2' (nearest above: 'Cohort 1')

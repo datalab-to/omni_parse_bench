@@ -228,3 +228,37 @@ def test_spacing_around_a_unit_exponent_or_a_plus_minus_between_values_is_free(g
                                         ("a ±0.1 b", "a 0.1 b")])
 def test_a_lost_sign_still_fails_with_the_spacing_tolerance(gold, lost):
     assert not any(all_types(gold, lost, 2)), (gold, lost)
+
+
+@pytest.mark.parametrize("gold, lost", [
+    ("net -$1,234 total", "net $1,234 total"), ("net −€5.5 total", "net €5.5 total"),
+    ("(−$5) net", "($5) net"),
+    ("loss -£5 here", "loss £5 here"), ("-¥500 paid", "¥500 paid"), ("-₹12 paid", "₹12 paid"),
+    ("net $-1,234 total", "net $1,234 total"), ("net +$5 total", "net $5 total"),
+])
+@pytest.mark.parametrize("md", [1, 2, 3])
+def test_a_sign_before_a_currency_symbol_is_kept_and_not_added(gold, lost, md):
+    assert all(all_types(gold, gold, md))
+    assert not any(all_types(gold, lost, md)), (gold, lost, md)
+    assert not any(all_types(lost, gold, md)), (lost, gold, md)
+
+
+@pytest.mark.parametrize("gold, page", [
+    ("Case A-5 and 5 units", "Case A-5 and -5 units"),        # a sign invented beside a hyphenated figure
+    ("A-5 vs 5 mg", "A-5 vs -5 mg"),
+])
+@pytest.mark.parametrize("md", [1, 2])
+def test_an_invented_sign_is_not_taken_for_a_hyphen(gold, page, md):
+    assert not any(all_types(gold, page, md)), (gold, page, md)
+
+
+@pytest.mark.parametrize("gold, page", [("−0.756", "− 0.756"), ("net −5 total", "net − 5 total"),
+                                        ("x = −5", "x = − 5")])
+def test_a_spaced_minus_on_the_page_is_the_golds_minus(gold, page):
+    assert all(all_types(gold, page, 1)), (gold, page)
+
+
+@pytest.mark.parametrize("gold, page", [("5 6", "6 5"), ("5", "5 5"), ("5 and 6", "6 and 5"),
+                                        ("5 6", "5 6 6")])
+def test_the_numbers_of_a_cell_are_in_order_and_as_many(gold, page):
+    assert not cell(gold, page, 3), (gold, page)

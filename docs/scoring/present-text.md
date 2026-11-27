@@ -155,7 +155,9 @@ A sign belongs to its number: a `-` (or `−`, or an en dash, which fold to one)
 number is a sign unless the character before it is a letter or a digit. So `-5`, `+1.55`, `x = -5`, `(-5)` and
 `3 -5` are signed, and so are an exponent's sign (`1e-3`) and a sign after a Chinese, Japanese or Korean
 character (such a text puts no space before it). A gold's sign must be written and cannot be added: `+1.55` is
-not `1.55`. In a `table_cell` cell, a `- ` with a space (`− 0.756`, `(− 5)`) is a sign too at the start of the
+not `1.55`. A sign before a currency symbol counts too (`-$1,234`, `(−€5)`), the symbol being part of the
+number, and a spaced minus on the page (`− 0.756` for the gold's `−0.756`) is the gold's minus unless a value comes
+before it (`3 - 5`). In a `table_cell` cell, a `- ` with a space (`− 0.756`, `(− 5)`) is a sign too at the start of the
 cell or after an opening bracket (in a page text `- 12` may start a list item).
 
 A `-` after a Latin letter or a digit is a hyphen: `A-12`, `2026-11-26`, `1-2` and `COVID-19` keep costing one
@@ -368,6 +370,8 @@ Blind spots of `blank_after`, besides those of `present`:
   text-budget-real-word), and, on a long passage with a budget of 2 or more, a dropped `not` (case
   text-budget-negation) all pass. This is not a negation guard: keep the budget at 0 where one word flips the
   meaning.
+- **Brackets round a number are not a sign.** An accounting negative `(1,234)` passes for `1,234` and the other
+  way round when the budget has 2 edits to spend (case cell-accounting-brackets); keep the budget at 0 for it.
 - **Image descriptions pay.** A description that contains the string passes the test (case text-alt).
 - **Most budgets are real.** 1,370 of the 3,684 real present text tests allow 1 to 4 edits; the others allow none.
 - **Short golds and edit budgets are loose.** With one edit, `ab` is found in a page holding `a` (case

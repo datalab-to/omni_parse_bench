@@ -66,7 +66,8 @@ def test_changing_one_digit_of_a_table_cell_test_fails_the_test(t, k):
 
 # A gold and what it reads as in each type: a figure with a sign, and a figure that holds a hyphen.
 SIGNED = [("net -5 total", "net 5 total", "net -5 total"), ("temp −5 C", "temp 5 C", "temp −5 C"),
-          ("x = -12.5 kg", "x = 12.5 kg", "x = –12.5 kg"), ("(-5) margin", "(5) margin", "(-5) margin")]
+          ("x = -12.5 kg", "x = 12.5 kg", "x = –12.5 kg"), ("(-5) margin", "(5) margin", "(-5) margin"),
+          ("loss -$1,234 ok", "loss $1,234 ok", "loss −$1,234 ok")]
 UNSIGNED = [("table 2026-11-26 ok", "table 2026 11-26 ok"), ("see A-12 and B-7", "see A12 and B-7"),
             ("pages 1-2 here", "pages 1 2 here"), ("COVID-19 cases", "COVID19 cases")]
 
@@ -79,7 +80,7 @@ def verdicts(gold: str, page: str, md: int) -> list[bool]:
             passes(cell_test(gold, md), cell)]
 
 
-@relation(HOLDS, domain="4 golds with a minus sign (`-` before a number after a space, a bracket or the start, `−`, "
+@relation(HOLDS, domain="5 golds with a minus sign (`-` before a number or a currency symbol, after a space, a bracket or the start, `−`, "
                         "an en dash) x 4 budgets x 3 test types: the sign lost, added, or written as `−` or an en dash")
 def test_a_lost_or_added_minus_sign_fails_at_any_budget():
     """A minus sign directly before a number, after white space, a bracket or the start of the string, must be
@@ -155,10 +156,10 @@ def test_a_budget_never_pays_for_a_separator_inside_a_number():
 
 
 PLUS = [("dose +1.55 mg", "dose 1.55 mg"), ("dose ±0.3 mg", "dose 0.3 mg"), ("(+5) and", "(5) and"),
-        ("x = +5 ok", "x = 5 ok")]
+        ("x = +5 ok", "x = 5 ok"), ("net +$5 total", "net $5 total")]
 
 
-@relation(HOLDS, domain="4 golds with a `+` or `±` sign x 4 budgets x 3 test types: the sign lost, or added to the "
+@relation(HOLDS, domain="5 golds with a `+` or `±` sign x 4 budgets x 3 test types: the sign lost, or added to the "
                         "unsigned gold")
 def test_a_lost_or_added_plus_or_plus_minus_sign_fails_at_any_budget():
     """A `+` or `±` directly before a number, after white space, a bracket or the start of the string (not after

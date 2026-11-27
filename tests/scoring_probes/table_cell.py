@@ -84,6 +84,8 @@ TABLES = [
         cell("cell-digit-neighbor", "P", "a changed digit in a neighbor", "1,300", A.replace("1,240", "1,241"), md=1, up="1,240", show=show("A", "1,240", "1,241"), why=True),
         cell("cell-sign-lost", "P", "a lost minus sign", "-4.8", "<table><tr><td>4.8</td></tr></table>", md=1),
         cell("cell-sign-added", "P", "a minus sign added", "4.8", "<table><tr><td>-4.8</td></tr></table>", md=1),
+        cell("cell-accounting-brackets", "B", "brackets round a number are no sign: a budget pays for the pair", "(1,234)", "<table><tr><td>1,234</td></tr></table>", md=2),
+        cell("cell-currency-sign", "P", "a sign before a currency symbol is kept", "-$5", "<table><tr><td>$5</td></tr></table>", md=1),
         cell("cell-decimal-comma", "P", "a comma for the decimal point", "1.2", "<table><tr><td>1,2</td></tr></table>", md=1),
         cell("cell-plus-lost", "P", "a lost plus sign", "+1.55", "<table><tr><td>1.55</td></tr></table>", md=1),
         cell("cell-section-wrong", "P", "a wrong section", "6", C, section="Cohort 2", show=show("C"), why=True),
