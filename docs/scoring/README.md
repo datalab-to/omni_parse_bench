@@ -118,6 +118,7 @@ the page to be blank). Each type's page gives its cases.
   what it asks, its rules table, its blind spots.
 - [internals.md](internals.md): how an output becomes the text the tests compare: markdown to html, the text
   view, the fold steps, the dollar reader, the edit budget, the hyphen rule, and what a gold must be to load.
+- [chain.md](chain.md): the normalizer chain (Id, Text, Cased, Words), the one distance, and the rules that decide a text match, each a switch.
 - [reader.md](reader.md): the reader behind the scorer's text views: what it drops (hidden text, alt text), cells, tokens, scripts and quantities, and the switches that turn each rule on or off.
 
 ## Keeping the pages true

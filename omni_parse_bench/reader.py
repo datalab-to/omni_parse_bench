@@ -60,7 +60,7 @@ CONTENT = frozenset(
 # The four script classes of section 8 of the design, for a letter's cluster.
 SPACED, HANGUL, CHARACTER, PHRASE = "spaced", "hangul", "character", "phrase"
 
-RULES = ("visibility", "alt_text_out", "cell_windows", "sup_exponent", "tokens")
+RULES = ("visibility", "alt_text_out", "cell_windows", "sup_exponent", "tokens", "text_fold")
 
 
 @dataclass(frozen=True, slots=True)
@@ -565,6 +565,71 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
 _INNER = frozenset("-‐‑'’ʼ")     # hyphens and apostrophes
 
 
+def _fold_records(u: str, recs: list[tuple], rules: frozenset[str]) -> list[tuple]:
+    """The Id -> Text fold between the quantity scan and word tokenization: each run of Word, Sym and Space
+    records is folded as text and, when the fold changed it, read into tokens again. A quantity, a mark and a
+    wrap keep what the scan made of them. A re-read token stands for the whole run in the source (`lo:hi`)."""
+    from .fold import fold_gap
+
+    out: list[tuple] = []
+    i, n = 0, len(recs)
+    while i < n:
+        if recs[i][0] not in (WORD, SYM, SPACE):
+            out.append(recs[i])
+            i += 1
+            continue
+        j = i
+        while j < n and recs[j][0] in (WORD, SYM, SPACE):
+            j += 1
+        lo, hi = recs[i][3], recs[j - 1][4]
+        at = [x for x in range(lo, hi) if u[x] not in (SUP_OPEN, SUP_CLOSE)]  # raw position -> offset in u
+        raw = "".join(" " if u[x] == SOFT_BREAK else u[x] for x in at)
+        folded = fold_gap(raw, line_start=i == 0)
+        if folded == raw:
+            out.extend(recs[i:j])
+        else:
+            again: list[tuple] = []
+            _tokenize_line(
+                folded,
+                [frozenset()] * len(folded),
+                lambda *r, _a=again: _a.append(r),
+                output=False,
+                rules=rules,
+            )
+            while again and again[0][0] == SPACE and not out:
+                again.pop(0)
+            while again and again[-1][0] == SPACE and j == n:
+                again.pop()
+            span = _fold_map(raw, folded)
+            for c, t, k, a, b, sc in again:
+                src = [span[x] for x in range(a, b)] or [span[min(a, len(folded) - 1)]]
+                out.append((c, t, k, at[min(x[0] for x in src)], at[max(x[1] for x in src)] + 1, sc))
+        i = j
+    return out
+
+
+def _fold_map(raw: str, folded: str) -> list[tuple[int, int]]:
+    """For each character of `folded`, the (first, last) raw positions it comes from: an unchanged stretch
+    maps one to one, a rewritten stretch (`ﬁ` to `fi`) maps each of its characters to the raw stretch."""
+    import difflib
+
+    p = 0
+    while p < min(len(raw), len(folded)) and raw[p] == folded[p]:
+        p += 1
+    q = 0
+    while q < min(len(raw), len(folded)) - p and raw[-1 - q] == folded[-1 - q]:
+        q += 1
+    out = [(x, x) for x in range(p)]
+    rm, fm = raw[p : len(raw) - q], folded[p : len(folded) - q]
+    for tag, a0, a1, b0, b1 in difflib.SequenceMatcher(None, rm, fm, autojunk=False).get_opcodes():
+        if tag == "equal":
+            out.extend((p + a0 + d, p + a0 + d) for d in range(a1 - a0))
+        elif b1 > b0:
+            out.extend([(p + a0, p + max(a1, a0 + 1) - 1)] * (b1 - b0))
+    out.extend((len(raw) - q + x, len(raw) - q + x) for x in range(q))
+    return out
+
+
 def _spaced_letter(u: str, i: int) -> bool:
     """Whether the cluster `u[i]` is in has a spaced-script letter for its base (a mark looks back)."""
     while 0 < i < len(u) and _is_mark(u[i]):
@@ -710,6 +775,12 @@ class _Builder:
         for line in lines:
             while line and line[-1][0] in (" ", SOFT_BREAK):
                 line.pop()
+            if line and line[-1][0][-1:] in (" ", "\t", "\f"):
+                line[-1] = (line[-1][0].rstrip(" \t\f"), line[-1][1])
+            while line and not line[0][0].strip(" \t\f"):
+                line.pop(0)
+            if line and line[0][0][:1] in (" ", "\t", "\f"):
+                line[0] = (line[0][0].lstrip(" \t\f"), line[0][1])
             if not line:
                 continue
             if emitted:
@@ -756,6 +827,10 @@ class _Builder:
                 mk.append(markup)
             in_sup = sup
             text = text.replace(SUP_OPEN, "�").replace(SUP_CLOSE, "�")
+            if "text_fold" in self.rules:
+                from .fold import enumerator_digits
+
+                text = enumerator_digits(text)
             u_parts.append(text)
             mk.extend([markup] * len(text))
         if in_sup:
@@ -769,7 +844,12 @@ class _Builder:
             both = frozenset.intersection(*ms) if ms else frozenset()
             self._add(cls, text, canon, block, line, both, cell, script)
 
-        _tokenize_line(u, mk, emit, output=self.output, rules=self.rules)
+        recs: list[tuple] = []
+        _tokenize_line(u, mk, lambda *r: recs.append(r), output=self.output, rules=self.rules)
+        if "text_fold" in self.rules:
+            recs = _fold_records(u, recs, self.rules)
+        for r in recs:
+            emit(*r)
 
     def finish(self) -> Document:
         self.flush()

@@ -63,6 +63,52 @@ _SWITCHES = (
         1,
         False,
     ),
+    Switch(
+        "text_fold",
+        "The Id to Text fold (compatibility forms, typography, invisible characters, leaders, look-alike "
+        "symbols) is applied once, between the quantity scan and word tokenization.",
+        2,
+        False,
+    ),
+    Switch(
+        "chain",
+        "A `present` text test is matched on the normalizer chain (Id, Text, Cased, Words) by the one "
+        "distance, in place of the old fold, squeeze retries and number guard. The rules below are the "
+        "chain's own; with `chain` off none of them is read.",
+        2,
+        True,
+    ),
+    Switch("word_edges", "A match starts and ends at token edges: `Total` is not in `Totally`.", 2, False),
+    Switch(
+        "space_one_sided",
+        "From Cased on a space of the gold is free, a space of the output is not: `Total Due` matches "
+        "`TotalDue`, `therapist` does not match `the rapist`. Off: spaces are free on both sides.",
+        2,
+        False,
+    ),
+    Switch(
+        "osa",
+        "A swap of two neighbouring characters is one edit (OSA); off: it is two (Levenshtein).",
+        2,
+        False,
+    ),
+    Switch(
+        "qty_atomic",
+        "A quantity is atomic: any edit that touches one costs more than any budget, so `10kg` never "
+        "matches `10mg`. Off: its characters are edited like any others.",
+        2,
+        False,
+    ),
+    Switch("marks_free", "From Cased on a footnote mark is deleted from gold and output.", 2, False),
+    Switch(
+        "wrap_free", "A hyphen wrapped over a line end is free in the output, or equals a gold `-`.", 2, False
+    ),
+    Switch(
+        "break_free",
+        "A line or block break matches a gold space at no cost, and from Cased on may be deleted.",
+        2,
+        False,
+    ),
 )
 SWITCHES: dict[str, Switch] = {s.name: s for s in _SWITCHES}
 

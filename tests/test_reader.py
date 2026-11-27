@@ -12,7 +12,8 @@ from omni_parse_bench.views import MalformedOutput
 
 @pytest.fixture(autouse=True)
 def rules_on():
-    with switches.set_all(True):
+    """The reader's rules of step 1 on; the text fold (step 2) is off here and on where a test says so."""
+    with switches.using(**{r: r != "text_fold" for r in reader.RULES}):
         yield
 
 
@@ -41,7 +42,7 @@ def words(h: str) -> list[str]:
 def test_a_switch_is_off_by_default_and_named():
     with switches.set_all(False):
         assert not any(switches.state().values())
-    assert set(switches.SWITCHES) == set(reader.RULES)
+    assert set(reader.RULES) <= set(switches.SWITCHES)
     with pytest.raises(KeyError):
         switches.on("nope")
     with pytest.raises(KeyError):
@@ -549,3 +550,25 @@ def test_a_grouping_space_is_part_of_a_quantity_and_a_sign_gap_is_not():
 
 def test_a_hyphen_after_a_combining_mark_stays_in_the_word():
     assert toks("<p>a\u0301-b</p>") == [("Word", "a\u0301-b")]
+
+
+def test_the_text_fold_runs_between_the_quantity_scan_and_word_tokenization():
+    with switches.using(text_fold=True):
+        _check_fold()
+
+
+def _check_fold():
+    assert toks("<p>ﬁx the “quote” – x ① ＡＢＣ 12 ３４ a…b</p>") == [
+        ("Word", "fix"), ("Word", "the"), ("Sym", '"'), ("Word", "quote"), ("Sym", '"'), ("Sym", "-"),
+        ("Word", "x"), ("Qty", "1"), ("Word", "ABC"), ("Qty", "12"), ("Qty", "34"), ("Word", "a"),
+        ("Word", "b")]
+    assert toks("<p>• Bullet</p>") == [("Word", "Bullet")]
+
+
+def test_a_quantity_keeps_its_spelling_through_the_fold():
+    assert [t.text for t in reader.read("<p>１２３ 4,5</p>").tokens if t.cls == "Qty"] == ["１２３", "4,5"]
+
+
+def test_with_text_fold_off_the_reading_is_the_unfolded_one():
+    with switches.using(text_fold=False):
+        assert words("<p>ﬁx “q”</p>") == ["ﬁx", "q"]
