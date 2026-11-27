@@ -30,7 +30,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 
 ### Added
 
-- Provider `monkeyocr`: MonkeyOCR-pro-3B (html and blocks), served from `providers/serve/monkeyocr/`. The weights are non-commercial (code Apache-2.0).
+- Provider `monkeyocr`: MonkeyOCR-pro-3B (html and blocks), served from `providers/serve/monkeyocr/`. The weights are non-commercial (code Apache-2.0). (#119)
 
 ### Changed
 
