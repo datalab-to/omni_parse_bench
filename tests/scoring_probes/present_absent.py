@@ -15,7 +15,8 @@ TABLES = [
         absent("ab-over-budget", "I", "a reading further off than the budget", H, "<p>Patient name: John Smith</p>", md=3),
         absent("ab-part", "I", "part of the text, short of the budget", NEXT, "<p>Chapter 4.</p>", md=2),
         absent("ab-number-changed", "I", "a digit changed: numbers are exact, as in `present`", "Account number 4417 1234 5678 9113", "<p>Account number 4417 1234 5678 9112</p>", md=2),
-        absent("ab-alt", "I", "in an image description, which is not read (`present` reads it)", H, "<img alt='Patient name: Johnathan Quincy Smithers'>", md=3),
+        absent("ab-alt", "I", "in an image description, which is not read (`present` reads it)", H, "<p>Patient name:</p><img alt='Johnathan Quincy Smithers'>", md=3),
+        absent("ab-empty-blank", "I", "nothing written, on a blank page (its gold holds a `page_near_empty` test)", H, "", md=3, blank=True),
         absent("ab-text-order", "I", "a two-line notice in the order its text layer reads", SIGN, "<p>Opens Tuesday</p><p>North station</p>", md=3),
     ),
     table(
@@ -25,6 +26,8 @@ TABLES = [
     ),
     table(
         "absent-penalized",
+        absent("ab-empty", "P", "nothing written: no reading to hold the text against", H, "", md=3, why=True),
+        absent("ab-image-only", "P", "an image alone, whose description is not read", H, "<img alt='Johnathan Quincy Smithers'>", md=3),
         absent("ab-read-through", "P", "the hidden text read through the box", H, "<p>Patient name: Johnathan Quincy Smithers</p>", md=3, why=True),
         absent("ab-near", "P", "a near copy, within the budget", H, "<p>Patient name: Jonathan Quincy Smithers</p>", md=3),
         absent("ab-case-spacing", "P", "another case and spacing", H, "<p>PATIENT NAME:JOHNATHAN QUINCY SMITHERS</p>", md=3),

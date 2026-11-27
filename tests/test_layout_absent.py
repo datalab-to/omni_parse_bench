@@ -57,11 +57,16 @@ def test_the_loader_refuses(settings, args, why):
 
 
 @pytest.mark.parametrize("blocks", [
-    [], [block("text", text="7")], [block("page_furniture", (0.4, 0.02, 0.6, 0.05), "- 7 -")],
+    [block("text", text="7")], [block("page_furniture", (0.4, 0.02, 0.6, 0.05), "- 7 -")],
     [block("figure", (0, 0, 1, 1))], [block(k) for k in ALLOWED] * 3,
 ])
 def test_allowed_blocks_pass(blocks):
     assert verdict(blocks) == (True, "")
+
+
+def test_no_blocks_is_no_output_and_fails_a_normal_page():
+    ok, why = verdict([])
+    assert not ok and why.startswith("no output")    # tests/test_empty_gate.py
 
 
 @pytest.mark.parametrize("kind", BLANK)

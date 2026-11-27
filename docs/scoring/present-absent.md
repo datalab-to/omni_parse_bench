@@ -45,7 +45,8 @@ What the test ignores:
 | I | a reading further off than the budget | not `Johnathan Quincy Smithers` (md 3) | `<p>Patient name: John Smith</p>` | pass | `ab-over-budget` |
 | I | part of the text, short of the budget | not `Chapter 4. The harbor at night` (md 2) | `<p>Chapter 4.</p>` | pass | `ab-part` |
 | I | a digit changed: numbers are exact, as in `present` | not `Account number 4417 1234 5678 9113` (md 2) | `<p>Account number 4417 1234 5678 9112</p>` | pass | `ab-number-changed` |
-| I | in an image description, which is not read (`present` reads it) | not `Johnathan Quincy Smithers` (md 3) | `<img alt='Patient name: Johnathan Quincy Smithers'>` | pass | `ab-alt` |
+| I | in an image description, which is not read (`present` reads it) | not `Johnathan Quincy Smithers` (md 3) | `<p>Patient name:</p><img alt='Johnathan Quincy Smithers'>` | pass | `ab-alt` |
+| I | nothing written, on a blank page (its gold holds a `page_near_empty` test) | not `Johnathan Quincy Smithers` (md 3), on a page with a `page_near_empty` test | `""` | pass | `ab-empty-blank` |
 | I | a two-line notice in the order its text layer reads | not `North station opens Tuesday` (md 3) | `<p>Opens Tuesday</p><p>North station</p>` | pass | `ab-text-order` |
 <!-- /cases -->
 
@@ -63,6 +64,8 @@ What it penalizes:
 <!-- cases:absent-penalized -->
 | | difference | gold | output | verdict | case |
 |---|---|---|---|---|---|
+| P | nothing written: no reading to hold the text against | not `Johnathan Quincy Smithers` (md 3) | `""` | fail: `no output: a test of what the page does not hold passes only an output that writes something, unless the page is blank (a page_near_empty test)` | `ab-empty` |
+| P | an image alone, whose description is not read | not `Johnathan Quincy Smithers` (md 3) | `<img alt='Johnathan Quincy Smithers'>` | fail | `ab-image-only` |
 | P | the hidden text read through the box | not `Johnathan Quincy Smithers` (md 3) | `<p>Patient name: Johnathan Quincy Smithers</p>` | fail: `'Johnathan Quincy Smithers' found, a reading the page does not print` | `ab-read-through` |
 | P | a near copy, within the budget | not `Johnathan Quincy Smithers` (md 3) | `<p>Patient name: Jonathan Quincy Smithers</p>` | fail | `ab-near` |
 | P | another case and spacing | not `Johnathan Quincy Smithers` (md 3) | `<p>PATIENT NAME:JOHNATHAN QUINCY SMITHERS</p>` | fail | `ab-case-spacing` |
@@ -95,6 +98,15 @@ What it penalizes:
 - **A paraphrase or a translation passes** (case ab-paraphrase): the test finds the text, not its meaning.
 - **The words written apart pass** (case ab-split): the search is for the whole text, within its budget.
 - **A reading further off than the budget passes** (case ab-over-budget), and so does part of it (case ab-part).
-- **A reading written into an image description passes** (case ab-alt): the test reads what the page shows.
+- **A reading written into an image description passes** (case ab-alt): the test reads what the page shows. An
+  output that is only an image fails, as an empty one does (case ab-image-only).
+
+**An empty output fails.** The test passes only an output that writes something: html with no character a reader
+sees outside image descriptions (nothing, white space, an image alone, as `page_near_empty` counts) fails with
+`no output: a test of what the page does not hold passes only an output that writes something, unless the page is
+blank (a page_near_empty test)`, whatever the text (cases ab-empty, ab-image-only). Without this, writing nothing
+earned a pass on every absent test. The exception is a blank page: when the page's gold holds a `page_near_empty`
+test, an empty output is the right answer and passes (case ab-empty-blank). A page is blank by its gold, not by what
+the output holds, so an output that writes the reading on a blank page still fails.
 
 The why reads `<text> found, a reading the page does not print`, the text cut at 60 characters.

@@ -57,7 +57,7 @@ def test_the_loader_needs_content():
 
 
 PAGES = [
-    "", "<p>Patient name:</p>", "<p>Patient name: ████</p>", "<p>Patient name: [REDACTED]</p>",
+    "<p>x</p>", "<p>Patient name:</p>", "<p>Patient name: ████</p>", "<p>Patient name: [REDACTED]</p>",
     f"<p>Patient name: {H}</p>", "<p>Patient name: Jonathan Quincy Smithers</p>", "<p>Patient name: John Smith</p>",
     f"<p>{H.upper().replace(' ', '')}</p>", f"<table><tr><td>{H}</td></tr></table>",
     "<p>Johnathan</p><p>Quincy Smithers</p>", "<p>Johnathan Quincy Smith-</p><p>ers</p>", f"<p>x</p><p>{H}</p><p>{H}</p>",
@@ -75,7 +75,10 @@ def test_absent_is_not_present_on_a_page_without_images(html, md):
                                   f"![{H}](a.png)", f"<figure><img alt='{H}'><figcaption>Fig. 1</figcaption></figure>"])
 def test_an_image_description_is_not_read_though_present_reads_it(html):
     assert R.present(R.Present(R.Text(H, 3)), views.html(html))[0]
-    assert verdict(html) == (True, "")
+    assert verdict(html + "<p>Fig. 1</p>") == (True, "")
+    # Note: an image alone is an output with nothing to read: it fails like an empty one (tests/test_empty_gate.py)
+    if "<p>" not in html and "<figcaption>" not in html:
+        assert verdict(html)[1].startswith("no output")
     # Note: the same reading in the visible text beside the image still fails
     assert not verdict(html + f"<p>{H}</p>")[0]
 

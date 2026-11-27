@@ -156,35 +156,45 @@ def verbatim(label, mark, rule, start, end, content, out, md=0, from_markdown=Fa
                    lambda: _v(R.verbatim(R.Verbatim(start, end, content, md), views.html(page))), **kw)
 
 
-def excess(label, mark, rule, gold, out, shown_gold=None, **kw) -> Case:
+# What a page with a `page_near_empty` test adds to a negative test's gold column.
+BLANK_NOTE = ", on a page with a `page_near_empty` test"
+
+
+def excess(label, mark, rule, gold, out, shown_gold=None, blank=False, **kw) -> Case:
     """`no_excess_repeats`: `gold` is the page's full text."""
-    return verdict(label, mark, rule, shown_gold or code(gold), out,
-                   lambda: _v(R.no_excess_repeats(R.NoExcessRepeats(gold), views.html(html(out)))), **kw)
+    return verdict(label, mark, rule, (shown_gold or code(gold)) + (BLANK_NOTE if blank else ""), out,
+                   lambda: _v(R.run("no_excess_repeats", R.NoExcessRepeats(gold),
+                                    views.html(html(out)), blank)),
+                   **kw)
 
 
-def absent(label, mark, rule, gold, out, md=0, from_markdown=False, **kw) -> Case:
+def absent(label, mark, rule, gold, out, md=0, from_markdown=False, blank=False, **kw) -> Case:
     """`present` with `{"absent": true}`: `gold` must not be found. `from_markdown`: `out` is markdown,
     turned to html as the harness
     does."""
     from omni_parse_bench import markdown
     page = markdown.to_html(out) if from_markdown else html(out)
-    return verdict(label, mark, rule, "not " + _md(gold, md), out,
-                   lambda: _v(R.present(R.Present(R.Text(gold, md), absent=True), views.html(page))), **kw)
+    return verdict(label, mark, rule, "not " + _md(gold, md) + (BLANK_NOTE if blank else ""), out,
+                   lambda: _v(R.run("present", R.Present(R.Text(gold, md), absent=True),
+                                    views.html(page), blank)),
+                   **kw)
 
 
 BLANK = ("heading", "table", "caption", "equation", "footnote", "list", "code")
 
 
 def layout_absent(label, mark, rule, blocks: Sequence[tuple[str, tuple[float, ...], str]],
-                  kinds: Sequence[str] = BLANK, **kw) -> Case:
+                  kinds: Sequence[str] = BLANK, blank=False, **kw) -> Case:
     """`layout_absent` with `kinds` (by default the set for a blank page); `blocks` are (label, bbox,
     text)."""
     raw = [{"label": b, "bbox": list(box), "text": text} for b, box, text in blocks]
     shown = "; ".join(f"{b} {list(box)} {text!r}" for b, box, text in blocks) or "no blocks"
     named = ", ".join(code(k) for k in kinds)
     gold = "none of the blank-page set" if tuple(kinds) == BLANK else f"no {named}"
+    gold += BLANK_NOTE if blank else ""
     t = R.LayoutAbsent(tuple(kinds))
-    return verdict(label, mark, rule, gold, "", lambda: _v(R.layout_absent(t, views.blocks(raw))),
+    return verdict(label, mark, rule, gold, "",
+                   lambda: _v(R.run("layout_absent", t, views.blocks(raw), blank)),
                    show=code(shown) if blocks else shown, **kw)
 
 

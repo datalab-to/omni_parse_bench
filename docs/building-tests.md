@@ -98,6 +98,10 @@ It reads as: "some table in the output has a cell `167.8`, under the column head
 | layout_kind | `content`, with its `place` | `kind` | the smallest block covering at least half of the place is labeled `kind` (one of `views.LABELS`); for `text`, a `list` or `form` block (a list item, or a form field or key-value pair) passes too |
 | layout_absent | none | `kinds` | no block of the page is labeled one of `kinds` (labels of `views.LABELS` other than `text`, compared as written) ([layout_absent.md](scoring/layout_absent.md)) |
 
+A test of what the output must not hold (`present` with `absent`, `no_excess_repeats`, `layout_absent`) fails an output
+with nothing in it (no visible character, or no block at all; one stray character passes), unless the page's gold holds a `page_near_empty` test: author one on every blank page, and
+its negative tests then pass an empty output ([scoring/README.md](scoring/README.md#empty-output)).
+
 `page_near_empty` takes no args and settings exactly `{"max_chars": N}`, where N is a whole number,
 0 or more. Judge it from the page: it prints nothing a reader would transcribe beyond what the limit
 allows (a stamp, a folio number). Show-through from the other side counts as blank only where it can't

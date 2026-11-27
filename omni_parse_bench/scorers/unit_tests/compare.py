@@ -31,6 +31,7 @@ class Verdict(NamedTuple):
 def score(pred: Mapping[str, Any], gold: Sequence[_tests.Test]) -> list[Verdict]:
     """One verdict per test of `gold`, the page's tests. `pred` maps an output type to its value, or to None
     when it errored. A test whose output is missing fails."""
+    blank = None    # whether the page's gold says it is blank (a page_near_empty test), read when needed
     built: dict[str, Any] = {}   # output type -> its view, or the Verdict its tests all get
     out = []
     for t in gold:
@@ -42,8 +43,10 @@ def score(pred: Mapping[str, Any], gold: Sequence[_tests.Test]) -> list[Verdict]
         if isinstance(v := built[t.output_type], Verdict):
             out.append(v._replace(id=t.id))
             continue
+        if blank is None:
+            blank = any(g.test_type == "page_near_empty" for g in gold)
         try:
-            passed, why = runners.TYPES[t.test_type][1](t.params, v)
+            passed, why = runners.run(t.test_type, t.params, v, blank)
         except Exception as e:
             e.add_note(f"while running test {t.id} ({t.test_type}) of page {t.page_id}")
             raise

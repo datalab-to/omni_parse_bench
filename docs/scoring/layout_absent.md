@@ -19,7 +19,8 @@ dataset holds no tests of this type yet.
 **The rule.** The test fails when any block of the output, anywhere and of any size, carries a label in `kinds`,
 and passes otherwise. Labels are compared as written: the rule of `layout_kind` that a `list` or `form` block
 passes a `text` test is not applied, so a `list` block fails a test that forbids `list` (case la-list). A block's
-text and box are never read, beyond naming the block in the why. An empty block list passes (case la-none).
+text and box are never read, beyond naming the block in the why. An empty block list is an output with nothing read: it fails (case la-no-blocks), unless the page is blank, when
+its gold holds a `page_near_empty` test, and an empty block list is the right answer (case la-none).
 
 **The set for blank pages** forbids `heading`, `table`, `caption`, `equation`, `footnote`, `list` and `code`,
 and allows `text`, `figure`, `page_furniture` and `form`. A blank page's folio or running head is page
@@ -38,7 +39,7 @@ What the test ignores:
 <!-- cases:layout-absent-ignored -->
 | | difference | gold | output | verdict | case |
 |---|---|---|---|---|---|
-| I | no blocks at all: a blank page read as blank | none of the blank-page set | no blocks | pass | `la-none` |
+| I | no blocks at all, on a blank page (its gold holds a `page_near_empty` test) | none of the blank-page set, on a page with a `page_near_empty` test | no blocks | pass | `la-none` |
 | I | a page number as page furniture | none of the blank-page set | `page_furniture [0.4, 0.02, 0.6, 0.05] '7'` | pass | `la-folio` |
 | I | a text block (`page_near_empty` reads text) | none of the blank-page set | `text [0.2, 0.4, 0.8, 0.5] 'a synthetic note'` | pass | `la-text` |
 | I | a figure (a stain, a stamp, a plate) | none of the blank-page set | `figure [0, 0, 1, 1] ''` | pass | `la-figure` |
@@ -60,6 +61,7 @@ What it penalizes:
 <!-- cases:layout-absent-penalized -->
 | | difference | gold | output | verdict | case |
 |---|---|---|---|---|---|
+| P | no blocks at all, on a page that is not blank: nothing was read | none of the blank-page set | no blocks | fail: `no output: a test of what the page does not hold passes only an output that writes something, unless the page is blank (a page_near_empty test)` | `la-no-blocks` |
 | P | a heading block | none of the blank-page set | `heading [0.2, 0.4, 0.8, 0.5] 'SAMPLE HEADING'` | fail: `a heading block at [0.20, 0.40, 0.80, 0.50]: 'SAMPLE HEADING'` | `la-heading` |
 | P | an empty table | none of the blank-page set | `table [0.2, 0.4, 0.8, 0.5] ''` | fail: `a table block at [0.20, 0.40, 0.80, 0.50]: ''` | `la-table` |
 | P | a list block (labels are compared as written: a list is not text here) | none of the blank-page set | `list [0.2, 0.4, 0.8, 0.5] '- item'` | fail | `la-list` |
@@ -76,7 +78,10 @@ What it penalizes:
   one label a system can be held to: leave out a page whose mark a reader could call a heading as well as page
   furniture (a large centered folio, a running title in capitals) or a caption as well as a figure (a stamp with
   a line of text). A faithful system that labels such a mark `heading` would fail.
-- **Pair it with `page_near_empty`** for the text on the page: this test allows text blocks.
+- **Pair it with `page_near_empty`** for the text on the page: this test allows text blocks. The loader requires
+  the pairing: a page with a `layout_absent` test and no `page_near_empty` test is refused, since an output with no
+  block at all fails `layout_absent` unless the page is blank. So on a loaded page the pairing makes the page blank by its gold,
+  and an empty block list passes there; the failing case (la-no-blocks) is the test run without that pairing.
 
 ## Blind spots
 
