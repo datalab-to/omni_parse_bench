@@ -125,6 +125,7 @@ TABLES = [
         folds("fold-fraction-alone", "a vulgar fraction alone", "¾", "3/4"),
         folds("fold-nfkc", "compatibility forms (ligatures, full width, sub- and superscripts)", "ﬁnal １２ m² H₂O ½ №", "final 12 m2 h2o 1/2 no"),
         folds("fold-invisible", "zero-width and soft hyphen characters vanish", "a\u200bb a\u00adb", "ab ab", show="`a` U+200B `b a` U+00AD `b`"),
+        folds("fold-root-tick", "a `√` with no operand is a tick (a checked box); with an operand it is a root", "√ Done （ √ ） √2 √x √(a+b) √ 2", "☒ done ( ☒ ) √2 √x √(a+b) √ 2"),
         folds("fold-checkbox", "checkboxes become ☒ or ☐ (`⊠`, a maths operator, stays as written)", "[x] Yes [ ] No ☑ ok ⊠ ◼ ◻", "☒ yes ☐ no ☒ ok ⊠ ☒ ☐"),
         folds("fold-footnote", "a bracketed footnote marker becomes a spaced number", "Smith[1] and [12] Jones", "smith 1 and 12 jones"),
         folds("fold-bullet", "a bullet starting a line goes; one inside a line stays", "• one • two", "one • two"),

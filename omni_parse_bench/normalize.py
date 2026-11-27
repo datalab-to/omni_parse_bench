@@ -22,6 +22,11 @@ _CHECKED = re.compile("[☑☒■◼▣✓✔✗✘]")
 # Note: ⊠ (U+22A0) is not here: it is the squared-times operator, and a form that draws a box with it is
 # not told from maths typed as text, so it stays as written (deferred; no public test reads it).
 _UNCHECKED = re.compile("[☐□◻❏▢⬜]")
+# Note: a √ (U+221A) drawn as a tick is a checked box, but the same glyph is a root: it is a root when an
+# operand starts right after it ("√2", "√x", "√(a+b)", "√{x}", "√\alpha", "√-1", "√√2"), or when spaces and
+# then a digit, "(", "{" or "\" do ("√ 2"); with nothing, or a word after a space ("√ Distributed ...",
+# "（ √ ）"), it is a tick. A block break is no space: "√" alone in a block is a tick.
+_TICK = re.compile(r"√(?![\w(\[{\\√.+\-\u2212]|[ \t]+[\d(\[{\\])")
 _BRACKET_CHECKED = re.compile(r"\[(?:[xX✓✗]|checked)\]", re.I)
 _BRACKET_UNCHECKED = re.compile(r"\[[ \u2029]?\]|\[unchecked\]", re.I)   # a block break reads as a space
 _FOOTNOTE = re.compile(r"\[\^\s*(\w{1,3})\s*\]|\[\s*(\d{1,3})\s*\]")
@@ -152,7 +157,8 @@ def fold(s: str) -> str:
                          bidi controls, soft hyphen, word joiner, ...) removed, except the visible
                          number signs that are Cf (Arabic, Syriac, Kaithi: `_VISIBLE_FORMAT`)
         checkboxes       every checked glyph -> ☒, every unchecked glyph -> ☐; so are [x], [checked],
-                         [ ] and [unchecked]
+                         [ ] and [unchecked]; so is a "√" with no operand after it ("√ Done", "（ √ ）":
+                         a tick), while "√2", "√x", "√(a+b)" and "√ 2" stay roots
         markers          a footnote marker [1] or [^1] -> " 1"; a bullet glyph starting a line -> a space
         leaders          runs of 3+ dots (ideographic full stops too), dashes or underscores -> a space;
                          white space may sit inside a run, but not a block break
@@ -268,7 +274,7 @@ def _in_word(c: str) -> bool:
 def boxes(s: str) -> str:
     """`s` with every checked box, a glyph or a bracket, as ☒ and every unchecked one as ☐."""
     s = _BRACKET_UNCHECKED.sub(views.UNCHECKED, _BRACKET_CHECKED.sub(views.CHECKED, s))
-    return _UNCHECKED.sub(views.UNCHECKED, _CHECKED.sub(views.CHECKED, s))
+    return _UNCHECKED.sub(views.UNCHECKED, _CHECKED.sub(views.CHECKED, _TICK.sub(views.CHECKED, s)))
 
 
 def _primes(s: str) -> str:

@@ -781,6 +781,7 @@ fold-fraction	1 1/2
 fold-fraction-alone	3/4
 fold-nfkc	final 12 m2 h2o 1/2 no
 fold-invisible	ab ab
+fold-root-tick	☒ done ( ☒ ) √2 √x √(a+b) √ 2
 fold-checkbox	☒ yes ☐ no ☒ ok ⊠ ☒ ☐
 fold-footnote	smith 1 and 12 jones
 fold-bullet	one • two
