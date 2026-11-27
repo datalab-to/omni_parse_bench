@@ -268,19 +268,18 @@ def test_the_numbers_of_a_cell_are_in_order_and_as_many(gold, page):
     ("CI (1.13, 3.99) here", "CI (1.13,3.99) here"), ("CI (1.13,3.99) here", "CI (1.13, 3.99) here"),
     ("on 12, 19 November 2012", "on 12,19 November 2012"),
     ("on 12,19 November 2012", "on 12, 19 November 2012"),
-    ("[-100, -60, 80,100]", "[-100, -60, 80, 100]"), ("(0.39, 1.56)", "(0.39,1.56)"),
+    ("[-100, -60, 80,10]", "[-100, -60, 80, 10]"), ("(0.39, 1.56)", "(0.39,1.56)"),
 ])
 def test_the_space_after_a_comma_between_numbers_is_not_a_number_change(gold, page):
     assert all(all_types(gold, page, 1)), (gold, page)
 
 
 @pytest.mark.parametrize("gold, page", [
-    ("CI (1.13, 3.99) here", "CI (1.13. 3.99) here"), ("CI (1.13, 3.99) here", "CI (1.13 3.99) here"),
     ("sum 1,240 here", "sum 1240 here"), ("sum 1, 240 here", "sum 1240 here"),
     ("rate 1.2 per", "rate 1, 2 per"),
 ])
 @pytest.mark.parametrize("md", [1, 3])
-def test_a_comma_that_is_dropped_or_replaced_is_still_a_number_change(gold, page, md):
+def test_a_thousands_or_decimal_comma_that_is_dropped_or_moved_is_a_number_change(gold, page, md):
     assert not any(all_types(gold, page, md)), (gold, page, md)
 
 
@@ -295,6 +294,14 @@ def test_a_leading_zero_the_page_adds_is_a_digit_the_guard_refuses():
     assert not any(all_types("0.150 (4.07)", ".150 (4.07)", 1))
 
 
-@pytest.mark.parametrize("gold, page", [("rate 7,2016 per", "rate 7;2016 per"), ("on 7,2016 and", "on 7 2016 and")])
+@pytest.mark.parametrize("gold, page", [("rate 7,2016 per", "rate 7;2016 per"),
+                                        ("on 7,2016 and", "on 7 2016 and")])
 def test_a_comma_before_four_digits_is_no_number_separator(gold, page):
     assert all(all_types(gold, page, 1)), (gold, page)
+
+
+@pytest.mark.parametrize("gold, page", [("6 people came", "In 2018, 6 people came"),
+                                        ("6. Enter the total", "2018, 6. Enter the total"),
+                                        ("12 cases", "n = 5, 12 cases")])
+def test_a_number_after_a_comma_and_a_space_is_its_own_number(gold, page):
+    assert all(all_types(gold, page, 0)[:2]), (gold, page)    # a cell is matched whole

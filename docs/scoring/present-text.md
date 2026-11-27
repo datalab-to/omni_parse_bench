@@ -147,12 +147,12 @@ exact instead ([Numbers are exact](#numbers-are-exact)).
 A gold that holds a digit must match with each of its numbers whole and unchanged, after fold, at any
 `max_diffs`: an edit may not change, add, drop, split or join a number, the squeezed retry never joins two, and
 the matched text may not end inside one. A number is digit runs joined by a single `.` between digits, or by a
-single `,` (and a space or none) before one to three digits: `1.2`, `1,240`, `12.05.2021`, `0.39, 1.56`, but not
-`7,2016`. A leading `.` (`.5`) after white space, a bracket or an operator is part of it. Its separators are part
-of it: `1,2` or `12` for `1.2`, `1240` for `1,240` and `5` for `.5` are other numbers; only a space after a
-comma between two numbers is free (`(1.13, 3.99)` is `(1.13,3.99)`). A leading zero the page adds (`0.150` for
-`.150`) is a digit the guard refuses. Every other character still costs one edit, and a gold without a digit is
-matched as above.
+single `,` before exactly three digits: `1.2`, `1,240`, `12.05.2021`. A comma before one, two or four digits is a
+list comma, not part of a number (`0.39, 1.56`, `1,2`, `7,2016`), and so is one followed by a space. A leading `.`
+(`.5`) after white space, a bracket or an operator is part of a number. Its separators are part of it: `1,2` or
+`12` for `1.2`, `1240` or `1, 240` for `1,240` and `5` for `.5` are other numbers; a space after a list comma is
+free (`(1.13, 3.99)` is `(1.13,3.99)`). A leading zero the page adds (`0.150` for `.150`) is a digit the guard
+refuses. Every other character still costs one edit, and a gold without a digit is matched as above.
 
 A sign belongs to its number: a `-` (or `−`, or an en dash, which fold to one), `+` or `±` directly before a
 number is a sign unless the character before it is a letter or a digit. So `-5`, `+1.55`, `x = -5`, `(-5)` and
@@ -376,8 +376,9 @@ Blind spots of `blank_after`, besides those of `present`:
   text-budget-real-word), and, on a long passage with a budget of 2 or more, a dropped `not` (case
   text-budget-negation) all pass. This is not a negation guard: keep the budget at 0 where one word flips the
   meaning.
-- **A space after a comma is free, so a list comma and a number comma look alike.** `1,240` passes for `1, 240`
-  and `12,5` for `12, 5` (a thousands or decimal comma against a list comma); `1240` for `1,240` still fails.
+- **A comma before one or two digits is a list comma.** A decimal comma (`1,2`) is two numbers to the reader, so
+  `1,2` passes for `1 2` or `1;2` with an edit to spend; `1.2` for `1,2` still fails. A thousands comma against a
+  list comma (`80,100` for `80, 100`) is a number change.
 - **Brackets round a number are not a sign.** An accounting negative `(1,234)` passes for `1,234` and the other
   way round when the budget has 2 edits to spend (case cell-accounting-brackets); keep the budget at 0 for it.
 - **Image descriptions pay.** A description that contains the string passes the test (case text-alt).

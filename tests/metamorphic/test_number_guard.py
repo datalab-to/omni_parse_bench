@@ -174,21 +174,22 @@ def test_a_lost_or_added_plus_or_plus_minus_sign_fails_at_any_budget():
 
 
 COMMA = [("CI (1.13, 3.99) here", "CI (1.13,3.99) here"), ("on 12, 19 November 2012", "on 12,19 November 2012"),
-         ("[-100, -60, 80,100]", "[-100, -60, 80, 100]")]
+         ("[-100, -60, 80,10]", "[-100, -60, 80, 10]")]
 
 
 @relation(HOLDS, domain="3 golds with a comma between numbers (a CI, a date list, a list) x 2 directions x budgets 1 to 3 "
-                        "x 3 test types: the space after the comma added or dropped; and `1,240` for `1240`, `1.2` for `1, 2`")
+                        "x 3 test types: the space after the comma added or dropped; and `1,240` for `1240` or `1, 240`, `1.2` for `1, 2` or `1,2`")
 def test_a_space_after_a_comma_between_numbers_is_free_but_a_dropped_comma_is_not():
     """A space added or dropped after a comma between two numbers (`(1.13, 3.99)` and `(1.13,3.99)`) keeps the
     verdict in `present`, `order` and `table_cell`, in both directions; a comma replaced or dropped (`1,240` for
-    `1240`, `1.2` for `1, 2`) fails at budgets 1 to 3. [M182]
+    `1240` or `1, 240`, `1.2` for `1,2`) fails at budgets 1 to 3. [M182]
     Why it matters for a score: the digits and the numbers are the same, only the white space moved; the number
     guard must not turn that into a number change."""
     for gold, page in COMMA:
         for md in (1, 2, 3):
             assert all(verdicts(gold, page, md)), (gold, page, md)
             assert all(verdicts(page, gold, md)), (page, gold, md)
-    for gold, page in [("sum 1,240 here", "sum 1240 here"), ("rate 1.2 per", "rate 1, 2 per")]:
+    for gold, page in [("sum 1,240 here", "sum 1240 here"), ("sum 1,240 here", "sum 1, 240 here"),
+                      ("rate 1.2 per", "rate 1, 2 per"), ("rate 1.2 per", "rate 1,2 per"), ("rate 1,2 per", "rate 1.2 per")]:
         for md in (1, 2, 3):
             assert not any(verdicts(gold, page, md)), (gold, page, md)
