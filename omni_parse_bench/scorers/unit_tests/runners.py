@@ -20,6 +20,7 @@ import fuzzysearch
 from fuzzysearch.common import group_matches
 from fuzzysearch.levenshtein import find_near_matches_levenshtein
 from rapidfuzz import fuzz
+from rapidfuzz.distance import OSA
 
 from omni_parse_bench import markdown, marks, normalize, tables, views
 from omni_parse_bench.scorers.unit_tests import hyphenation
@@ -561,6 +562,154 @@ def page_near_empty(t: PageNearEmpty, v: views.Html) -> Mark:
     return _mark(n <= t.max_chars, f"{n} non-space characters (limit {t.max_chars})")
 
 
+# --------------------------------------------------------------------------- closed regions
+
+
+class Verbatim(NamedTuple):
+    start: str | None       # the text the region follows, matched exactly; None: the page start
+    end: str | None         # the text that ends it, matched exactly; None: the page end
+    content: str | None     # everything the page prints between them; None: nothing
+    max_diffs: int          # edits allowed over the whole content; 0 when there is none
+
+
+# Note: where fold joins a hyphen a line broke after ("self-" then "aware"), a region writes this mark
+# instead, so that the hyphen can be read either way: kept ("self-aware") or joined ("selfaware"), never as a
+# space. A page's own NUL is read as U+FFFD, as an HTML parser reads it, and the loader refuses one in a
+# verbatim test's text, so the mark is only ever a joined hyphen.
+_WRAP = "\x00"
+# A hyphen after a letter in a folded anchor: where a line breaks after it, fold joins the word
+# ("Self-<br>aware" reads "selfaware"), so an exact anchor holding one is not found on a faithful page. The
+# loader refuses it.
+_WRAPS = re.compile(r"[^\W\d_]-")
+# Note: what a region does not compare: a run of underscores that touches no letter or digit (a line
+# printed to write on, which fold keeps when shorter than 3 and markdown may read as emphasis: "__/__/____"
+# -> "//"), and a bullet glyph before a space, a list's mark, which fold drops only at the start of a line.
+# An underscore that touches a letter or a digit ("foo_bar", "_token", "__init__") is text.
+_UNCOMPARED = re.compile(r"(?<!\w)_+(?!\w)|[•‣◦▪▶∙●](?=\s|$)")
+
+
+def verbatim(t: Verbatim, v: views.Html) -> Mark:
+    """The text between `start` and `end` is `content` as a whole, within `max_diffs` edits, for every copy
+    of `start` on the page: a closed world, so anything written there that the page does not print fails.
+    See docs/scoring/verbatim.md.
+
+    The page is the text view without image descriptions, nothing for an element that holds nothing (as
+    `page_near_empty`), folded as a region reads it (`_verbatim_fold`), in the html's order: a table is read
+    cell by cell, row by row, and a region runs on across it. An anchor is a copy of its text at a word edge,
+    under fold (`_anchors`). Each copy of `start` opens a region that runs to the first copy of `end` after it
+    (or to the page end); without a `start`, one region opens at the page start."""
+    page = _verbatim_fold(views.text(_NOTHING.sub("", v.html), alt=False).replace(_WRAP, "\ufffd"))
+    if t.start is None:
+        opens = [0]
+    elif not (opens := [j for _, j in _anchors(t.start, page, t.end)]):
+        return False, f"start {t.start[:60]!r} not found whole, at a word edge"
+    ends = None if t.end is None else [i for i, _ in _anchors(t.end, page)]
+    if ends == []:
+        return False, f"end {t.end[:60]!r} not found whole, at a word edge"
+    reasons = []
+    for k, s in enumerate(opens):
+        e = len(page) if ends is None else next((i for i in ends if i >= s), None)
+        why = (f"no end {t.end[:60]!r} after start {t.start[:60]!r}" if e is None
+               else _closed(page[s:e], t))
+        if why:
+            reasons.append(f"copy {k + 1} of {len(opens)}: {why}" if len(opens) > 1 else why)
+    if not reasons:
+        return True, ""
+    return False, reasons[0] + (f" (and {len(reasons) - 1} more)" if len(reasons) > 1 else "")
+
+
+def verbatim_anchor_copies(page_text: str, anchor: str) -> int:
+    """How many copies of `anchor` the scorer finds in `page_text` (a page's full text, as a gold author holds
+    it): a `verbatim` anchor must have exactly one. See docs/scoring/verbatim.md, Building a verbatim test."""
+    return len(_anchors(anchor, _verbatim_fold(page_text)))
+
+
+def _verbatim_fold(s: str) -> str:
+    """`normalize.fold`, with two things kept that it would lose: `_WRAP` where it joins a hyphen a line broke
+    after, and a run of underscores that touches a letter or a digit on either side ("foo___bar", "token____",
+    "____init"), which it would fold as a leader."""
+    return normalize._cased(s, line_mark=_WRAP, keep_word_underscores=True).lower()
+
+
+def _anchors(text: str, page: str, inside: str | None = None) -> list[tuple[int, int]]:
+    """The copies of `text` in the region-folded `page` at a word edge (not inside a longer word, not cut out
+    of a longer number), as spans of `page`. They are found with every `_WRAP` removed from both, so a hyphen
+    a line broke after is joined as fold joins it: one equivalence, with no retry without spaces. A copy
+    inside a copy of the longer text `inside` (the start `Table 3` inside the end `Table 3 (continued)`) is
+    that text's, not a copy."""
+    want = _verbatim_fold(text).replace(_WRAP, "")
+    kept = [k for k, c in enumerate(page) if c != _WRAP]
+    flat = page.replace(_WRAP, "")
+    spans = [(kept[i], kept[j - 1] + 1) for i, j in _copies(want, flat, False)]
+    if inside and len(_verbatim_fold(inside).replace(_WRAP, "")) > len(want):
+        outer = _anchors(inside, page)
+        spans = [(i, j) for i, j in spans if not any(a <= i and j <= b for a, b in outer)]
+    return spans
+
+
+def _closed(got: str, t: Verbatim) -> str:
+    """Why the folded region `got` is not the test's content within its edits; "" when it is. Both are read
+    without the underscores and bullets a region does not compare (`_UNCOMPARED`), their white space one
+    space, and compared as whole strings: an edit is a character substituted, inserted or deleted, or two
+    adjacent ones swapped, and a `_WRAP` is free to drop or to read as a hyphen. Their numbers, as every test
+    reads them (`_numbers_of`, `_same_numbers`), must be the same, in order, at any budget."""
+    a, b = (re.sub(r" +", " ", _UNCOMPARED.sub("", x)).strip()
+            for x in (_verbatim_fold(t.content or ""), got))
+    want, have = a.replace(_WRAP, ""), b.replace(_WRAP, "")
+    numbers = _same_numbers(want, have) if _numbers_of(want) else not _numbers_of(have)
+    edits = _verbatim_edits(a, b, t.max_diffs)
+    if numbers and edits <= t.max_diffs:
+        return ""
+    where = (f"between {t.start[:40]!r} and {t.end[:40]!r}" if t.start is not None and t.end is not None
+             else f"after {t.start[:40]!r} to the page end" if t.start is not None
+             else f"from the page start to {t.end[:40]!r}" if t.end is not None else "the page")
+    shown, gold = _difference(b.replace(_WRAP, "-"), a.replace(_WRAP, "-"))
+    how = (f"{edits} edit{'s' * (edits != 1)}, max_diffs {t.max_diffs}" if edits > t.max_diffs
+           else "a number differs")
+    return f"{where} holds {shown} where the gold has {gold} ({how})"
+
+
+def _verbatim_edits(a: str, b: str, k: int) -> int:
+    """The edits between `a` and `b` (as `_closed` counts them), or more than `k` when there are more."""
+    if _WRAP not in a and _WRAP not in b:
+        return OSA.distance(a, b)
+    # Note: a dynamic program over the band of diagonals any alignment within k paid edits can reach; a free
+    # drop of a `_WRAP` moves an alignment one diagonal, so the band grows by the marks of each side.
+    lo, hi = -(k + a.count(_WRAP)), k + b.count(_WRAP)    # j - i
+    big = k + 1
+
+    def same(x: str, y: str) -> bool:
+        return x == y or {x, y} == {_WRAP, "-"}
+
+    prev2: dict[int, int] = {}
+    prev = {0: 0}
+    for j in range(1, min(len(b), hi) + 1):
+        prev[j] = min(big, prev[j - 1] + (b[j - 1] != _WRAP))
+    for i in range(1, len(a) + 1):
+        cur: dict[int, int] = {}
+        for j in range(max(0, i + lo), min(len(b), i + hi) + 1):
+            best = prev.get(j, big) + (a[i - 1] != _WRAP)
+            if j:
+                best = min(best, cur.get(j - 1, big) + (b[j - 1] != _WRAP),
+                           prev.get(j - 1, big) + (not same(a[i - 1], b[j - 1])))
+                if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                    best = min(best, prev2.get(j - 2, big) + 1)
+            cur[j] = min(best, big)
+        prev2, prev = prev, cur
+    return prev.get(len(b), big)
+
+
+def _difference(got: str, want: str, n: int = 60) -> tuple[str, str]:
+    """The two texts as a failure shows them: whole when short, else from a little before where they first
+    differ; "nothing" for an empty one."""
+    i = next((k for k, (x, y) in enumerate(zip(got, want, strict=False)) if x != y), min(len(got), len(want)))
+    a = max(0, i - 20) if max(len(got), len(want)) > n else 0
+    def show(s: str) -> str:
+        part = s[a:a + n]
+        return "nothing" if not s else repr(("…" if a else "") + part + ("…" if a + n < len(s) else ""))
+    return show(got), show(want)
+
+
 # --------------------------------------------------------------------------- tables
 
 
@@ -739,6 +888,7 @@ TYPES: dict[str, tuple[type, Runner]] = {
     "order": (Order, order),
     "repeat": (Repeat, repeat),
     "page_near_empty": (PageNearEmpty, page_near_empty),
+    "verbatim": (Verbatim, verbatim),
     "table_cell": (TableCell, table_cell),
     "layout_kind": (LayoutKind, layout_kind),
     "format": (Format, format_mark),
@@ -1140,6 +1290,16 @@ def _hyphened(s: str) -> set[str]:
 _BEFORE_POINT = frozenset(" \t\n\xa0([{<>=:;|/±+-")
 
 
+def _exponent_of(s: str, nums: list[list[int]], pos: int, end: int) -> bool:
+    """Whether the digits `s[pos:end]` are the exponent of the number `nums[-1]`: an `e` or `E`, then an
+    optional sign, joins them to it (`1e-3`, `2.5E+4`, `6.02e23`). A letter glued before or after (`x1e3`,
+    `1e3m`) does not split it, as a letter beside a number never does."""
+    if not nums:
+        return False
+    mark = pos - 1 - (s[pos - 1:pos] in ("-", "+"))
+    return nums[-1][1] == mark and s[mark:mark + 1] in ("e", "E")
+
+
 def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
     """`s` as spans (start, end, is_number) that tile it. A number is digit runs (`str.isdigit`) joined by a
     single `.` between digits, or by a single `,` before exactly three digits (`1.2`, `1,240`, `12.05.2021`;
@@ -1150,14 +1310,15 @@ def _number_pieces(s: str, spaced: bool = False) -> list[tuple[int, int, bool]]:
     sign, so `A-12`, `2026-11-26` and `1-2` hold a hyphen (as `_number_pattern` reads one), and `1e-3` has
     the exponent's sign. A `-` before a number after white space, as in `3 -5`, is a sign; `3 - 5` has none.
     A `- `, `+ ` or `± ` with a space is a sign too when `spaced` and no value comes before it (a table cell
-    `\u2212 0.756`, `to \u2212 23.4`; a page that starts a list item `- 12` is not a negative number)."""
+    `\u2212 0.756`, `to \u2212 23.4`; a page that starts a list item `- 12` is not a negative number). A
+    number in scientific notation is one number, its exponent included (`_exponent_of`)."""
     nums: list[list[int]] = []
     pos = 0
     for digits, run in itertools.groupby(s, str.isdigit):
         end = pos + len(list(run))
         if digits:
             sep = s[pos - 1] if nums and nums[-1][1] == pos - 1 else ""
-            if sep == "." or sep == "," and end - pos == 3:
+            if sep == "." or sep == "," and end - pos == 3 or _exponent_of(s, nums, pos, end):
                 nums[-1][1] = end
             else:
                 nums.append([pos, end])

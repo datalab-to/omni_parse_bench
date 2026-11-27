@@ -94,6 +94,7 @@ What it penalizes:
 | P | a middle-dot separator after a CJK character | `太原·2020` | `太原.2020` | fail | `text-middot-cjk` |
 | P | a dropped thousands separator | `1,240` | `1240` | fail | `text-thousands` |
 | P | decimal comma for a point | `1.5` | `1,5` | fail | `text-decimal-comma` |
+| P | a number in scientific notation split, within the budget | `Rate 1e3 per s` (md 2) | `Rate 1 3 per s` | fail | `text-sci-split` |
 | P | a dropped currency sign | `$5.00` | `5.00` | fail | `text-currency-lost` |
 | P | an extra word inside | `Hello World` | `Hello big World` | fail | `text-extra-word` |
 | P | words swapped | `Hello World` | `World Hello` | fail | `text-word-order` |
@@ -151,7 +152,9 @@ single `,` before exactly three digits: `1.2`, `1,240`, `12.05.2021`. A comma be
 list comma, not part of a number (`0.39, 1.56`, `1,2`, `7,2016`), and so is one followed by a space. A leading `.`
 (`.5`) after white space, a bracket or an operator is part of a number. Its separators are part of it: `1,2` or
 `12` for `1.2`, `1240` or `1, 240` for `1,240` and `5` for `.5` are other numbers; a space after a list comma is
-free (`(1.13, 3.99)` is `(1.13,3.99)`). A leading zero the page adds (`0.150` for `.150`) is a digit the guard
+free (`(1.13, 3.99)` is `(1.13,3.99)`). A number in scientific notation is one number, its exponent
+included: a mantissa, then `e` or `E`, an optional sign and digits (`1e-3`, `2.5E+4`, `6.02e23`), a letter glued
+to it aside (`2.45E-002x` holds `2.45E-002`), so `1e3` written `1 3` is another number (case text-sci-split). A leading zero the page adds (`0.150` for `.150`) is a digit the guard
 refuses. Every other character still costs one edit, and a gold without a digit is matched as above.
 
 A sign belongs to its number: a `-` (or `−`, or an en dash, which fold to one), `+` or `±` directly before a
@@ -165,8 +168,8 @@ spaced sign on the page (`− 0.756` for the gold's `−0.756`) in front of a nu
 the sign dropped (`12.20 13.20`) fails.
 
 A `-` after a Latin letter or a digit is a hyphen: `A-12`, `2026-11-26`, `1-2` and `COVID-19` keep costing one
-edit to drop, as do a list dash (`- 5` in the middle of a text) and a space-dash-space (`3 - 2`). This differs
-on purpose from the number reader of `region`, which reads a sign after a letter too (`A-12`): a page often
+edit to drop, as do a list dash (`- 5` in the middle of a text) and a space-dash-space (`3 - 2`), and
+`verbatim` reads it the same way (`COVID-19` against `COVID 19` costs one edit there too): a page often
 writes such an id as `COVID 19` or `A12`, and a budget exists for that kind of noise. Spacing a unit exponent either way does not change
 what a number is: a gold's `kg-1` is matched by the page's spaced `kg -1`, and a gold's `dm -3` by `dm-3` (after a
 letter only). A `+` or `±` between two values (`6% ± 2%`, `1 +2`) is an operator, not a sign. The cost of this narrow rule: a minus written right after a Latin letter (`x-5`) reads as a hyphen, so
@@ -371,7 +374,7 @@ Blind spots of `blank_after`, besides those of `present`:
 
 - **No word edges.** `Total` is found in `Totally` (case text-longer-word). Use `repeat` for whole words.
 - **Letters beside a number are free.** `4.8` is found in `a4.8` (case text-letter-beside). Use a number arg
-  ([present-number.md](present-number.md)) when sign and percent matter.
+  ([present-number.md](present-number.md)) when the percent sign matters.
 - **A budget still pays for anything that is not a digit or a sign.** A unit that reads as another (`5%` for
   `5‰`, case text-budget-unit), a letter change that makes another real word (`from` for `form`, case
   text-budget-real-word), and, on a long passage with a budget of 2 or more, a dropped `not` (case

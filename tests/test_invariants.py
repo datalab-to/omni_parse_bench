@@ -1,8 +1,8 @@
 """What must hold for every test, whatever its content: on tests/fixtures/invariants/, and on the
 published dataset when OPB_DATASET is set to its root.
 
-    empty      an empty output (html "", blocks []) passes no test except a page_near_empty test, which it
-               passes by definition;
+    empty      an empty output (html "", blocks []) passes no test except a page_near_empty test, or a region
+               test with no anchors and no content, which it passes by definition;
     answer     a test's own answer written as the output (`answer`) passes it; and
     determined scoring a page twice, caches cleared, gives the same verdicts.
 
@@ -51,6 +51,8 @@ def answer(t: gold.Test) -> dict[str, Any]:
         case runners.Repeat(content=runners.Text(text=x) | runners.Number(number=x)):
             html = "".join(f"<p>{e(x)}</p>" for _ in range(p.expected_count))
         case runners.PageNearEmpty(): html = f"<p>{'x' * p.max_chars}</p>"     # as much as it allows
+        case runners.Verbatim():
+            html = "".join(f"<p>{e(x)}</p>" for x in (p.start, p.content, p.end) if x is not None)
         case runners.TableCell(): html = table(p)
         case runners.Format():
             span = e(p.span)
@@ -109,7 +111,9 @@ def failures(tests: Sequence[gold.Test], outputs, want: str) -> list[str]:
 def test_an_empty_output_passes_no_test(tests):
     # A page_near_empty test asks for a page with at most max_chars characters, so an empty output passes
     # it by definition; the next test checks that it fails one character over.
-    asked = [t for t in tests if not isinstance(t.params, runners.PageNearEmpty)]
+    # A verbatim test with no anchors and no content asks for an empty page too.
+    asked = [t for t in tests if not isinstance(t.params, runners.PageNearEmpty)
+             and t.params != runners.Verbatim(None, None, None, 0)]
     bad = failures(asked, lambda t: EMPTY, "fail")
     assert not bad, f"{len(bad)} tests pass on an empty output, e.g. {bad[:5]}"
 

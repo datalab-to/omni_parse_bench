@@ -192,8 +192,10 @@ def fold_cased(s: str) -> str:
 
 
 def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool = False,
-           drop_footnotes: bool = False) -> str:
-    """The fold before lowercasing, for inspecting a continuation's original case."""
+           drop_footnotes: bool = False, line_mark: str = "", keep_word_underscores: bool = False) -> str:
+    """The fold before lowercasing, for inspecting a continuation's original case. `line_mark` is written
+    where a line-end hyphen is joined (a `verbatim` reads it either way); `keep_word_underscores` keeps a run
+    of underscores between two letters or digits (`foo___bar`) rather than folding it as a leader."""
     # Note: composed first, so a letter written as a base and a combining accent ("e" + U+0301, as a macOS
     # text layer gives it) is one letter to the hyphen rule below, as "é" is.
     # Note: the block breaks `views.text` leaves stay until the leaders are folded, so a leader run never
@@ -202,7 +204,8 @@ def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool
     # Note: only before a lowercase letter, or between two words in capitals, so a line ending "-" before a
     # capital after a word in lower or mixed case ("Anglo- Saxon"), or before a digit, stays.
     if not preserve_line_hyphens:
-        s = _LINE_HYPHEN.sub(lambda m: m[1] if _joins(m.string, m.start(), m.start(1)) else m[0], s)
+        s = _LINE_HYPHEN.sub(
+            lambda m: line_mark + m[1] if _joins(m.string, m.start(), m.start(1)) else m[0], s)
     s = _SUPERSCRIPT_DIGITS.sub(r" \1", s)
     # Note: NFKC writes "½" as "1⁄2", so "1½" would read "11/2"; a space keeps the whole number apart, as
     # "1 1/2" is written.
@@ -213,11 +216,25 @@ def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool
     # matches a text layer's "Probiotic1".
     s = _FOOTNOTE.sub(functools.partial(_footnote, drop=drop_footnotes), s)
     s = _BULLET.sub(r"\1 ", s)
-    s = _LEADERS.sub(" ", s).replace(views.BREAK, " ")
+    s = _LEADERS.sub(_leader_in_word if keep_word_underscores else " ", s).replace(views.BREAK, " ")
     s = typography(s, preserve_dashes=preserve_dashes)
     s = s.replace("…", "...").translate(_CJK_PUNCT)
     s = _DECIMAL_MIDDOT.sub(".", s).replace("♢", "◊").replace("≦", "≤")
     return _WHITESPACE.sub(" ", s).strip()
+
+
+def _leader_in_word(m: re.Match) -> str:
+    """A leader run folds to a space, unless it is underscores alone touching a letter or a digit on either
+    side: part of an identifier ("foo___bar", "token____", "____init"), not a line to write on."""
+    # Note: a leader run takes the white space after it; the run is the underscores before it, and the white
+    # space stays one space.
+    run = m[0].rstrip()
+    s, i, j = m.string, m.start(), m.start() + len(run)
+    touches = (i and _LETTER_OR_DIGIT.match(s, i - 1)) or (j < len(s) and _LETTER_OR_DIGIT.match(s, j))
+    return run + " " * (j < m.end()) if touches and set(run) == {"_"} else " "
+
+
+_LETTER_OR_DIGIT = re.compile(r"[^\W_]")
 
 
 def _joins(s: str, i: int, j: int) -> bool:

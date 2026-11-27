@@ -27,7 +27,7 @@ def test_a_derivation_is_one_of_the_closed_list():
 
 def with_args(args: dict, test_type: str = "present", settings: dict | None = None, **fields) -> dict:
     output = {"present": "html", "order": "html", "repeat": "html", "page_near_empty": "html",
-              "table_cell": "html", "layout_kind": "blocks", "format": "html"}[test_type]
+              "verbatim": "html", "table_cell": "html", "layout_kind": "blocks", "format": "html"}[test_type]
     return {"id": "t", "test_type": test_type, "output_type": output, "derivation": "authored", "tags": [],
             "args": args, "settings": settings or {}} | fields
 

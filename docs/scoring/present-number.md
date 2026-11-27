@@ -104,5 +104,6 @@ What it penalizes:
 - **Percent and parentheses are one-way.** An added percent sign is free; a lost one fails. Parentheses never make
   a number negative (cases num-percent-extra, num-percent-lost, num-parens-negative).
 
-A text arg that holds a number is a different test: it has a digit edge, but no sign or percent rules
-([present-text.md](present-text.md#the-digit-edge)).
+A text arg that holds a number is a different test: it has a digit edge, and its numbers are exact at any
+budget, signs included, but a budget still pays for a unit such as `%` for `‰`
+([present-text.md](present-text.md#numbers-are-exact)).
