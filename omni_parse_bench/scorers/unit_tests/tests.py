@@ -29,13 +29,15 @@ ARG_ROLES = {
     "repeat": ("content",),
     "page_near_empty": (),
     "verbatim": ("start", "end", "content"),
+    "no_excess_repeats": ("content",),
     "table_cell": ("cell", "headings", "section", "row_groups", *RELATIONS),
     "layout_kind": ("content",),
     "format": ("before", "span", "after"),
 }
 LISTS = frozenset({"headings", "row_groups", "stops"})   # roles that take a list of args
 REQUIRED = {"present": ("content",), "order": ("before", "after"), "repeat": ("content",),
-            "page_near_empty": (), "verbatim": (), "table_cell": ("cell",), "layout_kind": ("content",),
+            "page_near_empty": (), "verbatim": (), "no_excess_repeats": ("content",), "table_cell": ("cell",),
+            "layout_kind": ("content",),
             "format": ("span",)}
 assert set(ARG_ROLES) == set(REQUIRED) == set(runners.TYPES) == set(vocab.READS) == set(vocab.FAMILIES)
 
@@ -232,6 +234,19 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
                 return runners.PageNearEmpty(settings["max_chars"])
             case "verbatim":
                 return _verbatim(where, args, settings)
+            case "no_excess_repeats":
+                _no(where, settings)
+                c = args["content"]
+                if not (isinstance(c, dict) and set(c) == {"text", "max_diffs"} and c["max_diffs"] == 0):
+                    raise ValueError(f"{where}: no_excess_repeats's content is the page's full text, a text "
+                                     f"arg {{text, max_diffs: 0}} (no place, no exact_case; its words are "
+                                     f"counted, not matched), not {c!r:.80}")
+                if not runners._words(c["text"]):
+                    raise ValueError(f"{where}: no_excess_repeats's content has no word to count")
+                if m := runners.UNSEGMENTED.search(c["text"]):
+                    raise ValueError(f"{where}: no_excess_repeats's content holds {m[0]!r}, of a script "
+                                     "written without spaces between words, which the test cannot count")
+                return runners.NoExcessRepeats(c["text"])
             case "layout_kind":
                 if set(settings) != {"kind"}:
                     raise ValueError(f"{where}: layout_kind's settings are exactly {{kind}}")

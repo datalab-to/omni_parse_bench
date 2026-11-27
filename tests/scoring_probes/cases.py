@@ -156,6 +156,12 @@ def verbatim(label, mark, rule, start, end, content, out, md=0, from_markdown=Fa
                    lambda: _v(R.verbatim(R.Verbatim(start, end, content, md), views.html(page))), **kw)
 
 
+def excess(label, mark, rule, gold, out, shown_gold=None, **kw) -> Case:
+    """`no_excess_repeats`: `gold` is the page's full text."""
+    return verdict(label, mark, rule, shown_gold or code(gold), out,
+                   lambda: _v(R.no_excess_repeats(R.NoExcessRepeats(gold), views.html(html(out)))), **kw)
+
+
 def cell(label, mark, rule, gold, out, md=0, headings=(), section=None, row_groups=(), **rel) -> Case:
     """`table_cell`; `out` is html, or a fixture name (`cell_fixture`) with optional replacements."""
     kw = {k: rel.pop(k) for k in ("show", "why") if k in rel}

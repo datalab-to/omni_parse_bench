@@ -22,6 +22,7 @@ READS = {
     "repeat": "html",
     "page_near_empty": "html",
     "verbatim": "html",
+    "no_excess_repeats": "html",
     "table_cell": "html",
     "layout_kind": "blocks",
     "format": "html",
@@ -31,7 +32,7 @@ READS = {
 # family's flat over its tests), so how many tests a family has never sets its weight (docs/design.md).
 FAMILIES = {
     "present": "text", "order": "text", "repeat": "text", "page_near_empty": "text", "verbatim": "text",
-    "table_cell": "tables",
+    "no_excess_repeats": "text", "table_cell": "tables",
     "layout_kind": "layout",
     "format": "format",
 }

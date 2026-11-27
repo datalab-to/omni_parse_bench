@@ -53,6 +53,7 @@ def answer(t: gold.Test) -> dict[str, Any]:
         case runners.PageNearEmpty(): html = f"<p>{'x' * p.max_chars}</p>"     # as much as it allows
         case runners.Verbatim():
             html = "".join(f"<p>{e(x)}</p>" for x in (p.start, p.content, p.end) if x is not None)
+        case runners.NoExcessRepeats(): html = f"<p>{e(p.content)}</p>"
         case runners.TableCell(): html = table(p)
         case runners.Format():
             span = e(p.span)
