@@ -29,7 +29,7 @@ from typing import NamedTuple
 import regex
 
 from . import reader, switches, work
-from .reader import BREAK, CONTENT, MARK, QTY, SPACE, WORD, WRAP, Token
+from .reader import BREAK, CONTENT, MARK, QTY, SPACE, SYM, WORD, WRAP, Token  # noqa: F401
 
 ID, TEXT, CASED, WORDS = "Id", "Text", "Cased", "Words"
 POINTS = (ID, TEXT, CASED, WORDS)
@@ -120,11 +120,12 @@ def cells(
             body = t.canon if t.cls == QTY else t.text
             parts = _CLUSTER.findall(body)
             edges = "word_edges" in rules
+            kind = "m" if t.cls == MARK else "c"  # a mark equals only a mark, never a letter or a quantity
             for j, c in enumerate(parts):
                 if r >= RANK[WORDS] and word:
                     c = "".join(_lower(x) for x in c) if len(c) > 1 else _lower(c)
                 out.append(
-                    Cell(c, "c", i, j == 0 or not edges, j == len(parts) - 1 or not edges, False, group)
+                    Cell(c, kind, i, j == 0 or not edges, j == len(parts) - 1 or not edges, False, group)
                 )
     return out
 
@@ -147,6 +148,8 @@ class Window(NamedTuple):
 
 
 def _sub(g: Cell, o: Cell) -> int:
+    if g.kind == "m" or o.kind == "m":
+        return 0 if g.kind == o.kind and g.sym == o.sym else INF
     if g.kind == "q" or o.kind == "q":
         return 0 if g.kind == o.kind and g.sym == o.sym else INF
     return 0 if g.sym == o.sym else 1

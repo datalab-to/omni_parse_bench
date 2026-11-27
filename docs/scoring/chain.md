@@ -52,5 +52,9 @@ twice is the fold applied once; a swap of gold and output gives the same whole-s
 
 ## Scope of this step, and one choice
 
-- Only a `present` text test runs on the chain in this change (the `chain` switch): its content, `absent` included. `order`, `repeat`, number, `verbatim`, `table_cell` and `format` keep their own readings until later changes move them onto it.
+- The chain change itself moved only a `present` text test onto the chain (the `chain` switch): its content, `absent` included. The claim contract change (`schema.md`) adds `order` (also `chain`) and the `verbatim` region (`region`). `repeat`, number, blank fields, `table_cell` and `format` keep their own readings until later changes move them onto it.
 - A gold that is nothing but footnote marks (`[25]`) keeps them at Cased, and so does the output it is read against: with the marks free the gold would be empty and unmatchable. A gold with any other content treats marks as free from Cased on.
+
+## Underscores
+
+A run of three or more underscores (and the other leaders: dots, dashes, equals signs, asterisks) folds to a space at Text, except underscores alone that touch a letter or a digit on either side (`token____`, `foo___bar`, `____init`): part of an identifier, which Text keeps.

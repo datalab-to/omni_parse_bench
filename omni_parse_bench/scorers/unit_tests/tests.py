@@ -14,7 +14,7 @@ from typing import Any, NamedTuple
 
 from omni_parse_bench import equations, normalize, views, vocab
 
-from . import runners
+from . import runners, schema
 
 FIELDS = ("id", "test_type", "output_type", "derivation", "tags", "args", "settings")
 KINDS = {"text": ("text", "max_diffs"), "number": ("number",), "latex": ("latex",)}
@@ -23,24 +23,11 @@ SIDES = ("up", "down", "left", "right")    # the roles that also take {"empty": 
 FLAGS = ("empty", "end")
 RELATIONS = ("up", "down", "left", "right", "top_heading", "left_heading", "right_heading")
 # The roles of each test type's args, the content it compares. Not `vocab.ROLES`, which are tags.
-ARG_ROLES = {
-    "present": ("content", "printed", "stops"),
-    "order": ("before", "after"),
-    "repeat": ("content",),
-    "page_near_empty": (),
-    "verbatim": ("start", "end", "content"),
-    "no_excess_repeats": ("content",),
-    "table_cell": ("cell", "headings", "section", "row_groups", *RELATIONS),
-    "layout_kind": ("content",),
-    "layout_absent": (),
-    "format": ("before", "span", "after"),
-}
+ARG_ROLES = schema.roles()   # the table of the contract (schema.py)
 LISTS = frozenset({"headings", "row_groups", "stops"})   # roles that take a list of args
-REQUIRED = {"present": ("content",), "order": ("before", "after"), "repeat": ("content",),
-            "page_near_empty": (), "verbatim": (), "no_excess_repeats": ("content",),
-            "table_cell": ("cell",), "layout_kind": ("content",), "layout_absent": (),
-            "format": ("span",)}
+REQUIRED = schema.required()
 assert set(ARG_ROLES) == set(REQUIRED) == set(runners.TYPES) == set(vocab.READS) == set(vocab.FAMILIES)
+assert all(vocab.READS[r.type] == r.reads and vocab.FAMILIES[r.type] == r.family for r in schema.ROWS)
 
 
 _LANGUAGE = re.compile(r"[a-z]{3}")    # ISO 639-3
@@ -216,7 +203,8 @@ def _params(where: str, test_type: str, args: Any, settings: Any) -> Any:
                                        tuple(_arg(where, "stops", a) for a in args.get("stops", [])))
             case "order":
                 _no(where, settings)
-                return runners.Order(text("before"), text("after"), diffs(["before", "after"]))
+                b, a = (args[r]["max_diffs"] for r in ("before", "after"))
+                return runners.Order(text("before"), text("after"), b, None if a == b else a)
             case "repeat":
                 content = args["content"]
                 if _kind(where, "content", content) == "latex":
@@ -525,3 +513,28 @@ def _frozen(v: Any) -> Any:
     if isinstance(v, list):
         return tuple(_frozen(x) for x in v)
     return v
+
+
+def order_lint(tests: Iterable[Test], reference: str | None = None) -> list[tuple[str, str]]:
+    """The `order` tests that may pass on unrelated copies, as (test id, why): `before` and `after` the same
+    text or one inside the other, or either found more than once in `reference`, the transcription the test
+    was written from, when one is given. A flagged test is rewritten to unique spans through the gold process;
+    the scorer still reads it as exists-over-copies, and says when a pass used a copy other than the first."""
+    from omni_parse_bench import chain
+
+    found: list[tuple[str, str]] = []
+    for t in tests:
+        if t.test_type != "order":
+            continue
+        a, b = (normalize.fold(t.args[r]["text"]) for r in ("before", "after"))
+        if a == b:
+            found.append((t.id, "before and after are the same text"))
+        elif a in b or b in a:
+            found.append((t.id, "before and after: one is inside the other"))
+        if reference is not None:
+            ref = chain.tokens_of_gold(reference)
+            for role in ("before", "after"):
+                n = len(chain.windows(chain.tokens_of_gold(t.args[role]["text"]), ref, chain.WORDS, 0))
+                if n > 1:
+                    found.append((t.id, f"{role} is found {n} times in the reference text"))
+    return found

@@ -230,3 +230,15 @@ The why reads `<where> holds <output> where the gold has <content> (<n> edit(s),
 start to <end>` or `the page`, and `copy <i> of <n>: ` comes first when `start` has several copies. A missing
 anchor reads `start <text> not found whole, at a word edge`, `end <text> not found whole, at a word edge` or
 `no end <end> after start <start>`.
+
+## On the chain (switch `region`, off by default)
+
+With `region` on, the region is read on the normalizer chain (`chain.md`) instead of by the folded-string search above:
+
+- an anchor is a copy of its text at Words, at token edges, budget 0 (a space of the gold is free, so `Date of birth:` also finds `Dateofbirth:`; a wrapped hyphen of the page is free);
+- each copy of `start` pairs with the first copy of `end` after it; if `start` opens again before that end, the first copy is not closed and fails (there is no nesting). A missing `end` fails; with no `end` in the test the region runs to the page end;
+- the region equals `content` as a whole at Text, within `max_diffs`: case is kept, a number is one atomic symbol (`10kg` is never `10mg`, `1,5` is never `1.5`), and a region may run across table cells;
+- still not compared (a parameter of the region relation, applied to both sides, each behind its own switch, `region_underscore` and `region_bullet`): a run of one or two underscores that touches no word or number (three or more is a leader, which the Text fold removes before the region is read, so `text_fold` decides it), and a bullet glyph before a space;
+- a footnote mark is a kept `Mark` at Text and equals only a `Mark`, never a number or a letter: a gold cannot write the digit of a `<sup>` footnote, so a region holding one fails (`parsing.1` and `parsing. 1` both fail on `parsing.<sup>1</sup>`). A gold written with brackets (`[1]`) is a mark and matches a bracketed one.
+
+Differences from the reading above, all behind the switch: case is kept; a long underscore run touching a letter folds to a space with the rest of the Text fold; a leading-dot number (`.5`) is a symbol and a number, so a budget can drop its dot; `selfaware` and `self aware` are both found by a gold anchor through the free space; `NUL` is dropped by the Text fold. Failures start with the same `between ... and ... holds ... where the gold has ...` text, without the edit count.

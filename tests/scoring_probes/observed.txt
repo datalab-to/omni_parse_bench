@@ -845,5 +845,6 @@ load-md-max	refused
 load-md-ok	loads
 load-repeat-md	refused
 load-shared-md	refused
+load-order-md	loads
 load-empty	refused
 load-latex-empty	refused

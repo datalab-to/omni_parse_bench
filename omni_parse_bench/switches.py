@@ -72,10 +72,41 @@ _SWITCHES = (
     ),
     Switch(
         "chain",
-        "A `present` text test is matched on the normalizer chain (Id, Text, Cased, Words) by the one "
+        "A `present` text test and an `order` test are matched on the normalizer chain (Id, Text, Cased, "
+        "Words) by the one "
         "distance, in place of the old fold, squeeze retries and number guard. The rules below are the "
         "chain's own; with `chain` off none of them is read.",
         2,
+        True,
+    ),
+    Switch(
+        "label_order",
+        "`layout_absent` reads the label order: a block whose label is at most a forbidden kind counts "
+        "(`list` and `form` are at most `text`). Off: a label is compared as written.",
+        3,
+        True,
+    ),
+    Switch(
+        "region",
+        "`verbatim` reads its region on the chain: anchors are copies at token edges, each opening anchor "
+        "pairs "
+        "with the first end after it (another opening anchor before it leaves the first unclosed), and the "
+        "region equals the content as a whole at Text, case kept, across table cells.",
+        3,
+        True,
+    ),
+    Switch(
+        "region_underscore",
+        "In a `verbatim` region (with `region` on) a run of underscores that touches no word or number is "
+        "not compared, in the region or the content: a line printed to write on, a printed mask.",
+        3,
+        True,
+    ),
+    Switch(
+        "region_bullet",
+        "In a `verbatim` region (with `region` on) a bullet glyph before a space is not compared, in the "
+        "region or the content: a list's mark.",
+        3,
         True,
     ),
     Switch("word_edges", "A match starts and ends at token edges: `Total` is not in `Totally`.", 2, False),

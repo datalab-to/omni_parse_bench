@@ -24,7 +24,7 @@ from rapidfuzz import fuzz
 from rapidfuzz.distance import OSA
 
 from omni_parse_bench import markdown, marks, mathspans, normalize, switches, tables, views
-from omni_parse_bench.scorers.unit_tests import hyphenation
+from omni_parse_bench.scorers.unit_tests import hyphenation, quantifiers, schema
 
 # Note: a ratio test (table_cell, or present's first pass) allowing k edits in an n-character string
 # passes at ratio 1 - k/n, and rapidfuzz returns exactly that ratio for k substitutions, which in binary lands
@@ -444,7 +444,12 @@ def _number_found(text: str, v: views.Html) -> Mark:
 class Order(NamedTuple):
     before: str
     after: str
-    max_diffs: int
+    max_diffs: int                  # the budget of `before`, and of `after` unless `after_diffs` is given
+    after_diffs: int | None = None  # the budget of `after`, when it differs
+
+    @property
+    def budgets(self) -> tuple[int, int]:
+        return self.max_diffs, self.max_diffs if self.after_diffs is None else self.after_diffs
 
 
 def order(t: Order, v: views.Html) -> Mark:
@@ -454,6 +459,8 @@ def order(t: Order, v: views.Html) -> Mark:
 
     Note: whether to retry does not depend on the budget: with an edit to spend, both can be found in the
     folded text out of order while the squeezed text, which passed with fewer edits, holds them in order."""
+    if switches.on("chain"):
+        return _chain_order(t, v)
     folded = normalize.fold(v.text)
     cut = [False, False]
     both = False
@@ -464,13 +471,13 @@ def order(t: Order, v: views.Html) -> Mark:
         hay = f(v.text)
         kept = [k for k, c in enumerate(folded) if not c.isspace()] if f is normalize.squeeze else None
         if any(strict):
-            raw = [_near_numbers(normalize.fold(x), folded, t.max_diffs, f is normalize.squeeze)
-                   for x in (t.before, t.after)]
+            raw = [_near_numbers(normalize.fold(x), folded, d, f is normalize.squeeze)
+                   for x, d in zip((t.before, t.after), t.budgets, strict=True)]
             a, b = raw
             cut = [c or (s and not m and _only_glued(x, v.text))
                    for c, s, m, x in zip(cut, strict, raw, (t.before, t.after), strict=True)]
         else:
-            raw = [_near(f(x), hay, t.max_diffs) for x in (t.before, t.after)]
+            raw = [_near(f(x), hay, d) for x, d in zip((t.before, t.after), t.budgets, strict=True)]
             a, b = (_unglued(m, folded, kept) for m in raw)
             cut = [c or (bool(m) and not x) for c, m, x in zip(cut, raw, (a, b), strict=True)]
         if a and b and any(x.start < y.start for x in a for y in b):
@@ -482,6 +489,28 @@ def order(t: Order, v: views.Html) -> Mark:
     if both: return False, f"{t.before[:34]!r} does not appear before {t.after[:34]!r}"
     if not a: return False, f"'before' text {t.before[:40]!r} {_why_missing(cut[0])}"
     return False, f"'after' text {t.after[:40]!r} {_why_missing(cut[1])}"
+
+
+def _chain_order(t: Order, v: views.Html) -> Mark:
+    """`before` and `after` are two claims on the chain at Words, each within the test's budget, and some copy
+    of `before` ends before some copy of `after` begins (exists over copies, decision 2). A pass that needs a
+    copy other than the first of either is marked `[copy]`; a failure names the claim that is missing, or the
+    rules whose switching off alone would have found it, as `present` does."""
+    from omni_parse_bench import chain
+    out = chain.tokens_of_output(v.html)
+    gold = [chain.tokens_of_gold(x) for x in (t.before, t.after)]
+    wins = [chain.windows(g, out, chain.WORDS, d) for g, d in zip(gold, t.budgets, strict=True)]
+    for name, w, g, x, d in zip(("before", "after"), wins, gold, (t.before, t.after), t.budgets, strict=True):
+        if not w:
+            code = ",".join(chain.blame(g, out, chain.WORDS, d)) or "chain"
+            return False, f"[{code}] {name!r} text {x[:40]!r} not found within {d} edits"
+    pairs = [(b, a) for b in wins[0] for a in wins[1] if b.last < a.first]
+    if not pairs:
+        return False, f"[order] {t.before[:34]!r} does not appear before {t.after[:34]!r}"
+    first = (min(wins[0], key=lambda w: w.first), min(wins[1], key=lambda w: w.first))
+    if first[0].last < first[1].first:
+        return True, ""
+    return True, "[copy] ordered by a copy other than the first"
 
 
 def _order_hyphenated(t: Order, v: views.Html) -> bool:
@@ -640,11 +669,12 @@ def _characters(v: views.Html) -> int:
 
 def negative(params: Any) -> bool:
     """Whether a test only says what the output must not hold, so that an empty output passes it by writing
-    nothing: `present` with `{"absent": true}`, `no_excess_repeats` and `layout_absent`. Every other type
-    needs a positive reading (its text, cell, anchor or kind) and fails an empty output already."""
-    if isinstance(params, Present):
-        return params.absent
-    return isinstance(params, (NoExcessRepeats, LayoutAbsent))
+    nothing: the rows of `schema` whose gate is `blank` (`present` with `{"absent": true}`,
+    `no_excess_repeats`, `layout_absent`). Every other type needs a positive reading (its text, cell, anchor
+    or kind) and fails an empty output already."""
+    kinds = {Present: "present", NoExcessRepeats: "no_excess_repeats", LayoutAbsent: "layout_absent"}
+    name = kinds.get(type(params))
+    return name is not None and schema.variant(name, params).gate == schema.BLANK
 
 
 def silent(view: Any) -> bool:
@@ -702,6 +732,8 @@ def verbatim(t: Verbatim, v: views.Html) -> Mark:
     cell by cell, row by row, and a region runs on across it. An anchor is a copy of its text at a word edge,
     under fold (`_anchors`). Each copy of `start` opens a region that runs to the first copy of `end` after it
     (or to the page end); without a `start`, one region opens at the page start."""
+    if switches.on("region"):
+        return _chain_verbatim(t, v)
     page = _verbatim_fold(views.text(_NOTHING.sub("", v.html), alt=False).replace(_WRAP, "\ufffd"))
     if t.start is None:
         opens = [0]
@@ -720,6 +752,104 @@ def verbatim(t: Verbatim, v: views.Html) -> Mark:
     if not reasons:
         return True, ""
     return False, reasons[0] + (f" (and {len(reasons) - 1} more)" if len(reasons) > 1 else "")
+
+
+def _chain_verbatim(t: Verbatim, v: views.Html) -> Mark:
+    """The closed region on the chain (`chain.py`): anchors are copies of `start` and `end` at Words, at token
+    edges, budget 0; each anchor of `start` pairs with the first copy of `end` after it, and is closed only if
+    no other anchor comes between; the region between them equals `content` as a whole at Text, within
+    `max_diffs` (a region runs across table cells). For all anchors: every one must be closed and right."""
+    from omni_parse_bench import chain
+    out = chain.tokens_of_output(_NOTHING.sub("", v.html))
+    free = chain.rules_now() - {"cell_windows"}
+
+    def copies(text: str, longer: str | None = None) -> list[chain.Window]:
+        ws = chain.windows(chain.tokens_of_gold(text), out, chain.WORDS, 0, rules=free)
+        if longer is not None and len(longer) > len(text):
+            outer = chain.windows(chain.tokens_of_gold(longer), out, chain.WORDS, 0, rules=free)
+            ws = [w for w in ws if not any(o.first <= w.first and w.last <= o.last for o in outer)]
+        return quantifiers.select(ws)
+
+    if t.start is None:
+        opens = [(-1, -1)]
+    elif not (anchors := copies(t.start, t.end)):
+        return False, f"start {t.start[:60]!r} not found whole, at a word edge"
+    else:
+        opens = [(a.first, a.last) for a in anchors]
+    ends = None
+    if t.end is not None:
+        ends = copies(t.end)
+        if not ends:
+            return False, f"end {t.end[:60]!r} not found whole, at a word edge"
+    gold = _uncompared(chain.tokens_of_gold(t.content or ""))
+    reasons = []
+    for k, (_, last) in enumerate(opens):
+        nxt = opens[k + 1][0] if k + 1 < len(opens) else None
+        if ends is None:
+            stop = len(out)
+        else:
+            e = next((w for w in ends if w.first > last), None)
+            if e is None:
+                why = f"no end {t.end[:60]!r} after start {t.start[:60]!r}"
+                reasons.append(f"copy {k + 1} of {len(opens)}: {why}" if len(opens) > 1 else why)
+                continue
+            if nxt is not None and nxt < e.first:
+                why = f"start {t.start[:60]!r} opened again before an end {t.end[:60]!r}"
+                reasons.append(f"copy {k + 1} of {len(opens)}: {why}" if len(opens) > 1 else why)
+                continue
+            stop = e.first
+        region = _uncompared(out[last + 1:stop])
+        while region and region[0].cls in (chain.SPACE, chain.BREAK):
+            region = region[1:]
+        while region and region[-1].cls in (chain.SPACE, chain.BREAK):
+            region = region[:-1]
+        if not chain.equal(gold, region, chain.TEXT, t.max_diffs, rules=free):
+            have = re.sub(r"\s+", " ", "".join(x.text for x in region)).strip()
+            want = re.sub(r"\s+", " ", "".join(x.text for x in gold)).strip()
+            shown, wanted = _difference(have, want)
+            why = f"{_where(t)} holds {shown} where the gold has {wanted} (max_diffs {t.max_diffs})"
+            reasons.append(f"copy {k + 1} of {len(opens)}: {why}" if len(opens) > 1 else why)
+    if not reasons:
+        return True, ""
+    return False, reasons[0] + (f" (and {len(reasons) - 1} more)" if len(reasons) > 1 else "")
+
+
+def _where(t: Verbatim) -> str:
+    return (f"between {t.start[:40]!r} and {t.end[:40]!r}" if t.start is not None and t.end is not None
+            else f"after {t.start[:40]!r} to the page end" if t.start is not None
+            else f"from the page start to {t.end[:40]!r}" if t.end is not None else "the page")
+
+
+_BULLETS = frozenset("•‣◦▪▶∙●")
+
+
+def _uncompared(tokens: list) -> list:
+    """What the region relation leaves out of both the region and the content, as `verbatim` always has: a run
+    of underscores that touches no word or number (a line printed to write on) and a bullet glyph before a
+    space (a list's mark). A parameter of the relation (`schema.py`, row `verbatim`), applied to the tokens of
+    both sides, each behind its own switch (`region_underscore`, `region_bullet`). A footnote mark is not
+    touched: it is a kept `Mark` at Text, never equal to a quantity."""
+    from omni_parse_bench import chain
+    keep: list = []
+    n = len(tokens)
+    for i, tok in enumerate(tokens):
+        if tok.cls == chain.SYM and tok.text == "_" and switches.on("region_underscore"):
+            j, k = i, i
+            while j > 0 and tokens[j - 1].cls == chain.SYM and tokens[j - 1].text == "_":
+                j -= 1
+            while k + 1 < n and tokens[k + 1].cls == chain.SYM and tokens[k + 1].text == "_":
+                k += 1
+            before = tokens[j - 1].cls if j > 0 else None
+            after = tokens[k + 1].cls if k + 1 < n else None
+            if before not in (chain.WORD, chain.QTY) and after not in (chain.WORD, chain.QTY):
+                continue
+        if tok.cls == chain.SYM and tok.text in _BULLETS and switches.on("region_bullet") and (
+                i + 1 == n or tokens[i + 1].cls in (chain.SPACE, chain.BREAK)):
+            continue
+        if tok.cls in (chain.SPACE, chain.BREAK) and keep and keep[-1].cls in (chain.SPACE, chain.BREAK):
+            continue    # a dropped glyph leaves one space, as a run of white space is one
+        keep.append(tok)
+    return keep
 
 
 def verbatim_anchor_copies(page_text: str, anchor: str) -> int:
@@ -1040,7 +1170,10 @@ def layout_absent(t: LayoutAbsent, blocks: Sequence[Block]) -> Mark:
     written: `AS_TEXT` is not applied (a list block is a list here), and `text` is never a kind, since
     `page_near_empty` reads text. Every other block, its text and its box are ignored. See
     docs/scoring/layout_absent.md."""
-    bad = [b for b in blocks if b.label in t.kinds]
+    if switches.on("label_order"):
+        bad = [b for b in blocks if any(schema.label_le(b.label, k) for k in t.kinds)]
+    else:
+        bad = [b for b in blocks if b.label in t.kinds]
     if not bad:
         return True, ""
     b = bad[0]

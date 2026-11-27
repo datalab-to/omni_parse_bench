@@ -223,7 +223,8 @@ The dataset is checked when it is read; a test that breaks these rules is refuse
 | `max_diffs` must be below the folded length | present: content `ab` (md 2) | `refused` | `load-md-max` |
 | one edit on two characters | present: content `ab` (md 1) | `loads` | `load-md-ok` |
 | `repeat` takes no edits | repeat: content `ab` (md 1) | `refused` | `load-repeat-md` |
-| the args of one test share `max_diffs` | order: before `abc` (md 1), after `abc` (md 0) | `refused` | `load-shared-md` |
+| the args of one `table_cell` test share `max_diffs` | table_cell: cell `abc` (md 1), right `abc` (md 0) | `refused` | `load-shared-md` |
+| an `order` test's args keep their own `max_diffs` | order: before `abc` (md 1), after `abc` (md 0) | `loads` | `load-order-md` |
 | a gold that folds to nothing | present: content U+200B (md 0) | `refused` | `load-empty` |
 | a latex gold that renders nothing | present: content `\quad` | `refused` | `load-latex-empty` |
 <!-- /cases -->

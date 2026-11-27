@@ -11,6 +11,7 @@ import collections
 import dataclasses
 import hashlib
 import statistics
+import warnings
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, ClassVar
 
@@ -114,7 +115,7 @@ def gold(page: data.Page) -> tuple[_tests.Test, ...]:
     return ts
 
 
-def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
+def check(pages: Sequence[data.Page], references: Mapping[str, str] | None = None) -> tuple[_tests.Test, ...]:
     """Every test of `pages`, each page's checked (`gold`), and what no single page can show: a test id used
     twice. It is what publishing a dataset checks; grading needs none of it.
 
@@ -128,6 +129,15 @@ def check(pages: Sequence[data.Page]) -> tuple[_tests.Test, ...]:
     if empty := sorted({p.page_id for p in pages} - {t.page_id for t in every}):
         raise ValueError(f"pages with no tests: {errors.counted(len(empty), 'page')}, e.g. "
                          f"{empty[:3]}; remove them or give them tests")
+    # `references` maps a page id to the transcription its tests were written from; a dataset ships none
+    # today, so the loader's own run lints only the text of each pair (the repeated-copy check needs one)
+    by_page = collections.defaultdict(list)
+    for t in every:
+        by_page[t.page_id].append(t)
+    lint = [x for pid, ts in by_page.items() for x in _tests.order_lint(ts, (references or {}).get(pid))]
+    if lint:
+        warnings.warn(f"order tests that may pass on unrelated copies: {errors.counted(len(lint), 'test')}, "
+                      f"e.g. {lint[:3]}", stacklevel=2)
     return every
 
 
