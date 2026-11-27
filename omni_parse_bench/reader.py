@@ -13,6 +13,9 @@ reading. Text the page hides is not read; what a reader draws on screen is: `ari
     alt text   is not text; a figure contributes its caption
     cells      a table cell is its own block, tagged (table, row, column); a window never crosses one
 
+This is the Id reading: the Text fold (compatibility forms, typography) is a later stage between the quantity scan
+and word tokenization, so a Word here is not yet a Text token.
+
 Tokens (classes below) are fixed for an output: no later step splits or joins one. Text is cut into grapheme
 clusters (UAX #29, at the Unicode version of the pinned `regex`), and each cluster takes its script's class:
 spaced scripts make a `Word` of a run; Han, kana, Hangul and the phrase-spaced scripts make one `Word` per
