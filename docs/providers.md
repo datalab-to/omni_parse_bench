@@ -559,6 +559,7 @@ Full public run: 2,937/2,937 pages, 0 failures; 66.9 headline (46.4 text, 63.8 t
 PP-StructureV3 (PaddleOCR's `PPStructureV3` pipeline of several models, at its defaults) runs on the CPU by default,
 slowly (a page with formulas can take minutes), and on a GPU where its server's `DEVICE` says so; its markdown
 keeps every block (`markdown_ignore_labels=[]`), and its boxes are turned back from the upright page onto the page as sent.
+Full public run: 2,935/2,937 pages; 2 failed (HTTP 500 from the server); 56.2 headline (55.8 text, 48.5 tables, 64.3 layout); one H100 with `DEVICE=gpu:0` (paddlepaddle-gpu 3.2.2, CUDA 12.6; the Dockerfile's CPU wheel is the same 3.2.2 version); released OPB 1.7.0, dataset revision `24e3ef4d2aa1718e622d357db7f6d0d10742c93d`.
 
 Their labels (LightOn's table is above):
 

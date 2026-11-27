@@ -35,7 +35,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 
 ### Added
 
-- Provider: PP-StructureV3 (`pp-structurev3`, paddleocr 3.7.0, paddlepaddle 3.2.2), PaddleOCR's pipeline at its defaults with every block kept in the markdown, served from a CPU image (a GPU is optional): html from its markdown and layout blocks from its parsing result (#118).
+- Provider: PP-StructureV3 (`pp-structurev3`, paddleocr 3.7.0, paddlepaddle 3.2.2), PaddleOCR's pipeline at its defaults with every block kept in the markdown, served from a CPU image (a GPU is optional): html from its markdown and layout blocks from its parsing result; the full public run (one H100) scores 56.2 (text 55.8, tables 48.5, layout 64.3) on 2,935 of 2,937 pages (#118).
 
 ### Changed
 

@@ -54,6 +54,7 @@ check any row. The dataset is on [Hugging Face](https://huggingface.co/datasets/
 | HunyuanOCR-1.5 | open | 68.8 | 62.3 | 62.6 | 81.4 | — |
 | Docling (formula) | open | 66.9 | 46.4 | 63.8 | 90.6 | — |
 | Docling | open | 64.5 | 39.1 | 63.8 | 90.6 | — |
+| PP-StructureV3 | open | 56.2 | 55.8 | 48.5 | 64.3 | — |
 | PyMuPDF4LLM (OCR) | open | 51.5 | 26.5 | 42.1 | 86.0 | — |
 | LiteParse (Tesseract) | open | 42.3 | 43.6 | 14.5 | 68.8 | — |
 | PyMuPDF4LLM | open | 41.2 | 17.7 | 42.0 | 64.0 | — |
