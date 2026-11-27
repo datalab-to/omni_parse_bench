@@ -101,6 +101,11 @@ def gold(page: data.Page) -> tuple[_tests.Test, ...]:
     if not ts:
         raise ValueError(f"page {page.page_id!r}: its gold {page.gt_path} has no tests; give it tests, "
                         "or drop the page from the manifest")
+    kinds = {t.test_type for t in ts}
+    if "layout_absent" in kinds and "page_near_empty" not in kinds:
+        raise ValueError(f"page {page.page_id!r}: it has a layout_absent test and no page_near_empty test; "
+                         "an output with no block fails layout_absent unless the page is blank, so pair them "
+                         "(docs/scoring/layout_absent.md)")
     if frozenset(page.outputs) != _tests.wants(ts):
         raise ValueError(f"page {page.page_id!r}: the manifest says it is asked for "
                         f"{list(page.outputs)}, but its tests read {sorted(_tests.wants(ts))}; the "

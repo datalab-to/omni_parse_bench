@@ -96,6 +96,18 @@ and in the case files under [tests/scoring_probes](../../tests/scoring_probes/).
 | one block for the whole page | a page-sized `table` block passes every `table` test | `layout_kind` | (case lay-page-block) |
 | extra content | a loop that repeats the string passes; only `repeat` caps a count, `verbatim` a closed stretch and `no_excess_repeats` a page's repeats | all but `repeat`, `verbatim` and `no_excess_repeats` | (case text-loop) |
 
+## Empty output
+
+A test that only says what the output must not hold (`present` with `{"absent": true}`, `no_excess_repeats`,
+`layout_absent`) fails an output with nothing in it: html with no character a reader sees outside image
+descriptions (as `page_near_empty` counts), or no block at all. It is a floor, not a guard: one stray character, or
+one block with no text, is an output, and passes. A page that carries a `layout_absent` test must also carry a
+`page_near_empty` test (the loader refuses one that does not), so that its honest empty answer is not failed. Every other test
+type needs its text, cell, anchor or label and already fails an empty output. The exception is a blank page: when
+the page's gold holds a `page_near_empty` test, an empty output is the right answer and passes these three. So an
+empty output, on a page that is not blank, passes no test but `page_near_empty` (and a `verbatim` test with no anchor and no content, which asks
+the page to be blank). Each type's page gives its cases.
+
 ## Pages
 
 - [present-text.md](present-text.md), [present-number.md](present-number.md),

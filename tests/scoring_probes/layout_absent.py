@@ -9,7 +9,7 @@ PAGE = (0, 0, 1, 1)
 TABLES = [
     table(
         "layout-absent-ignored",
-        layout_absent("la-none", "I", "no blocks at all: a blank page read as blank", []),
+        layout_absent("la-none", "I", "no blocks at all, on a blank page (its gold holds a `page_near_empty` test)", [], blank=True),
         layout_absent("la-folio", "I", "a page number as page furniture", [("page_furniture", TOP, "7")]),
         layout_absent("la-text", "I", "a text block (`page_near_empty` reads text)", [("text", MID, "a synthetic note")]),
         layout_absent("la-figure", "I", "a figure (a stain, a stamp, a plate)", [("figure", PAGE, "")]),
@@ -23,6 +23,7 @@ TABLES = [
     ),
     table(
         "layout-absent-penalized",
+        layout_absent("la-no-blocks", "P", "no blocks at all, on a page that is not blank: nothing was read", [], why=True),
         layout_absent("la-heading", "P", "a heading block", [("heading", MID, "SAMPLE HEADING")], why=True),
         layout_absent("la-table", "P", "an empty table", [("table", MID, "")], why=True),
         layout_absent("la-list", "P", "a list block (labels are compared as written: a list is not text here)", [("list", MID, "- item")]),

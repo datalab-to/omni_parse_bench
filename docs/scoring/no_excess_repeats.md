@@ -31,7 +31,8 @@ than in `content`. Otherwise it passes.
   first condition: a passage of 16 words or more written twice is found wherever the copies stand, but two
   shorter blocks each written twice are found only when a run of 16 repeats across them (written A B A B, not
   A A B B; case rx-short-blocks).
-- Text left out costs nothing here; `present` and `order` tests see it (case rx-dropped).
+- Text left out costs nothing here; `present` and `order` tests see it (case rx-dropped). An output with no text at
+  all is not text left out: it fails (case rx-empty), unless the page is blank (case rx-empty-blank), below.
 - A table counts as text on both sides: the content holds its cells, and the output's cells are read however
   it writes them, in a `<table>`, as a markdown table or flattened to paragraphs (cases rx-table, rx-table-pipe,
   rx-table-flat). A row the page prints once, written twice, fails (case rx-table-row-twice).
@@ -83,6 +84,7 @@ What the test ignores:
 | I | a passage the page prints twice, written twice | the first sentence, twice | `<p>The committee met on Monday to review the budget and the plans for the new library downtown.</p><p>The committee met on Monday to review the budget and the plans for the new library downtown.</p>` | pass | `rx-printed-twice` |
 | I | a phrase shorter than 16 words written twice | `Total due on receipt of this invoice.` | `<p>Total due on receipt of this invoice.</p><p>Total due on receipt of this invoice.</p>` | pass | `rx-short-repeat` |
 | I | text left out (other tests miss it) | the page's two sentences | `<p>The committee met on Monday to review the budget and the plans for the new library downtown.</p>` | pass | `rx-dropped` |
+| I | nothing written, on a blank page (its gold holds a `page_near_empty` test) | the page's two sentences, on a page with a `page_near_empty` test | `""` | pass | `rx-empty-blank` |
 | I | a table the page prints, as a table | the page's two sentences and its table's two rows | `<p>The committee met on Monday to review the budget and the plans for the new library downtown.</p><p>Members asked for a second estimate before the vote.</p><table><tr><td>Not applicable, see note one for the details of the lease terms and the fees listed in the annex</td></tr><tr><td>Not applicable, see note one for the details of the lease terms and the fees listed in the annex</td></tr></table>` | pass | `rx-table` |
 | I | the same table as a markdown table left in a paragraph | the page's two sentences and its table's two rows | `<p>The committee met on Monday to review the budget and the plans for the new library downtown.</p><p>Members asked for a second estimate before the vote.</p><p>\| Not applicable, see note one for the details of the lease terms and the fees listed in the annex \|\n\| Not applicable, see note one for the details of the lease terms and the fees listed in the annex \|</p>` | pass | `rx-table-pipe` |
 | I | the same table flattened to paragraphs | the page's two sentences and its table's two rows | `<p>The committee met on Monday to review the budget and the plans for the new library downtown.</p><p>Members asked for a second estimate before the vote.</p><p>Not applicable, see note one for the details of the lease terms and the fees listed in the annex</p><p>Not applicable, see note one for the details of the lease terms and the fees listed in the annex</p>` | pass | `rx-table-flat` |
@@ -111,6 +113,7 @@ What it penalizes:
 <!-- cases:repeats-penalized -->
 | | difference | gold | output | verdict | case |
 |---|---|---|---|---|---|
+| P | nothing written: no output to check | the page's two sentences | `""` | fail: `no output: a test of what the page does not hold passes only an output that writes something, unless the page is blank (a page_near_empty test)` | `rx-empty` |
 | P | a sentence written twice | the page's two sentences | `<p>The committee met on Monday to review the budget and the plans for the new library downtown.</p><p>The committee met on Monday to review the budget and the plans for the new library downtown.</p><p>Members asked for a second estimate before the vote.</p>` | fail: `'the committee met on monday to review the budget and the plans for the new libra' appears 2x, and its words more often than the page prints them (e.g. 'the' 9x, the page 5x)` | `rx-duplicate` |
 | P | a loop | the page's two sentences | `<p>The committee met on Monday to review the budget and the plans for the new library downtown.</p><p>Members asked for a second estimate before the vote.</p><p>and the plans and the plans and the plans and the plans and the plans and the plans and the plans and the plans and the plans and the plans and the plans and the plans </p>` | fail: `'the plans and the plans and the plans and the plans and the plans and the' appears 7x, and its words more often than the page prints them (e.g. 'the' 17x, the page 5x)` | `rx-loop` |
 | P | one word repeated | the page's two sentences | `<p>budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget budget </p>` | fail | `rx-loop-word` |
@@ -120,6 +123,14 @@ What it penalizes:
 | P | a table row written twice in a table | the page's two sentences and its table's row | `<p>The committee met on Monday to review the budget and the plans for the new library downtown.</p><p>Members asked for a second estimate before the vote.</p><table><tr><td>Not applicable, see note one for the details of the lease terms and the fees listed in the annex</td></tr><tr><td>Not applicable, see note one for the details of the lease terms and the fees listed in the annex</td></tr></table>` | fail | `rx-table-row-twice` |
 | P | the same two blocks written A B A B: a run of 16 repeats across them | two 8-word blocks | `<p>one two three four five six seven eight</p><p>nine ten eleven twelve thirteen fourteen fifteen sixteen</p><p>one two three four five six seven eight</p><p>nine ten eleven twelve thirteen fourteen fifteen sixteen</p>` | fail | `rx-short-blocks-across` |
 <!-- /cases -->
+
+## Empty output
+
+The test passes only an output that writes something: html with no character a reader sees outside image
+descriptions (nothing, white space, an image alone, as `page_near_empty` counts) fails with `no output: a test of
+what the page does not hold passes only an output that writes something, unless the page is blank (a
+page_near_empty test)` (case rx-empty). Without this, writing nothing earned a pass. When the page's gold holds a
+`page_near_empty` test the page is blank, an empty output is the right answer, and it passes (case rx-empty-blank).
 
 ## Building a test
 

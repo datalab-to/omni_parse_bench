@@ -612,9 +612,45 @@ def page_near_empty(t: PageNearEmpty, v: views.Html) -> Mark:
     """A blank page yields at most `max_chars` characters a reader sees outside image alt text: no white
     space, no invisible format character (a zero-width space, a byte-order mark, a soft hyphen), and none of
     the marks the text view writes for an element that holds nothing."""
-    seen = views.text(_NOTHING.sub("", v.html), alt=False)
-    n = sum(unicodedata.category(c) != "Cf" for c in re.sub(r"\s", "", seen))
+    n = _characters(v)
     return _mark(n <= t.max_chars, f"{n} non-space characters (limit {t.max_chars})")
+
+
+def _characters(v: views.Html) -> int:
+    """How many characters a reader sees outside image alt text (`page_near_empty` counts them)."""
+    seen = views.text(_NOTHING.sub("", v.html), alt=False)
+    return sum(unicodedata.category(c) != "Cf" for c in re.sub(r"\s", "", seen))
+
+
+# --------------------------------------------------------------------------- negative tests need an output
+
+
+def negative(params: Any) -> bool:
+    """Whether a test only says what the output must not hold, so that an empty output passes it by writing
+    nothing: `present` with `{"absent": true}`, `no_excess_repeats` and `layout_absent`. Every other type
+    needs a positive reading (its text, cell, anchor or kind) and fails an empty output already."""
+    if isinstance(params, Present):
+        return params.absent
+    return isinstance(params, (NoExcessRepeats, LayoutAbsent))
+
+
+def silent(view: Any) -> bool:
+    """Whether the output holds nothing a reader sees: an html output with no characters outside image alt
+    text (`page_near_empty` at 0, so an image alone is silent), a blocks output with no block."""
+    return _characters(view) == 0 if isinstance(view, views.Html) else not view
+
+
+SILENT = ("no output: a test of what the page does not hold passes only an output that writes something, "
+          "unless the page is blank (a page_near_empty test)")
+
+
+def run(test_type: str, params: Any, view: Any, blank: bool = False) -> Mark:
+    """One test's verdict on its output's view: its runner's, except that a negative test fails an empty
+    output (`SILENT`) unless `blank`, the page's gold holding a `page_near_empty` test. See
+    docs/scoring/README.md, "Empty output"."""
+    if not blank and negative(params) and silent(view):
+        return False, SILENT
+    return TYPES[test_type][1](params, view)
 
 
 # --------------------------------------------------------------------------- closed regions

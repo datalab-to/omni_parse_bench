@@ -20,6 +20,7 @@ TABLES = [
         excess("rx-printed-twice", "I", "a passage the page prints twice, written twice", f"{A} {A}", f"<p>{A}</p><p>{A}</p>", shown_gold="the first sentence, twice"),
         excess("rx-short-repeat", "I", "a phrase shorter than 16 words written twice", SHORT, f"<p>{SHORT}</p><p>{SHORT}</p>"),
         excess("rx-dropped", "I", "text left out (other tests miss it)", PAGE, f"<p>{A}</p>", shown_gold=G),
+        excess("rx-empty-blank", "I", "nothing written, on a blank page (its gold holds a `page_near_empty` test)", PAGE, "", shown_gold=G, blank=True),
         excess("rx-table", "I", "a table the page prints, as a table", f"{PAGE} {ROW} {ROW}", f"<p>{A}</p><p>{B}</p><table><tr><td>{ROW}</td></tr><tr><td>{ROW}</td></tr></table>", shown_gold="the page's two sentences and its table's two rows"),
         excess("rx-table-pipe", "I", "the same table as a markdown table left in a paragraph", f"{PAGE} {ROW} {ROW}", f"<p>{A}</p><p>{B}</p><p>| {ROW} |\n| {ROW} |</p>", shown_gold="the page's two sentences and its table's two rows"),
         excess("rx-table-flat", "I", "the same table flattened to paragraphs", f"{PAGE} {ROW} {ROW}", f"<p>{A}</p><p>{B}</p><p>{ROW}</p><p>{ROW}</p>", shown_gold="the page's two sentences and its table's two rows"),
@@ -40,6 +41,7 @@ TABLES = [
     ),
     table(
         "repeats-penalized",
+        excess("rx-empty", "P", "nothing written: no output to check", PAGE, "", shown_gold=G, why=True),
         excess("rx-duplicate", "P", "a sentence written twice", PAGE, f"<p>{A}</p><p>{A}</p><p>{B}</p>", shown_gold=G, why=True),
         excess("rx-loop", "P", "a loop", PAGE, f"<p>{A}</p><p>{B}</p><p>{'and the plans ' * 12}</p>", shown_gold=G, why=True),
         excess("rx-loop-word", "P", "one word repeated", PAGE, "<p>" + "budget " * 40 + "</p>", shown_gold=G),

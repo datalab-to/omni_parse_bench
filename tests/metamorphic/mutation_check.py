@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Mutation check: each relation of M126 to M144, M150 to M159, M160 to M167, M170 to M173 and M174 to M177 must FAIL when the scorer rule it pins is removed or changed.
+"""Mutation check: each relation of M126 to M144, M150 to M159, M160 to M167, M170 to M173, M174 to M177 and M196 to M198 must FAIL when the scorer rule it pins is removed or changed.
 
 Not a test file (pytest does not collect it). From the repository root:
 
@@ -395,6 +395,30 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
     ('M177', 'scorers/unit_tests/runners.py',
      '    bad = [b for b in blocks if b.label in t.kinds]',
      '    bad = [b for b in blocks if b.label in t.kinds and b.label != "heading"]'),
+    ('M196', 'scorers/unit_tests/runners.py',
+     'if not blank and negative(params) and silent(view):',
+     'if False and negative(params) and silent(view):'),
+    ('M196', 'scorers/unit_tests/runners.py',
+     'return _characters(view) == 0 if isinstance(view, views.Html) else not view',
+     'return False'),
+    ('M196', 'scorers/unit_tests/runners.py',
+     '    return isinstance(params, (NoExcessRepeats, LayoutAbsent))',
+     '    return isinstance(params, NoExcessRepeats)'),
+    ('M197', 'scorers/unit_tests/runners.py',
+     'if not blank and negative(params) and silent(view):',
+     'if negative(params) and silent(view):'),
+    ('M197', 'scorers/unit_tests/compare.py',
+     'blank = any(g.test_type == "page_near_empty" for g in gold)',
+     'blank = any(g.test_type == "page_near_empty" and g.settings.get("max_chars") == 0 for g in gold)'),
+    ('M198', 'scorers/unit_tests/runners.py',
+     'return _characters(view) == 0 if isinstance(view, views.Html) else not view',
+     'return True'),
+    ('M198', 'scorers/unit_tests/runners.py',
+     'return _characters(view) == 0 if isinstance(view, views.Html) else not view',
+     'return _characters(view) < 30 if isinstance(view, views.Html) else not view'),
+    ('M197', 'scorers/unit_tests/compare.py',
+     'blank = any(g.test_type == "page_near_empty" for g in gold)',
+     'blank = False'),
 ]
 
 

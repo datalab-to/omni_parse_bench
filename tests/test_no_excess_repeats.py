@@ -71,7 +71,7 @@ def test_the_loader_needs_content():
 
 @pytest.mark.parametrize("html", [
     f"<p>{A}</p><p>{B}</p>", f"<p>{B}</p><p>{A}</p>", f"<p>{A} {B}</p>", f"<h1>{A}</h1><ul><li>{B}</li></ul>",
-    f"<p>{A}</p>", "", f"<p>{A.upper()}</p><p>{B}</p>",
+    f"<p>{A}</p>", f"<p>{A.upper()}</p><p>{B}</p>",
 ])
 def test_a_faithful_or_shorter_page_passes(html):
     assert verdict(html) == (True, "")
