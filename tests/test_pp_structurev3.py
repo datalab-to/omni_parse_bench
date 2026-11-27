@@ -123,7 +123,8 @@ def test_server_reads_the_paddle_version_of_the_cpu_or_the_gpu_wheel(monkeypatch
 
     # Note: server.py needs paddleocr at import, so only its version function is run.
     src = (Path(pp.__file__).parent / "serve" / "pp-structurev3" / "server.py").read_text()
-    (func,) = [n for n in ast.parse(src).body if isinstance(n, ast.FunctionDef) and n.name == "_paddle_version"]
+    (func,) = [n for n in ast.parse(src).body
+               if isinstance(n, ast.FunctionDef) and n.name == "_paddle_version"]
     scope = {"importlib": __import__("importlib")}
     exec(compile(ast.Module([func], []), "server.py", "exec"), scope)
 
