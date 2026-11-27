@@ -528,6 +528,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
 | Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
 | Docling | `docling` | `docling` | html, blocks |
+| Docling (formula) | `docling-formula` | `docling` | html, blocks |
 | Nanonets-OCR2-3B | `nanonets-ocr` | `nanonets-ocr` | html |
 | Nemotron 3.5 Parse | `nemotron-parse` | `nemotron-parse` | html, blocks |
 | MiniCPM-OCR 1.0 | `minicpm-ocr` | `minicpm-ocr` | html, markdown, blocks |
@@ -544,6 +545,13 @@ Docling's default device, the GPU when there is one (`docker run --gpus all`) an
 is the document's own `export_to_html` (headers and footers kept), and its picture and formula items are not read
 by default (a formula is exported as "Formula not decoded").
 Full public run: 2,937/2,937 pages, 0 failures; 64.5 headline (39.1 text, 63.8 tables, 90.6 layout); GPU, B200, `auto` device; released OPB 1.7.0.
+The `docling-formula` row is the same pipeline with one option changed, `do_formula_enrichment=True`: each formula
+item is read as LaTeX by docling-project/CodeFormulaV2 (pinned revision `ecedbe11`, cdla-permissive-2.0), and the
+adapter reads the HTML export's TeX annotation (`encoding="TeX"`) as `application/x-tex`. The same image serves
+both rows. The server runs the formula stage without PyTorch's cuDNN attention: cuDNN builds a new plan for each
+new decode shape, which made a page of formulas take minutes on a B200; with it off (flash or memory-efficient
+attention) a page takes seconds, and a formula's LaTeX can differ by a few characters from the cuDNN path.
+Full public run: 2,937/2,937 pages, 0 failures; 66.9 headline (46.4 text, 63.8 tables, 90.6 layout); GPU, B200, `auto` device; released OPB 1.7.0.
 
 Their labels (LightOn's table is above):
 

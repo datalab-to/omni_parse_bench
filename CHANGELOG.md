@@ -27,7 +27,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 
 ### Added
 
-- Provider: Docling (`docling`, docling 2.153.0), its standard PDF pipeline at its defaults, with a server image that runs on Docling's default device (the GPU when there is one, else the CPU): html from its own HTML export and layout blocks from its items (#117).
+- Provider: Docling (`docling`, docling 2.153.0), its standard PDF pipeline at its defaults, with a server image that runs on Docling's default device (the GPU when there is one, else the CPU): html from its own HTML export and layout blocks from its items; and a `docling-formula` row, the same pipeline with `do_formula_enrichment=True` (formulas read as LaTeX by CodeFormulaV2, pinned), served by the same image (#117).
 
 ### Changed
 
