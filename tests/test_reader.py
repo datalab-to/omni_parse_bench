@@ -587,3 +587,21 @@ def test_long_inputs_are_linear_and_do_not_recurse():
     syms = reader.tokenize("§" * 200000)
     assert len(syms) == 200000
     assert time.time() - t0 < 20
+
+
+def test_long_rewritten_run_reads_in_bounded_time():
+    """A long stretch that the fold rewrites everywhere (full-width bars) keeps exact source spans, and reads
+    in time linear in its length (difflib alone was quadratic here, and so was the markup of each span)."""
+    import time
+
+    from omni_parse_bench import reader, switches
+
+    text = "｜ " * 8000
+    with switches.using(text_fold=True):
+        t0 = time.time()
+        toks = reader.tokenize(text)
+        assert time.time() - t0 < 20
+    bars = [t for t in toks if t.text == "|"]
+    assert len(bars) == 8000
+    assert all(t.end - t.start == 1 for t in bars)
+    assert bars[3].start == 6

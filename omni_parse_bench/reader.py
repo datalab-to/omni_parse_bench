@@ -28,6 +28,7 @@ given `rules`.
 
 from __future__ import annotations
 
+import bisect
 import functools
 import re
 import unicodedata
@@ -617,7 +618,7 @@ def _fold_records(u: str, recs: list[tuple], rules: frozenset[str]) -> list[tupl
                 again.pop(0)
             while again and again[-1][0] == SPACE and j == n:
                 again.pop()
-            span = _fold_map(raw, folded)
+            span = _fold_map(raw, folded, line_start=i == 0)
             for c, t, k, a, b, sc in again:
                 src = [span[x] for x in range(a, b)] or [span[min(a, len(folded) - 1)]]
                 out.append((c, t, k, at[min(x[0] for x in src)], at[max(x[1] for x in src)] + 1, sc))
@@ -625,11 +626,28 @@ def _fold_records(u: str, recs: list[tuple], rules: frozenset[str]) -> list[tupl
     return out
 
 
-def _fold_map(raw: str, folded: str) -> list[tuple[int, int]]:
+_CHUNKS = (64, 512, 4096)  # a stretch longer than the first is aligned piece by piece (difflib is quadratic)
+
+
+def _pieces(raw: str, size: int) -> list[str]:
+    """`raw` cut into pieces of about `size` characters, each cut before a starter (not a mark, a format
+    character or a space, so a run of white space stays whole): the cuts the fold is likely to leave alone."""
+    out, last, n = [], 0, len(raw)
+    while n - last > size:
+        x = last + size
+        while x < n and (unicodedata.category(raw[x]) in ("Mn", "Mc", "Me", "Cf", "Zs", "Cc") or raw[x].isspace()):
+            x += 1
+        if x >= n:
+            break
+        out.append(raw[last:x])
+        last = x
+    out.append(raw[last:])
+    return out
+
+
+def _fold_map(raw: str, folded: str, line_start: bool = False) -> list[tuple[int, int]]:
     """For each character of `folded`, the (first, last) raw positions it comes from: an unchanged stretch
     maps one to one, a rewritten stretch (`ﬁ` to `fi`) maps each of its characters to the raw stretch."""
-    import difflib
-
     p = 0
     while p < min(len(raw), len(folded)) and raw[p] == folded[p]:
         p += 1
@@ -638,12 +656,35 @@ def _fold_map(raw: str, folded: str) -> list[tuple[int, int]]:
         q += 1
     out = [(x, x) for x in range(p)]
     rm, fm = raw[p : len(raw) - q], folded[p : len(folded) - q]
+    out.extend((p + a, p + b) for a, b in _align(rm, fm, line_start and p == 0))
+    out.extend((len(raw) - q + x, len(raw) - q + x) for x in range(q))
+    return out
+
+
+def _align(rm: str, fm: str, line_start: bool) -> list[tuple[int, int]]:
+    """The (first, last) positions of `rm` each character of `fm` comes from."""
+    import difflib
+
+    from .fold import fold_gap
+
+    if len(rm) > _CHUNKS[0] and len(fm) > _CHUNKS[0]:
+        for size in _CHUNKS:
+            parts = _pieces(rm, size)
+            folds = [fold_gap(x, line_start=line_start and k == 0) for k, x in enumerate(parts)]
+            if len(parts) > 1 and "".join(folds) == fm:
+                out, base = [], 0
+                for x, f in zip(parts, folds, strict=True):
+                    out.extend((base + a, base + b) for a, b in _align(x, f, False))
+                    base += len(x)
+                return out
+        if len(rm) * len(fm) > 4_000_000:  # no cheap alignment: the whole stretch maps to its whole source
+            return [(0, max(len(rm) - 1, 0))] * len(fm)
+    out = []
     for tag, a0, a1, b0, b1 in difflib.SequenceMatcher(None, rm, fm, autojunk=False).get_opcodes():
         if tag == "equal":
-            out.extend((p + a0 + d, p + a0 + d) for d in range(a1 - a0))
+            out.extend((a0 + d, a0 + d) for d in range(a1 - a0))
         elif b1 > b0:
-            out.extend([(p + a0, p + max(a1, a0 + 1) - 1)] * (b1 - b0))
-    out.extend((len(raw) - q + x, len(raw) - q + x) for x in range(q))
+            out.extend([(a0, max(a1, a0 + 1) - 1)] * (b1 - b0))
     return out
 
 
@@ -856,9 +897,20 @@ class _Builder:
         u = "".join(u_parts)
         line = self._line
 
+        # the markup of `u` as runs, so the markup common to a span costs one step per run, not per character
+        run_at: list[int] = []
+        run_mk: list[frozenset[str]] = []
+        for x, m in enumerate(mk):
+            if not run_mk or m != run_mk[-1]:
+                run_at.append(x)
+                run_mk.append(m)
+
         def emit(cls, text, canon, lo, hi, script) -> None:
-            ms = [m for m in mk[lo:hi]] or [frozenset()]
-            both = frozenset.intersection(*ms) if ms else frozenset()
+            if hi > lo:
+                ms = set(run_mk[bisect.bisect_right(run_at, lo) - 1 : bisect.bisect_left(run_at, hi)])
+            else:
+                ms = {frozenset()}
+            both = frozenset.intersection(*ms)
             self._add(cls, text, canon, block, line, both, cell, script)
 
         recs: list[tuple] = []
