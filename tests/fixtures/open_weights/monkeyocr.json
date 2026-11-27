@@ -1,0 +1,150 @@
+{
+ "model": "MonkeyOCR",
+ "page": "synthetic",
+ "provider": "monkeyocr",
+ "options": {},
+ "outputs": [
+  "html",
+  "blocks"
+ ],
+ "sent": null,
+ "synthetic": "written by hand from MonkeyOCR's documented output (middle JSON blocks and the .md of parse.py, magic_pdf/dict2md/ocr_mkcontent.py at 73dee40); not an answer of the model Run with --pred-abandon, so headers and page numbers are read; their labels are restored by the server from the layout detections.",
+ "raw": {
+  "markdown": "Journal of Examples, 2024  \n\n# 2. Methods\n\nWe estimate $\\alpha$ from the survey data in Table 1.  \n\n- first item\n- second item\n\n$$\nE = mc^2\n$$\n\nTable 1: Survey results  \n\n\n<table><tr><td>Year</td><td>Count</td></tr><tr><td>2020</td><td>14</td></tr></table>\n\n\n![](images/0f3a.jpg)  \nFigure 1: A map of the sites  \n\nSee the supplementary notes.  \n\n3  ",
+  "blocks": [
+   {
+    "type": "header",
+    "bbox": [
+     72.0,
+     30.0,
+     540.0,
+     45.0
+    ],
+    "content": "Journal of Examples, 2024"
+   },
+   {
+    "type": "title",
+    "bbox": [
+     72.0,
+     80.0,
+     250.0,
+     100.0
+    ],
+    "content": "2. Methods",
+    "level": 1
+   },
+   {
+    "type": "text",
+    "bbox": [
+     72.0,
+     110.0,
+     540.0,
+     150.0
+    ],
+    "content": "We estimate $\\alpha$ from the survey data in Table 1. "
+   },
+   {
+    "type": "list",
+    "bbox": [
+     72.0,
+     160.0,
+     300.0,
+     200.0
+    ],
+    "content": "first item  \nsecond item "
+   },
+   {
+    "type": "interline_equation",
+    "bbox": [
+     200.0,
+     210.0,
+     400.0,
+     240.0
+    ],
+    "content": "\n$$\nE = mc^2\n$$\n"
+   },
+   {
+    "type": "table_caption",
+    "bbox": [
+     72.0,
+     250.0,
+     300.0,
+     265.0
+    ],
+    "content": "Table 1: Survey results "
+   },
+   {
+    "type": "table_body",
+    "bbox": [
+     72.0,
+     270.0,
+     300.0,
+     330.0
+    ],
+    "content": "<table><tr><td>Year</td><td>Count</td></tr><tr><td>2020</td><td>14</td></tr></table>"
+   },
+   {
+    "type": "image_body",
+    "bbox": [
+     72.0,
+     340.0,
+     300.0,
+     500.0
+    ],
+    "content": ""
+   },
+   {
+    "type": "image_caption",
+    "bbox": [
+     72.0,
+     505.0,
+     300.0,
+     520.0
+    ],
+    "content": "Figure 1: A map of the sites "
+   },
+   {
+    "type": "text",
+    "bbox": [
+     72.0,
+     700.0,
+     400.0,
+     715.0
+    ],
+    "content": "See the supplementary notes. "
+   },
+   {
+    "type": "number",
+    "bbox": [
+     300.0,
+     760.0,
+     312.0,
+     772.0
+    ],
+    "content": "3"
+   }
+  ],
+  "page_size": [
+   612.0,
+   792.0
+  ],
+  "middle": {
+   "pdf_info": [
+    {
+     "page_idx": 0,
+     "page_size": [
+      612.0,
+      792.0
+     ],
+     "para_blocks": "(abridged: the server's `blocks` are read from it)",
+     "discarded_blocks": []
+    }
+   ],
+   "_parse_type": "ocr"
+  },
+  "served": {
+   "weights": "echo840/MonkeyOCR-pro-3B",
+   "revision": "913c6e24b2ef293e6384f74a3e374d0c043c9741"
+  }
+ }
+}

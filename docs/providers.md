@@ -524,6 +524,7 @@ and a picture's contents (a description, a chart's data) become an image's alt t
 | Surya OCR 2 | `surya-ocr` | `surya-ocr` | html, blocks |
 | Surya OCR 2.5 | `surya-ocr-2.5` | `surya-ocr-2.5` | html, blocks |
 | MinerU2.5-Pro | `mineru` | `mineru` | html, blocks |
+| MonkeyOCR | `monkeyocr` | `monkeyocr` | html, blocks |
 | GLM-OCR | `glm-ocr` | `glm-ocr` | html, blocks |
 | PaddleOCR-VL-1.6 | `paddleocr-vl` | `paddleocr-vl` | html, blocks |
 | Indra OCR | `indra-ocr` | `indra-ocr` | html, blocks |
@@ -653,6 +654,27 @@ MinerU2.5-Pro (`providers/mineru.py`):
 | code, algorithm | code |
 | table | table |
 | image, chart, image_block | figure |
+
+MonkeyOCR-pro-3B (`providers/monkeyocr.py`):
+
+| MonkeyOCR block type | label |
+| --- | --- |
+| text, index | text |
+| title | heading |
+| list | list |
+| interline_equation | equation |
+| image_body | figure |
+| image_caption, table_caption | caption |
+| image_footnote, table_footnote | footnote |
+| table_body | table |
+| header, footer, number | page_furniture |
+| header_image, footer_image, seal | figure |
+| formula_number | equation |
+
+It runs with `--pred-abandon`, so the regions its layout model abandons (the last three rows, PP-DocLayoutV2's labels) are
+read; the server restores each one's label, as the middle JSON turns them into plain text blocks.
+
+Full public run: 2,923/2,937 pages; 14 failed (the `realdoc_pages-images_*` pages are WebP files stored as `.png` in public v1.0, which MonkeyOCR's PyMuPDF loader cannot open; they count as failures); no separate OCR engine; 79.9 headline (70.3 text, 79.6 tables, 89.8 layout), graded with released OPB 1.7.0, dataset revision `24e3ef4d2aa1718e622d357db7f6d0d10742c93d`, on one H100 (the server does not support B200).
 
 GLM-OCR (`providers/glm_ocr.py`):
 

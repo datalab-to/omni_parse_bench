@@ -42,6 +42,7 @@ A document-parsing benchmark with 16,288 tests on 2,937 pages. See [Hugging Face
 | GLM-OCR | open | 1.3B | 81.9 | — | 71.6 | 84.7 | 89.3 | — |
 | Unlimited-OCR 2 | open | 3.3B | 81.5 | — | 73.0 | 80.0 | 91.6 | — |
 | PaddleOCR-VL-1.6 | open | 0.96B | 81.3 | — | 69.2 | 84.0 | 90.7 | — |
+| MonkeyOCR | open | 3B | 79.9 | — | 70.3 | 79.6 | 89.8 | — |
 | Unlimited-OCR | open | 3.3B | 79.5 | — | 70.7 | 76.6 | 91.1 | — |
 | Indra OCR (Datalab) | open | about 17M | 78.8 | — | 68.0 | 75.8 | 92.6 | — |
 | Infinity-Parser2-Flash | open | 2.2B | 78.7 | — | 78.8 | 66.8 | 90.4 | — |
@@ -430,6 +431,7 @@ The slices use omni-parse-bench 1.7.0 and the same runs as the results table; ro
 | GLM-OCR | 42.6 | 90.3 | 83.9 | 69.0 | 75.7 | 66.5 | 61.8 | 55.4 | 27.3 |
 | Unlimited-OCR 2 | 35.8 | 88.2 | 79.3 | 71.9 | 70.9 | 59.4 | 34.4 | 49.5 | 44.3 |
 | PaddleOCR-VL-1.6 | 40.0 | 82.3 | 82.6 | 67.9 | 69.7 | 58.6 | 70.9 | 43.9 | 39.6 |
+| MonkeyOCR | 45.7 | 91.0 | 78.7 | 64.1 | 73.5 | 66.2 | 48.3 | 53.9 | 22.7 |
 | Unlimited-OCR | 31.3 | 89.3 | 75.3 | 69.1 | 68.8 | 59.3 | 15.6 | 50.4 | 36.8 |
 | Indra OCR (Datalab) | 28.1 | 63.5 | 76.6 | 65.4 | 68.7 | 78.1 | 61.5 | 34.6 | 71.1 |
 | Infinity-Parser2-Flash | 63.6 | 93.5 | 67.5 | 75.6 | 77.5 | 73.7 | 33.6 | 71.8 | 41.0 |

@@ -407,9 +407,9 @@ def test_nanonets_asks_vllm_with_its_config(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("provider", ["chandra-ocr", "deepseek-ocr", "dots-mocr", "glm-ocr", "hunyuan-ocr",
-                                      "infinity-parser2", "lightonocr", "mineru", "nanonets-ocr",
-                                      "nemotron-parse", "ocria-1", "olmocr", "ovisocr", "ovisocr2",
-                                      "ovisocr3", "paddleocr-vl", "surya-ocr", "surya-ocr-2.5",
+                                      "infinity-parser2", "lightonocr", "mineru", "monkeyocr",
+                                      "nanonets-ocr", "nemotron-parse", "ocria-1", "olmocr", "ovisocr",
+                                      "ovisocr2", "ovisocr3", "paddleocr-vl", "surya-ocr", "surya-ocr-2.5",
                                       "unlimited-ocr", "unlimited-ocr-2"])
 def test_a_served_model_run_is_named_by_every_option(provider):
     """Every option names the run but the server's address: the same model at another address is the same
@@ -674,3 +674,105 @@ def test_ovis_qwen35_servers_choose_the_vision_encoders_attention(
                          text=True, check=True).stdout.strip()
     assert out == (f"--mm-encoder-attn-backend {expect}" if expect else "")
     assert '"${ENC[@]}"' in text.split("vllm.entrypoints.cli.main serve", 1)[1]
+
+
+def test_monkeyocr_reads_its_markdown_and_blocks_with_labels_and_page_frame():
+    """The fixture is synthetic (written from MonkeyOCR's documented output, not a model's answer): it checks
+    the client side, which needs no vendor code."""
+    fx, outs, errs = _read(HERE / "monkeyocr.json")
+    assert "synthetic" in fx and not errs
+    assert "Methods" in views.text(outs["html"]) and "<table>" in outs["html"]
+    got = [(b["label"], b["text"]) for b in outs["blocks"]]
+    assert [label for label, _ in got] == ["page_furniture", "heading", "text", "list", "equation",
+                                           "caption", "table", "figure", "caption", "text", "page_furniture"]
+    assert all(0 <= x <= 1 for b in outs["blocks"] for x in b["bbox"])
+    assert outs["blocks"][1]["bbox"] == pytest.approx([72 / 612, 80 / 792, 250 / 612, 100 / 792])
+    assert "Journal of Examples" in views.text(outs["html"])
+
+
+def test_monkeyocr_fails_a_block_type_its_table_lacks_for_blocks_only():
+    from omni_parse_bench.harness.providers import monkeyocr
+
+    fx = json.loads((HERE / "monkeyocr.json").read_text())
+    request = monkeyocr.MonkeyOcr().requests(frozenset({"html", "blocks"}))[0]
+    blocks = [{"type": "no_such_type", "bbox": [0, 0, 1, 1]}]
+    outs, errs = monkeyocr.parse(fx["raw"] | {"blocks": blocks}, request)
+    assert "Methods" in views.text(outs["html"]) and "blocks" in errs and "blocks" not in outs
+
+
+def _load_server(name: str, fakes: dict):
+    """A serve folder's server.py loaded with its vendor's modules faked (it imports them at the top)."""
+    import importlib.util
+    import sys
+
+    saved = {k: sys.modules.get(k) for k in fakes}
+    for k, attrs in fakes.items():
+        sys.modules[k] = _module(k, attrs)
+    try:
+        path = Path(harness.__file__).parent / "providers" / "serve" / name / "server.py"
+        spec = importlib.util.spec_from_file_location(f"_serve_{name}", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    finally:
+        for k, v in saved.items():
+            if v is None: sys.modules.pop(k, None)
+            else: sys.modules[k] = v
+
+
+def _module(name: str, attrs: dict):
+    import types
+
+    m = types.ModuleType(name)
+    m.__dict__.update(attrs)
+    return m
+
+
+def test_the_monkeyocr_server_flattens_image_and_table_blocks_into_their_parts():
+    """server.py's `blocks`: a page's `para_blocks` as typed boxes; the vendor's text merge is faked here."""
+    def merge(block):
+        return " ".join(s["content"] for ln in block["lines"] for s in ln["spans"])
+
+    noop = type("X", (), {})
+    fakes = {
+        "magic_pdf": {}, "magic_pdf.data": {}, "magic_pdf.dict2md": {}, "magic_pdf.model": {},
+        "magic_pdf.data.data_reader_writer": {"FileBasedDataWriter": noop},
+        "magic_pdf.data.dataset": {"ImageDataset": noop, "PymuDocDataset": noop},
+        "magic_pdf.dict2md.ocr_mkcontent": {"get_title_level": lambda b: b.get("level", 1),
+                                            "merge_para_with_text": merge},
+        "magic_pdf.model.custom_model": {"MonkeyOCR": noop},
+        "magic_pdf.model.doc_analyze_by_custom_model_llm": {"doc_analyze_llm": noop},
+    }
+    server = _load_server("monkeyocr", fakes)
+
+    def lines(text):
+        return [{"spans": [{"type": "text", "content": text}]}]
+
+    page = {"para_blocks": [
+        {"type": "title", "level": 2, "bbox": [0, 0, 1, 1], "lines": lines("Head")},
+        {"type": "table", "bbox": [0, 2, 3, 4], "blocks": [
+            {"type": "table_caption", "bbox": [0, 2, 3, 3], "lines": lines("Cap")},
+            {"type": "table_body", "bbox": [0, 3, 3, 4],
+             "lines": [{"spans": [{"type": "table", "html": "<table/>"}]}]}]},
+        {"type": "image", "bbox": [5, 5, 6, 6], "blocks": [
+            {"type": "image_body", "bbox": [5, 5, 6, 6],
+             "lines": [{"spans": [{"type": "image", "image_path": "a.jpg"}]}]}]},
+    ], "discarded_blocks": [{"type": "discarded", "bbox": [9, 9, 9, 9]}]}
+    class Inferred:
+        def get_infer_res(self):
+            dets = [{"original_label": "header", "poly": [0, 0, 10, 0, 10, 4, 0, 4]},
+                    {"original_label": "text", "poly": [0, 0, 1, 0, 1, 1, 0, 1]}]
+            return [{"page_info": {"width": 20, "height": 8}, "layout_dets": dets}]
+
+    regions = server.abandoned(Inferred(), [10, 4])
+    assert regions == [("header", [0.0, 0.0, 5.0, 2.0])]
+    page["para_blocks"].append({"type": "text", "bbox": [0, 0, 5.0, 2.1], "lines": lines("Run head")})
+    last = server.blocks(page, regions)[-1]
+    assert last == {"type": "header", "bbox": [0, 0, 5.0, 2.1], "content": "Run head"}
+    page["para_blocks"].pop()
+    assert server.blocks(page) == [
+        {"type": "title", "bbox": [0, 0, 1, 1], "content": "Head", "level": 2},
+        {"type": "table_caption", "bbox": [0, 2, 3, 3], "content": "Cap"},
+        {"type": "table_body", "bbox": [0, 3, 3, 4], "content": "<table/>"},
+        {"type": "image_body", "bbox": [5, 5, 6, 6], "content": ""},
+    ]
