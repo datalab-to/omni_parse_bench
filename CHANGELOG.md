@@ -25,10 +25,6 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 - `present` setting `{"blank_after": true}` (below): no verdict moves, because no published test uses it. Regraded on saved predictions of the 27 published systems (unlimited-ocr-2 with `--partial`), old main 222f0cd against this change: 439,776 verdicts, none changed.
 - `table_cell` `section`: a section label written in every cell of its row (`<td>Cohort 1</td><td>Cohort 1</td>`) now reads as the section row a merged cell (`colspan`) already did, for a test that names it: a row whose cells all fold to one string that matches the test's section (within its `max_diffs`, as a merged label does), start in the row and span no other, is read as that section in a second reading (the first still passes what it passed, so no verdict goes from pass to fail). Any other repeated row (`Yes | Yes`, `0 | 0`) stays data. Remaining tradeoff: a test that names `Yes` as its section passes on a `Yes | Yes` row, and, as a merged label does, a repeated value within the test's `max_diffs` of the section; copies that differ from each other stay data; published tests name real section labels (case cell-section-repeated-value). Regraded on the saved predictions of the 27 published systems (unlimited-ocr-2 holds 2,934 of 2,937 pages; the 3 missing hold no `table_cell` test, so each system has all 5,386), old main 24adb7e against this change, `table_cell` tests only (`section` is read nowhere else): 145,422 verdicts, none changed, no score changed.
 
-### Added
-
-- Provider: Docling (`docling`, docling 2.153.0), its standard PDF pipeline at its defaults, with a server image that runs on Docling's default device (the GPU when there is one, else the CPU): html from its own HTML export and layout blocks from its items; and a `docling-formula` row, the same pipeline with `do_formula_enrichment=True` (formulas read as LaTeX by CodeFormulaV2, pinned), served by the same image (#117).
-
 ### Changed
 
 - Indra OCR: update the CPU adapter to `indra-ocr==1.2.0` and model revision `v1.2.0`. Math is enabled by default; the full public run scores 78.8 (text 68.0, tables 75.8, layout 92.6) on 2,937 pages (#129).
@@ -50,6 +46,7 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 - Providers: `pymupdf4llm` and `pymupdf4llm-ocr` (PyMuPDF4LLM 2.1, AGPL-3.0), local CPU rows with html and layout blocks; the OCR row uses RapidOCR or tesseract only when available (#113).
 - Provider: `opendataloader` (OpenDataLoader PDF 2.5.24, Apache-2.0), local Java engine; html and blocks, no OCR (#114).
 - Providers: `liteparse` (LiteParse 2.21.1, local; html and blocks), as a text-layer row and, with `ocr=true`, a Tesseract row (`liteparse-tesseract`) and, with `ocr_backend=ocria-nano`, a row for LiteParse's own OCR and table models (`liteparse-ocria-nano`; its weights are under their own license, which allows benchmarking). Replaces #80 (#115).
+- Provider: Docling (`docling`, docling 2.153.0), its standard PDF pipeline at its defaults (OCR: RapidOCR), with a server image that runs on Docling's default device (the GPU when there is one, else the CPU): html from its own HTML export and layout blocks from its items; full public run 64.5 (text 39.1, tables 63.8, layout 90.6), 0 failures. A `docling-formula` row is the same pipeline with `do_formula_enrichment=True` (formulas read as LaTeX by CodeFormulaV2, pinned), served by the same image: 66.9 (text 46.4, tables 63.8, layout 90.6), 0 failures (#117).
 
 ### Fixed
 
