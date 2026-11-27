@@ -116,6 +116,7 @@ TABLES = [
     table(
         "internals-fold",
         folds("fold-math", "math is read as text", "$c_{\\text{MC}}$ and $$2 . 5 5$$", "cmc and 2.55"),
+        folds("fold-math-symbol", "a LaTeX symbol reads as its character", r"$\neg p$ and $a \ne b$", "¬p and a≠b"),
         folds("fold-hyphen", "a line-end hyphen before a lowercase letter joins; a capital after a word in mixed case keeps it", "develop- ers, Anglo- Saxon", "developers, anglo- saxon"),
         folds("fold-hyphen-caps", "so does one between two words in capitals", "DEVELOP- ERS, RE- M", "developers, rem"),
         folds("fold-hyphen-block", "a block break is a line break for a hyphen: it joins, as a `<br>` does", "<p>Head-</p><p>quarters</p><p>develop-<br>ers</p>", "headquarters developers"),
@@ -124,6 +125,7 @@ TABLES = [
         folds("fold-fraction-alone", "a vulgar fraction alone", "¾", "3/4"),
         folds("fold-nfkc", "compatibility forms (ligatures, full width, sub- and superscripts)", "ﬁnal １２ m² H₂O ½ №", "final 12 m2 h2o 1/2 no"),
         folds("fold-invisible", "zero-width and soft hyphen characters vanish", "a\u200bb a\u00adb", "ab ab", show="`a` U+200B `b a` U+00AD `b`"),
+        folds("fold-root-tick", "a `√` with no operand is a tick (a checked box); with an operand it is a root", "√ Done （ √ ） √2 √x √(a+b) √ 2", "☒ done ( ☒ ) √2 √x √(a+b) √ 2"),
         folds("fold-checkbox", "checkboxes become ☒ or ☐ (`⊠`, a maths operator, stays as written)", "[x] Yes [ ] No ☑ ok ⊠ ◼ ◻", "☒ yes ☐ no ☒ ok ⊠ ☒ ☐"),
         folds("fold-footnote", "a bracketed footnote marker becomes a spaced number", "Smith[1] and [12] Jones", "smith 1 and 12 jones"),
         folds("fold-bullet", "a bullet starting a line goes; one inside a line stays", "• one • two", "one • two"),

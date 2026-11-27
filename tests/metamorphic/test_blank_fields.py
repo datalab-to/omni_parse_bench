@@ -331,6 +331,8 @@ def test_every_real_present_test_keeps_its_old_verdict(old_package):
         c = p.content
         kind, value = ("text", c.text) if isinstance(c, runners.Text) else (
             ("number", c.number) if isinstance(c, runners.Number) else ("latex", c.latex))
+        if "√" in value:
+            continue    # a `√` is a checked box since the fold reads it as a tick: its whys name ☒, not √
         shown = f"$${value}$$" if kind == "latex" else escaped(value)
         exact, md = (c.exact_case, c.max_diffs) if kind == "text" else (False, 0)
         for page in (f"<p>{shown}</p>", f"<p>{shown[:-1]}</p>", f"<p>{shown} x</p>",

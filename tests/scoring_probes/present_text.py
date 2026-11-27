@@ -27,6 +27,9 @@ TABLES = [
         text("text-checkbox", "I", "checkbox written another way", "☒ Yes", "<p><input type=checkbox checked> Yes</p>"),
         text("text-math-letter", "I", "a variable in math", "U test", "$U$ test"),
         text("text-math-symbol", "I", "a symbol in math", "3σ", r"$3\sigma$"),
+        text("text-math-negation", "I", "a symbol written in LaTeX, the gold a character", "¬p", r"$\neg p$"),
+        text("text-math-relation", "I", "a relation written in LaTeX, the gold a character", "a≠b", r"$a \ne b$"),
+        text("text-math-words", "I", "words in `\\mbox` in math", "x if y", r"$x\mbox{ if } y$"),
         text("text-middot", "I", "middle dot as a decimal point", "2.3", "2·3"),
         text("text-leading-middot", "I", "a raised decimal point without a leading zero", "·2480550383", ".2480550383"),
         text("text-glued-dash", "I", "dashes glued to a number are a leader", "Revenue 5", "Revenue -----5"),
@@ -57,6 +60,7 @@ TABLES = [
     table(
         "text-penalized",
         text("text-changed", "P", "a changed letter", "Total", "Totel", why=True),
+        text("text-math-negation-dropped", "P", "a negation left out of a page", "¬p", "<p>p</p>"),
         text("text-over-budget", "P", "more edits than `max_diffs`", "Total", "Tutel", md=1),
         text("text-inserted", "P", "each inserted letter is an edit", "lorem ipsum dolor sit amet", "lorem izpsum dolqor sit amjet", md=2),
         text("text-page-edge", "P", "a text at the edge of the page gets no extra edits", "lorem ipsum", "abc xxxem ipsum", md=2),

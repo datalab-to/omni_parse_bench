@@ -1,6 +1,6 @@
 """Relations of text matching: the edit budget (M3, M23), order (M4, M25), repeat (M5), words broken at a
 hyphen (M11), digits glued to an answer (M13), numbers kept exact (M88, M89), vulgar fractions (M90) and
-checkbox glyphs (M91, M92)."""
+checkbox glyphs (M91, M92) and a root sign (M195)."""
 from __future__ import annotations
 
 import random
@@ -275,6 +275,25 @@ def test_repeat_needs_exactly_its_count(text, n, rnd):
     # When on n + 1 or n - 1 lines; Then it fails
     assert not passes(r, page_with_lines(text, n + 1, rnd))
     assert not passes(r, page_with_lines(text, n - 1, rnd))
+
+
+@relation(HOLDS, domain="9 texts x 5 neighbors, 2 sides, 1 to 3 copies")
+@given(st.sampled_from(["一年里的第", "资料来源", "ประเทศ", "ការ", "ありがとう", "안녕", "ab", "1", "第12"]),
+       st.sampled_from(["一", "か", "한", "ก", "ក"]), st.sampled_from(["x", "Я", "7", "é", "Ω"]),
+       st.booleans(), st.integers(1, 3))
+def test_repeat_counts_a_copy_beside_a_script_written_without_spaces(text, unspaced, spaced, before, n):
+    """A repeat test counts each copy of its text that has a letter of a script written without spaces (Han,
+    kana, Hangul, Thai, Khmer) glued to either end, and counts none that has a letter or digit of a spaced
+    script glued there (Latin, Cyrillic, Greek). [M194]
+    Why it matters for a score: a line that starts with the same words in Chinese or Thai has no space to end
+    its word, so requiring one scored every system 0 on such a test."""
+    # Given n lines each holding the text with a neighbor glued before or after it
+    glue = lambda c: f"{c}{text}" if before else f"{text}{c}"  # noqa: E731
+    r = runners.Repeat(runners.Text(text, 0), n)
+    # When the neighbor is of an unspaced script; Then every copy counts
+    assert passes(r, "".join(f"<p>{glue(unspaced)}</p>" for _ in range(n)))
+    # When it is of a spaced script; Then none counts, so a test of n fails
+    assert not passes(r, "".join(f"<p>{glue(spaced)}</p>" for _ in range(n)))
 
 
 @more_evidence(pool="repeat")
@@ -657,7 +676,7 @@ def test_every_real_test_with_a_vulgar_fraction_passes_it_written_in_ascii():
 
 # ------------------------------------------------------------------------------------- checkboxes
 
-CHECKED_GLYPHS = ["☒", "☑", "■", "◼", "▣", "✓", "✔", "[x]", "<input type=checkbox checked>"]
+CHECKED_GLYPHS = ["☒", "☑", "■", "◼", "▣", "✓", "✔", "√", "[x]", "<input type=checkbox checked>"]
 UNCHECKED_GLYPHS = ["☐", "□", "◻", "❏", "▢", "⬜", "[ ]", "<input type=checkbox>"]
 # Note: a test's text is plain text, so only a page can write a box as an input.
 TEXT_GLYPHS = [g for g in CHECKED_GLYPHS + UNCHECKED_GLYPHS if not g.startswith("<")]
@@ -670,8 +689,8 @@ PAIRS = [(g, w) for g in TEXT_GLYPHS for w in CHECKED_GLYPHS + UNCHECKED_GLYPHS]
 @pytest.mark.parametrize("gold, page", PAIRS)
 def test_a_checkbox_state_written_with_any_of_its_glyphs_keeps_every_verdict(gold, page):
     """An exact (`max_diffs` 0) present text test gives the same verdict when a checkbox in its text or in the
-    page is written with another glyph of the same state (`☒`, `■`, `◼`, `[x]` or a checked input; `☐`,
-    `◻`, `[ ]` or an input), and a context that was wrong stays wrong. [M91]
+    page is written with another glyph of the same state (`☒`, `■`, `◼`, a `√` with no operand, `[x]` or a
+    checked input; `☐`, `◻`, `[ ]` or an input), and a context that was wrong stays wrong. [M91]
     Why it matters for a score: a form's boxes are drawn with whichever glyph the font or the model chose; the
     state is the content, not the glyph."""
     # Given an exact text test for "<glyph> Yes", and a page that writes the box with another glyph
@@ -712,3 +731,24 @@ def test_a_squared_times_sign_is_not_a_box():
         assert passes(runners.Present(runners.Text(text, 0)), f"<p>{page}</p>")
     for text, page in (("A⊠B", "A☒B"), ("A☒B", "A⊠B")):
         assert not passes(runners.Present(runners.Text(text, 0)), f"<p>{page}</p>"), (text, page)
+
+
+@relation(HOLDS, domain="6 operands x 2 roots x 2 spacings")
+@given(st.sampled_from(["2", "x", "(a+b)", "{x}", "-1", "2.5"]), st.sampled_from(["√", "√√"]),
+       st.sampled_from(["", " "]))
+@example(operand="2", root="√", space=" ")
+def test_a_square_root_sign_with_an_operand_is_not_a_checked_box(operand, root, space):
+    """A `√` with an operand after it (`√2`, `√x`, `√(a+b)`, `√{x}`, `√-1`, and a digit or bracket after a
+    space) is a root: an exact present text test for it fails on a page that has a checked box in its place,
+    and passes on its own text; the same sign alone before a word is a checked box. [M195]
+    Why it matters for a score: a root is maths and a tick is a form's answer; reading every `√` as a tick
+    would pass `☒2` for `√2`."""
+    # Given a root; after a space only a digit or a bracket keeps it a root (a letter there is a label)
+    assume(not space or operand[0] in "2({")
+    text = f"{root}{space}{operand} Yes"
+    # When a page writes a checked box in its place; Then the test fails, and it passes on the root itself
+    p = runners.Present(runners.Text(text, 0))
+    assert passes(p, f"<p>{text}</p>")
+    assert not passes(p, f"<p>☒{space}{operand} Yes</p>"), text
+    # And the sign alone before a word reads as the tick, for the checked glyphs
+    assert passes(runners.Present(runners.Text("√ Yes", 0)), "<p>✓ Yes</p>")

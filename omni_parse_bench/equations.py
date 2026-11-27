@@ -74,6 +74,14 @@ _LATEX = re.compile(r"\\[A-Za-z]|[\^_]")
 _WORD = re.compile(r"(?<![\\\w])[^\W\d_]{3,}")
 _BRACED = re.compile(r"\{[^{}]*\}")
 _MAX_UNDEFINED = 5
+# Note: KaTeX reads nested groups, and a run of \dots (each looks ahead at the next), by recursion. Deep
+# enough, the embedded V8 overruns its thread's stack and kills the whole process (SIGBUS, exit 138) instead
+# of raising. Two bounds: math nested more than MAX_NESTING groups deep (`{`, \left, \begin) does not render,
+# and V8 itself stops at STACK_KB (the backstop for what the count does not see: \dots\dots.., \sqrt\sqrt..).
+# Both read as "does not render": no symbols, as for a span with an error.
+MAX_NESTING = 64
+STACK_KB = 256
+_GROUP = re.compile(r"\\[{}]|\\(?:left|begin)(?![A-Za-z])|\\(?:right|end)(?![A-Za-z])|[{}]")
 # Between spans: whitespace only (soft), or prose (hard); a full stop, comma or semicolon right after
 # a span (its own token). The tokens aren't symbols KaTeX makes.
 _SOFT, _HARD, _GAP, _SPACE, _DISPLAY_END = "\0~", "\0#", "\0", " ", "\0$"
@@ -90,6 +98,8 @@ class _KaTeX:
     def __init__(self) -> None:
         import py_mini_racer
 
+        py_mini_racer.init_mini_racer(flags=(*py_mini_racer.DEFAULT_V8_FLAGS, f"--stack-size={STACK_KB}"),
+                                      ignore_duplicate_init=True)
         # Note: a V8 context runs one call at a time, so the threads take turns.
         self.lock = threading.Lock()
         self.ctx = py_mini_racer.MiniRacer()
@@ -101,6 +111,7 @@ class _KaTeX:
         self.ctx.eval(f"var render = {_RENDER}")
 
     def render(self, tex: str, display: bool) -> dict:
+        if _too_deep(tex): return {"error": "nested too deeply"}
         with self.lock:
             return self.ctx.call("render", tex, display)
 
@@ -115,6 +126,17 @@ class _KaTeX:
         # Note: takes the lock, so a thread mid-call finishes before the context goes away.
         with self.lock:
             self.ctx.close()
+
+
+def _too_deep(tex: str) -> bool:
+    """Whether `tex` nests groups deeper than MAX_NESTING."""
+    depth = 0
+    for m in _GROUP.finditer(tex):
+        t = m[0]
+        if t.startswith("\\") and len(t) == 2: continue    # \{ and \}: a printed brace
+        depth += 1 if t in ("{", "\\left", "\\begin") else -1
+        if depth > MAX_NESTING: return True
+    return False
 
 
 @functools.cache
@@ -161,8 +183,12 @@ def symbols(tex: str, display: bool = False) -> tuple[str, ...] | None:
 def _from_mathml(mathml: str) -> tuple[str, ...] | None:
     try:
         root = ET.fromstring(re.sub(r"^<span[^>]*>|</span>$", "", mathml.strip()))
-    except ET.ParseError:
+        return _flatten(root)
+    except (ET.ParseError, RecursionError):    # Note: or MathML nested past Python's own limit
         return None
+
+
+def _flatten(root: ET.Element) -> tuple[str, ...]:
     if root.get("display") == "block":
         def rows(e: ET.Element, in_table: bool = False) -> None:
             in_table = in_table or e.tag.removeprefix(_NS) == "mtable"

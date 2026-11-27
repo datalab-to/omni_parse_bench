@@ -544,3 +544,27 @@ def test_a_raised_decimal_folds_at_a_start_after_space_a_bracket_a_sign_or_a_cur
 @pytest.mark.parametrize("text", ["(a)·1", "x)·2", "A·1", "太原·2020", "a·1", "x]·2", "x}·2", "ab·5", "Ö·5"])
 def test_a_raised_dot_after_anything_else_is_a_separator_not_a_decimal(text):
     assert "·" in normalize.fold(text) and "." not in normalize.fold(text).replace("·", "")
+
+
+@pytest.mark.parametrize("text, folded", [
+    ("√ Distributed offsetting receipts", "☒ distributed offsetting receipts"),
+    ("（ √ ）公告邀请", "( ☒ )公告邀请"), ("√", "☒"), ("Done √", "done ☒"), ("√.", "√."),
+    ("√ Next", "☒ next"),
+])
+def test_a_square_root_sign_with_no_operand_is_a_checked_box(text, folded):
+    assert normalize.fold(text) == folded
+
+
+@pytest.mark.parametrize("text", ["√2", "√x", "√(a+b)", "√{x}", r"√\alpha", "√-1", "√√2", "√ 2", "√ (a+b)",
+                                  "SD × √1 − r", "x=√2", "√2.5"])
+def test_a_square_root_sign_before_an_operand_stays_a_root(text):
+    assert "☒" not in normalize.fold(text)
+    assert "√" in normalize.fold(text)
+
+
+def test_a_tick_written_as_a_root_sign_matches_the_checked_box_glyphs_both_ways():
+    for glyph in "√✓✔☑☒":
+        assert runners.found(runners.Text(f"{glyph} Done", 0), views.html("<p>√ Done</p>"))[0]
+        assert runners.found(runners.Text("√ Done", 0), views.html(f"<p>{glyph} Done</p>"))[0]
+    assert not runners.found(runners.Text("√ Done", 0), views.html("<p>☐ Done</p>"))[0]
+    assert not runners.found(runners.Text("√2 Done", 0), views.html("<p>☒2 Done</p>"))[0]

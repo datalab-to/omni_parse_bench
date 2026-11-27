@@ -66,6 +66,7 @@ TABLES = [
     table(
         "latex-penalized",
         latex("tex-case", "P", "letter case", "x^2", "$X^2$", why=True),
+        latex("tex-too-deep", "P", "math nested more than 64 groups deep is not read", "x", r"$" + r"\frac{1}{" * 65 + "x" + "}" * 65 + "$", show="`$\\frac{1}{\\frac{1}{…x…}}$`, 65 levels"),
         latex("tex-symbol", "P", "a different exponent", "x^2", "$x^3$"),
         latex("tex-single-bracket", "P", "a single bracket for a double bracket", "[[z,w]]", "$[z,w]$"),
         latex("tex-blackboard", "P", "blackboard, script or fraktur dropped", r"\mathbb{R}", "$R$"),

@@ -1150,7 +1150,7 @@ requires-dist = [
     { name = "liteparse", marker = "extra == 'liteparse'", specifier = "==2.21.1" },
     { name = "markdown-it-py", marker = "extra == 'harness'", specifier = ">=3.0" },
     { name = "markitdown", extras = ["pdf"], marker = "extra == 'markitdown'", specifier = "==0.1.9" },
-    { name = "mini-racer", specifier = ">=0.12" },
+    { name = "mini-racer", specifier = ">=0.14" },
     { name = "omni-bench-core", specifier = ">=0.14,<0.15" },
     { name = "omni-bench-core", extras = ["hub"], marker = "extra == 'benchmark'", specifier = ">=0.14,<0.15" },
     { name = "omni-parse-bench", extras = ["benchmark"], marker = "extra == 'dev'" },

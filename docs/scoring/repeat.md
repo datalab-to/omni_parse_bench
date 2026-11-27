@@ -5,7 +5,11 @@ text and none with a number yet; family text; reads `html`. It is the test for l
 dropped repeats and a figure merged or invented in a table.
 
 The test folds the gold and the page text, drops the gold's spaces and allows any spacing between its characters.
-It counts matches that are whole words: no letter or digit may be glued to either end. It allows no edits
+It counts matches that are whole words: no letter or digit may be glued to either end, except one of a script
+written without spaces between words (Han, kana, Hangul, Thai, Lao, Khmer, Myanmar, Tibetan: Unicode blocks
+listed in `runners._UNSPACED`), where no space ends a word, so `一年里的第` counts in `一年里的第一季` (case
+rep-cjk-neighbor) while `Тест` does not count in `Тестов` (case rep-cyrillic-glued). Latin, Cyrillic, Greek,
+Hebrew, Arabic, Devanagari and every other spaced script glue as before. It allows no edits
 (`max_diffs` must be 0) and reads the text **without** image descriptions. When the count is not N, it counts
 again with each hyphen a line broke after (on the page or in the gold) read kept or dropped, each copy once, and N
 copies there pass too, so a hyphenated compound broken at a line end counts (case rep-compound; detail in
@@ -43,6 +47,10 @@ is always one `present` finds.
 | P | an extra copy | `Total` ×2 | `<p>Total</p><p>Total</p><p>Total</p>` | fail: `'Total' appears 3x, not 2x` | `rep-extra` |
 | P | only inside a longer word | `Total` ×1 | `Totals` | fail | `rep-longer-word` |
 | P | a digit glued on | `Total` ×1 | `Total1` | fail | `rep-digit` |
+| I | a letter of a script written without spaces beside a copy | `一年里的第` ×2 | `<p>一年里的第一季</p><p>一年里的第二季</p>` | pass | `rep-cjk-neighbor` |
+| I | a model number in an English line and in a Japanese line | `4284A` ×2 | `<p>LCR meter 4284A</p><p>LCRメータ4284A</p>` | pass | `rep-katakana-model` |
+| P | the English line written twice beside the Japanese one | `4284A` ×2 | `<p>LCR meter 4284A</p><p>LCR meter 4284A</p><p>LCRメータ4284A</p>` | fail: `'4284A' appears 3x, not 2x` | `rep-katakana-duplicate` |
+| P | a letter of a spaced script glued on | `Тест` ×1 | `Тестов` | fail | `rep-cyrillic-glued` |
 | P | a changed character | `Total` ×1 | `Tota1` | fail | `rep-typo` |
 | P | only in an image description | `Total` ×1 | `<img alt='Total'>` | fail | `rep-alt-only` |
 | P | copies that overlap | `aa` ×1 | `aaaa` | fail | `rep-overlap` |

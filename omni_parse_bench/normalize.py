@@ -8,7 +8,7 @@ import re
 import sys
 import unicodedata
 
-from omni_parse_bench import mathspans, views
+from omni_parse_bench import mathspans, texsymbols, views
 
 # Note: Cf is the whole invisible-formatting category, so a stray one (a zero-width space in "Ac\u200bme")
 # never splits a word; but the prepended concatenation marks are Cf and printed (the Arabic number
@@ -22,6 +22,11 @@ _CHECKED = re.compile("[☑☒■◼▣✓✔✗✘]")
 # Note: ⊠ (U+22A0) is not here: it is the squared-times operator, and a form that draws a box with it is
 # not told from maths typed as text, so it stays as written (deferred; no public test reads it).
 _UNCHECKED = re.compile("[☐□◻❏▢⬜]")
+# Note: a √ (U+221A) drawn as a tick is a checked box, but the same glyph is a root: it is a root when an
+# operand starts right after it ("√2", "√x", "√(a+b)", "√{x}", "√\alpha", "√-1", "√√2"), or when spaces and
+# then a digit, "(", "{" or "\" do ("√ 2"); with nothing, or a word after a space ("√ Distributed ...",
+# "（ √ ）"), it is a tick. A block break is no space: "√" alone in a block is a tick.
+_TICK = re.compile(r"√(?![\w(\[{\\√.+\-\u2212]|[ \t]+[\d(\[{\\])")
 _BRACKET_CHECKED = re.compile(r"\[(?:[xX✓✗]|checked)\]", re.I)
 _BRACKET_UNCHECKED = re.compile(r"\[[ \u2029]?\]|\[unchecked\]", re.I)   # a block break reads as a space
 _FOOTNOTE = re.compile(r"\[\^\s*(\w{1,3})\s*\]|\[\s*(\d{1,3})\s*\]")
@@ -120,6 +125,13 @@ _PRE_NFKC = str.maketrans({"〜": "~", "∗": "*"})
 # ţ; gershayim is the Hebrew double quote.
 _POST_NFKC = str.maketrans({"ş": "ș", "ţ": "ț", "Ş": "Ș", "Ţ": "Ț", "״": '"'})
 _WRAP_HYPHEN = re.compile("[-‐‑](?=\\s)")
+# Note: one relation or operator, two glyphs: the slanted ≤ ≥ and their double-line forms are ≤ ≥ (so
+# `\leqslant` reads as ≤), an n-ary operator is its binary one, and the set relations and triangles fold
+# as `equations` folds them.
+_SYMBOL_ALIASES = str.maketrans({"♢": "◊", "≦": "≤", "≧": "≥", "⩽": "≤", "⩾": "≥",
+                                 "⨀": "⊙", "⨁": "⊕", "⨂": "⊗", "⨄": "⊎", "⨆": "⊔",
+                                 "⫅": "⊆", "⫆": "⊇", "⫋": "⊊", "⫌": "⊋", "⊲": "◃", "⊳": "▹",
+                                 "⟺": "⇔", "⟷": "↔", "⌅": "⊼"})
 
 
 def fold(s: str) -> str:
@@ -145,14 +157,16 @@ def fold(s: str) -> str:
                          bidi controls, soft hyphen, word joiner, ...) removed, except the visible
                          number signs that are Cf (Arabic, Syriac, Kaithi: `_VISIBLE_FORMAT`)
         checkboxes       every checked glyph -> ☒, every unchecked glyph -> ☐; so are [x], [checked],
-                         [ ] and [unchecked]
+                         [ ] and [unchecked]; so is a "√" with no operand after it ("√ Done", "（ √ ）":
+                         a tick), while "√2", "√x", "√(a+b)" and "√ 2" stay roots
         markers          a footnote marker [1] or [^1] -> " 1"; a bullet glyph starting a line -> a space
         leaders          runs of 3+ dots (ideographic full stops too), dashes or underscores -> a space;
                          white space may sit inside a run, but not a block break
         typography       dash, quote (with primes, ꞌ, ˈ), space and arrow families unified, then two single
                          quotes in a row (TeX's `` and '', or a mixed pair '’) -> "; the fraction slash
                          -> "/"; "…" -> "..."; CJK full-width punctuation -> ASCII; ş ţ -> ș ț; ״ -> "
-        symbols          decimal middle dots -> "."; ♢ -> ◊; ≦ -> ≤
+        symbols          decimal middle dots -> "."; ♢ -> ◊; ≦ ⩽ -> ≤; ≧ ⩾ -> ≥; ⨀ ⨁ ⨂ ⨄ ⨆ -> ⊙ ⊕ ⊗ ⊎ ⊔;
+                         ⫅ ⫆ ⫋ ⫌ -> ⊆ ⊇ ⊊ ⊋; ⊲ ⊳ -> ◃ ▹; ⟺ ⟷ -> ⇔ ↔; ⌅ -> ⊼
         case, spacing    lowercased (case kept for an arg with exact_case: `fold_cased`); whitespace
                          collapsed and trimmed
 
@@ -219,7 +233,7 @@ def _cased(s: str, *, preserve_dashes: bool = False, preserve_line_hyphens: bool
     s = _LEADERS.sub(_leader_in_word if keep_word_underscores else " ", s).replace(views.BREAK, " ")
     s = typography(s, preserve_dashes=preserve_dashes)
     s = s.replace("…", "...").translate(_CJK_PUNCT)
-    s = _DECIMAL_MIDDOT.sub(".", s).replace("♢", "◊").replace("≦", "≤")
+    s = _DECIMAL_MIDDOT.sub(".", s).translate(_SYMBOL_ALIASES)
     return _WHITESPACE.sub(" ", s).strip()
 
 
@@ -260,7 +274,7 @@ def _in_word(c: str) -> bool:
 def boxes(s: str) -> str:
     """`s` with every checked box, a glyph or a bracket, as ☒ and every unchecked one as ☐."""
     s = _BRACKET_UNCHECKED.sub(views.UNCHECKED, _BRACKET_CHECKED.sub(views.CHECKED, s))
-    return _UNCHECKED.sub(views.UNCHECKED, _CHECKED.sub(views.CHECKED, s))
+    return _UNCHECKED.sub(views.UNCHECKED, _CHECKED.sub(views.CHECKED, _TICK.sub(views.CHECKED, s)))
 
 
 def _primes(s: str) -> str:
@@ -453,6 +467,8 @@ def _text_context():
     macros = [latex2text.MacroTextSpec(name, simplify_repl="%s/%s") for name in _FRACTION_STYLES]
     # The optional alignment argument shifts cfrac's numerator and denominator to args 2 and 3.
     macros.append(latex2text.MacroTextSpec(_CFRAC_STYLE, simplify_repl="%(2)s/%(3)s"))
+    macros += [latex2text.MacroTextSpec(name, simplify_repl=ch) for name, ch in texsymbols.SYMBOLS.items()]
+    macros += [latex2text.MacroTextSpec(name, simplify_repl="%s") for name in texsymbols.TEXT]
     db.add_context_category("opb-fraction-styles", macros=macros, prepend=True)
     return db
 
@@ -467,5 +483,6 @@ def _walker_context():
     macros = [MacroSpec(name, "{{") for name in _FRACTION_STYLES]
     # cfrac takes an optional [l] or [r] argument before its numerator and denominator.
     macros.append(MacroSpec(_CFRAC_STYLE, "[{{"))
+    macros += [MacroSpec(name, "{") for name in texsymbols.TEXT]
     db.add_context_category("opb-fraction-styles", macros=macros, prepend=True)
     return db
