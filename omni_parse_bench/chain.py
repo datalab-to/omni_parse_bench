@@ -28,7 +28,7 @@ from typing import NamedTuple
 
 import regex
 
-from . import reader, switches
+from . import reader, switches, work
 from .reader import BREAK, CONTENT, MARK, QTY, SPACE, WORD, WRAP, Token
 
 ID, TEXT, CASED, WORDS = "Id", "Text", "Cased", "Words"
@@ -158,14 +158,18 @@ def _search(a: list[Cell], b: list[Cell], k: int, *, whole: bool, osa: bool) -> 
     `a`, kept sparse: for each offset of `b`, the starts whose cost is at most `k`."""
     m, n = len(a), len(b)
     Row = dict[int, dict[int, int]]
+    states = 0  # relaxations: the deterministic measure of the search's work
 
     def relax(row: Row, j: int, c: int, st: int) -> None:
+        nonlocal states
+        states += 1
         d = row.setdefault(j, {})
         if c < d.get(st, INF):
             d[st] = c
 
     def close(row: Row) -> None:
         """Insertions of the output's cells along the row."""
+        nonlocal states
         for j0 in sorted(row):
             for st, c0 in list(row[j0].items()):
                 j, c = j0, c0
@@ -174,6 +178,7 @@ def _search(a: list[Cell], b: list[Cell], k: int, *, whole: bool, osa: bool) -> 
                     if c > k:
                         break
                     j += 1
+                    states += 1
                     d = row.setdefault(j, {})
                     if d.get(st, INF) <= c:
                         break
@@ -213,7 +218,10 @@ def _search(a: list[Cell], b: list[Cell], k: int, *, whole: bool, osa: bool) -> 
         close(new)
         prev2, row = row, new
         if not row:
+            work.add("search_states", states)
             return []
+    work.add("search_states", states)
+    work.check_search(m, n, states)
     if whole:
         return [(0, n, row[n][0])] if n in row and 0 in row[n] else []
     return [(st, j, c) for j, d in row.items() if j == 0 or b[j - 1].end for st, c in d.items()]

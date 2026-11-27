@@ -38,7 +38,7 @@ from collections.abc import Iterable, Iterator
 import html5lib
 import regex
 
-from . import switches
+from . import switches, work
 from .views import MalformedOutput
 
 # ------------------------------------------------------------------------------------------ token classes
@@ -679,6 +679,7 @@ def _align(rm: str, fm: str, line_start: bool) -> list[tuple[int, int]]:
                 return out
         if len(rm) * len(fm) > 4_000_000:  # no cheap alignment: the whole stretch maps to its whole source
             return [(0, max(len(rm) - 1, 0))] * len(fm)
+    work.add("diff_cells", len(rm) * len(fm))
     out = []
     for tag, a0, a1, b0, b1 in difflib.SequenceMatcher(None, rm, fm, autojunk=False).get_opcodes():
         if tag == "equal":
@@ -907,7 +908,9 @@ class _Builder:
 
         def emit(cls, text, canon, lo, hi, script) -> None:
             if hi > lo:
-                ms = set(run_mk[bisect.bisect_right(run_at, lo) - 1 : bisect.bisect_left(run_at, hi)])
+                seen = run_mk[bisect.bisect_right(run_at, lo) - 1 : bisect.bisect_left(run_at, hi)]
+                work.add("emit_runs", len(seen))
+                ms = set(seen)
             else:
                 ms = {frozenset()}
             both = frozenset.intersection(*ms)
@@ -1147,6 +1150,7 @@ def read(h: str, *, rules: Iterable[str] | None = None, output: bool = True) -> 
     if not isinstance(h, str):
         raise MalformedOutput(f"html must be a string, not {type(h).__name__}: {h!r:.80}")
     rules = _rules(rules)
+    before = work.snapshot()
     root = _parse(h)
     maths: dict[int, str] = {}
     for el in list(root.iter("math")):  # a math element is its source: its children are not text
@@ -1257,7 +1261,9 @@ def read(h: str, *, rules: Iterable[str] | None = None, output: bool = True) -> 
             if tag == "pre" and pre:
                 pre -= 1
             b.begin("text", cell_now[-1])
-    return b.finish()
+    doc = b.finish()
+    work.check_read(len(h), before)
+    return doc
 
 
 def _span(el, name: str) -> int:
