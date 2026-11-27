@@ -380,6 +380,8 @@ Blind spots of `blank_after`, besides those of `present`:
 - **A comma before one or two digits is a list comma.** A decimal comma (`1,2`) is two numbers to the reader, so
   `1,2` passes for `1 2` or `1;2` with an edit to spend; `1.2` for `1,2` still fails. A thousands comma against a
   list comma (`80,100` for `80, 100`) is a number change.
+- **A page that tightens a spaced range gains a sign.** A gold `12.20 - 13.20` fails on `12.20 -13.20` (the
+  page's `-13.20` is a signed number); the other way round passes. Rarer than a page that spaces a sign.
 - **Brackets round a number are not a sign.** An accounting negative `(1,234)` passes for `1,234` and the other
   way round when the budget has 2 edits to spend (case cell-accounting-brackets); keep the budget at 0 for it.
 - **Image descriptions pay.** A description that contains the string passes the test (case text-alt).

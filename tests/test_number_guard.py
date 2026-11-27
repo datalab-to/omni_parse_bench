@@ -347,3 +347,8 @@ def test_a_time_range_with_a_spaced_hyphen_is_the_golds_hyphen(gold, page):
                                         ("12.20 -13.20 here", "12.20 13.20 here")])
 def test_a_lost_hyphen_before_a_number_after_a_value_still_fails(gold, lost):
     assert not any(all_types(gold, lost, 0)[:2]), (gold, lost)
+
+
+def test_a_page_that_tightens_a_spaced_range_gains_a_sign():          # a documented blind spot
+    assert not any(all_types("12.20 - 13.20 here", "12.20 -13.20 here", 1))
+    assert not any(all_types("net 100 - 20 = 80", "net 100 -20 = 80", 1))
