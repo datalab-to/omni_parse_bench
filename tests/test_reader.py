@@ -531,3 +531,21 @@ def test_a_page_that_hides_nothing_reads_the_same_with_the_switches_on_or_off():
 
 def test_the_visible_html_of_malformed_input_is_html():
     assert "Secret" not in views.html("<div hidden><p>Secret<p>more</div><p>x").html
+
+
+def test_a_rowspan_holds_its_column_in_the_rows_below():
+    _, c = doc_cells(
+        "<table><tr><td rowspan=2>A</td><td>B</td></tr><tr><td>C</td></tr>"
+        "<tr><td colspan=2 rowspan=2>D</td><td>E</td></tr><tr><td>F</td></tr></table>"
+    )
+    assert [(t.text, t.cell[1:]) for t in c] == [("A", (0, 0)), ("B", (0, 1)), ("C", (1, 1)), ("D", (2, 0)),
+                                                 ("E", (2, 2)), ("F", (3, 2))]
+
+
+def test_a_grouping_space_is_part_of_a_quantity_and_a_sign_gap_is_not():
+    assert gold("1\u2009234")[0] == ("Qty", "1\u2009234") != gold("1234")[0]
+    assert gold("- 0.756") == [("Qty", "-0.756")]
+
+
+def test_a_hyphen_after_a_combining_mark_stays_in_the_word():
+    assert toks("<p>a\u0301-b</p>") == [("Word", "a\u0301-b")]

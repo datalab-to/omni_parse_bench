@@ -337,6 +337,10 @@ def qty_canon(text: str) -> str:
             i = j
             continue
         if c.isspace():
+            if "".join(out) in ("-", "+", "±"):    # the gap of a spaced sign; a grouping space is content
+                i += 1
+                continue
+            out.append(c)
             i += 1
             continue
         if c in _MINUS:
@@ -559,6 +563,9 @@ _INNER = frozenset("-‐‑'’ʼ")     # hyphens and apostrophes
 
 
 def _spaced_letter(u: str, i: int) -> bool:
+    """Whether the cluster `u[i]` is in has a spaced-script letter for its base (a mark looks back)."""
+    while 0 < i < len(u) and _is_mark(u[i]):
+        i -= 1
     return 0 <= i < len(u) and _is_letter(u[i]) and script_class(u[i]) == SPACED
 
 
@@ -1023,7 +1030,7 @@ def read(h: str, *, rules: Iterable[str] | None = None, output: bool = True) -> 
             markup.append(markup[-1] | {m} if m else markup[-1])
             if tag == "table":
                 tables += 1
-                cell_stack.append([tables, -1, -1])
+                cell_stack.append([tables, -1, -1, set()])
                 b.begin("text", None)
             elif tag == "tr":
                 if cell_stack:
@@ -1034,13 +1041,13 @@ def read(h: str, *, rules: Iterable[str] | None = None, output: bool = True) -> 
                 if cell_stack:
                     st = cell_stack[-1]
                     st[2] += 1
+                    while (st[1], st[2]) in st[3]:      # a slot an earlier rowspan holds
+                        st[2] += 1
                     cell_now.append((st[0], st[1], st[2]))
                     b.begin("cell", cell_now[-1])
-                    st[2] += (
-                        max(int(el.attrib.get("colspan", "1") or 1) - 1, 0)
-                        if el.attrib.get("colspan", "1").isdigit()
-                        else 0
-                    )
+                    cs, rs = (_span(el, k) for k in ("colspan", "rowspan"))
+                    st[3].update((st[1] + dr, st[2] + dc) for dr in range(rs) for dc in range(cs))
+                    st[2] += cs - 1
                 else:
                     b.begin("text", cell_now[-1])
             elif tag == "br":
@@ -1099,6 +1106,11 @@ def read(h: str, *, rules: Iterable[str] | None = None, output: bool = True) -> 
                 pre -= 1
             b.begin("text", cell_now[-1])
     return b.finish()
+
+
+def _span(el, name: str) -> int:
+    v = el.attrib.get(name, "1").strip()
+    return min(int(v), 1000) if v.isdigit() and int(v) > 0 else 1
 
 
 def _math_source(el) -> str:
