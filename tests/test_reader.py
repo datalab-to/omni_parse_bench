@@ -615,3 +615,24 @@ def test_a_stretch_that_folds_to_nothing_reads_as_nothing():
     with switches.using(text_fold=True):
         html = "<p>a</p><p>\u200b\u200b</p><p>b</p>"
         assert [t.text for t in reader.read(html).tokens if t.cls == "Word"] == ["a", "b"]
+
+
+def test_a_scorer_error_fails_one_test_and_not_the_run(monkeypatch, caplog):
+    """A test that raises on a well-formed output fails with a logged reason; the page's other tests still run."""
+    from omni_parse_bench.scorers.unit_tests import compare, runners, tests
+
+    monkeypatch.delenv("OPB_RAISE_SCORER_ERRORS", raising=False)
+    real = runners.run
+
+    def run_bad(*a):
+        raise ValueError("zip mismatch")
+
+    spec = {"test_type": "present", "output_type": "html", "derivation": "publisher_markup", "tags": [],
+            "args": {"content": {"text": "hello", "max_diffs": 0}}, "settings": {}}
+    bad, ok = tests.parse("p", {"tests": [{**spec, "id": "bad", "args": {"content": {"text": "boom", "max_diffs": 0}}}, {**spec, "id": "ok"}]})
+    monkeypatch.setattr(runners, "run", lambda *a: real(*a) if a[1] == ok.params else run_bad(*a))
+    with caplog.at_level("ERROR", logger="omni_parse_bench.scorer"):
+        out = compare.score({"html": "<p>hello</p>"}, [bad, ok])
+    assert [(v.id, v.result) for v in out] == [("bad", "fail"), ("ok", "pass")]
+    assert out[0].why.startswith("scorer error: ValueError: zip mismatch")
+    assert any("test bad" in r.getMessage() for r in caplog.records)
