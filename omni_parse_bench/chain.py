@@ -39,6 +39,7 @@ RANK = {p: i for i, p in enumerate(POINTS)}
 # The chain's own rules: each a switch of the same name.
 CHAIN_RULES = (
     "word_edges",
+    "glue_edges",
     "space_one_sided",
     "osa",
     "qty_atomic",
@@ -122,14 +123,22 @@ def cells(
             body = t.canon if t.cls in (QTY, MATH) else t.text
             parts = _CLUSTER.findall(body)
             edges = "word_edges" in rules
+            glue = "glue_edges" in rules and word
             kind = "m" if t.cls == MARK else "c"  # a mark equals only a mark, never a letter or a quantity
             for j, c in enumerate(parts):
+                first = j == 0 or not edges or (glue and _glued(parts[j - 1], parts[j]))
+                last = j == len(parts) - 1 or not edges or (glue and _glued(parts[j], parts[j + 1]))
                 if r >= RANK[WORDS] and word:
                     c = "".join(_lower(x) for x in c) if len(c) > 1 else _lower(c)
-                out.append(
-                    Cell(c, kind, i, j == 0 or not edges, j == len(parts) - 1 or not edges, False, group)
-                )
+                out.append(Cell(c, kind, i, first, last, False, group))
     return out
+
+
+def _glued(a: str, b: str) -> bool:
+    """Whether two neighbouring clusters of one Word sit at the seam of two glued words: a lower-case letter
+    then an upper-case one (`ПостачальникТовариство`), or a letter and a digit (`Dollars2`)."""
+    x, y = a[:1], b[:1]
+    return (x.islower() and y.isupper()) or (x.isalpha() and y.isdigit()) or (x.isdigit() and y.isalpha())
 
 
 def _expanded(tokens: list[Token]):

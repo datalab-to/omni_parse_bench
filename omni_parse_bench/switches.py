@@ -71,6 +71,28 @@ _SWITCHES = (
         False,
     ),
     Switch(
+        "glue_edges",
+        "A window may start or end inside an output word at the seam of two glued words (a lower-case letter "
+        "then an upper-case one, or a letter and a digit): a missing space at the gold's own boundary does "
+        "not hide it. A cut anywhere else inside a word still fails (`word_edges`).",
+        4,
+        True,
+    ),
+    Switch(
+        "qty_spaced_suffix",
+        "One space between a number and its unit or magnitude suffix does not change the quantity "
+        "(`2100 万` and `2100万`, `20 mM` and `20mM` are one spelling).",
+        4,
+        False,
+    ),
+    Switch(
+        "unit_exponent_dash",
+        "A minus after a short unit word with no digit before it (`kg -1`, `kg{-1}`) is a symbol, as in "
+        "`kg-1`, never the sign of a number.",
+        4,
+        False,
+    ),
+    Switch(
         "math_spans",
         "A math span written in the text of an output (`$..$`, `$$..$$`, `\\(..\\)`, `\\[..\\]`) "
         "is one `Math` "

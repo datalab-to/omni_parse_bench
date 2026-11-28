@@ -37,8 +37,11 @@ def test_a_coarser_point_adds_passes_for_exists_and_failures_for_absent():
 
 
 def test_tokens_stay_fixed_so_a_glued_pair_never_matches_at_any_point():
-    for point in ("Text", "Cased", "Words"):
-        assert not ok("Total", "<p>TotalDue</p>", point)
+    with switches.using(glue_edges=False):
+        for point in ("Text", "Cased", "Words"):
+            assert not ok("Total", "<p>TotalDue</p>", point)
+    with switches.using(glue_edges=True):  # a seam of two glued words is where a cut may fall
+        assert ok("Total", "<p>TotalDue</p>") and not ok("Tota", "<p>TotalDue</p>")
 
 
 def test_case_with_a_budget_is_refused_at_cased():
@@ -426,3 +429,29 @@ def test_a_signed_or_fractional_leading_dot_decimal_is_one_quantity():
 def test_a_quantity_in_math_is_atomic_like_one_outside():
     assert ok("5", "<p>$5$</p>") and ok("10kg", "<p>$10kg$</p>")
     assert not ok("5", "<p>$6$</p>", k=1) and not ok("10kg", "<p>$10mg$</p>", k=1)
+
+
+# --------------------------------------------------------------------- glued neighbours (glue_edges)
+
+
+def _found(gold_text, html, point=chain.WORDS, k=0):
+    return bool(chain.windows(chain.tokens_of_gold(gold_text), chain.tokens_of_output(html), point, k))
+
+
+def test_a_window_may_cut_a_glued_word_at_its_seam_when_the_rule_is_on():
+    html = "<p>ПостачальникТовариство з обмеженою</p>"
+    with switches.using(glue_edges=True):
+        assert _found("Товариство з обмеженою", html)
+        assert _found("Postachalnik", "<p>PostachalnikTovarystvo x</p>")
+        assert _found("Tovarystvo x", "<p>PostachalnikTovarystvo x</p>")
+        assert _found("Plan", "<p>Dollars2Plan</p>")  # a letter and a digit seam
+    with switches.using(glue_edges=False):
+        assert not _found("Товариство з обмеженою", html)
+
+
+def test_a_cut_inside_a_word_that_is_not_a_seam_still_fails_with_glue_edges_on():
+    with switches.using(glue_edges=True):
+        assert not _found("cat", "<p>concatenate</p>")
+        assert not _found("cat", "<p>Concatenate</p>")
+        assert not _found("amount paid in ful", "<p>amount paid in full</p>")
+        assert not _found("ate", "<p>PostachalnikTovarystvate</p>")  # the seam is elsewhere

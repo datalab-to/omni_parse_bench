@@ -63,6 +63,11 @@ A quantity is read once, on the raw characters, before any fold:
 A unit with a space (`10 kg`) is a quantity and a word; a unit is protected only when glued to its number.
 CJK numerals (`三万`) are words.
 
+## Spaced suffixes and unit exponents (switches `qty_spaced_suffix`, `unit_exponent_dash`)
+
+- `qty_spaced_suffix`: one ordinary space between a number and a listed unit or magnitude suffix is part of the quantity, and its spelling drops it: `2100 万`, `2100万`, `20 kg` and `20kg` are one spelling. Two spaces, a word that merely starts like a suffix (`20 kgs`) and a single ASCII letter after a space (`763791104 b Account`, `5 s`) are not.
+- `unit_exponent_dash`: a minus after a unit word of the suffix list, with no digit before the word, perhaps with one space or a `{` (`^{`) between (`kg -1`, `kg{-1}`, `kg^{-1}`), is a `Sym` as in `kg-1`, never the sign of a number. `in` is left out (`in -5` is a word and a number).
+
 ## Leading-dot decimals and math spans (switches `leading_dot`, `math_spans`)
 
 - `leading_dot`: a decimal written without its integer part (`.5`, `-.5`, `$.50`, `.5kg`) is one `Qty`, scanned at the same places as any quantity (after a space, a bracket, the start of a line; not after a letter or digit, so `x.5` is `x`, `.`, `5`). Equality is by spelling: `.5` is not `0.5`, and a budget can no longer drop its point.

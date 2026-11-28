@@ -398,7 +398,8 @@ def test_digits_glued_to_letters_of_a_spaced_script_make_one_word(s):
 
 
 def test_digits_glued_to_a_unit_are_a_quantity_and_to_cjk_are_not_glued():
-    assert gold("10 kg") == [("Qty", "10"), ("Word", "kg")]  # a unit with a space is a Word
+    with switches.using(qty_spaced_suffix=False):
+        assert gold("10 kg") == [("Qty", "10"), ("Word", "kg")]  # a unit with a space is a Word
     assert gold("3章") == [("Qty", "3"), ("Word", "章")]
     assert gold("第3章") == [("Word", "第"), ("Qty", "3"), ("Word", "章")]
 
@@ -674,3 +675,30 @@ def test_a_math_span_in_the_text_is_one_math_token_when_the_rule_is_on():
         assert ("Math", "\\(a_2\\)") in toks("<p>ok \\(a_2\\) end</p>")
         assert toks("<p>costs $5 and $6</p>").count(("Math", "$5 and $")) == 0   # prices stay text
     assert ("Math", "$p<0.05$") not in toks("<p>We have $p<0.05$ done</p>")
+
+
+def test_one_space_before_a_suffix_is_not_part_of_the_quantity_when_the_rule_is_on():
+    with switches.using(qty_spaced_suffix=True):
+        assert gold("2100 万") == gold("2100万") == [("Qty", "2100万")]
+        a, b = reader.tokenize("20 kg"), reader.tokenize("20kg")
+        assert [t.canon for t in a] == [t.canon for t in b] == ["20kg"]
+        assert [t.cls for t in reader.tokenize("20 kgs")] == ["Qty", "Space", "Word"]  # a word, not a suffix
+        assert [t.cls for t in reader.tokenize("5  kg")] == ["Qty", "Space", "Word"]  # one space only
+        assert [t.cls for t in reader.tokenize("763791104 b Account")][:3] == ["Qty", "Space", "Word"]
+        assert [t.cls for t in reader.tokenize("5kg")] == ["Qty"]
+        assert [t.cls for t in reader.tokenize("5s")] == ["Qty"]
+    with switches.using(qty_spaced_suffix=False):
+        assert [t.cls for t in reader.tokenize("20 kg")] == ["Qty", "Space", "Word"]
+
+
+def test_the_dash_of_a_unit_exponent_is_a_symbol_when_the_rule_is_on():
+    kinds = lambda s: [t.cls for t in reader.tokenize(s)]  # noqa: E731
+    with switches.using(unit_exponent_dash=True):
+        assert kinds("kg -1") == ["Word", "Space", "Sym", "Qty"]
+        assert kinds("kg{-1}") == ["Word", "Sym", "Sym", "Qty", "Sym"]
+        assert kinds("kg^{-1}") == ["Word", "Sym", "Sym", "Sym", "Qty", "Sym"]
+        assert kinds("kg-1") == ["Word", "Sym", "Qty"]  # unchanged
+        assert kinds("temperature -1") == ["Word", "Space", "Qty"]  # not a unit word: a negative number
+        assert kinds("5 kg -1")[-1] == "Qty" and kinds("5 kg -1")[-2] == "Space"  # a digit before the unit
+    with switches.using(unit_exponent_dash=False):
+        assert kinds("kg -1") == ["Word", "Space", "Qty"]

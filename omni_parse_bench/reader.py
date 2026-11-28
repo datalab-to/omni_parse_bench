@@ -70,6 +70,8 @@ RULES = (
     "text_fold",
     "leading_dot",
     "math_spans",
+    "qty_spaced_suffix",
+    "unit_exponent_dash",
 )
 
 
@@ -380,16 +382,22 @@ def _digit_run(u: str, i: int) -> int:
 
 
 def _qty_end(
-    u: str, i: int, sign_ok: bool, sup_exponent: bool = True, spaced_ok: bool = False, dot: bool = False
+    u: str,
+    i: int,
+    sign_ok: bool,
+    sup_exponent: bool = True,
+    spaced_ok: bool = False,
+    dot: bool = False,
+    spaced_suffix: bool = False,
 ) -> tuple[int | None, int]:
     """Where the quantity starting at `i` ends (see `_qty_one`), extended over a fraction chain `a/b/c`
     (iteratively: a long run of slashes must not recurse)."""
-    j, core = _qty_one(u, i, sign_ok, sup_exponent, spaced_ok, dot)
+    j, core = _qty_one(u, i, sign_ok, sup_exponent, spaced_ok, dot, spaced_suffix)
     if j is None:
         return None, core
     n = len(u)
     while j < n and u[j] == "/":
-        r, _ = _qty_one(u, j + 1, False, sup_exponent, False, dot)
+        r, _ = _qty_one(u, j + 1, False, sup_exponent, False, dot, spaced_suffix)
         if r is None:
             break
         j = r
@@ -397,7 +405,13 @@ def _qty_end(
 
 
 def _qty_one(
-    u: str, i: int, sign_ok: bool, sup_exponent: bool = True, spaced_ok: bool = False, dot: bool = False
+    u: str,
+    i: int,
+    sign_ok: bool,
+    sup_exponent: bool = True,
+    spaced_ok: bool = False,
+    dot: bool = False,
+    spaced_suffix: bool = False,
 ) -> tuple[int | None, int]:
     """Where the quantity starting at `i` ends, or (None, core_end): no quantity, with the end of the number
     when letters glued to it are what rule it out (the run is then one Word). `sign_ok` says a sign may start
@@ -454,10 +468,16 @@ def _qty_one(
     # suffix
     if j < n and (u[j] in _PERCENT or unicodedata.category(u[j]) == "Sc"):
         j += 1
-    elif j < n and u[j] in _SUFFIX_FIRST:
+    elif j < n and (
+        u[j] in _SUFFIX_FIRST
+        or (spaced_suffix and u[j] == " " and j + 1 < n and u[j + 1] in _SUFFIX_FIRST)
+    ):
+        at = j + 1 if u[j] == " " else j  # one ordinary space may stand between the number and its suffix
         for s in _SUFFIX_BY_LENGTH:
-            if u.startswith(s, j) and not (j + len(s) < n and _glues(u[j + len(s)])):
-                j += len(s)
+            if at > j and len(s) == 1 and s.isascii():
+                continue  # after a space a single letter is a word of its own (`763791104 b Account`)
+            if u.startswith(s, at) and not (at + len(s) < n and _glues(u[at + len(s)])):
+                j = at + len(s)
                 break
     if j == core and j < n and _glues(u[j]) and not (script_class(u[j]) != SPACED and _is_letter(u[j])):
         return None, core  # letters, digits or marks glued on: a Word
@@ -477,6 +497,8 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
     n = len(u)
     sup_exp = "sup_exponent" in rules
     dot = "leading_dot" in rules
+    spaced_suffix = "qty_spaced_suffix" in rules
+    unit_dash = "unit_exponent_dash" in rules
     starts = [m.start() for m in _CLUSTER.finditer(u)]
     boundary = set(starts) | {n}
     following = [n] * (n + 1)  # the start of the next cluster after each offset
@@ -566,6 +588,8 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
                     or (script_class(p) != SPACED and _is_letter(p))
                     or unicodedata.category(p) in ("Ps", "Pi")
                 )
+        if sign_ok and unit_dash and c in _MINUS and _unit_exponent_dash(u, i):
+            sign_ok = False  # `kg -1`, `kg{-1}`: the dash of a unit exponent is a Sym, as in `kg-1`
         spaced_ok = last[0] not in (
             QTY,
             WORD,
@@ -577,9 +601,11 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
             or (dot and c == "." and i + 1 < n and _is_digit(u[i + 1]))
         )
         if starts_number and (c in _SIGNS or not prev_glues(i)):
-            end, core = _qty_end(u, i, sign_ok, sup_exp, spaced_ok, dot)
+            end, core = _qty_end(u, i, sign_ok, sup_exp, spaced_ok, dot, spaced_suffix)
             if end is not None and (end in boundary or end == n or u[end] in (SUP_OPEN, SUP_CLOSE)):
                 raw = u[i:end]
+                if end > core and u[core] == " ":  # the space before a suffix is not part of the spelling
+                    raw = u[i:core] + u[core + 1 : end]
                 put(QTY, i, end, canon=qty_canon(raw))
                 i = end
                 continue
@@ -599,6 +625,29 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
         j = following[i]
         put(SYM, i, j)
         i = j
+
+
+def _unit_exponent_dash(u: str, i: int) -> bool:
+    """Whether the minus at `u[i]` is the dash of a unit exponent: directly after a short letters-only unit
+    word with no digit before it, perhaps with one space or a `{` (or `^{`) between (`kg -1`, `kg{-1}`)."""
+    j = i - 1
+    while j >= 0 and u[j] in (SUP_OPEN, SUP_CLOSE):
+        j -= 1
+    if j >= 0 and u[j] == "{":
+        j -= 1
+        if j >= 0 and u[j] == "^":
+            j -= 1
+    elif j >= 0 and u[j] == " ":
+        j -= 1
+    end = j + 1
+    while j >= 0 and u[j].isalpha() and script_class(u[j]) == SPACED:
+        j -= 1
+    word = u[j + 1 : end]
+    if word not in QTY_SUFFIX or word == "in":  # "in -5" is a word and a number
+        return False
+    if j >= 0 and u[j] == " ":
+        j -= 1
+    return not (j >= 0 and (_is_digit(u[j]) or u[j] in ".,"))
 
 
 _INNER = frozenset("-‐‑'’ʼ")     # hyphens and apostrophes
