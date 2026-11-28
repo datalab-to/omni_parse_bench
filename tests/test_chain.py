@@ -8,7 +8,8 @@ import itertools
 
 import pytest
 
-from omni_parse_bench import chain, fold, reader, score, switches
+from omni_parse_bench import chain, fold, reader, score, switches, views
+from omni_parse_bench.scorers.unit_tests import runners
 from omni_parse_bench.scorers.unit_tests import tests as gold_tests
 
 
@@ -318,3 +319,73 @@ def test_present_text_goes_through_the_chain_when_it_is_on():
 def test_with_chain_off_present_text_is_the_old_reading():
     with switches.using(chain=False):
         assert verdict("therapist", "<p>the rapist</p>").result == "pass"  # the old squeeze joins words
+
+
+# ------------------------------------------------------------------------------------------------ order
+
+
+def order_verdict(before: str, after: str, html: str, k: int = 0, **sw):
+    t = {
+        "id": "o",
+        "derivation": "authored",
+        "tags": [],
+        "output_type": "html",
+        "test_type": "order",
+        "args": {"before": {"text": before, "max_diffs": k}, "after": {"text": after, "max_diffs": k}},
+        "settings": {},
+    }
+    with switches.using(chain=True, **sw):
+        return score({"html": html, "blocks": []}, gold_tests.parse("p", {"tests": [t]}))[0]
+
+
+def test_order_on_the_chain_reads_each_claim_at_words_and_any_copy():
+    assert order_verdict("Total", "Due", "<p>Total</p><p>Due</p>").result == "pass"
+    v = order_verdict("Total", "Due", "<p>Due</p><p>Total</p>")
+    assert v.result == "fail" and v.why.startswith("[order]"), v
+    v = order_verdict("Total", "Due", "<p>Due x</p><p>Total x</p><p>Due</p>")
+    assert v.result == "pass" and v.why.startswith("[copy]"), v
+
+
+def test_order_swaps_cost_one_and_a_missing_claim_is_named():
+    assert order_verdict("Totla", "Due", "<p>Total</p><p>Due</p>", 1).result == "pass"
+    v = order_verdict("Totla", "Due", "<p>Total</p><p>Due</p>")
+    assert v.result == "fail" and "'before'" in v.why, v
+
+
+def test_order_keeps_a_quantity_atomic_and_a_split_word_fails():
+    assert order_verdict("10kg", "xyz", "<p>10mg xyz</p>", 1).result == "fail"
+    assert order_verdict("therapist", "x", "<p>the rapist x</p>").result == "fail"
+
+
+def test_order_claims_keep_their_own_budgets():
+    from omni_parse_bench.scorers.unit_tests import tests as loader
+
+    def load(b: int, a: int):
+        t = {"id": "o", "derivation": "authored", "tags": [], "output_type": "html", "test_type": "order",
+             "args": {"before": {"text": "Totla", "max_diffs": b}, "after": {"text": "Duee", "max_diffs": a}},
+             "settings": {}}
+        return loader.parse("p", {"tests": [t]})[0].params
+
+    p = load(1, 0)
+    assert p.budgets == (1, 0) and load(1, 1).budgets == (1, 1)
+    page = {"html": "<p>Total</p><p>Duee</p>", "blocks": []}
+    for sw in (True, False):
+        with switches.using(chain=sw):
+            assert runners.run("order", p, views.html(page["html"]))[0]       # 'before' spends its edit
+            q = load(0, 1)
+            assert not runners.run("order", q, views.html(page["html"]))[0]            # 'before' has none
+            assert runners.run("order", load(1, 0), views.html("<p>Total</p><p>Duxe</p>")) [0] is False
+
+
+def test_a_quantity_matches_only_a_quantity_and_a_mark_never_stands_for_one():
+    sup = chain.tokens_of_output("<sup>1</sup>")
+    assert not chain.equal(tok_("1"), sup, "Text") and not chain.equal(tok_("1"), sup, "Words")
+    # both ways: a gold that names the mark as a number fails; a gold without it passes where marks are free
+    page = "<p>Smith<sup>1</sup></p>"
+    assert not ok("Smith 1", page) and not ok("Smith 1", page, "Text") and not ok("Smith1", page)
+    assert ok("Smith", page, "Cased") and ok("Smith", page, "Words")
+
+
+def test_the_fold_keeps_the_underscores_of_an_identifier_and_removes_a_leader():
+    assert fold.fold_gap("a ____ b") == "a b"
+    assert fold.fold_gap("token____ x") == "token____ x" and fold.fold_gap("foo___bar") == "foo___bar"

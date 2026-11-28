@@ -48,7 +48,9 @@ def _bullets(s: str) -> str:
 
 
 def _leaders(s: str) -> str:
-    return normalize._LEADERS.sub(" ", s)
+    """A leader run folds to a space, except underscores alone that touch a letter or a digit on either side
+    (`token____`, `foo___bar`, `____init`): part of an identifier, which Text keeps."""
+    return normalize._LEADERS.sub(normalize._leader_in_word, s)
 
 
 def _ellipsis_cjk(s: str) -> str:

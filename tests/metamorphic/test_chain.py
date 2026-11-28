@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Relations of the normalizer chain and its distance (M205 to M216): the gold written as the output passes; what the
+"""Relations of the normalizer chain and its distance (M205 to M220): the gold written as the output passes; what the
 chain frees changes no verdict; a quantity is atomic; a budget only widens; a match stops at a token edge; copies change
 nothing for an exists test; the whole-mode relation is symmetric at Text; raw candidates only grow along the chain;
 Hangul spacing is free; a glued unit keeps its case. The loaded strings are the gold's own, matched with `chain` on."""
@@ -230,6 +230,67 @@ def test_two_different_circled_digits_are_two_numbers(a, b):
     assume(fold.enumerator_digits(a) != fold.enumerator_digits(b))
     for p in (chain.TEXT, chain.WORDS):
         assert not found(a, page(b), p, 0 if p == chain.CASED else 1), (a, b, p)
+
+
+def ordered(before: str, after: str, html: str) -> bool:
+    with switches.set_all(True):
+        out = chain.tokens_of_output(html)
+        b = chain.windows(chain.tokens_of_gold(before), out, chain.WORDS, 0)
+        a = chain.windows(chain.tokens_of_gold(after), out, chain.WORDS, 0)
+    return any(x.last < y.first for x in b for y in a)
+
+
+@relation(HOLDS, domain="every pair of loaded text strings x the two written as two paragraphs, in order",
+          pool="text, order, repeat, table_cell")
+@LOOSE
+@given(st.sampled_from(STRINGS), st.sampled_from(STRINGS))
+def test_two_claims_written_in_order_are_ordered(x, y):
+    """Two text claims written as two paragraphs, `before` first, are in order at Words, for any budget. [M217]
+    Why it matters for a score: an order test passes the page it was written from."""
+    assert ordered(x, y, page(x) + page(y)), (x, y)
+
+
+@relation(HOLDS, domain="every pair of loaded text strings with no word in common x the two written in the other order",
+          pool="text, order, repeat, table_cell")
+@LOOSE
+@given(st.sampled_from(STRINGS), st.sampled_from(STRINGS))
+def test_two_claims_written_the_other_way_are_not_ordered(x, y):
+    """Two claims with no word in common, the page writing `after` then `before` once each, are not in order. [M218]
+    Why it matters for a score: an order test fails a page that reverses it."""
+    assume(not set(x.lower().split()) & set(y.lower().split()) and x.strip() and y.strip())
+    assume(not found(x, page(y)) and not found(y, page(x)))
+    assert not ordered(x, y, page(y) + page(x)), (x, y)
+
+
+def region(content: str, written: str, k: int = 0) -> bool:
+    from omni_parse_bench import views
+    from omni_parse_bench.scorers.unit_tests import runners
+
+    html = f"<p>Zqstart:</p>{page(written)}<p>Zqend:</p>"
+    with switches.set_all(True):
+        return runners.verbatim(runners.Verbatim("Zqstart:", "Zqend:", content, k), views.html(html))[0]
+
+
+@relation(HOLDS, domain="every loaded text string x written as the only paragraph between two anchors", pool="text, order, repeat, table_cell")
+@LOOSE
+@given(st.sampled_from(STRINGS))
+def test_a_region_equals_the_content_written_in_it(x):
+    """A string written as the paragraph between a start and an end anchor is the region the string names, at budget 0. [M219]
+    Why it matters for a score: a verbatim test passes the page it was written from."""
+    assume(x.strip() and not any(c in x for c in "_•‣◦▪▶∙●[]"))
+    assert region(x, x), x
+
+
+@relation(HOLDS, domain="every loaded text string with a letter x its first letter changed, in the page", pool="text, order, repeat, table_cell")
+@LOOSE
+@given(st.sampled_from(STRINGS))
+def test_a_region_with_a_changed_letter_is_not_the_content(x):
+    """Changing a letter of the content as written in the region makes a budget-0 region fail. [M220]
+    Why it matters for a score: a closed region admits nothing the gold does not state."""
+    m = re.search("[a-z]", x)
+    assume(m and not any(c in x for c in "_•‣◦▪▶∙●[]"))
+    changed = x[: m.start()] + ("q" if m[0] != "q" else "z") + x[m.end():]
+    assert not region(x, changed), (x, changed)
 
 
 @every_real_test("text strings", note="each written as the output, at Text, Cased and Words")

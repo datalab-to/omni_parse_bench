@@ -3,8 +3,8 @@
 **Asks:** somewhere in the page's text, `before` starts earlier than `after`. 1,189 tests; family text; reads
 `html`.
 
-Both strings are folded and searched in the folded page text, allowing up to `max_diffs` edits (both share one
-budget). If either is not written exactly in the folded text, both are searched again in the squeezed text. The
+Both strings are folded and searched in the folded page text, allowing up to `max_diffs` edits (each string has its
+own budget; a gold that gives both the same value is the old shared budget). If either is not written exactly in the folded text, both are searched again in the squeezed text. The
 test passes when any match of `before` starts before any match of `after`. A larger budget keeps every match a
 smaller one found, so it never fails a page that passes with fewer edits. When the pair is not found in order,
 both are tried once more, exactly, with each hyphen a line broke after (on the page or in a string) read kept or
