@@ -87,8 +87,8 @@ _SWITCHES = (
     ),
     Switch(
         "qty_spaced_suffix",
-        "One space between a number and its unit or magnitude suffix does not change the quantity "
-        "(`2100 万` and `2100万`, `20 mM` and `20mM` are one spelling).",
+        "One space between a number and a CJK magnitude (`万`, `億`, ...) does not change the quantity "
+        "(`2100 万` and `2100万` are one spelling); a spaced Latin unit stays a word.",
         4,
         False,
     ),
@@ -101,8 +101,8 @@ _SWITCHES = (
     ),
     Switch(
         "unit_exponent_dash",
-        "A minus after a short unit word with no digit before it (`kg -1`, `kg{-1}`) is a symbol, as in "
-        "`kg-1`, never the sign of a number.",
+        "A minus after a unit word with no digit before it, with a `{` between (`kg{-1}`), is a symbol, as "
+        "in `kg-1`, never the sign of a number.",
         4,
         False,
     ),

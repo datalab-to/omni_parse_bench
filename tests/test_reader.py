@@ -677,31 +677,32 @@ def test_a_math_span_in_the_text_is_one_math_token_when_the_rule_is_on():
     assert ("Math", "$p<0.05$") not in toks("<p>We have $p<0.05$ done</p>")
 
 
-def test_one_space_before_a_suffix_is_not_part_of_the_quantity_when_the_rule_is_on():
+def test_one_space_before_a_cjk_magnitude_is_not_part_of_the_quantity_when_the_rule_is_on():
     with switches.using(qty_spaced_suffix=True):
         assert gold("2100 万") == gold("2100万") == [("Qty", "2100万")]
-        a, b = reader.tokenize("20 kg"), reader.tokenize("20kg")
-        assert [t.canon for t in a] == [t.canon for t in b] == ["20kg"]
-        assert [t.cls for t in reader.tokenize("20 kgs")] == ["Qty", "Space", "Word"]  # a word, not a suffix
-        assert [t.cls for t in reader.tokenize("5  kg")] == ["Qty", "Space", "Word"]  # one space only
-        assert [t.cls for t in reader.tokenize("763791104 b Account")][:3] == ["Qty", "Space", "Word"]
+        a, b = reader.tokenize("3.5 億"), reader.tokenize("3.5億")
+        assert [t.canon for t in a] == [t.canon for t in b] == ["3.5億"]
+        assert [t.cls for t in reader.tokenize("2100  万")] == ["Qty", "Space", "Word"]  # one space only
+        # a spaced unit stays a word of its own: a typo in it stays one edit, as before
+        for s in ("20 kg", "6.5 ft", "763791104 b Account", "200 µL", "5 s"):
+            assert [t.cls for t in reader.tokenize(s)][:3] == ["Qty", "Space", "Word"]
         assert [t.cls for t in reader.tokenize("5kg")] == ["Qty"]
         assert [t.cls for t in reader.tokenize("5s")] == ["Qty"]
     with switches.using(qty_spaced_suffix=False):
-        assert [t.cls for t in reader.tokenize("20 kg")] == ["Qty", "Space", "Word"]
+        assert [t.cls for t in reader.tokenize("2100 万")] == ["Qty", "Space", "Word"]
 
 
 def test_the_dash_of_a_unit_exponent_is_a_symbol_when_the_rule_is_on():
     kinds = lambda s: [t.cls for t in reader.tokenize(s)]  # noqa: E731
     with switches.using(unit_exponent_dash=True):
-        assert kinds("kg -1") == ["Word", "Space", "Sym", "Qty"]
+        assert kinds("kg -1") == ["Word", "Space", "Qty"]  # a space keeps it a sign
         assert kinds("kg{-1}") == ["Word", "Sym", "Sym", "Qty", "Sym"]
         assert kinds("kg^{-1}") == ["Word", "Sym", "Sym", "Sym", "Qty", "Sym"]
         assert kinds("kg-1") == ["Word", "Sym", "Qty"]  # unchanged
         assert kinds("temperature -1") == ["Word", "Space", "Qty"]  # not a unit word: a negative number
         assert kinds("5 kg -1")[-1] == "Qty" and kinds("5 kg -1")[-2] == "Space"  # a digit before the unit
     with switches.using(unit_exponent_dash=False):
-        assert kinds("kg -1") == ["Word", "Space", "Qty"]
+        assert kinds("kg{-1}") == ["Word", "Sym", "Qty", "Sym"]
 
 
 def test_a_suffix_after_the_end_of_a_sup_binds_to_the_quantity_inside_when_the_rule_is_on():

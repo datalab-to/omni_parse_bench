@@ -67,8 +67,8 @@ CJK numerals (`三万`) are words.
 
 - `qty_suffix_across_sup`: a suffix right after the end of a `<sup>` binds to the quantity inside it, so `M<sup>−1</sup>s<sup>−1</sup>` reads the `1s` that the plain `M−1s−1` does.
 
-- `qty_spaced_suffix`: one ordinary space between a number and a listed unit or magnitude suffix is part of the quantity, and its spelling drops it: `2100 万`, `2100万`, `20 kg` and `20kg` are one spelling. Two spaces, a word that merely starts like a suffix (`20 kgs`) and a single ASCII letter after a space (`763791104 b Account`, `5 s`) are not.
-- `unit_exponent_dash`: a minus after a unit word of the suffix list, with no digit before the word, perhaps with one space or a `{` (`^{`) between (`kg -1`, `kg{-1}`, `kg^{-1}`), is a `Sym` as in `kg-1`, never the sign of a number. `in` is left out (`in -5` is a word and a number).
+- `qty_spaced_suffix`: one ordinary space between a number and a CJK magnitude (`十百千万億兆`) is part of the quantity, and its spelling drops it: `2100 万` and `2100万` are one spelling. A spaced Latin unit (`20 kg`, `6.5 ft`, `200 µL`) stays a number and a word, so a typo in it stays one edit; two spaces are not one.
+- `unit_exponent_dash`: a minus after a unit word of the suffix list, with no digit before the word, perhaps with a `{` (`^{`) between (`kg{-1}`, `kg^{-1}`), is a `Sym` as in `kg-1`, never the sign of a number. A space before the dash keeps it a sign (`dm -3` beside `dm$^{-3}$`). `in` is left out (`in -5` is a word and a number).
 
 ## Leading-dot decimals and math spans (switches `leading_dot`, `math_spans`)
 

@@ -297,6 +297,7 @@ _MAGNITUDES = ("k", "K", "M", "B", "bn", "mn", "十", "百", "千", "万", "億"
 QTY_SUFFIX: frozenset[str] = frozenset(
     {p + u for u in _SI_UNITS for p in _SI_PREFIXES} | set(_COMMON_UNITS) | set(_MAGNITUDES)
 )
+_CJK_MAGNITUDES = frozenset(s for s in _MAGNITUDES if not s.isascii())
 _SUFFIX_BY_LENGTH = tuple(sorted(QTY_SUFFIX, key=lambda s: (-len(s), s)))
 _SUFFIX_FIRST = frozenset(s[0] for s in QTY_SUFFIX)
 
@@ -479,8 +480,8 @@ def _qty_one(
         # one ordinary space, or the end of a <sup>, may stand between the number and its suffix
         at = j + 1 if u[j] in (" ", SUP_CLOSE) else j
         for s in _SUFFIX_BY_LENGTH:
-            if u[j] == " " and len(s) == 1 and s.isascii():
-                continue  # after a space a single letter is a word of its own (`763791104 b Account`)
+            if u[j] == " " and s not in _CJK_MAGNITUDES:
+                continue  # after a space only a CJK magnitude binds: a spaced unit stays a word of its own
             if u.startswith(s, at) and not (at + len(s) < n and _glues(u[at + len(s)])):
                 j = at + len(s)
                 break
@@ -634,8 +635,9 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
 
 
 def _unit_exponent_dash(u: str, i: int) -> bool:
-    """Whether the minus at `u[i]` is the dash of a unit exponent: directly after a short letters-only unit
-    word with no digit before it, perhaps with one space or a `{` (or `^{`) between (`kg -1`, `kg{-1}`)."""
+    """Whether the minus at `u[i]` is the dash of a unit exponent: directly after a unit word with no digit
+    before it, perhaps with a `{` (or `^{`) between (`kg{-1}`, `kg^{-1}`). A space before the dash keeps it a
+    sign (`dm -3` beside `dm$^{-3}$`)."""
     j = i - 1
     while j >= 0 and u[j] in (SUP_OPEN, SUP_CLOSE):
         j -= 1
@@ -643,8 +645,6 @@ def _unit_exponent_dash(u: str, i: int) -> bool:
         j -= 1
         if j >= 0 and u[j] == "^":
             j -= 1
-    elif j >= 0 and u[j] == " ":
-        j -= 1
     end = j + 1
     while j >= 0 and u[j].isalpha() and script_class(u[j]) == SPACED:
         j -= 1
