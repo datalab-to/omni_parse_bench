@@ -635,7 +635,9 @@ def _pieces(raw: str, size: int) -> list[str]:
     out, last, n = [], 0, len(raw)
     while n - last > size:
         x = last + size
-        while x < n and (unicodedata.category(raw[x]) in ("Mn", "Mc", "Me", "Cf", "Zs", "Cc") or raw[x].isspace()):
+        while x < n and (
+            unicodedata.category(raw[x]) in ("Mn", "Mc", "Me", "Cf", "Zs", "Cc") or raw[x].isspace()
+        ):
             x += 1
         if x >= n:
             break

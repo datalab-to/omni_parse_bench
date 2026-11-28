@@ -618,7 +618,7 @@ def test_a_stretch_that_folds_to_nothing_reads_as_nothing():
 
 
 def test_a_scorer_error_fails_one_test_and_not_the_run(monkeypatch, caplog):
-    """A test that raises on a well-formed output fails with a logged reason; the page's other tests still run."""
+    """A test that raises on a well-formed output fails with a logged reason; the page's other tests run."""
     from omni_parse_bench.scorers.unit_tests import compare, runners, tests
 
     monkeypatch.delenv("OPB_RAISE_SCORER_ERRORS", raising=False)
@@ -629,7 +629,8 @@ def test_a_scorer_error_fails_one_test_and_not_the_run(monkeypatch, caplog):
 
     spec = {"test_type": "present", "output_type": "html", "derivation": "publisher_markup", "tags": [],
             "args": {"content": {"text": "hello", "max_diffs": 0}}, "settings": {}}
-    bad, ok = tests.parse("p", {"tests": [{**spec, "id": "bad", "args": {"content": {"text": "boom", "max_diffs": 0}}}, {**spec, "id": "ok"}]})
+    boom = {"content": {"text": "boom", "max_diffs": 0}}
+    bad, ok = tests.parse("p", {"tests": [{**spec, "id": "bad", "args": boom}, {**spec, "id": "ok"}]})
     monkeypatch.setattr(runners, "run", lambda *a: real(*a) if a[1] == ok.params else run_bad(*a))
     with caplog.at_level("ERROR", logger="omni_parse_bench.scorer"):
         out = compare.score({"html": "<p>hello</p>"}, [bad, ok])

@@ -166,7 +166,8 @@ def test_a_pages_line_holds_its_counts_and_its_details_every_verdict():
         assert all(isinstance(c.pop("ids"), int) for c in s.result[kind].values())
     assert not any("ids" in c for kind in ("per_family", "per_test_type", "per_derivation")
                    for c in s.result[kind].values())
-    assert s.result == {"tests": 5, "passed": 2, "scorer_errors": 0, "per_family": {"text": {"tests": 5, "passed": 2}},
+    assert s.result == {"tests": 5, "passed": 2, "scorer_errors": 0,
+                        "per_family": {"text": {"tests": 5, "passed": 2}},
                         "per_tag": {"eng": {"tests": 3, "passed": 2}, "table": {"tests": 1, "passed": 0},
                                     "form": {"tests": 1, "passed": 0}, "math": {"tests": 1, "passed": 0}},
                         "per_test_type": {"present": {"tests": 5, "passed": 2}},
