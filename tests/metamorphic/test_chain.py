@@ -108,8 +108,9 @@ def test_a_budget_only_widens(x, k, data):
     assume(letters)
     i = data.draw(st.sampled_from(letters))
     swapped = x[:i] + x[i + 1] + x[i] + x[i + 2:]
-    assume(len(chain.tokens_of_gold(x)) == len(chain.tokens_of_gold(swapped)))
-    assume(chain.tokens_of_gold(x)[0].cls != "Qty" or " " in x)
+    with switches.set_all(True):  # read as `found` reads (a spaced suffix is part of a quantity)
+        read_x, read_swapped = chain.tokens_of_gold(x), chain.tokens_of_gold(swapped)
+    assume([t.cls for t in read_x] == [t.cls for t in read_swapped])
     assert found(x, page(swapped), chain.WORDS, 1), (x, swapped)
 
 
