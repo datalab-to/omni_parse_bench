@@ -464,7 +464,7 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
     starts = [m.start() for m in _CLUSTER.finditer(u)]
     boundary = set(starts) | {n}
     following = [n] * (n + 1)  # the start of the next cluster after each offset
-    for a, b in zip(starts, starts[1:] + [n], strict=True):
+    for a, b in zip(starts, starts[1:] + [n], strict=False):  # no starts when `u` is empty
         for x in range(a, b):
             following[x] = b
     i = 0

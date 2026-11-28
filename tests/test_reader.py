@@ -605,3 +605,13 @@ def test_long_rewritten_run_reads_in_bounded_time():
     assert len(bars) == 8000
     assert all(t.end - t.start == 1 for t in bars)
     assert bars[3].start == 6
+
+
+def test_a_stretch_that_folds_to_nothing_reads_as_nothing():
+    """The cluster table of an empty line is empty (a fold can empty a stretch: invisible characters only)."""
+    from omni_parse_bench import reader
+
+    assert reader.tokenize("") == []
+    with switches.using(text_fold=True):
+        html = "<p>a</p><p>\u200b\u200b</p><p>b</p>"
+        assert [t.text for t in reader.read(html).tokens if t.cls == "Word"] == ["a", "b"]
