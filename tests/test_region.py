@@ -124,3 +124,45 @@ def test_the_underscore_switch_decides_a_short_run_that_touches_no_word():
         assert v(page, content="hi")[0]
     with switches.using(region_underscore=False):
         assert not v(page, content="hi")[0]
+
+
+# ------------------------------------------------------------------------------ blank fields (step 4)
+
+
+def blank(html: str, label="Name:", printed=None, stops=()) -> tuple[bool, str]:
+    p = R.Present(
+        R.Text(label, 0), blank_after=True,
+        printed=None if printed is None else R.Text(printed, 0), stops=tuple(R.Text(s, 0) for s in stops),
+    )
+    return R.blank_after(p, views.html(html))
+
+
+def test_a_blank_field_on_the_chain_passes_and_a_value_fails():
+    assert blank("<p>Name: ____</p>")[0] and blank("<p>Name:</p>")[0]
+    ok, why = blank("<p>Name: Ann</p>")
+    assert not ok and "is followed by 'Ann'" in why, why
+    ok, why = blank("<p>Ann Name:</p>")
+    assert not ok and "before it" in why, why
+
+
+def test_the_printed_mask_is_allowed_once_and_a_stop_ends_the_region():
+    assert blank("<p>Date: __/__/____</p>", "Date:", "__/__/____")[0]
+    assert not blank("<p>Date: __/__/____ 12</p>", "Date:", "__/__/____")[0]
+    page = "<p>Name: ____</p><p>Place: Paris</p>"
+    assert not blank(page)[0]
+    assert blank(page, stops=("Place:",))[0]
+
+
+def test_every_copy_of_the_label_is_judged_and_a_longer_stop_keeps_its_own_copy():
+    assert not blank("<p>Name: ____</p><p>Name: Ann</p>")[0]
+    assert blank("<p>Last Name: ____</p><p>Name: ____</p>", stops=("Last Name:",))[0]
+
+
+def test_a_label_in_a_table_cell_keeps_the_grid_reading():
+    assert blank("<table><tr><td>Name:</td><td></td></tr></table>")[0]
+    assert not blank("<table><tr><td>Name:</td><td>Ann</td></tr></table>")[0]
+
+
+def test_a_blank_field_with_the_switch_off_is_the_old_reading():
+    with switches.using(region_blank=False):
+        assert blank("<p>Name: ____</p>")[0] and not blank("<p>Name: Ann</p>")[0]

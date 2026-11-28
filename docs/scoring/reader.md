@@ -62,3 +62,15 @@ A quantity is read once, on the raw characters, before any fold:
 
 A unit with a space (`10 kg`) is a quantity and a word; a unit is protected only when glued to its number.
 CJK numerals (`三万`) are words.
+
+## Spaced suffixes and unit exponents (switches `qty_spaced_suffix`, `unit_exponent_dash`, `qty_suffix_across_sup`)
+
+- `qty_suffix_across_sup`: a suffix right after the end of a `<sup>` binds to the quantity inside it, so `M<sup>−1</sup>s<sup>−1</sup>` reads the `1s` that the plain `M−1s−1` does.
+
+- `qty_spaced_suffix`: one ordinary space between a number and a CJK magnitude (`十百千万億兆`) is part of the quantity, and its spelling drops it: `2100 万` and `2100万` are one spelling. A spaced Latin unit (`20 kg`, `6.5 ft`, `200 µL`) stays a number and a word, so a typo in it stays one edit; two spaces are not one.
+- `unit_exponent_dash`: a minus after a unit word of the suffix list, with no digit before the word, perhaps with a `{` (`^{`) between (`kg{-1}`, `kg^{-1}`), is a `Sym` as in `kg-1`, never the sign of a number. A space before the dash keeps it a sign (`dm -3` beside `dm$^{-3}$`). `in` is left out (`in -5` is a word and a number).
+
+## Leading-dot decimals and math spans (switches `leading_dot`, `math_spans`)
+
+- `leading_dot`: a decimal written without its integer part (`.5`, `-.5`, `$.50`, `.5kg`) is one `Qty`, scanned at the same places as any quantity (after a space, a bracket, the start of a line; not after a letter or digit, so `x.5` is `x`, `.`, `5`). Equality is by spelling: `.5` is not `0.5`, and a budget can no longer drop its point.
+- `math_spans`: a math span written in the text of an output (`$..$` and `$$..$$` as `mathspans` pairs them, so a price stays text, and `\(..\)` and `\[..\]`) is one `Math` token carrying its source, as a `<math>` element is, and compared as the text it renders (`$\alpha$` reads `α`, `$x^2$` reads `x2`, as the text view writes them; its delimiters and TeX commands are not text, and math too long or too spaced to read is compared as written). A span that crosses a change of markup or a line is left as text. The leading-dot rule also takes a spaced sign (`− .5`) and a fraction (`1/.5`) as one quantity.

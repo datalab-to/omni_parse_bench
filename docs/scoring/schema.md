@@ -45,3 +45,8 @@ Each is a named switch, off by default (`switches.py`); the table above is read 
 - A footnote mark is a kept `Mark` that equals only a `Mark`, in every type and point: gold `Smith 1` fails on `Smith<sup>1</sup>`, gold `Smith` passes it at Cased and Words where marks are free.
 - The loader lints `order` tests (`tests.order_lint`): `before` and `after` the same text or one inside the other, which it warns of (it does not refuse). The check that either text is found more than once in the page's reference text (the transcription the test was written from) is implemented (`check(pages, references=...)`) but not run by default: a dataset ships no transcription today.
 - Per-claim budgets: an `order` test keeps the budget of `before` and of `after` separately (`runners.Order.budgets`), on the chain and on the old reading alike.
+
+## Blank fields and the format locator (step 4)
+
+- `region_blank`: a blank field's label outside a table cell is read on the region relation: each copy of the label (at Words, in one cell or paragraph, not inside a longer stop) opens a region to the next stop or the next copy of the label, blank when it holds only white space and placeholder symbols (`_ . · …`), once the printed mask (if the test has one) is taken out once; what comes before the label in its block must be blank or another label or stop. A label in a table cell keeps the grid reading (`present-text.md`, "Blank fields"), and a page with a table the cell reader cannot parse keeps the old reading throughout.
+- `format_locator`: a negative `format` test is a locator and a claim (`locator_and_not_exists`): the context must be found, and no occurrence carries a forbidden mark. An output with no marks at all passes it when the context is there; before, it failed.

@@ -22,6 +22,7 @@ raw candidates only grow along the chain (law L1). A candidate is identified by 
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 from collections.abc import Iterable
 from typing import NamedTuple
@@ -29,7 +30,7 @@ from typing import NamedTuple
 import regex
 
 from . import reader, switches, work
-from .reader import BREAK, CONTENT, MARK, QTY, SPACE, SYM, WORD, WRAP, Token  # noqa: F401
+from .reader import BREAK, CONTENT, MARK, MATH, QTY, SPACE, SYM, WORD, WRAP, Token  # noqa: F401
 
 ID, TEXT, CASED, WORDS = "Id", "Text", "Cased", "Words"
 POINTS = (ID, TEXT, CASED, WORDS)
@@ -38,7 +39,9 @@ RANK = {p: i for i, p in enumerate(POINTS)}
 # The chain's own rules: each a switch of the same name.
 CHAIN_RULES = (
     "word_edges",
+    "glue_edges",
     "space_one_sided",
+    "cjk_latin_space",
     "osa",
     "qty_atomic",
     "marks_free",
@@ -90,7 +93,7 @@ def cells(
     cased, text = r >= RANK[CASED], r >= RANK[TEXT]
     out: list[Cell] = []
     group, seen = 0, None  # the cell group changes where content moves from one table cell to another
-    for i, t in enumerate(tokens):
+    for i, t in _expanded(tokens):
         if t.cls in CONTENT:
             if "cell_windows" in rules:
                 if seen is not None and t.cell != seen[0]:
@@ -102,7 +105,10 @@ def cells(
             if gold:
                 free = cased  # a space of the gold is free from Cased on (one-sided, or squeezed)
             else:
-                free = cased and (_script_free(tokens, i) or "space_one_sided" not in rules)
+                joined = tokens[i].cls == SPACE and (
+                    _script_free(tokens, i) or ("cjk_latin_space" in rules and _cjk_latin(tokens, i))
+                )
+                free = cased and (joined or "space_one_sided" not in rules)
             out.append(Cell(" ", "s", i, True, True, free, group))
         elif t.cls == BREAK:
             free = cased and "break_free" in rules
@@ -117,17 +123,52 @@ def cells(
             out.append(Cell(t.canon, "q", i, True, True, False, group))
         else:
             word = t.cls == WORD
-            body = t.canon if t.cls == QTY else t.text
+            body = t.canon if t.cls in (QTY, MATH) else t.text
             parts = _CLUSTER.findall(body)
             edges = "word_edges" in rules
+            glue = "glue_edges" in rules and word
             kind = "m" if t.cls == MARK else "c"  # a mark equals only a mark, never a letter or a quantity
             for j, c in enumerate(parts):
+                first = j == 0 or not edges or (glue and _glued(parts[j - 1], parts[j]))
+                last = j == len(parts) - 1 or not edges or (glue and _glued(parts[j], parts[j + 1]))
                 if r >= RANK[WORDS] and word:
                     c = "".join(_lower(x) for x in c) if len(c) > 1 else _lower(c)
-                out.append(
-                    Cell(c, kind, i, j == 0 or not edges, j == len(parts) - 1 or not edges, False, group)
-                )
+                out.append(Cell(c, kind, i, first, last, False, group))
     return out
+
+
+def _cjk_latin(tokens: list[Token], i: int) -> bool:
+    """A space between a Han, kana or Hangul character and a Latin-script word or a number."""
+    j, k = i - 1, i + 1
+    if j < 0 or k >= len(tokens):
+        return False
+
+    def cjk(t: Token) -> bool:
+        return t.cls == WORD and t.script in ("character", "hangul")
+
+    def latin(t: Token) -> bool:
+        return (t.cls == WORD and t.script == "") or t.cls == QTY
+
+    a, b = tokens[j], tokens[k]
+    return (cjk(a) and latin(b)) or (latin(a) and cjk(b))
+
+
+def _glued(a: str, b: str) -> bool:
+    """Whether two neighbouring clusters of one Word sit at the seam of two glued words: a lower-case letter
+    then an upper-case one (`ПостачальникТовариство`), or a letter and a digit (`Dollars2`)."""
+    x, y = a[:1], b[:1]
+    return (x.islower() and y.isupper()) or (x.isalpha() and y.isdigit()) or (x.isdigit() and y.isalpha())
+
+
+def _expanded(tokens: list[Token]):
+    """(index, token) pairs, a `Math` token replaced by the tokens of its text reading, each with the math
+    token's index: math reads as words, quantities and symbols as the text around it does."""
+    for i, t in enumerate(tokens):
+        if t.cls == MATH:
+            for u in reader.tokenize(t.canon, rules=reader_rules()):
+                yield i, dataclasses.replace(u, cell=t.cell)
+        else:
+            yield i, t
 
 
 def _script_free(tokens: list[Token], i: int) -> bool:

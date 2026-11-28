@@ -64,6 +64,74 @@ _SWITCHES = (
         False,
     ),
     Switch(
+        "leading_dot",
+        "A decimal written without its integer part (`.5`, `-.5`, `$.50`) is one quantity, so a budget "
+        "cannot drop its point; it equals only its own spelling (`.5` is not `0.5`).",
+        4,
+        False,
+    ),
+    Switch(
+        "glue_edges",
+        "A window may start or end inside an output word at the seam of two glued words (a lower-case letter "
+        "then an upper-case one, or a letter and a digit): a missing space at the gold's own boundary does "
+        "not hide it. A cut anywhere else inside a word still fails (`word_edges`).",
+        4,
+        True,
+    ),
+    Switch(
+        "cjk_latin_space",
+        "A space between a Han, kana or Hangul character and a Latin letter or digit is free in the output "
+        "from Cased on (as the gold's spaces are), like the inner spaces of a Hangul phrase; Text keeps it.",
+        4,
+        True,
+    ),
+    Switch(
+        "qty_spaced_suffix",
+        "One space between a number and a CJK magnitude (`万`, `億`, ...) does not change the quantity "
+        "(`2100 万` and `2100万` are one spelling); a spaced Latin unit stays a word.",
+        4,
+        False,
+    ),
+    Switch(
+        "qty_suffix_across_sup",
+        "A unit suffix right after the end of a `<sup>` binds to the quantity inside it: `M<sup>-1</sup>s` "
+        "reads the `1s` of `M-1s`.",
+        4,
+        False,
+    ),
+    Switch(
+        "unit_exponent_dash",
+        "A minus after a unit word with no digit before it, with a `{` between (`kg{-1}`), is a symbol, as "
+        "in `kg-1`, never the sign of a number.",
+        4,
+        False,
+    ),
+    Switch(
+        "math_spans",
+        "A math span written in the text of an output (`$..$`, `$$..$$`, `\\(..\\)`, `\\[..\\]`) "
+        "is one `Math` "
+        "token carrying its source, as a `<math>` element is, not a run of words and symbols.",
+        4,
+        False,
+    ),
+    Switch(
+        "format_locator",
+        "A negative `format` test is a locator and a claim: the context must be found, and no occurrence of "
+        "it carries a forbidden mark. An output with no marks at all passes it when the context is there "
+        "(before: it failed, since nothing showed a mark could have been written).",
+        4,
+        True,
+    ),
+    Switch(
+        "region_blank",
+        "A blank field's label outside a table cell is read on the chain's region relation: each copy of the "
+        "label opens a region to the next stop or label, blank when it holds only white space and "
+        "placeholder "
+        "symbols (the printed mask once). Cells keep the grid reading.",
+        4,
+        True,
+    ),
+    Switch(
         "text_fold",
         "The Id to Text fold (compatibility forms, typography, invisible characters, leaders, look-alike "
         "symbols) is applied once, between the quantity scan and word tokenization.",

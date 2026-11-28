@@ -53,7 +53,7 @@ import unicodedata
 from html.parser import HTMLParser
 from typing import NamedTuple
 
-from omni_parse_bench import mathspans, normalize, views
+from omni_parse_bench import mathspans, normalize, switches, views
 
 KINDS = ("bold", "italic", "underline", "strike", "sup", "sub")
 # Note: on a character whose script `maths` read from LaTeX, beside its "sub" or "sup"; never a kind
@@ -487,7 +487,11 @@ def check(out: Marked, before: str, span: str, after: str, wanted: tuple[str, ..
         raise ValueError("a format test's span has nothing left after folding")
     # Note: a script read from maths shows only that a script could have been written, so it is evidence
     # for an absent `sub` or `sup` and for no other kind
-    if absent and not (out.emitted if set(absent) <= {"sub", "sup"} else out.written):
+    # Note: with `format_locator` on, the context is the locator and the forbidden mark the claim (exists a
+    # locator, and no claim): the target is found first and an output with no marks at all passes, as it
+    # carries none on the span.
+    if absent and not switches.on("format_locator") and not (
+            out.emitted if set(absent) <= {"sub", "sup"} else out.written):
         return False, "the output has no marks at all, so it cannot show that a mark is absent"
     t, why, verdicts = out.text, "", []
     context = b + s + a

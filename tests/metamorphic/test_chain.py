@@ -108,8 +108,9 @@ def test_a_budget_only_widens(x, k, data):
     assume(letters)
     i = data.draw(st.sampled_from(letters))
     swapped = x[:i] + x[i + 1] + x[i] + x[i + 2:]
-    assume(len(chain.tokens_of_gold(x)) == len(chain.tokens_of_gold(swapped)))
-    assume(chain.tokens_of_gold(x)[0].cls != "Qty" or " " in x)
+    with switches.set_all(True):  # read as `found` reads (a spaced suffix is part of a quantity)
+        read_x, read_swapped = chain.tokens_of_gold(x), chain.tokens_of_gold(swapped)
+    assume([t.cls for t in read_x] == [t.cls for t in read_swapped])
     assert found(x, page(swapped), chain.WORDS, 1), (x, swapped)
 
 
@@ -212,6 +213,7 @@ def test_a_circled_digit_is_the_digit(x, in_gold):
     """Writing a digit as its circled form, in the gold or in the page, leaves a text claim passing at Text, Cased and Words
     (a circled and a plain digit are the same enumerator). [M215]
     Why it matters for a score: models write `①` for a list's `1`; a careful reader takes them as one."""
+    assume("$" not in x and "\\" not in x)   # inside a math span nothing is folded
     m = re.search("[1-3]", x)
     circled = x[: m.start()] + "①②③"[int(m[0]) - 1] + x[m.end():]
     assume(not re.search("[0-9]", x[m.end():m.end() + 1]) and not re.search("[0-9.,]", x[max(0, m.start() - 1):m.start()]))

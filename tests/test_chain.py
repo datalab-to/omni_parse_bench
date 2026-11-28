@@ -37,8 +37,11 @@ def test_a_coarser_point_adds_passes_for_exists_and_failures_for_absent():
 
 
 def test_tokens_stay_fixed_so_a_glued_pair_never_matches_at_any_point():
-    for point in ("Text", "Cased", "Words"):
-        assert not ok("Total", "<p>TotalDue</p>", point)
+    with switches.using(glue_edges=False):
+        for point in ("Text", "Cased", "Words"):
+            assert not ok("Total", "<p>TotalDue</p>", point)
+    with switches.using(glue_edges=True):  # a seam of two glued words is where a cut may fall
+        assert ok("Total", "<p>TotalDue</p>") and not ok("Tota", "<p>TotalDue</p>")
 
 
 def test_case_with_a_budget_is_refused_at_cased():
@@ -389,3 +392,87 @@ def test_a_quantity_matches_only_a_quantity_and_a_mark_never_stands_for_one():
 def test_the_fold_keeps_the_underscores_of_an_identifier_and_removes_a_leader():
     assert fold.fold_gap("a ____ b") == "a b"
     assert fold.fold_gap("token____ x") == "token____ x" and fold.fold_gap("foo___bar") == "foo___bar"
+
+
+# ------------------------------------------------------------------------ math spans, leading dot (step 4)
+
+
+@pytest.mark.parametrize(
+    "gold, html",
+    [
+        ("x", "<p>$x$</p>"),
+        ("α", "<p>$\\alpha$</p>"),
+        ("x²", "<p>$x^2$</p>"),
+        ("Let x ok", "<p>Let $x$ ok</p>"),
+    ],
+)
+def test_a_math_span_is_read_as_the_text_it_renders(gold, html):
+    assert ok(gold, html) and ok(gold, html, "Text")
+    # the TeX is not text
+    assert not ok("TeX", "<p>$x$</p>") and not ok("alpha", "<p>$\\alpha$</p>")
+
+
+def test_a_math_span_across_markup_or_lines_stays_text():
+    with switches.using(math_spans=True):
+        toks = reader.read("<p>a $x <b>y</b> z$ b</p>").tokens
+        assert not any(t.cls == "Math" for t in toks)
+        assert not any(t.cls == "Math" for t in reader.read("<p>$$\nE=mc^2\n$$</p>").tokens)
+
+
+def test_a_signed_or_fractional_leading_dot_decimal_is_one_quantity():
+    for s in ("− .5", "-.5", "1/.5", "$.50"):
+        qs = [t for t in tok(s) if t.cls == "Qty"]
+        assert len(qs) == 1, (s, [(t.cls, t.canon) for t in tok(s)])
+    assert not ok("− .5", "<p>.5</p>", k=1) and not ok("1/.5", "<p>1 .5</p>", k=1)
+
+
+def test_a_quantity_in_math_is_atomic_like_one_outside():
+    assert ok("5", "<p>$5$</p>") and ok("10kg", "<p>$10kg$</p>")
+    assert not ok("5", "<p>$6$</p>", k=1) and not ok("10kg", "<p>$10mg$</p>", k=1)
+
+
+# --------------------------------------------------------------------- glued neighbours (glue_edges)
+
+
+def _found(gold_text, html, point=chain.WORDS, k=0):
+    return bool(chain.windows(chain.tokens_of_gold(gold_text), chain.tokens_of_output(html), point, k))
+
+
+def test_a_window_may_cut_a_glued_word_at_its_seam_when_the_rule_is_on():
+    html = "<p>ПостачальникТовариство з обмеженою</p>"
+    with switches.using(glue_edges=True):
+        assert _found("Товариство з обмеженою", html)
+        assert _found("Postachalnik", "<p>PostachalnikTovarystvo x</p>")
+        assert _found("Tovarystvo x", "<p>PostachalnikTovarystvo x</p>")
+        assert _found("Plan", "<p>Dollars2Plan</p>")  # a letter and a digit seam
+    with switches.using(glue_edges=False):
+        assert not _found("Товариство з обмеженою", html)
+
+
+def test_a_cut_inside_a_word_that_is_not_a_seam_still_fails_with_glue_edges_on():
+    with switches.using(glue_edges=True):
+        assert not _found("cat", "<p>concatenate</p>")
+        assert not _found("cat", "<p>Concatenate</p>")
+        assert not _found("amount paid in ful", "<p>amount paid in full</p>")
+        assert not _found("ate", "<p>PostachalnikTovarystvate</p>")  # the seam is elsewhere
+
+
+# ------------------------------------------------- a space between CJK and Latin or digits (cjk_latin_space)
+
+
+def test_a_space_between_cjk_and_latin_or_a_digit_is_free_on_both_sides_from_cased_on():
+    with switches.using(cjk_latin_space=True):
+        for g, h in (
+            ("5个Inception块", "<p>5个 Inception 块</p>"),  # the output has the space the gold lacks
+            ("5个 Inception 块", "<p>5个Inception块</p>"),  # and the other way round
+            ("한국어abc", "<p>한국어 abc</p>"),
+        ):
+            assert ok(g, h, "Cased") and ok(g, h, "Words")
+        assert not ok("5个Inception块", "<p>5个 Inception 块</p>", "Text")  # Text keeps the printed spacing
+    with switches.using(cjk_latin_space=False):
+        assert not ok("5个Inception块", "<p>5个 Inception 块</p>", "Cased")
+
+
+def test_the_cjk_latin_space_does_not_free_a_space_between_two_latin_words():
+    with switches.using(cjk_latin_space=True):
+        assert not ok("abcd", "<p>ab cd</p>", "Cased") and not ok("therapist", "<p>the rapist</p>")

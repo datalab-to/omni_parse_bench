@@ -207,15 +207,20 @@ def blank_after(t: Present, v: views.Html) -> Mark:
     flow, spans, loose, chunks = _flow(html)
     reasons: list[str] = []
     copies = 0
-    for start, region, cut in _regions(t, flow):
-        if any(a <= start < b and parsed for a, b, parsed in spans):
-            continue    # in a table the cell reader parses: its cells judge it
-        copies += 1
-        if why := _in_text(label, t, region, cut):
-            reasons.append(why)
-    for line in re.split(r"[\u2029\n]", loose):
-        hay = normalize.fold(line)
-        reasons += [why for start, _, _ in _regions(t, hay) if (why := _before(label, t, hay, start))]
+    chained = switches.on("region_blank") and all(parsed for _, _, parsed in spans)
+    if chained:    # a page with a table the cell reader cannot parse keeps the old reading
+        # the text outside a table, on the chain's region relation
+        copies, reasons = _chain_blank_flat(t, html)
+    else:
+        for start, region, cut in _regions(t, flow):
+            if any(a <= start < b and parsed for a, b, parsed in spans):
+                continue    # in a table the cell reader parses: its cells judge it
+            copies += 1
+            if why := _in_text(label, t, region, cut):
+                reasons.append(why)
+        for line in re.split(r"[\u2029\n]", loose):
+            hay = normalize.fold(line)
+            reasons += [why for start, _, _ in _regions(t, hay) if (why := _before(label, t, hay, start))]
     for (_, end, parsed), chunk in zip(spans, chunks, strict=True):
         for n, table in enumerate(tables.parse(chunk) if parsed else ()):
             for rc, text in table.text.items():
@@ -237,6 +242,60 @@ def blank_after(t: Present, v: views.Html) -> Mark:
     if not reasons:
         return True, ""
     return False, "; ".join(reasons[:2]) + (f" (and {len(reasons) - 2} more)" if len(reasons) > 2 else "")
+
+
+_PLACEHOLDER_SYMS = frozenset("_.\u00b7\u2026")
+
+
+def _chain_blank_flat(t: Present, html: str) -> tuple[int, list[str]]:
+    """The blank-field relation on the chain for the text outside table cells (the cells keep the
+    grid reading):
+    each copy of the label (a copy at Words, k = 0, token edges; not one inside a longer stop) opens a region
+    that runs to the next stop or the next copy of the label, or the end of the text; the region is blank when
+    it holds nothing but white space and placeholder symbols, once the printed mask (if the test has one) is
+    taken out once; and what comes before the label in its block is blank, or another label or stop. Returns
+    the number of copies judged and why each failed."""
+    from omni_parse_bench import chain
+
+    out = chain.tokens_of_output(_NOTHING.sub("", html))
+    free = chain.rules_now() - {"cell_windows"}
+
+    def copies(text: str) -> list:
+        ws = chain.windows(chain.tokens_of_gold(text), out, chain.WORDS, 0)    # a label stays in one cell
+        return quantifiers.select(ws)
+
+    stops = [w for x in t.stops for w in copies(x.text)]
+    every = copies(t.content.text)
+    labels = [w for w in every if out[w.first].cell is None]
+    labels = [lw for lw in labels if not any(s.lo <= lw.lo and lw.hi <= s.hi and s.hi - s.lo > lw.hi - lw.lo
+                                              for s in stops)]
+    ends = sorted([s.first for s in stops] + [lw.first for lw in every])
+    flat = [i for i, x in enumerate(out) if x.cell is None]
+    reasons: list[str] = []
+    printed = chain.tokens_of_gold(t.printed.text) if t.printed is not None else None
+    label = t.content.text
+    for k, lw in enumerate(labels):
+        cut = next((e for e in ends if e > lw.last), None)
+        region = [x for i, x in enumerate(out) if i > lw.last and (cut is None or i < cut)]
+        if printed:
+            for w in chain.windows(printed, region, chain.TEXT, 0, rules=free)[:1]:
+                keep = {id(x) for x in region[w.first : w.last + 1]}
+                region = [x for x in region if id(x) not in keep]
+        rest = "".join(x.text for x in region if not _blank_token(x)).strip()
+        if rest:
+            where = "before the next field" if cut is not None else "to the end of the page"
+            reasons.append(f"{label[:60]!r} is followed by {rest[:60]!r} {where}")
+            continue
+        block = [out[i] for i in flat if out[i].block == out[lw.first].block and i < lw.first]
+        prior = "".join(x.text for x in block if not _blank_token(x)).strip()
+        if prior and not any(s.last < lw.first and out[s.first].block == out[lw.first].block
+                             for s in [*stops, *labels[:k]]):
+            reasons.append(f"{label[:60]!r} has {prior[:60]!r} before it")
+    return len(labels), reasons
+
+
+def _blank_token(x) -> bool:
+    return x.cls in ("Space", "Break") or (x.cls == "Sym" and x.text in _PLACEHOLDER_SYMS)
 
 
 def _before(label: str, t: Present, hay: str, start: int) -> str:

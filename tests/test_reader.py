@@ -10,10 +10,13 @@ from omni_parse_bench import reader, switches, views
 from omni_parse_bench.views import MalformedOutput
 
 
+LATER = ("text_fold", "leading_dot", "math_spans")    # rules of the steps after the reader's own
+
+
 @pytest.fixture(autouse=True)
 def rules_on():
     """The reader's rules of step 1 on; the text fold (step 2) is off here and on where a test says so."""
-    with switches.using(**{r: r != "text_fold" for r in reader.RULES}):
+    with switches.using(**{r: r not in LATER for r in reader.RULES}):
         yield
 
 
@@ -395,7 +398,8 @@ def test_digits_glued_to_letters_of_a_spaced_script_make_one_word(s):
 
 
 def test_digits_glued_to_a_unit_are_a_quantity_and_to_cjk_are_not_glued():
-    assert gold("10 kg") == [("Qty", "10"), ("Word", "kg")]  # a unit with a space is a Word
+    with switches.using(qty_spaced_suffix=False):
+        assert gold("10 kg") == [("Qty", "10"), ("Word", "kg")]  # a unit with a space is a Word
     assert gold("3章") == [("Qty", "3"), ("Word", "章")]
     assert gold("第3章") == [("Word", "第"), ("Qty", "3"), ("Word", "章")]
 
@@ -641,3 +645,74 @@ def test_a_scorer_error_fails_one_test_and_not_the_run(monkeypatch, caplog):
 
     page = scorer.UnitTests().score({"html": "<p>hello</p>"}, [bad, ok])
     assert page.result["scorer_errors"] == 1
+
+
+
+
+# ------------------------------------------------------------------------- leading dot, math spans (step 4)
+
+
+def test_a_leading_dot_decimal_is_one_quantity_when_the_rule_is_on():
+    with switches.using(leading_dot=True):
+        assert gold(".5") == [("Qty", ".5")] and gold("-.5") == [("Qty", "-.5")]
+        assert gold("$.50 or (.5)") == [
+        ("Qty", "$.50"),
+        ("Word", "or"),
+        ("Sym", "("),
+        ("Qty", ".5"),
+        ("Sym", ")"),
+    ]
+        assert gold("x.5")[-1] == ("Qty", "5") and gold("1.5") == [("Qty", "1.5")]
+        assert gold(".5kg") == [("Qty", ".5kg")] and gold("a .5")[-1] == ("Qty", ".5")
+    assert gold(".5") == [("Sym", "."), ("Qty", "5")]
+
+
+def test_a_math_span_in_the_text_is_one_math_token_when_the_rule_is_on():
+    with switches.using(math_spans=True):
+        assert toks("<p>We have $p<0.05$ done</p>") == [
+            ("Word", "We"), ("Word", "have"), ("Math", "$p<0.05$"), ("Word", "done")]
+        assert ("Math", "$$E=mc^2$$") in toks("<p>$$E=mc^2$$</p>")
+        assert ("Math", "\\(a_2\\)") in toks("<p>ok \\(a_2\\) end</p>")
+        assert toks("<p>costs $5 and $6</p>").count(("Math", "$5 and $")) == 0   # prices stay text
+    assert ("Math", "$p<0.05$") not in toks("<p>We have $p<0.05$ done</p>")
+
+
+def test_one_space_before_a_cjk_magnitude_is_not_part_of_the_quantity_when_the_rule_is_on():
+    with switches.using(qty_spaced_suffix=True):
+        assert gold("2100 万") == gold("2100万") == [("Qty", "2100万")]
+        a, b = reader.tokenize("3.5 億"), reader.tokenize("3.5億")
+        assert [t.canon for t in a] == [t.canon for t in b] == ["3.5億"]
+        assert [t.cls for t in reader.tokenize("2100  万")] == ["Qty", "Space", "Word"]  # one space only
+        # a spaced unit stays a word of its own: a typo in it stays one edit, as before
+        for s in ("20 kg", "6.5 ft", "763791104 b Account", "200 µL", "5 s"):
+            assert [t.cls for t in reader.tokenize(s)][:3] == ["Qty", "Space", "Word"]
+        assert [t.cls for t in reader.tokenize("5kg")] == ["Qty"]
+        assert [t.cls for t in reader.tokenize("5s")] == ["Qty"]
+    with switches.using(qty_spaced_suffix=False):
+        assert [t.cls for t in reader.tokenize("2100 万")] == ["Qty", "Space", "Word"]
+
+
+def test_the_dash_of_a_unit_exponent_is_a_symbol_when_the_rule_is_on():
+    kinds = lambda s: [t.cls for t in reader.tokenize(s)]  # noqa: E731
+    with switches.using(unit_exponent_dash=True):
+        assert kinds("kg -1") == ["Word", "Space", "Qty"]  # a space keeps it a sign
+        assert kinds("kg{-1}") == ["Word", "Sym", "Sym", "Qty", "Sym"]
+        assert kinds("kg^{-1}") == ["Word", "Sym", "Sym", "Sym", "Qty", "Sym"]
+        assert kinds("kg-1") == ["Word", "Sym", "Qty"]  # unchanged
+        assert kinds("temperature -1") == ["Word", "Space", "Qty"]  # not a unit word: a negative number
+        assert kinds("5 kg -1")[-1] == "Qty" and kinds("5 kg -1")[-2] == "Space"  # a digit before the unit
+    with switches.using(unit_exponent_dash=False):
+        assert kinds("kg{-1}") == ["Word", "Sym", "Qty", "Sym"]
+
+
+def test_a_suffix_after_the_end_of_a_sup_binds_to_the_quantity_inside_when_the_rule_is_on():
+    html = "<p>kon (M<sup>−1</sup>s<sup>−1</sup>)</p>"
+    with switches.using(qty_suffix_across_sup=True):
+        got = [(t.cls, t.text) for t in reader.read(html).tokens if t.cls != "Space"]
+        assert ("Qty", "1s") in got and ("Word", "s") not in got
+        assert [t.canon for t in reader.read(html).tokens if t.cls == "Qty"] == ["1s", "1"]
+        # a word that only starts like a suffix, and a mark, are not bound
+        other = reader.read("<p>a<sup>1</sup>second</p>").tokens
+        assert ("Word", "second") in [(t.cls, t.text) for t in other]
+    with switches.using(qty_suffix_across_sup=False):
+        assert ("Word", "s") in [(t.cls, t.text) for t in reader.read(html).tokens]
