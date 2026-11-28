@@ -13,11 +13,14 @@ regrade of saved predictions. Each PR used its own set of systems, so the counts
 
 ### Score impact
 
+- Normalizer chain and distance (below): off by default (switch `chain`), so no verdict moves in this change. With it on, a `present` text test is matched on the chain by one OSA distance in place of the old fold, squeeze retries and number guard; verdicts can move both ways, per rule (`word_edges`, `space_one_sided`, `osa`, `qty_atomic`, `marks_free`, `wrap_free`, `break_free`, `cell_windows`, `text_fold`). Regrade with each rule alone before turning any on.
 - Reader rules behind switches (below): off by default, so no verdict moves in this change. With `visibility` and `alt_text_out` on, a page's hidden text and its images' alt text stop counting as text: verdicts can move from pass to fail (a string written only in hidden markup or alt text) and from fail to pass (a negative test of text the page never shows). Regrade with each switch alone before turning any on.
 
 ### Added
 
+- Normalizer chain (`omni_parse_bench/chain.py`, `omni_parse_bench/fold.py`, `docs/scoring/chain.md`): Id, Text, Cased and Words points, the Id to Text fold as a table (`FOLD`), and one search by the OSA distance over grapheme clusters (quantities atomic, a space of the gold free from Cased on, a footnote mark and a wrapped hyphen free, case of words folded at Words). Switches: `text_fold`, `chain`, `word_edges`, `space_one_sided`, `osa`, `qty_atomic`, `marks_free`, `wrap_free`, `break_free`. A failed text claim names the rules that decided it (`[space_one_sided] ...`).
 - Reader (`omni_parse_bench/reader.py`, `docs/scoring/reader.md`): one HTML5 parser reads an output into blocks, lines and tokens (words by grapheme cluster and script class, quantities, symbols, footnote marks, wrapped hyphens), with hidden text and alt text left out, table cells as blocks a window never crosses, and a quantity reader (signs, separators, exponents, glued units, currency, fractions). Each rule is a named switch (`omni_parse_bench/switches.py`, set with `OPB_SWITCHES`): `visibility`, `alt_text_out`, `cell_windows`, `sup_exponent`, `tokens`. The text views consult `visibility` and `alt_text_out`; the others are used by the steps that follow. New dependencies: `html5lib`, `regex`.
+- Work counters (`omni_parse_bench/work.py`): the reader and the chain search count their work in deterministic units (difflib cells, markup runs visited, search states). A read or search over its fixed bound logs a warning; no verdict depends on a count or on time. Long repetitive outputs now read in linear time (the reader recursed on a long `a/b/c` run and scanned quadratically on very long lines).
 
 ## [1.9.0] - 2026-11-27
 

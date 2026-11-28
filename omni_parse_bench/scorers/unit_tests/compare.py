@@ -1,10 +1,13 @@
 """One page's tests run against its outputs: a verdict per test (`score`). Each output is read once into its
 view (`views`), and each test runs on its output's view (`runners`). A test fails when it fails, or when its
-output is missing or malformed. A test that raises on a well-formed output is a bug of the scorer's, so
-`score` raises it, naming the test.
+output is missing or malformed. A test that raises on a well-formed output is a bug of the scorer's: it fails
+with the reason `scorer error: ...` and is logged at ERROR with its id, so one bad test never ends a grade
+run (set `OPB_RAISE_SCORER_ERRORS=1`, as the test suite does, to raise it instead).
 """
 from __future__ import annotations
 
+import logging
+import os
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal, NamedTuple
 
@@ -13,6 +16,8 @@ from omni_parse_bench import views
 from . import runners
 from . import tests as _tests
 
+log = logging.getLogger("omni_parse_bench.scorer")
+SCORER_ERROR = "scorer error: "  # the start of the reason of a test that raised
 Result = Literal["pass", "fail"]
 
 
@@ -49,7 +54,11 @@ def score(pred: Mapping[str, Any], gold: Sequence[_tests.Test]) -> list[Verdict]
             passed, why = runners.run(t.test_type, t.params, v, blank)
         except Exception as e:
             e.add_note(f"while running test {t.id} ({t.test_type}) of page {t.page_id}")
-            raise
+            if os.environ.get("OPB_RAISE_SCORER_ERRORS"):
+                raise
+            log.error("scorer error on test %s (%s) of page %s: %r", t.id, t.test_type, t.page_id, e)
+            out.append(Verdict(t.id, "fail", f"{SCORER_ERROR}{type(e).__name__}: {e}"))
+            continue
         out.append(Verdict(t.id, "pass" if passed else "fail", why))
     return out
 

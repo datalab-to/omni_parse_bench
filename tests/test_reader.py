@@ -12,7 +12,8 @@ from omni_parse_bench.views import MalformedOutput
 
 @pytest.fixture(autouse=True)
 def rules_on():
-    with switches.set_all(True):
+    """The reader's rules of step 1 on; the text fold (step 2) is off here and on where a test says so."""
+    with switches.using(**{r: r != "text_fold" for r in reader.RULES}):
         yield
 
 
@@ -41,7 +42,7 @@ def words(h: str) -> list[str]:
 def test_a_switch_is_off_by_default_and_named():
     with switches.set_all(False):
         assert not any(switches.state().values())
-    assert set(switches.SWITCHES) == set(reader.RULES)
+    assert set(reader.RULES) <= set(switches.SWITCHES)
     with pytest.raises(KeyError):
         switches.on("nope")
     with pytest.raises(KeyError):
@@ -549,3 +550,94 @@ def test_a_grouping_space_is_part_of_a_quantity_and_a_sign_gap_is_not():
 
 def test_a_hyphen_after_a_combining_mark_stays_in_the_word():
     assert toks("<p>a\u0301-b</p>") == [("Word", "a\u0301-b")]
+
+
+def test_the_text_fold_runs_between_the_quantity_scan_and_word_tokenization():
+    with switches.using(text_fold=True):
+        _check_fold()
+
+
+def _check_fold():
+    assert toks("<p>ﬁx the “quote” – x ① ＡＢＣ 12 ３４ a…b</p>") == [
+        ("Word", "fix"), ("Word", "the"), ("Sym", '"'), ("Word", "quote"), ("Sym", '"'), ("Sym", "-"),
+        ("Word", "x"), ("Qty", "1"), ("Word", "ABC"), ("Qty", "12"), ("Qty", "34"), ("Word", "a"),
+        ("Word", "b")]
+    assert toks("<p>• Bullet</p>") == [("Word", "Bullet")]
+
+
+def test_a_quantity_keeps_its_spelling_through_the_fold():
+    assert [t.text for t in reader.read("<p>１２３ 4,5</p>").tokens if t.cls == "Qty"] == ["１２３", "4,5"]
+
+
+def test_with_text_fold_off_the_reading_is_the_unfolded_one():
+    with switches.using(text_fold=False):
+        assert words("<p>ﬁx “q”</p>") == ["ﬁx", "q"]
+
+
+def test_long_inputs_are_linear_and_do_not_recurse():
+    """A fraction chain of any length reads as one quantity, and a very long line of symbols reads in time
+    linear in its length (these once recursed and went quadratic)."""
+    import time
+
+    from omni_parse_bench import reader
+
+    t0 = time.time()
+    chain = reader.tokenize("1/" * 20000 + "1")
+    assert len(chain) == 1 and chain[0].cls == reader.QTY
+    syms = reader.tokenize("§" * 200000)
+    assert len(syms) == 200000
+    assert time.time() - t0 < 20
+
+
+def test_long_rewritten_run_reads_in_bounded_time():
+    """A long stretch that the fold rewrites everywhere (full-width bars) keeps exact source spans, and reads
+    in time linear in its length (difflib alone was quadratic here, and so was the markup of each span)."""
+    import time
+
+    from omni_parse_bench import reader, switches
+
+    text = "｜ " * 8000
+    with switches.using(text_fold=True):
+        t0 = time.time()
+        toks = reader.tokenize(text)
+        assert time.time() - t0 < 20
+    bars = [t for t in toks if t.text == "|"]
+    assert len(bars) == 8000
+    assert all(t.end - t.start == 1 for t in bars)
+    assert bars[3].start == 6
+
+
+def test_a_stretch_that_folds_to_nothing_reads_as_nothing():
+    """The cluster table of an empty line is empty (a fold can empty a stretch: invisible characters only)."""
+    from omni_parse_bench import reader
+
+    assert reader.tokenize("") == []
+    with switches.using(text_fold=True):
+        html = "<p>a</p><p>\u200b\u200b</p><p>b</p>"
+        assert [t.text for t in reader.read(html).tokens if t.cls == "Word"] == ["a", "b"]
+
+
+def test_a_scorer_error_fails_one_test_and_not_the_run(monkeypatch, caplog):
+    """A test that raises on a well-formed output fails with a logged reason; the page's other tests run."""
+    from omni_parse_bench.scorers.unit_tests import compare, runners, tests
+
+    monkeypatch.delenv("OPB_RAISE_SCORER_ERRORS", raising=False)
+    real = runners.run
+
+    def run_bad(*a):
+        raise ValueError("zip mismatch")
+
+    spec = {"test_type": "present", "output_type": "html", "derivation": "publisher_markup", "tags": [],
+            "args": {"content": {"text": "hello", "max_diffs": 0}}, "settings": {}}
+    boom = {"content": {"text": "boom", "max_diffs": 0}}
+    bad, ok = tests.parse("p", {"tests": [{**spec, "id": "bad", "args": boom}, {**spec, "id": "ok"}]})
+    monkeypatch.setattr(runners, "run", lambda *a: real(*a) if a[1] == ok.params else run_bad(*a))
+    with caplog.at_level("ERROR", logger="omni_parse_bench.scorer"):
+        out = compare.score({"html": "<p>hello</p>"}, [bad, ok])
+    assert [(v.id, v.result) for v in out] == [("bad", "fail"), ("ok", "pass")]
+    assert out[0].why.startswith("scorer error: ValueError: zip mismatch")
+    assert any("test bad" in r.getMessage() for r in caplog.records)
+    from omni_parse_bench.scorers import unit_tests as scorer
+
+    page = scorer.UnitTests().score({"html": "<p>hello</p>"}, [bad, ok])
+    assert page.result["scorer_errors"] == 1

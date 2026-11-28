@@ -11,3 +11,6 @@ settings.register_profile("ci", max_examples=300, deadline=None, derandomize=Tru
 settings.register_profile("deep", max_examples=5000, deadline=None, database=None,
                           suppress_health_check=HEALTH)
 settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "ci"))
+
+# a scorer bug fails the suite; in a grade run it fails one test with a logged reason (see compare.py)
+os.environ.setdefault("OPB_RAISE_SCORER_ERRORS", "1")

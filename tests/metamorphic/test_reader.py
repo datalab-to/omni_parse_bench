@@ -23,6 +23,11 @@ HIDERS = ['<span style="display:none">{}</span>', '<span style="visibility:hidde
           '<div style="display: none"><p>{}</p></div>']
 
 
+def STEP1():
+    """The reader's rules of step 1 on, and none of the later ones (the text fold changes what a token holds)."""
+    return switches.using(**{r: r != "text_fold" for r in reader.RULES})
+
+
 def raw_test(kind: str, x: str) -> dict:
     base = {"id": "a", "derivation": "authored", "tags": [], "output_type": "html"}
     if kind == "present":
@@ -32,7 +37,7 @@ def raw_test(kind: str, x: str) -> dict:
 
 def passes(kind: str, x: str, html: str) -> bool:
     """The verdict of one present (or absent) test of `x` on `html`, with the reader's rules on."""
-    with switches.set_all(True):
+    with STEP1():
         r = score({"html": html, "blocks": []}, gold.parse("p", {"tests": [raw_test(kind, x)]}))[0]
     return r.result == "pass"
 
@@ -46,7 +51,7 @@ def loadable(kind: str, x: str) -> bool:
 
 
 def tokens(html: str) -> list[tuple[str, str]]:
-    with switches.set_all(True):
+    with STEP1():
         return [(t.cls, t.text) for t in reader.read(html).tokens]
 
 
@@ -98,13 +103,13 @@ def test_a_window_stops_at_a_cell_and_not_at_a_paragraph(x, data):
     words = x.split()
     k = data.draw(st.integers(1, len(words) - 1))
     a, b = " ".join(words[:k]), " ".join(words[k:])
-    with switches.set_all(True):
+    with STEP1():
         cells = reader.read(f"<table><tr><td>{escaped(a)}</td><td>{escaped(b)}</td></tr></table>")
         paras = reader.read(f"<p>{escaped(a)}</p><p>{escaped(b)}</p>")
     for d, crosses in ((cells, True), (paras, False)):
         content = [i for i, t in enumerate(d.tokens) if t.cls in reader.CONTENT]
         assume(len(content) >= 2)
-        with switches.set_all(True):
+        with STEP1():
             assert d.crosses_cell(content[0], content[-1]) is crosses, (a, b)
 
 
@@ -134,7 +139,7 @@ def test_tokens_cover_the_text(x):
     Why it matters for a score: tokens are fixed for an output and nothing is lost between the reader and a verdict, so
     a reason can quote the text it points at."""
     assume(not RESERVED.search(x))
-    with switches.set_all(True):
+    with STEP1():
         toks = reader.tokenize(x)
     joined = "".join(t.text for t in toks)
     squeezed = re.sub(r"(?<=[぀-ヿ一-鿿])\s+(?=[぀-ヿ一-鿿])", "", x)
@@ -154,7 +159,7 @@ def test_case_and_a_footnote_mark_change_no_token_boundary(x, data):
     assume(not RESERVED.search(x))
 
     def read(text: str) -> list[reader.Token]:
-        with switches.set_all(True):
+        with STEP1():
             return list(reader.read(f"<p>{escaped(text)}</p>").tokens)
 
     base = read(x)
@@ -168,7 +173,7 @@ def test_case_and_a_footnote_mark_change_no_token_boundary(x, data):
     assume(len(cased) == len(base))
     assert [t.cls for t in cased] == [t.cls for t in base]
     assert [t.text for j, t in enumerate(cased) if j != i] == [t.text for j, t in enumerate(base) if j != i]
-    with switches.set_all(True):
+    with STEP1():
         marked = [t for t in reader.read(
             f"<p>{escaped(x[:w.end])}<sup>1</sup>{escaped(x[w.end:])}</p>").tokens if t.cls != "Mark"]
     assert [(t.cls, t.text) for t in marked] == [(t.cls, t.text) for t in base if t.cls != "Mark"], (x, w.text)
@@ -182,7 +187,7 @@ def test_every_real_text_string_is_hidden_by_markup_and_is_covered_by_its_tokens
     n = 0
     for x in sorted({x for t in TESTS for x in text_strings(t.params)}):
         if not x.strip() or RESERVED.search(x): continue
-        with switches.set_all(True):
+        with STEP1():
             toks = reader.tokenize(x)
         assert re.sub(r"\s+", "", "".join(t.text for t in toks)) == re.sub(r"\s+", "", re.sub(
             r"(?<=[぀-ヿ一-鿿])\s+(?=[぀-ヿ一-鿿])", "", x)), x

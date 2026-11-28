@@ -28,6 +28,7 @@ given `rules`.
 
 from __future__ import annotations
 
+import bisect
 import functools
 import re
 import unicodedata
@@ -37,7 +38,7 @@ from collections.abc import Iterable, Iterator
 import html5lib
 import regex
 
-from . import switches
+from . import switches, work
 from .views import MalformedOutput
 
 # ------------------------------------------------------------------------------------------ token classes
@@ -60,7 +61,7 @@ CONTENT = frozenset(
 # The four script classes of section 8 of the design, for a letter's cluster.
 SPACED, HANGUL, CHARACTER, PHRASE = "spaced", "hangul", "character", "phrase"
 
-RULES = ("visibility", "alt_text_out", "cell_windows", "sup_exponent", "tokens")
+RULES = ("visibility", "alt_text_out", "cell_windows", "sup_exponent", "tokens", "text_fold")
 
 
 @dataclass(frozen=True, slots=True)
@@ -372,6 +373,23 @@ def _digit_run(u: str, i: int) -> int:
 def _qty_end(
     u: str, i: int, sign_ok: bool, sup_exponent: bool = True, spaced_ok: bool = False
 ) -> tuple[int | None, int]:
+    """Where the quantity starting at `i` ends (see `_qty_one`), extended over a fraction chain `a/b/c`
+    (iteratively: a long run of slashes must not recurse)."""
+    j, core = _qty_one(u, i, sign_ok, sup_exponent, spaced_ok)
+    if j is None:
+        return None, core
+    n = len(u)
+    while j < n and u[j] == "/":
+        r, _ = _qty_one(u, j + 1, False, sup_exponent)
+        if r is None:
+            break
+        j = r
+    return j, core
+
+
+def _qty_one(
+    u: str, i: int, sign_ok: bool, sup_exponent: bool = True, spaced_ok: bool = False
+) -> tuple[int | None, int]:
     """Where the quantity starting at `i` ends, or (None, core_end): no quantity, with the end of the number
     when letters glued to it are what rule it out (the run is then one Word). `sign_ok` says a sign may start
     it."""
@@ -428,10 +446,6 @@ def _qty_end(
                 break
     if j == core and j < n and _glues(u[j]) and not (script_class(u[j]) != SPACED and _is_letter(u[j])):
         return None, core  # letters, digits or marks glued on: a Word
-    if j < n and u[j] == "/":
-        r, _ = _qty_end(u, j + 1, False, sup_exponent)
-        if r is not None:
-            return r, core
     return j, core
 
 
@@ -449,6 +463,10 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
     sup_exp = "sup_exponent" in rules
     starts = [m.start() for m in _CLUSTER.finditer(u)]
     boundary = set(starts) | {n}
+    following = [n] * (n + 1)  # the start of the next cluster after each offset
+    for a, b in zip(starts, starts[1:] + [n], strict=False):  # no starts when `u` is empty
+        for x in range(a, b):
+            following[x] = b
     i = 0
 
     def prev_glues(k: int) -> bool:
@@ -557,12 +575,120 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
             i = j
             continue
         # a Sym: one cluster
-        j = next((s for s in starts if s > i), n)
+        j = following[i]
         put(SYM, i, j)
         i = j
 
 
 _INNER = frozenset("-‐‑'’ʼ")     # hyphens and apostrophes
+
+
+def _fold_records(u: str, recs: list[tuple], rules: frozenset[str]) -> list[tuple]:
+    """The Id -> Text fold between the quantity scan and word tokenization: each run of Word, Sym and Space
+    records is folded as text and, when the fold changed it, read into tokens again. A quantity, a mark and a
+    wrap keep what the scan made of them. A re-read token stands for the whole run in the source (`lo:hi`)."""
+    from .fold import fold_gap
+
+    out: list[tuple] = []
+    i, n = 0, len(recs)
+    while i < n:
+        if recs[i][0] not in (WORD, SYM, SPACE):
+            out.append(recs[i])
+            i += 1
+            continue
+        j = i
+        while j < n and recs[j][0] in (WORD, SYM, SPACE):
+            j += 1
+        lo, hi = recs[i][3], recs[j - 1][4]
+        at = [x for x in range(lo, hi) if u[x] not in (SUP_OPEN, SUP_CLOSE)]  # raw position -> offset in u
+        raw = "".join(" " if u[x] == SOFT_BREAK else u[x] for x in at)
+        folded = fold_gap(raw, line_start=i == 0)
+        if folded == raw:
+            out.extend(recs[i:j])
+        else:
+            again: list[tuple] = []
+            _tokenize_line(
+                folded,
+                [frozenset()] * len(folded),
+                lambda *r, _a=again: _a.append(r),
+                output=False,
+                rules=rules,
+            )
+            while again and again[0][0] == SPACE and not out:
+                again.pop(0)
+            while again and again[-1][0] == SPACE and j == n:
+                again.pop()
+            span = _fold_map(raw, folded, line_start=i == 0)
+            for c, t, k, a, b, sc in again:
+                src = [span[x] for x in range(a, b)] or [span[min(a, len(folded) - 1)]]
+                out.append((c, t, k, at[min(x[0] for x in src)], at[max(x[1] for x in src)] + 1, sc))
+        i = j
+    return out
+
+
+_CHUNKS = (64, 512, 4096)  # a stretch longer than the first is aligned piece by piece (difflib is quadratic)
+
+
+def _pieces(raw: str, size: int) -> list[str]:
+    """`raw` cut into pieces of about `size` characters, each cut before a starter (not a mark, a format
+    character or a space, so a run of white space stays whole): the cuts the fold is likely to leave alone."""
+    out, last, n = [], 0, len(raw)
+    while n - last > size:
+        x = last + size
+        while x < n and (
+            unicodedata.category(raw[x]) in ("Mn", "Mc", "Me", "Cf", "Zs", "Cc") or raw[x].isspace()
+        ):
+            x += 1
+        if x >= n:
+            break
+        out.append(raw[last:x])
+        last = x
+    out.append(raw[last:])
+    return out
+
+
+def _fold_map(raw: str, folded: str, line_start: bool = False) -> list[tuple[int, int]]:
+    """For each character of `folded`, the (first, last) raw positions it comes from: an unchanged stretch
+    maps one to one, a rewritten stretch (`ﬁ` to `fi`) maps each of its characters to the raw stretch."""
+    p = 0
+    while p < min(len(raw), len(folded)) and raw[p] == folded[p]:
+        p += 1
+    q = 0
+    while q < min(len(raw), len(folded)) - p and raw[-1 - q] == folded[-1 - q]:
+        q += 1
+    out = [(x, x) for x in range(p)]
+    rm, fm = raw[p : len(raw) - q], folded[p : len(folded) - q]
+    out.extend((p + a, p + b) for a, b in _align(rm, fm, line_start and p == 0))
+    out.extend((len(raw) - q + x, len(raw) - q + x) for x in range(q))
+    return out
+
+
+def _align(rm: str, fm: str, line_start: bool) -> list[tuple[int, int]]:
+    """The (first, last) positions of `rm` each character of `fm` comes from."""
+    import difflib
+
+    from .fold import fold_gap
+
+    if len(rm) > _CHUNKS[0] and len(fm) > _CHUNKS[0]:
+        for size in _CHUNKS:
+            parts = _pieces(rm, size)
+            folds = [fold_gap(x, line_start=line_start and k == 0) for k, x in enumerate(parts)]
+            if len(parts) > 1 and "".join(folds) == fm:
+                out, base = [], 0
+                for x, f in zip(parts, folds, strict=True):
+                    out.extend((base + a, base + b) for a, b in _align(x, f, False))
+                    base += len(x)
+                return out
+        if len(rm) * len(fm) > 4_000_000:  # no cheap alignment: the whole stretch maps to its whole source
+            return [(0, max(len(rm) - 1, 0))] * len(fm)
+    work.add("diff_cells", len(rm) * len(fm))
+    out = []
+    for tag, a0, a1, b0, b1 in difflib.SequenceMatcher(None, rm, fm, autojunk=False).get_opcodes():
+        if tag == "equal":
+            out.extend((a0 + d, a0 + d) for d in range(a1 - a0))
+        elif b1 > b0:
+            out.extend([(a0, max(a1, a0 + 1) - 1)] * (b1 - b0))
+    return out
 
 
 def _spaced_letter(u: str, i: int) -> bool:
@@ -710,6 +836,12 @@ class _Builder:
         for line in lines:
             while line and line[-1][0] in (" ", SOFT_BREAK):
                 line.pop()
+            if line and line[-1][0][-1:] in (" ", "\t", "\f"):
+                line[-1] = (line[-1][0].rstrip(" \t\f"), line[-1][1])
+            while line and not line[0][0].strip(" \t\f"):
+                line.pop(0)
+            if line and line[0][0][:1] in (" ", "\t", "\f"):
+                line[0] = (line[0][0].lstrip(" \t\f"), line[0][1])
             if not line:
                 continue
             if emitted:
@@ -756,6 +888,10 @@ class _Builder:
                 mk.append(markup)
             in_sup = sup
             text = text.replace(SUP_OPEN, "�").replace(SUP_CLOSE, "�")
+            if "text_fold" in self.rules:
+                from .fold import enumerator_digits
+
+                text = enumerator_digits(text)
             u_parts.append(text)
             mk.extend([markup] * len(text))
         if in_sup:
@@ -764,12 +900,30 @@ class _Builder:
         u = "".join(u_parts)
         line = self._line
 
+        # the markup of `u` as runs, so the markup common to a span costs one step per run, not per character
+        run_at: list[int] = []
+        run_mk: list[frozenset[str]] = []
+        for x, m in enumerate(mk):
+            if not run_mk or m != run_mk[-1]:
+                run_at.append(x)
+                run_mk.append(m)
+
         def emit(cls, text, canon, lo, hi, script) -> None:
-            ms = [m for m in mk[lo:hi]] or [frozenset()]
-            both = frozenset.intersection(*ms) if ms else frozenset()
+            if hi > lo:
+                seen = run_mk[bisect.bisect_right(run_at, lo) - 1 : bisect.bisect_left(run_at, hi)]
+                work.add("emit_runs", len(seen))
+                ms = set(seen)
+            else:
+                ms = {frozenset()}
+            both = frozenset.intersection(*ms)
             self._add(cls, text, canon, block, line, both, cell, script)
 
-        _tokenize_line(u, mk, emit, output=self.output, rules=self.rules)
+        recs: list[tuple] = []
+        _tokenize_line(u, mk, lambda *r: recs.append(r), output=self.output, rules=self.rules)
+        if "text_fold" in self.rules:
+            recs = _fold_records(u, recs, self.rules)
+        for r in recs:
+            emit(*r)
 
     def finish(self) -> Document:
         self.flush()
@@ -998,6 +1152,7 @@ def read(h: str, *, rules: Iterable[str] | None = None, output: bool = True) -> 
     if not isinstance(h, str):
         raise MalformedOutput(f"html must be a string, not {type(h).__name__}: {h!r:.80}")
     rules = _rules(rules)
+    before = work.snapshot()
     root = _parse(h)
     maths: dict[int, str] = {}
     for el in list(root.iter("math")):  # a math element is its source: its children are not text
@@ -1108,7 +1263,9 @@ def read(h: str, *, rules: Iterable[str] | None = None, output: bool = True) -> 
             if tag == "pre" and pre:
                 pre -= 1
             b.begin("text", cell_now[-1])
-    return b.finish()
+    doc = b.finish()
+    work.check_read(len(h), before)
+    return doc
 
 
 def _span(el, name: str) -> int:

@@ -23,7 +23,7 @@ from fuzzysearch.levenshtein import find_near_matches_levenshtein
 from rapidfuzz import fuzz
 from rapidfuzz.distance import OSA
 
-from omni_parse_bench import markdown, marks, mathspans, normalize, tables, views
+from omni_parse_bench import markdown, marks, mathspans, normalize, switches, tables, views
 from omni_parse_bench.scorers.unit_tests import hyphenation
 
 # Note: a ratio test (table_cell, or present's first pass) allowing k edits in an n-character string
@@ -80,6 +80,7 @@ def found(a: Arg, v: views.Html) -> Mark:
         # -> (True, "")"""
     if isinstance(a, Number): return _number_found(a.number, v)
     if isinstance(a, Latex): return _latex_found(a.latex, v)
+    if switches.on("chain"): return _chain_found(a, v)
     # Note: `exact_case` runs every path below on the case-kept fold (fold_cased); nothing else changes.
     fold_one, fold_marks = (normalize.fold_cased, normalize.unmarked_cased) if a.exact_case else (
         normalize.fold, normalize.unmarked)
@@ -109,6 +110,18 @@ def found(a: Arg, v: views.Html) -> Mark:
         return False, f"{a.text[:60]!r} found only inside a longer number"
     near = f"; closest {_excerpt(window)!r}" if window else ""
     return _mark(ok, f"{a.text[:60]!r} not found (best {r:.3f} < {thr:.3f}){near}")
+
+
+def _chain_found(a: Text, v: views.Html) -> Mark:
+    """A text claim on the normalizer chain (`chain.py`): Words, or Cased with `exact_case`. A failure
+    names the rules whose switching off alone would have passed it, as `[word_edges]`, else `[chain]`."""
+    from omni_parse_bench import chain
+    point = chain.CASED if a.exact_case else chain.WORDS
+    gold, out = chain.tokens_of_gold(a.text), chain.tokens_of_output(v.html)
+    if chain.match(gold, out, point, a.max_diffs):
+        return True, ""
+    code = ",".join(chain.blame(gold, out, point, a.max_diffs)) or "chain"
+    return False, f"[{code}] {a.text[:60]!r} not found within {a.max_diffs} edits at {point}"
 
 
 class Present(NamedTuple):

@@ -61,7 +61,8 @@ class UnitTests(scorer.Scorer[data.Page, tuple[_tests.Test, ...], Mapping[str, A
         vs = compare.score(pred, tests)
         by_id = {t.id: t for t in tests}
         result = {"tests": len(vs), "passed": sum(v.result == "pass" for v in vs),
-                  "ids": _ids(v.id for v in vs)}
+                  "ids": _ids(v.id for v in vs),
+                  "scorer_errors": sum(v.why.startswith(compare.SCORER_ERROR) for v in vs)}
         result |= _count((v.result == "pass", (t := by_id[v.id]).test_type, t.derivation, t.tags,
                           _tests.arg_kinds(t.test_type, t.args), t.id) for v in vs)
         return scorer.Score(result, [{"test_id": v.id, "test_type": (t := by_id[v.id]).test_type,
@@ -294,7 +295,13 @@ def _summary(pages: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
                              for x in pages if "suite" in x["row"]
                              for k, c in x.get("per_family", {}).items() if k == family)
         auxiliary[family] = families[family] | {"per_suite": per_suite}
+    errors_by_suite: dict[str, int] = collections.Counter()
+    for x in pages:
+        if "suite" in x["row"]:
+            errors_by_suite[x["row"]["suite"]] += x.get("scorer_errors", 0)
     return {"score": float(statistics.fmean(head)) if head else None,
+            "scorer_errors": sum(x.get("scorer_errors", 0) for x in pages),
+            "scorer_errors_by_suite": {k: errors_by_suite.get(k, 0) for k in sorted(suites)},
             "families": families,
             "auxiliary": auxiliary,
             "per_tag": _entries(counted("per_tag"), twins=twins),

@@ -12,6 +12,7 @@ moves. Every switch is off until the rules ship together; with the switches off 
 | `cell_windows` | A window of text stops at a table cell: two cells never form one window, and a cell never joins text outside every table. Paragraphs and lines do not stop one. |
 | `sup_exponent` | A `<sup>` (or a Unicode superscript) right after a digit is an exponent and part of the number: `10<sup>2</sup>` and `10²` are both `10^2`, never `10` and a footnote mark. |
 | `tokens` | Text is read as tokens at grapheme-cluster edges (below), not as characters. |
+| `text_fold` | The Id to Text fold (compatibility forms, typography, invisible characters, leaders, look-alike symbols) runs between the quantity scan and word tokenization, so Text tokens are fixed once per output. A quantity keeps its spelling through it. |
 
 Today the scorer's text views consult `visibility` and `alt_text_out`. The other three are rules of the reader
 itself, used by the steps that follow.
