@@ -17,6 +17,7 @@ from . import runners
 from . import tests as _tests
 
 log = logging.getLogger("omni_parse_bench.scorer")
+SCORER_ERROR = "scorer error: "  # the start of the reason of a test that raised
 Result = Literal["pass", "fail"]
 
 
@@ -56,7 +57,7 @@ def score(pred: Mapping[str, Any], gold: Sequence[_tests.Test]) -> list[Verdict]
             if os.environ.get("OPB_RAISE_SCORER_ERRORS"):
                 raise
             log.error("scorer error on test %s (%s) of page %s: %r", t.id, t.test_type, t.page_id, e)
-            out.append(Verdict(t.id, "fail", f"scorer error: {type(e).__name__}: {e}"))
+            out.append(Verdict(t.id, "fail", f"{SCORER_ERROR}{type(e).__name__}: {e}"))
             continue
         out.append(Verdict(t.id, "pass" if passed else "fail", why))
     return out

@@ -636,3 +636,7 @@ def test_a_scorer_error_fails_one_test_and_not_the_run(monkeypatch, caplog):
     assert [(v.id, v.result) for v in out] == [("bad", "fail"), ("ok", "pass")]
     assert out[0].why.startswith("scorer error: ValueError: zip mismatch")
     assert any("test bad" in r.getMessage() for r in caplog.records)
+    from omni_parse_bench.scorers import unit_tests as scorer
+
+    page = scorer.UnitTests().score({"html": "<p>hello</p>"}, [bad, ok])
+    assert page.result["scorer_errors"] == 1
