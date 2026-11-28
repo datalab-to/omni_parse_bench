@@ -26,6 +26,7 @@ OSA (Damerau-Levenshtein without repeated edits of one stretch) over grapheme cl
 | rule (switch) | what it does |
 |---|---|
 | `word_edges` | a match starts and ends at token edges: `Total` is not found in `Totally`, nor `cat` in `concatenate` |
+| `cjk_latin_space` | from Cased on a space of the output between a Han, kana or Hangul character and a Latin letter or a digit is free, as the gold's spaces are (`5个 Inception 块` is `5个Inception块`); Text keeps it, so a verbatim claim can still hold the printed spacing; two Latin words keep the one-sided space |
 | `glue_edges` | with `word_edges`: a match may also start or end inside an output word at the seam of two glued words, a lower-case letter then an upper-case one (`ПостачальникТовариство`) or a letter and a digit; `Total` is found in `TotalDue`, `cat` still not in `concatenate` |
 | `space_one_sided` | from Cased on a space of the gold is free, a space of the output is not: `Total Due` matches `TotalDue`, `therapist` does not match `the rapist`. Off: spaces are free on both sides |
 | `osa` | a swap of two neighbouring characters is one edit; off, two |

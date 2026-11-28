@@ -79,6 +79,13 @@ _SWITCHES = (
         True,
     ),
     Switch(
+        "cjk_latin_space",
+        "A space between a Han, kana or Hangul character and a Latin letter or digit is free in the output "
+        "from Cased on (as the gold's spaces are), like the inner spaces of a Hangul phrase; Text keeps it.",
+        4,
+        True,
+    ),
+    Switch(
         "qty_spaced_suffix",
         "One space between a number and its unit or magnitude suffix does not change the quantity "
         "(`2100 万` and `2100万`, `20 mM` and `20mM` are one spelling).",

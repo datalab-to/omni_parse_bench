@@ -41,6 +41,7 @@ CHAIN_RULES = (
     "word_edges",
     "glue_edges",
     "space_one_sided",
+    "cjk_latin_space",
     "osa",
     "qty_atomic",
     "marks_free",
@@ -104,7 +105,9 @@ def cells(
             if gold:
                 free = cased  # a space of the gold is free from Cased on (one-sided, or squeezed)
             else:
-                joined = tokens[i].cls == SPACE and _script_free(tokens, i)
+                joined = tokens[i].cls == SPACE and (
+                    _script_free(tokens, i) or ("cjk_latin_space" in rules and _cjk_latin(tokens, i))
+                )
                 free = cased and (joined or "space_one_sided" not in rules)
             out.append(Cell(" ", "s", i, True, True, free, group))
         elif t.cls == BREAK:
@@ -132,6 +135,22 @@ def cells(
                     c = "".join(_lower(x) for x in c) if len(c) > 1 else _lower(c)
                 out.append(Cell(c, kind, i, first, last, False, group))
     return out
+
+
+def _cjk_latin(tokens: list[Token], i: int) -> bool:
+    """A space between a Han, kana or Hangul character and a Latin-script word or a number."""
+    j, k = i - 1, i + 1
+    if j < 0 or k >= len(tokens):
+        return False
+
+    def cjk(t: Token) -> bool:
+        return t.cls == WORD and t.script in ("character", "hangul")
+
+    def latin(t: Token) -> bool:
+        return (t.cls == WORD and t.script == "") or t.cls == QTY
+
+    a, b = tokens[j], tokens[k]
+    return (cjk(a) and latin(b)) or (latin(a) and cjk(b))
 
 
 def _glued(a: str, b: str) -> bool:

@@ -455,3 +455,24 @@ def test_a_cut_inside_a_word_that_is_not_a_seam_still_fails_with_glue_edges_on()
         assert not _found("cat", "<p>Concatenate</p>")
         assert not _found("amount paid in ful", "<p>amount paid in full</p>")
         assert not _found("ate", "<p>PostachalnikTovarystvate</p>")  # the seam is elsewhere
+
+
+# ------------------------------------------------- a space between CJK and Latin or digits (cjk_latin_space)
+
+
+def test_a_space_between_cjk_and_latin_or_a_digit_is_free_on_both_sides_from_cased_on():
+    with switches.using(cjk_latin_space=True):
+        for g, h in (
+            ("5个Inception块", "<p>5个 Inception 块</p>"),  # the output has the space the gold lacks
+            ("5个 Inception 块", "<p>5个Inception块</p>"),  # and the other way round
+            ("한국어abc", "<p>한국어 abc</p>"),
+        ):
+            assert ok(g, h, "Cased") and ok(g, h, "Words")
+        assert not ok("5个Inception块", "<p>5个 Inception 块</p>", "Text")  # Text keeps the printed spacing
+    with switches.using(cjk_latin_space=False):
+        assert not ok("5个Inception块", "<p>5个 Inception 块</p>", "Cased")
+
+
+def test_the_cjk_latin_space_does_not_free_a_space_between_two_latin_words():
+    with switches.using(cjk_latin_space=True):
+        assert not ok("abcd", "<p>ab cd</p>", "Cased") and not ok("therapist", "<p>the rapist</p>")
