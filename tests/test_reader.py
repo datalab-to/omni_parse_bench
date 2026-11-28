@@ -702,3 +702,16 @@ def test_the_dash_of_a_unit_exponent_is_a_symbol_when_the_rule_is_on():
         assert kinds("5 kg -1")[-1] == "Qty" and kinds("5 kg -1")[-2] == "Space"  # a digit before the unit
     with switches.using(unit_exponent_dash=False):
         assert kinds("kg -1") == ["Word", "Space", "Qty"]
+
+
+def test_a_suffix_after_the_end_of_a_sup_binds_to_the_quantity_inside_when_the_rule_is_on():
+    html = "<p>kon (M<sup>−1</sup>s<sup>−1</sup>)</p>"
+    with switches.using(qty_suffix_across_sup=True):
+        got = [(t.cls, t.text) for t in reader.read(html).tokens if t.cls != "Space"]
+        assert ("Qty", "1s") in got and ("Word", "s") not in got
+        assert [t.canon for t in reader.read(html).tokens if t.cls == "Qty"] == ["1s", "1"]
+        # a word that only starts like a suffix, and a mark, are not bound
+        other = reader.read("<p>a<sup>1</sup>second</p>").tokens
+        assert ("Word", "second") in [(t.cls, t.text) for t in other]
+    with switches.using(qty_suffix_across_sup=False):
+        assert ("Word", "s") in [(t.cls, t.text) for t in reader.read(html).tokens]

@@ -93,6 +93,13 @@ _SWITCHES = (
         False,
     ),
     Switch(
+        "qty_suffix_across_sup",
+        "A unit suffix right after the end of a `<sup>` binds to the quantity inside it: `M<sup>-1</sup>s` "
+        "reads the `1s` of `M-1s`.",
+        4,
+        False,
+    ),
+    Switch(
         "unit_exponent_dash",
         "A minus after a short unit word with no digit before it (`kg -1`, `kg{-1}`) is a symbol, as in "
         "`kg-1`, never the sign of a number.",

@@ -63,7 +63,9 @@ A quantity is read once, on the raw characters, before any fold:
 A unit with a space (`10 kg`) is a quantity and a word; a unit is protected only when glued to its number.
 CJK numerals (`三万`) are words.
 
-## Spaced suffixes and unit exponents (switches `qty_spaced_suffix`, `unit_exponent_dash`)
+## Spaced suffixes and unit exponents (switches `qty_spaced_suffix`, `unit_exponent_dash`, `qty_suffix_across_sup`)
+
+- `qty_suffix_across_sup`: a suffix right after the end of a `<sup>` binds to the quantity inside it, so `M<sup>−1</sup>s<sup>−1</sup>` reads the `1s` that the plain `M−1s−1` does.
 
 - `qty_spaced_suffix`: one ordinary space between a number and a listed unit or magnitude suffix is part of the quantity, and its spelling drops it: `2100 万`, `2100万`, `20 kg` and `20kg` are one spelling. Two spaces, a word that merely starts like a suffix (`20 kgs`) and a single ASCII letter after a space (`763791104 b Account`, `5 s`) are not.
 - `unit_exponent_dash`: a minus after a unit word of the suffix list, with no digit before the word, perhaps with one space or a `{` (`^{`) between (`kg -1`, `kg{-1}`, `kg^{-1}`), is a `Sym` as in `kg-1`, never the sign of a number. `in` is left out (`in -5` is a word and a number).

@@ -72,6 +72,7 @@ RULES = (
     "math_spans",
     "qty_spaced_suffix",
     "unit_exponent_dash",
+    "qty_suffix_across_sup",
 )
 
 
@@ -389,15 +390,16 @@ def _qty_end(
     spaced_ok: bool = False,
     dot: bool = False,
     spaced_suffix: bool = False,
+    across_sup: bool = False,
 ) -> tuple[int | None, int]:
     """Where the quantity starting at `i` ends (see `_qty_one`), extended over a fraction chain `a/b/c`
     (iteratively: a long run of slashes must not recurse)."""
-    j, core = _qty_one(u, i, sign_ok, sup_exponent, spaced_ok, dot, spaced_suffix)
+    j, core = _qty_one(u, i, sign_ok, sup_exponent, spaced_ok, dot, spaced_suffix, across_sup)
     if j is None:
         return None, core
     n = len(u)
     while j < n and u[j] == "/":
-        r, _ = _qty_one(u, j + 1, False, sup_exponent, False, dot, spaced_suffix)
+        r, _ = _qty_one(u, j + 1, False, sup_exponent, False, dot, spaced_suffix, across_sup)
         if r is None:
             break
         j = r
@@ -412,6 +414,7 @@ def _qty_one(
     spaced_ok: bool = False,
     dot: bool = False,
     spaced_suffix: bool = False,
+    across_sup: bool = False,
 ) -> tuple[int | None, int]:
     """Where the quantity starting at `i` ends, or (None, core_end): no quantity, with the end of the number
     when letters glued to it are what rule it out (the run is then one Word). `sign_ok` says a sign may start
@@ -471,10 +474,12 @@ def _qty_one(
     elif j < n and (
         u[j] in _SUFFIX_FIRST
         or (spaced_suffix and u[j] == " " and j + 1 < n and u[j + 1] in _SUFFIX_FIRST)
+        or (across_sup and u[j] == SUP_CLOSE and j + 1 < n and u[j + 1] in _SUFFIX_FIRST)
     ):
-        at = j + 1 if u[j] == " " else j  # one ordinary space may stand between the number and its suffix
+        # one ordinary space, or the end of a <sup>, may stand between the number and its suffix
+        at = j + 1 if u[j] in (" ", SUP_CLOSE) else j
         for s in _SUFFIX_BY_LENGTH:
-            if at > j and len(s) == 1 and s.isascii():
+            if u[j] == " " and len(s) == 1 and s.isascii():
                 continue  # after a space a single letter is a word of its own (`763791104 b Account`)
             if u.startswith(s, at) and not (at + len(s) < n and _glues(u[at + len(s)])):
                 j = at + len(s)
@@ -498,6 +503,7 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
     sup_exp = "sup_exponent" in rules
     dot = "leading_dot" in rules
     spaced_suffix = "qty_spaced_suffix" in rules
+    across_sup = "qty_suffix_across_sup" in rules
     unit_dash = "unit_exponent_dash" in rules
     starts = [m.start() for m in _CLUSTER.finditer(u)]
     boundary = set(starts) | {n}
@@ -601,10 +607,10 @@ def _tokenize_line(u: str, mk: list[frozenset[str]], emit, *, output: bool, rule
             or (dot and c == "." and i + 1 < n and _is_digit(u[i + 1]))
         )
         if starts_number and (c in _SIGNS or not prev_glues(i)):
-            end, core = _qty_end(u, i, sign_ok, sup_exp, spaced_ok, dot, spaced_suffix)
+            end, core = _qty_end(u, i, sign_ok, sup_exp, spaced_ok, dot, spaced_suffix, across_sup)
             if end is not None and (end in boundary or end == n or u[end] in (SUP_OPEN, SUP_CLOSE)):
                 raw = u[i:end]
-                if end > core and u[core] == " ":  # the space before a suffix is not part of the spelling
+                if end > core and u[core] in (" ", SUP_CLOSE):  # not part of the spelling
                     raw = u[i:core] + u[core + 1 : end]
                 put(QTY, i, end, canon=qty_canon(raw))
                 i = end
